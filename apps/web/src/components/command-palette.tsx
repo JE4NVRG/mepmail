@@ -1,24 +1,23 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
-import { MAIL_NAV_ITEM, ORGANIZATION_NAV_ITEMS, SEND_NAV_ITEMS } from "@/components/sidebar";
-import { useTRPC } from "@/lib/trpc";
-
-interface PaletteItem {
-  id: string;
-  label: string;
-  href: string;
-}
+import { useEffect, useState } from "react";
+import { QueryRecoveryNotice } from "@/components/query-recovery";
+import {
+  MAIL_NAV_ITEM,
+  type PaletteItem,
+  paletteMove,
+  paletteSelection,
+  productPaletteGroups,
+  useProductNavigation,
+} from "@/lib/product-navigation";
 
 export function CommandPalette() {
   const tNav = useTranslations("nav");
   const t = useTranslations("common.commandPalette");
   const router = useRouter();
-  const trpc = useTRPC();
-  const mailboxCapability = useQuery(trpc.mailboxes.capabilities.queryOptions());
+  const navigation = useProductNavigation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
@@ -39,68 +38,31 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const groups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const matches = (items: PaletteItem[]) =>
-      q ? items.filter((item) => item.label.toLowerCase().includes(q)) : items;
-    return [
-      {
-        id: "send",
-        label: tNav("products.send"),
-        items: matches(
-          SEND_NAV_ITEMS.map((item) => ({ id: item.key, label: tNav(item.key), href: item.href })),
-        ),
-      },
-      {
-        id: "mail",
-        label: tNav("products.mail"),
-        items: mailboxCapability.data?.enabled
-          ? matches([
-              { id: MAIL_NAV_ITEM.key, label: tNav(MAIL_NAV_ITEM.key), href: MAIL_NAV_ITEM.href },
-            ])
-          : [],
-      },
-      {
-        id: "organization",
-        label: tNav("products.organization"),
-        items: matches(
-          ORGANIZATION_NAV_ITEMS.map((item) => ({
-            id: item.key,
-            label: tNav(item.key),
-            href: item.href,
-          })),
-        ),
-      },
-      {
-        id: "actions",
-        label: t("actions"),
-        items: matches([
-          { id: "createApiKey", label: t("createApiKey"), href: "/api-keys" },
-          { id: "addDomain", label: t("addDomain"), href: "/domains/new" },
-        ]),
-      },
-    ];
-  }, [query, t, tNav, mailboxCapability.data?.enabled]);
+  const groups = productPaletteGroups(navigation, tNav, t, query);
   const flat = groups.flatMap((group) => group.items);
+  const selectedIndex = paletteSelection(index, flat.length);
 
   if (!open) return null;
 
   function go(item: PaletteItem | undefined) {
-    if (!item) return;
+    // A late policy update must never activate an item removed from the current list.
+    if (!item || !flat.some((allowed) => allowed.id === item.id && allowed.href === item.href))
+      return;
     setOpen(false);
-    router.push(item.href);
+    if (item.href === MAIL_NAV_ITEM.href) window.open(item.href, "_blank", "noopener");
+    else router.push(item.href);
   }
 
   function onInputKeyDown(event: React.KeyboardEvent) {
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setIndex((i) => (flat.length ? (i + 1) % flat.length : 0));
+      setIndex((i) => paletteMove(i, flat.length, 1));
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setIndex((i) => (flat.length ? (i - 1 + flat.length) % flat.length : 0));
+      setIndex((i) => paletteMove(i, flat.length, -1));
     } else if (event.key === "Enter") {
       event.preventDefault();
-      go(flat[index]);
+      go(flat[selectedIndex]);
     }
   }
 
@@ -168,7 +130,15 @@ export function CommandPalette() {
           <span className="ms-keycap">Esc</span>
         </div>
         <div className="ms-cmdk-list" style={{ padding: 10, maxHeight: 420, overflowY: "auto" }}>
-          {flat.length === 0 ? (
+          {navigation.recoveryPhase ? (
+            <QueryRecoveryNotice
+              phase={navigation.recoveryPhase}
+              message={tNav(`recovery.${navigation.recoveryPhase}`)}
+              retryLabel={tNav("recovery.retry")}
+              retry={navigation.retry}
+            />
+          ) : null}
+          {flat.length === 0 && !navigation.recoveryPhase ? (
             <div style={{ padding: "9px 12px", fontSize: 14, color: "var(--ms-muted)" }}>
               {t("noResults")}
             </div>
@@ -183,7 +153,7 @@ export function CommandPalette() {
                     {group.label}
                   </div>
                   {group.items.map((item) => {
-                    const selected = flat.indexOf(item) === index;
+                    const selected = flat.indexOf(item) === selectedIndex;
                     return (
                       <button
                         type="button"

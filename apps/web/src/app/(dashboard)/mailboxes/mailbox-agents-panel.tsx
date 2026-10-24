@@ -8,6 +8,7 @@ import { toast } from "@/components/toast";
 import { useTRPC } from "@/lib/trpc";
 import { ACTIVITY_ACTION_KEYS } from "./mailbox-activity";
 import own from "./mailbox-agents-panel.module.css";
+import { MailboxCredentialPermissions } from "./mailbox-credential-permissions";
 import { MailboxBlockedRecipients } from "./mailbox-recipient-unblock";
 import styles from "./mailboxes.module.css";
 
@@ -26,6 +27,7 @@ export function MailboxAgentsPanel({
   onConnect?: () => void;
 }) {
   const t = useTranslations("mailboxes-agent.panel");
+  const tAgent = useTranslations("mailboxes-agent");
   const tActivity = useTranslations("mailboxes-activity");
   const locale = useLocale();
   const router = useRouter();
@@ -41,6 +43,8 @@ export function MailboxAgentsPanel({
     trpc.mailboxes.revokeTeamAgentKey.mutationOptions({ gcTime: 0 }),
   );
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [editingCredential, setEditingCredential] = useState<string | null>(null);
+  const [permissionsBusy, setPermissionsBusy] = useState(false);
   // Why the last approval of a card did not go out, shown on that card.
   const [sendError, setSendError] = useState<{
     itemId: string;
@@ -51,7 +55,11 @@ export function MailboxAgentsPanel({
     lifted: string[];
   } | null>(null);
   const busy =
-    send.isPending || discard.isPending || revokeKey.isPending || revokeCredential.isPending;
+    permissionsBusy ||
+    send.isPending ||
+    discard.isPending ||
+    revokeKey.isPending ||
+    revokeCredential.isPending;
   const when = (value: Date | string) =>
     new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(
       new Date(value),
@@ -336,7 +344,7 @@ export function MailboxAgentsPanel({
                       {agent.lastSentAt
                         ? ` · ${t("agents.sent", { date: when(agent.lastSentAt) })}`
                         : ""}
-                      {` · ${t(agent.scopes.includes("send") ? "agents.sendsAlone" : "agents.asksYou")}`}
+                      {` · ${tAgent("perMailbox.summary")}`}
                     </small>
                   </div>
                   {confirming === key ? (
@@ -374,15 +382,39 @@ export function MailboxAgentsPanel({
                       </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      className="ms-btn ms-btn-ghost ms-btn-sm"
-                      disabled={busy}
-                      onClick={() => setConfirming(key)}
-                    >
-                      {t("agents.revoke")}
-                    </button>
+                    <div className={own.actions}>
+                      {agent.kind !== "mailbox" ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-sm"
+                          disabled={busy}
+                          aria-label={tAgent("perMailbox.editLabel", { label: agent.label })}
+                          aria-expanded={editingCredential === agent.credentialId}
+                          onClick={() => {
+                            setConfirming(null);
+                            setEditingCredential(agent.credentialId);
+                          }}
+                        >
+                          {tAgent("perMailbox.action")}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="ms-btn ms-btn-ghost ms-btn-sm"
+                        disabled={busy}
+                        onClick={() => setConfirming(key)}
+                      >
+                        {t("agents.revoke")}
+                      </button>
+                    </div>
                   )}
+                  {editingCredential === agent.credentialId ? (
+                    <MailboxCredentialPermissions
+                      credentialId={agent.credentialId}
+                      onBusyChange={setPermissionsBusy}
+                      onClose={() => setEditingCredential(null)}
+                    />
+                  ) : null}
                 </li>
               );
             })}

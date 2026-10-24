@@ -9,6 +9,12 @@ import { migrate } from "drizzle-orm/pglite/migrator";
 import { simpleParser } from "mailparser";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EnvKeyring } from "../../../packages/core/src/crypto/keyring.js";
+import {
+  grantMailboxOAuthClient,
+  listMailboxAgentAccounts,
+  parseMailboxSelector,
+  withMailboxAgentAccess,
+} from "../../../packages/core/src/mailbox-agent-access.js";
 import { saveMailboxDraft } from "../../../packages/core/src/mailbox-private-store.js";
 import { createMailboxRegistry } from "../../../packages/core/src/mailbox-registry.js";
 import {
@@ -32,6 +38,7 @@ vi.mock("@/server/trpc", async (original) => ({
 }));
 
 const { mailboxesRouter } = await import("@/server/routers/mailboxes");
+const { getMailboxAgentsOverview } = await import("@/server/mailbox-agents-overview");
 const { createCallerFactory, router } = await import("@/server/trpc");
 const { GET: accountsGet } = await import("@/app/api/mailbox-agent/mailboxes/route");
 const { GET: itemsGet } = await import("@/app/api/mailbox-agent/items/route");
@@ -423,5 +430,424 @@ describe("editing a team agent credential in place", () => {
         errorCode: "agent_authorization_refused",
       });
     expect(provider).not.toHaveBeenCalled();
+  });
+});
+
+describe("mailbox-scoped edits of an existing grouped credential", () => {
+  const rows = (id: string) =>
+    db
+      .select()
+      .from(schema.mailboxAgentKeys)
+      .where(eq(schema.mailboxAgentKeys.groupId, id))
+      .orderBy(schema.mailboxAgentKeys.mailboxId);
+  const via = (
+    credential: Parameters<typeof withMailboxAgentAccess>[1],
+    mailboxId: string,
+    scope: "read" | "draft" | "send",
+  ) =>
+    withMailboxAgentAccess(
+      db,
+      credential,
+      scope,
+      async (context) => ({ mailboxId: context.mailboxId, keyId: context.keyId }),
+      parseMailboxSelector(mailboxId),
+    );
+
+  it.each(["team", "oauth"] as const)(
+    "adds send only on A, rereads the same %s credential, and audits no secret",
+    async (kind) => {
+      const expiresAt = new Date(Date.now() + 7 * 86400000);
+      const minted =
+        kind === "team"
+          ? await as().createTeamAgentKey({
+              label: "Same credential",
+              mailboxIds: [boxA, boxB, boxC],
+              scopes: ["read", "draft"],
+              defaultMailboxId: boxB,
+              expiresAt,
+            })
+          : await grantMailboxOAuthClient(
+              db,
+              { teamId, userId: "owner" },
+              {
+                clientId: "cursor-synthetic",
+                clientName: "Cursor",
+                mailboxIds: [boxA, boxB, boxC],
+              },
+            );
+      // OAuth reaches core only after independent verification. This test does not
+      // change the intentional mail:draft/MCP approval contract or mint an OAuth token.
+      const credential =
+        "token" in minted
+          ? minted.token
+          : {
+              oauth: { teamId, userId: "owner", clientId: "cursor-synthetic" },
+            };
+      if (kind === "oauth") {
+        await db.insert(schema.oauthClient).values({
+          id: "cursor-client",
+          clientId: "cursor-synthetic",
+          name: "Cursor",
+          redirectUris: ["http://localhost/synthetic-callback"],
+        });
+        await db.insert(schema.oauthRefreshToken).values({
+          id: "refresh-fixture",
+          token: "synthetic-refresh-hash",
+          clientId: "cursor-synthetic",
+          userId: "owner",
+          referenceId: teamId,
+          scopes: ["mail:read", "mail:draft"],
+        });
+        await db.insert(schema.oauthAccessToken).values({
+          id: "access-fixture",
+          token: "synthetic-access-hash",
+          clientId: "cursor-synthetic",
+          userId: "owner",
+          referenceId: teamId,
+          refreshId: "refresh-fixture",
+          scopes: ["mail:read", "mail:draft"],
+        });
+      }
+      const tokenRows = async () => ({
+        access: await db.select().from(schema.oauthAccessToken),
+        refresh: await db.select().from(schema.oauthRefreshToken),
+      });
+      const tokensBefore = await tokenRows();
+      const beforeRows = await rows(minted.id);
+      const before = await current(minted.id);
+      const edited = await as().updateTeamAgentKey({
+        id: minted.id,
+        expectedVersion: before.version,
+        mailboxScopes: [{ mailboxId: boxA, scopes: ["read", "draft", "send"] }],
+      });
+      const afterRows = await rows(minted.id);
+      expect(afterRows).toHaveLength(3);
+      for (const row of beforeRows) {
+        expect(afterRows.find((after) => after.id === row.id)).toEqual(
+          row.mailboxId === boxA ? { ...row, scopes: ["read", "draft", "send"] } : row,
+        );
+      }
+      expect(await tokenRows()).toEqual(tokensBefore);
+      expect(edited).toMatchObject({
+        id: minted.id,
+        scopes: ["read", "draft"],
+        change: {
+          scopes: null,
+          mailboxScopes: [
+            {
+              mailboxId: boxA,
+              before: ["read", "draft"],
+              after: ["read", "draft", "send"],
+            },
+          ],
+        },
+      });
+      expect(edited.version).not.toBe(before.version);
+      const reread = await current(minted.id);
+      expect(reread.version).toBe(edited.version);
+      expect(reread.scopes).toEqual(["read", "draft"]);
+      for (const box of [boxA, boxB, boxC]) {
+        const expected = box === boxA ? ["read", "draft", "send"] : ["read", "draft"];
+        expect(reread.mailboxes.find((row) => row.mailboxId === box)?.scopes).toEqual(expected);
+        const accounts = await listMailboxAgentAccounts(db, credential);
+        expect(accounts.mailboxes.find((row) => row.id === box)?.scopes).toEqual(expected);
+      }
+      expect(await via(credential, boxA, "send")).toMatchObject({ mailboxId: boxA });
+      for (const box of [boxB, boxC])
+        await expect(via(credential, box, "send")).rejects.toMatchObject({ code: "forbidden" });
+      const overview = await getMailboxAgentsOverview(db, { teamId, userId: "owner" });
+      const overviewKey = overview.credentials.find((key) => key.credentialId === minted.id)!;
+      expect(overviewKey.scopes).toEqual(["read", "draft"]);
+      expect(overviewKey.mailboxes.find((box) => box.mailboxId === boxA)?.scopes).toEqual([
+        "read",
+        "draft",
+        "send",
+      ]);
+      const audit = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "mailbox.team_agent_key_updated"));
+      expect(audit).toHaveLength(1);
+      expect(audit[0]!.data).toMatchObject({ mailboxScopes: edited.change.mailboxScopes });
+      expect(JSON.stringify(audit)).not.toContain(beforeRows[0]!.keyHash);
+      if (typeof credential === "string") {
+        expect(JSON.stringify(audit)).not.toContain(credential);
+        expect((await accounts(credential)).status).toBe(200);
+      }
+      expect(await tokenRows()).toEqual(tokensBefore);
+    },
+  );
+
+  it("preserves mixed scopes on label-only, expiry-only and default-only edits; global is explicit", async () => {
+    const minted = await as().createTeamAgentKey({
+      label: "Mixed",
+      mailboxIds: [boxA, boxB, boxC],
+    });
+    await as().updateTeamAgentKey({
+      id: minted.id,
+      expectedVersion: (await current(minted.id)).version,
+      mailboxScopes: [{ mailboxId: boxA, scopes: ["read", "draft", "send"] }],
+    });
+    const mixed = new Map((await rows(minted.id)).map((row) => [row.mailboxId, row.scopes]));
+    for (const edit of [
+      { label: "New label" },
+      { expiresAt: new Date(Date.now() + 7 * 86400000) },
+      { defaultMailboxId: boxC },
+    ]) {
+      await as().updateTeamAgentKey({
+        id: minted.id,
+        expectedVersion: (await current(minted.id)).version,
+        ...edit,
+      });
+      for (const row of await rows(minted.id)) expect(row.scopes).toEqual(mixed.get(row.mailboxId));
+    }
+    const global = await as().updateTeamAgentKey({
+      id: minted.id,
+      expectedVersion: (await current(minted.id)).version,
+      scopes: ["read", "draft", "send"],
+    });
+    expect(global.scopes).toEqual(["read", "draft", "send"]);
+    for (const row of await rows(minted.id)) expect(row.scopes).toEqual(["read", "draft", "send"]);
+    expect(global.change.mailboxScopes.map((row) => row.mailboxId).sort()).toEqual(
+      [boxB, boxC].sort(),
+    );
+  });
+
+  it("supports an empty intersection without fabricating common privileges on metadata edits", async () => {
+    const minted = await as().createTeamAgentKey({
+      label: "No common scope",
+      mailboxIds: [boxA, boxB],
+    });
+    await as().updateTeamAgentKey({
+      id: minted.id,
+      expectedVersion: (await current(minted.id)).version,
+      mailboxScopes: [
+        { mailboxId: boxA, scopes: ["read"] },
+        { mailboxId: boxB, scopes: ["draft"] },
+      ],
+    });
+    expect((await current(minted.id)).scopes).toEqual([]);
+    const edited = await as().updateTeamAgentKey({
+      id: minted.id,
+      expectedVersion: (await current(minted.id)).version,
+      label: "Still mixed",
+    });
+    expect(edited.scopes).toEqual([]);
+    expect(edited.change.mailboxScopes).toEqual([]);
+    expect((await current(minted.id)).mailboxes.map((row) => row.scopes)).toEqual([
+      ["read"],
+      ["draft"],
+    ]);
+  });
+
+  it("rejects duplicates, global plus per-box, foreign, ungranted, removed and revoked targets atomically", async () => {
+    const minted = await as().createTeamAgentKey({ label: "Scoped", mailboxIds: [boxA, boxB] });
+    const v = (await current(minted.id)).version;
+    const send = {
+      mailboxId: boxA,
+      scopes: ["read", "draft", "send"] as ("read" | "draft" | "send")[],
+    };
+    const before = await rows(minted.id);
+    for (const input of [
+      { mailboxScopes: [send, send] },
+      { scopes: ["read"] as "read"[], mailboxScopes: [send] },
+      { mailboxScopes: [{ mailboxId: boxA, scopes: ["read", "read"] as "read"[] }] },
+    ])
+      await expect(
+        as().updateTeamAgentKey({ id: minted.id, expectedVersion: v, ...input }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    for (const outside of [boxC, colleagueBox, foreignBox])
+      await expect(
+        as().updateTeamAgentKey({
+          id: minted.id,
+          expectedVersion: v,
+          mailboxScopes: [send, { ...send, mailboxId: outside }],
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      as().updateTeamAgentKey({
+        id: minted.id,
+        expectedVersion: v,
+        mailboxIds: [boxB],
+        mailboxScopes: [send],
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(await rows(minted.id)).toEqual(before);
+    const removed = await as().updateTeamAgentKey({
+      id: minted.id,
+      expectedVersion: v,
+      mailboxIds: [boxB],
+    });
+    await expect(
+      as().updateTeamAgentKey({
+        id: minted.id,
+        expectedVersion: removed.version,
+        mailboxIds: [boxA, boxB],
+        mailboxScopes: [send],
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect((await current(minted.id)).version).toBe(removed.version);
+  });
+
+  it("checks active ownership and the original membership for named rows", async () => {
+    const minted = await as().createTeamAgentKey({ label: "Scoped", mailboxIds: [boxA, boxB] });
+    const v = (await current(minted.id)).version;
+    const edit = () =>
+      as().updateTeamAgentKey({
+        id: minted.id,
+        expectedVersion: v,
+        mailboxScopes: [{ mailboxId: boxA, scopes: ["read", "draft", "send"] }],
+      });
+    await db
+      .update(schema.mailboxes)
+      .set({ ownerUserId: "member" })
+      .where(eq(schema.mailboxes.id, boxA));
+    await expect(edit()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await db
+      .update(schema.mailboxes)
+      .set({ ownerUserId: "owner", status: "suspended" })
+      .where(eq(schema.mailboxes.id, boxA));
+    await expect(edit()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await db
+      .update(schema.mailboxes)
+      .set({ status: "planned" })
+      .where(eq(schema.mailboxes.id, boxA));
+    await db
+      .update(schema.mailboxAgentKeys)
+      .set({ ownerMembershipId: null })
+      .where(
+        and(
+          eq(schema.mailboxAgentKeys.groupId, minted.id),
+          eq(schema.mailboxAgentKeys.mailboxId, boxA),
+        ),
+      );
+    await expect(edit()).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("rejects an expired target while preserving the remaining live rows", async () => {
+    const minted = await as().createTeamAgentKey({
+      label: "Partial expiry",
+      mailboxIds: [boxA, boxB],
+    });
+    await db
+      .update(schema.mailboxAgentKeys)
+      .set({
+        createdAt: new Date(Date.now() - 2 * 86400000),
+        expiresAt: new Date(Date.now() - 86400000),
+      })
+      .where(
+        and(
+          eq(schema.mailboxAgentKeys.groupId, minted.id),
+          eq(schema.mailboxAgentKeys.mailboxId, boxA),
+        ),
+      );
+    const before = await rows(minted.id);
+    const v = (await current(minted.id)).version;
+    await expect(
+      as().updateTeamAgentKey({
+        id: minted.id,
+        expectedVersion: v,
+        mailboxScopes: [{ mailboxId: boxA, scopes: ["read", "draft", "send"] }],
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(await rows(minted.id)).toEqual(before);
+    expect(await list(minted.token, "b@edit.invalid")).toBe(200);
+    expect(await list(minted.token, "a@edit.invalid")).toBe(403);
+  });
+
+  it("rejects a stale A edit when B changed, and includes revoked rows in the group fence", async () => {
+    const minted = await as().createTeamAgentKey({
+      label: "Fence",
+      mailboxIds: [boxA, boxB, boxC],
+    });
+    const v = (await current(minted.id)).version;
+    const edited = await as().updateTeamAgentKey({
+      id: minted.id,
+      expectedVersion: v,
+      mailboxScopes: [{ mailboxId: boxB, scopes: ["read", "draft", "send"] }],
+    });
+    await expect(
+      as().updateTeamAgentKey({
+        id: minted.id,
+        expectedVersion: v,
+        mailboxScopes: [{ mailboxId: boxA, scopes: ["read", "draft", "send"] }],
+      }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    const removed = await as().updateTeamAgentKey({
+      id: minted.id,
+      expectedVersion: edited.version,
+      mailboxIds: [boxA, boxB],
+    });
+    await db
+      .update(schema.mailboxAgentKeys)
+      .set({ label: "Historical row changed" })
+      .where(
+        and(
+          eq(schema.mailboxAgentKeys.groupId, minted.id),
+          eq(schema.mailboxAgentKeys.mailboxId, boxC),
+        ),
+      );
+    await expect(
+      as().updateTeamAgentKey({
+        id: minted.id,
+        expectedVersion: removed.version,
+        mailboxScopes: [{ mailboxId: boxA, scopes: ["read", "draft", "send"] }],
+      }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    expect((await rows(minted.id)).find((row) => row.mailboxId === boxA)?.scopes).toEqual([
+      "read",
+      "draft",
+    ]);
+  });
+
+  it("revokes send only on A at queue-drain time, while the same credential still sends B", async () => {
+    const minted = await as().createTeamAgentKey({
+      label: "Runtime",
+      mailboxIds: [boxA, boxB],
+      scopes: ["read", "draft", "send"],
+    });
+    const keys = h.keys as EnvKeyring;
+    const queue = async (mailboxId: string, address: string) => {
+      const draft = await saveMailboxDraft(
+        db,
+        keys,
+        { teamId, userId: "owner" },
+        {
+          mailboxId,
+          expectedRevision: 0,
+          raw: Buffer.from(
+            `From: ${address}\r\nTo: someone@example.invalid\r\nSubject: scoped\r\n\r\nbody`,
+          ),
+        },
+      );
+      return queueMailboxAgentDraft(
+        db,
+        keys,
+        minted.token,
+        { id: draft.id, expectedRevision: 1 },
+        mime,
+        undefined,
+        { address },
+      );
+    };
+    const a = await queue(boxA, "a@edit.invalid");
+    const b = await queue(boxB, "b@edit.invalid");
+    await as().updateTeamAgentKey({
+      id: minted.id,
+      expectedVersion: (await current(minted.id)).version,
+      mailboxScopes: [{ mailboxId: boxA, scopes: ["read", "draft"] }],
+    });
+    const provider = vi.fn(async () => ({ messageId: "synthetic-B-only" }));
+    expect(await sendMailboxOutbox(db, keys, a.id, { send: provider }, mime)).toMatchObject({
+      status: "failed",
+      errorCode: "agent_authorization_refused",
+    });
+    expect(provider).not.toHaveBeenCalled();
+    await expect(via(minted.token, boxA, "send")).rejects.toMatchObject({ code: "forbidden" });
+    expect(await via(minted.token, boxB, "send")).toMatchObject({ mailboxId: boxB });
+    expect(await sendMailboxOutbox(db, keys, b.id, { send: provider }, mime)).toMatchObject({
+      status: "accepted",
+    });
+    expect(provider).toHaveBeenCalledTimes(1);
   });
 });

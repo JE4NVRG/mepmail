@@ -52,6 +52,10 @@
       "types": "./src/mail-preferences.ts",
       "default": "./src/mail-preferences.ts"
     },
+    "./oauth-scopes": {
+      "types": "./src/oauth-scopes.ts",
+      "default": "./src/oauth-scopes.ts"
+    },
     "./mcp-tools": {
       "types": "./src/mcp-tools.ts",
       "default": "./src/mcp-tools.ts"

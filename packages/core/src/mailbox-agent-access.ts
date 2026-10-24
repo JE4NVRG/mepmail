@@ -38,6 +38,12 @@ export class MailboxAgentAccessError extends Error {
 }
 type AgentKey = typeof schema.mailboxAgentKeys.$inferSelect;
 const SCOPES: readonly MailboxAgentScope[] = ["read", "draft", "send"];
+/** A group's scopes promise only permissions held by every live mailbox row. */
+function commonScopes(rows: readonly { scopes: readonly string[] }[]): MailboxAgentScope[] {
+  return rows.length
+    ? SCOPES.filter((scope) => rows.every((row) => row.scopes.includes(scope)))
+    : [];
+}
 const MAX_ACTIVE_KEYS_PER_MAILBOX = 25;
 const MAX_TEAM_MAILBOXES = 20;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -655,10 +661,17 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
         oauthClientId: string | null;
         /** Edits name it (expectedVersion), so two editors never overwrite each other. */
         version: string;
-        mailboxes: { mailboxId: string; address: string; isDefault: boolean; revoked: boolean }[];
+        mailboxes: {
+          mailboxId: string;
+          address: string;
+          scopes: MailboxAgentScope[];
+          isDefault: boolean;
+          revoked: boolean;
+        }[];
       }
     >();
     const live = new Map<string, TeamKeyVersionRow[]>();
+    const now = new Date();
     for (const row of rows) {
       const id = row.groupId as string;
       const group = groups.get(id) ?? {
@@ -674,7 +687,7 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
         version: "",
         mailboxes: [],
       };
-      if (!row.revokedAt) {
+      if (!row.revokedAt && (!row.expiresAt || row.expiresAt > now)) {
         // Name, scopes and expiry come from a live row: an edit leaves removed
         // mailboxes' rows with the values they had.
         if (!live.has(id)) {
@@ -691,12 +704,18 @@ export async function listMailboxTeamAgentKeys(db: Db, actor: MailboxAgentOwnerA
       group.mailboxes.push({
         mailboxId: row.mailboxId,
         address: row.address,
+        scopes: [...row.scopes] as MailboxAgentScope[],
         isDefault: row.isDefault,
         revoked: row.revokedAt !== null,
       });
       groups.set(id, group);
     }
-    for (const group of groups.values()) group.version = teamKeyVersion(live.get(group.id) ?? []);
+    for (const group of groups.values()) {
+      const liveRows = live.get(group.id) ?? [];
+      group.scopes = commonScopes(liveRows);
+      // The fence covers the entire credential, not just the rows being edited.
+      group.version = teamKeyVersion(rows.filter((row) => row.groupId === group.id));
+    }
     return [...groups.values()];
   });
 }
@@ -707,15 +726,16 @@ interface TeamKeyVersionRow {
   scopes: readonly string[];
   isDefault: boolean;
   expiresAt: Date | null;
+  revokedAt: Date | null;
 }
 
-/** The live state of a team credential, as a short digest: mailboxes, scopes, name, default, expiry. */
+/** All rows of a team credential, including revoked/expired rows (never just the selection). */
 function teamKeyVersion(rows: readonly TeamKeyVersionRow[]): string {
   const state = [...rows]
     .sort((a, b) => (a.mailboxId < b.mailboxId ? -1 : a.mailboxId > b.mailboxId ? 1 : 0))
     .map(
       (row) =>
-        `${row.mailboxId}|${[...row.scopes].sort().join(",")}|${row.label}|${row.isDefault}|${row.expiresAt?.toISOString() ?? ""}`,
+        `${row.mailboxId}|${[...row.scopes].sort().join(",")}|${row.label}|${row.isDefault}|${row.expiresAt?.toISOString() ?? ""}|${row.revokedAt?.toISOString() ?? ""}`,
     )
     .join(";");
   return createHash("sha256").update(state).digest("hex").slice(0, 16);
@@ -726,6 +746,11 @@ export interface MailboxTeamAgentKeyChange {
   added: string[];
   removed: string[];
   scopes: { before: MailboxAgentScope[]; after: MailboxAgentScope[] } | null;
+  mailboxScopes: {
+    mailboxId: string;
+    before: MailboxAgentScope[];
+    after: MailboxAgentScope[];
+  }[];
   label: boolean;
   defaultMailboxId: { before: string | null; after: string | null } | null;
   expiresAt: { before: string | null; after: string | null } | null;
@@ -737,7 +762,10 @@ export interface MailboxTeamAgentKeyChange {
  * Only the person who minted it, under their current membership: an added mailbox
  * must be theirs and active, and gets a row with the same secret; a removed one is
  * revoked at once (a send it queued then fails authorization before the provider is
- * called, as for any revocation). Scopes and expiry apply to every live row alike,
+ * called, as for any revocation). Explicit global scopes apply to every live row;
+ * mailboxScopes edits only named live rows, and omitted scopes are preserved.
+ * New mailboxes inherit the common scopes unless global scopes are supplied.
+ * Expiry, when explicitly supplied, applies to every live row,
  * and queued agent sends are re-checked against them at send time. The default is
  * cleared when its mailbox is removed. `expectedVersion` (from the list) must match
  * the live state, so concurrent edits never overwrite each other.
@@ -751,6 +779,7 @@ export async function updateMailboxTeamAgentKey(
     label?: string | undefined;
     mailboxIds?: string[] | undefined;
     scopes?: MailboxAgentScope[] | undefined;
+    mailboxScopes?: { mailboxId: string; scopes: MailboxAgentScope[] }[] | undefined;
     defaultMailboxId?: string | null | undefined;
     expiresAt?: Date | null | undefined;
   },
@@ -780,6 +809,37 @@ export async function updateMailboxTeamAgentKey(
     (typeof input.defaultMailboxId !== "string" || !UUID.test(input.defaultMailboxId))
   )
     throw new MailboxAgentAccessError("invalid");
+  if (
+    (input.scopes !== undefined && input.mailboxScopes !== undefined) ||
+    (input.scopes !== undefined && !Array.isArray(input.scopes)) ||
+    (input.mailboxScopes !== undefined &&
+      (!Array.isArray(input.mailboxScopes) ||
+        !input.mailboxScopes.length ||
+        input.mailboxScopes.length > MAX_TEAM_MAILBOXES ||
+        input.mailboxScopes.some(
+          (entry) =>
+            !entry ||
+            typeof entry.mailboxId !== "string" ||
+            !UUID.test(entry.mailboxId) ||
+            !Array.isArray(entry.scopes) ||
+            !entry.scopes.length ||
+            entry.scopes.length > SCOPES.length ||
+            entry.scopes.some((scope) => !SCOPES.includes(scope)) ||
+            new Set(entry.scopes).size !== entry.scopes.length,
+        ) ||
+        new Set(input.mailboxScopes.map((entry) => entry.mailboxId)).size !==
+          input.mailboxScopes.length))
+  )
+    throw new MailboxAgentAccessError("invalid");
+  // Snapshot caller-owned arrays before the first await, including nested scope arrays.
+  input = {
+    ...input,
+    scopes: input.scopes === undefined ? undefined : [...input.scopes],
+    mailboxScopes: input.mailboxScopes?.map((entry) => ({
+      mailboxId: entry.mailboxId,
+      scopes: [...entry.scopes],
+    })),
+  };
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
     const memberId = await ownerMember(tx, actor, true);
@@ -805,23 +865,34 @@ export async function updateMailboxTeamAgentKey(
     // Rows minted under an earlier membership stay unusable; an edit never revives them.
     if (live.some((row) => row.ownerMembershipId !== memberId))
       throw new MailboxAgentAccessError("forbidden");
-    if (teamKeyVersion(live) !== input.expectedVersion)
+    if (teamKeyVersion(rows) !== input.expectedVersion)
       throw new MailboxAgentAccessError("conflict");
     const before = {
       label: first.label,
-      scopes: [...first.scopes] as MailboxAgentScope[],
+      scopes: commonScopes(live),
       expiresAt: first.expiresAt,
       defaultMailboxId: live.find((row) => row.isDefault)?.mailboxId ?? null,
     };
     const fields = credentialFields({
       label: input.label ?? before.label,
-      scopes: input.scopes ? [...input.scopes] : before.scopes,
+      // A mixed group's intersection may be empty; omitted scopes never rewrite its rows.
+      scopes:
+        input.scopes === undefined ? ([...first.scopes] as MailboxAgentScope[]) : input.scopes,
       expiresAt: input.expiresAt === undefined ? before.expiresAt : input.expiresAt,
     });
     const wanted = input.mailboxIds ?? live.map((row) => row.mailboxId);
     const liveIds = new Set(live.map((row) => row.mailboxId));
     const added = wanted.filter((id) => !liveIds.has(id)).sort();
     const removed = [...liveIds].filter((id) => !wanted.includes(id)).sort();
+    const perMailbox = new Map(
+      input.mailboxScopes?.map((entry) => [entry.mailboxId, entry.scopes]),
+    );
+    for (const id of perMailbox.keys()) {
+      // Not a way to mint access, resurrect an expired/revoked row, or edit a removed row.
+      if (!liveIds.has(id) || !wanted.includes(id)) throw new MailboxAgentAccessError("forbidden");
+    }
+    const addedScopes = input.scopes === undefined ? before.scopes : fields.scopes;
+    if (added.length && !addedScopes.length) throw new MailboxAgentAccessError("invalid");
     let defaultMailboxId =
       input.defaultMailboxId === undefined ? before.defaultMailboxId : input.defaultMailboxId;
     if (defaultMailboxId !== null && !wanted.includes(defaultMailboxId)) {
@@ -829,10 +900,15 @@ export async function updateMailboxTeamAgentKey(
       if (input.defaultMailboxId !== undefined) throw new MailboxAgentAccessError("invalid");
       defaultMailboxId = null;
     }
-    for (const id of added) {
+    // Recheck selected rows' current mailbox ownership/status under the existing lock order.
+    for (const id of [...new Set([...added, ...perMailbox.keys()])].sort()) {
       const box = await ownedBox(tx, actor, id, memberId, true);
-      if (box.status !== "planned") throw new MailboxAgentAccessError("forbidden");
-      if ((await activeKeysOn(tx, actor.teamId, box.id)) >= MAX_ACTIVE_KEYS_PER_MAILBOX)
+      if (box.status !== "planned" || box.deleteAfter)
+        throw new MailboxAgentAccessError("forbidden");
+      if (
+        added.includes(id) &&
+        (await activeKeysOn(tx, actor.teamId, box.id)) >= MAX_ACTIVE_KEYS_PER_MAILBOX
+      )
         throw new MailboxAgentAccessError("quota");
     }
     if (removed.length)
@@ -840,7 +916,11 @@ export async function updateMailboxTeamAgentKey(
         .update(k)
         .set({ revokedAt: now, isDefault: false })
         .where(and(mine, inArray(k.mailboxId, removed), isNull(k.revokedAt)));
-    const shared = { label: fields.label, scopes: [...fields.scopes], expiresAt: fields.expiresAt };
+    const shared = {
+      label: fields.label,
+      scopes: [...addedScopes],
+      expiresAt: fields.expiresAt,
+    };
     for (const id of added) {
       const old = rows.find((row) => row.mailboxId === id);
       // One row per mailbox and credential: a mailbox it held before comes back on that row.
@@ -869,35 +949,60 @@ export async function updateMailboxTeamAgentKey(
         });
     }
     const kept = wanted.filter((id) => liveIds.has(id));
-    if (kept.length)
+    const updates = {
+      ...(input.label === undefined ? {} : { label: fields.label }),
+      ...(input.scopes === undefined ? {} : { scopes: [...fields.scopes] }),
+      ...(input.expiresAt === undefined ? {} : { expiresAt: fields.expiresAt }),
+    };
+    if (kept.length && Object.keys(updates).length)
       await tx
         .update(k)
-        .set(shared)
+        .set(updates)
         .where(and(mine, inArray(k.mailboxId, kept), isNull(k.revokedAt)));
-    // The default flag moves last, so the set never holds two defaults on the way.
-    await tx
-      .update(k)
-      .set({ isDefault: false })
-      .where(and(mine, isNull(k.revokedAt), eq(k.isDefault, true)));
-    if (defaultMailboxId)
+    for (const [mailboxId, scopes] of perMailbox)
       await tx
         .update(k)
-        .set({ isDefault: true })
-        .where(and(mine, eq(k.mailboxId, defaultMailboxId), isNull(k.revokedAt)));
-    const after = await tx
-      .select()
-      .from(k)
-      .where(and(mine, isNull(k.revokedAt)))
-      .orderBy(asc(k.mailboxId));
+        .set({ scopes: [...scopes] })
+        .where(and(mine, eq(k.mailboxId, mailboxId), isNull(k.revokedAt)));
+    // Don't touch other rows on a per-mailbox scope-only edit. When moving the
+    // default, clear the old flag first so there cannot be two defaults on the way.
+    if (defaultMailboxId !== before.defaultMailboxId) {
+      await tx
+        .update(k)
+        .set({ isDefault: false })
+        .where(and(mine, isNull(k.revokedAt), eq(k.isDefault, true)));
+      if (defaultMailboxId)
+        await tx
+          .update(k)
+          .set({ isDefault: true })
+          .where(and(mine, eq(k.mailboxId, defaultMailboxId), isNull(k.revokedAt)));
+    }
+    const afterRows = await tx.select().from(k).where(mine).orderBy(asc(k.mailboxId));
+    const after = afterRows.filter(
+      (row) => !row.revokedAt && (!row.expiresAt || row.expiresAt > now),
+    );
     const same = (a: readonly string[], b: readonly string[]) =>
       [...a].sort().join(",") === [...b].sort().join(",");
     const iso = (date: Date | null) => date?.toISOString() ?? null;
+    const afterScopes = commonScopes(after);
     const change: MailboxTeamAgentKeyChange = {
       added,
       removed,
-      scopes: same(before.scopes, fields.scopes)
+      scopes: same(before.scopes, afterScopes)
         ? null
-        : { before: before.scopes, after: [...fields.scopes] },
+        : { before: before.scopes, after: afterScopes },
+      mailboxScopes: after.flatMap((row) => {
+        const old = live.find((previous) => previous.mailboxId === row.mailboxId);
+        return old && !same(old.scopes, row.scopes)
+          ? [
+              {
+                mailboxId: row.mailboxId,
+                before: [...old.scopes] as MailboxAgentScope[],
+                after: [...row.scopes] as MailboxAgentScope[],
+              },
+            ]
+          : [];
+      }),
       label: before.label !== fields.label,
       defaultMailboxId:
         before.defaultMailboxId === defaultMailboxId
@@ -911,11 +1016,15 @@ export async function updateMailboxTeamAgentKey(
     return {
       id: input.id,
       label: fields.label,
-      scopes: [...fields.scopes],
+      scopes: afterScopes,
       expiresAt: fields.expiresAt,
       defaultMailboxId,
       mailboxIds: after.map((row) => row.mailboxId),
-      version: teamKeyVersion(after),
+      mailboxScopes: after.map((row) => ({
+        mailboxId: row.mailboxId,
+        scopes: [...row.scopes] as MailboxAgentScope[],
+      })),
+      version: teamKeyVersion(afterRows),
       change,
     };
   });

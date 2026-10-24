@@ -34,8 +34,16 @@ describe.each([
     { next: "/signup" },
     { next: ["/emails", "/templates"] },
   ])("rejects unsafe, looping or ambiguous destinations: $next", async ({ next }) => {
-    await expect(page({ searchParams: Promise.resolve({ next }) })).rejects.toThrow("redirect:/");
+    await expect(page({ searchParams: Promise.resolve({ next }) })).rejects.toThrow(
+      `redirect:${_name === "login" ? "/post-login" : "/"}`,
+    );
   });
+});
+
+it("sends an already authenticated plain login to the server-resolved dashboard, not landing", async () => {
+  await expect(LoginPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
+    "redirect:/post-login",
+  );
 });
 
 describe.each([

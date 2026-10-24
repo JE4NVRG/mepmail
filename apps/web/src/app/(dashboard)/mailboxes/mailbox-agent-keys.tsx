@@ -6,6 +6,7 @@ import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import { AgentKeyHealth, CorreioClientSetup, ExpiryPresets } from "./correio-client-setup";
 import styles from "./mailbox-agent-keys.module.css";
+import { MailboxCredentialPermissions } from "./mailbox-credential-permissions";
 import registryStyles from "./mailboxes.module.css";
 
 type Props = {
@@ -53,6 +54,8 @@ function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
   const [confirmingRevoke, setConfirmingRevoke] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [editingCredential, setEditingCredential] = useState<string | null>(null);
+  const [permissionsBusy, setPermissionsBusy] = useState(false);
   const input = { mailboxId: mailbox.id };
   const listing = useQuery(
     trpc.mailboxes.agentKeys.queryOptions(input, {
@@ -68,7 +71,7 @@ function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
     trpc.mailboxes.revokeTeamAgentKey.mutationOptions({ gcTime: 0 }),
   );
   const resetRevoke = revoke.reset;
-  const busy = working || revoke.isPending || revokeCredential.isPending;
+  const busy = permissionsBusy || working || revoke.isPending || revokeCredential.isPending;
 
   useEffect(() => {
     active.current = true;
@@ -322,6 +325,7 @@ function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
       ) : (
         <form className={styles.form} onSubmit={(event) => void createKey(event)}>
           <h3>{t("createTitle")}</h3>
+          <p className={styles.description}>{t("perMailbox.newKeyHint")}</p>
           <fieldset
             className={styles.fields}
             disabled={busy || listing.isPending || listing.isError}
@@ -431,7 +435,7 @@ function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
               const expired = key.expiresAt !== null && key.expiresAt.getTime() <= Date.now();
               const status = key.revokedAt ? "revoked" : expired ? "expired" : "active";
               return (
-                <li key={key.id} className={styles.key}>
+                <li key={key.id} className={`${styles.key} ${styles.editableKey}`}>
                   <div className={styles.keyDetails}>
                     <div className={styles.keyHeading}>
                       <strong>{key.label}</strong>
@@ -494,16 +498,41 @@ function AgentKeysSession({ mailbox, onClose, mcpUrl }: Props) {
                       </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      className="ms-btn ms-btn-ghost"
-                      disabled={busy || key.revokedAt !== null}
-                      aria-label={t("revokeLabel", { label: key.label })}
-                      onClick={() => setConfirmingRevoke(key.id)}
-                    >
-                      {revokingId === key.id ? t("revoking") : t("revoke")}
-                    </button>
+                    <div className={styles.keyActions}>
+                      {status === "active" && key.kind !== "mailbox" ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-ghost"
+                          disabled={busy}
+                          aria-label={t("perMailbox.editLabel", { label: key.label })}
+                          aria-expanded={editingCredential === key.credentialId}
+                          onClick={() => {
+                            setConfirmingRevoke(null);
+                            setEditingCredential(key.credentialId);
+                          }}
+                        >
+                          {t("perMailbox.action")}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="ms-btn ms-btn-ghost"
+                        disabled={busy || key.revokedAt !== null}
+                        aria-label={t("revokeLabel", { label: key.label })}
+                        onClick={() => setConfirmingRevoke(key.id)}
+                      >
+                        {revokingId === key.id ? t("revoking") : t("revoke")}
+                      </button>
+                    </div>
                   )}
+                  {editingCredential === key.credentialId && key.kind !== "mailbox" ? (
+                    <MailboxCredentialPermissions
+                      credentialId={key.credentialId}
+                      mailboxId={mailbox.id}
+                      onBusyChange={setPermissionsBusy}
+                      onClose={() => setEditingCredential(null)}
+                    />
+                  ) : null}
                 </li>
               );
             })}

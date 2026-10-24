@@ -714,10 +714,28 @@ export const mailboxesRouter = router({
             .min(1)
             .max(3)
             .optional(),
+          mailboxScopes: z
+            .array(
+              z
+                .object({
+                  mailboxId: z.uuid(),
+                  scopes: z
+                    .array(z.enum(["read", "draft", "send"]))
+                    .min(1)
+                    .max(3),
+                })
+                .strict(),
+            )
+            .min(1)
+            .max(20)
+            .optional(),
           defaultMailboxId: z.uuid().nullable().optional(),
           expiresAt: z.date().nullable().optional(),
         })
-        .strict(),
+        .strict()
+        .refine((input) => input.scopes === undefined || input.mailboxScopes === undefined, {
+          message: "Use scopes or mailboxScopes, not both",
+        }),
     )
     .mutation(async ({ ctx, input }) => {
       const key = await call(() => updateMailboxTeamAgentKey(ctx.db, actor(ctx), input));

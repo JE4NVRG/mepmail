@@ -29,7 +29,8 @@ export interface MailboxAgentCredential {
   kind: "mailbox" | "team" | "oauth";
   label: string;
   scopes: string[];
-  mailboxes: { mailboxId: string; address: string }[];
+  /** Grouped credentials carry row scopes; a single mailbox uses the credential scopes. */
+  mailboxes: { mailboxId: string; address: string; scopes?: string[] }[];
   createdAt: Date;
   expiresAt: Date | null;
   lastUsedAt: Date | null;
@@ -105,7 +106,7 @@ export async function getMailboxAgentsOverview(
         scopes: [...group.scopes],
         mailboxes: group.mailboxes
           .filter((m) => !m.revoked)
-          .map((m) => ({ mailboxId: m.mailboxId, address: m.address })),
+          .map((m) => ({ mailboxId: m.mailboxId, address: m.address, scopes: [...m.scopes] })),
         createdAt: group.createdAt,
         expiresAt: group.expiresAt,
         lastUsedAt: group.lastUsedAt,

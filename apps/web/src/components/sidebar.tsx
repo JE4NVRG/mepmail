@@ -1,11 +1,10 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
-import { EllipsisGlyph, NavGlyph, type NavIconName } from "@/components/icons/nav-icons";
+import { EllipsisGlyph, NavGlyph } from "@/components/icons/nav-icons";
 import { useDismiss } from "@/components/popover-menu";
 import { QueryRecoveryNotice } from "@/components/query-recovery";
 import { TeamSwitcher } from "@/components/team-switcher";
@@ -13,54 +12,22 @@ import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { DOCS_URL } from "@/lib/docs-links";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
-import { isActive, navItemsWithConsole } from "@/lib/nav";
-import { queryRecoveryPhase, recoverQuery } from "@/lib/query-recovery";
+import { isActive } from "@/lib/nav";
+import { MAIL_NAV_ITEM, type ProductNavItem, useProductNavigation } from "@/lib/product-navigation";
 import { openSupportChat } from "@/lib/support-chat";
 import { applyTheme, currentTheme, type Theme } from "@/lib/theme";
-import { useTRPC } from "@/lib/trpc";
+
 import styles from "./app-shell.module.css";
 
-// Shared route definitions also power the command palette.
-export const NAV_ITEMS: ReadonlyArray<{ key: string; href: string; icon: NavIconName }> = [
-  { key: "emails", href: "/emails", icon: "emails" },
-  { key: "broadcasts", href: "/broadcasts", icon: "broadcasts" },
-  { key: "templates", href: "/templates", icon: "templates" },
-  { key: "audience", href: "/audience", icon: "audience" },
-  { key: "metrics", href: "/metrics", icon: "metrics" },
-  { key: "domains", href: "/domains", icon: "domains" },
-  { key: "logs", href: "/logs", icon: "logs" },
-  { key: "apiKeys", href: "/api-keys", icon: "api-keys" },
-  { key: "webhooks", href: "/webhooks", icon: "webhooks" },
-  { key: "settings", href: "/settings", icon: "settings" },
-];
-
-/** Correio is its own full-window app (/mail): the menu opens it in a new tab. */
-export const MAIL_NAV_ITEM: (typeof NAV_ITEMS)[number] = {
-  key: "mailboxes",
-  href: "/mail",
-  icon: "emails",
-};
-export const ORGANIZATION_NAV_ITEMS = NAV_ITEMS.filter((item) =>
-  ["domains", "settings"].includes(item.key),
-);
-export const SEND_NAV_ITEMS = NAV_ITEMS.filter((item) => !ORGANIZATION_NAV_ITEMS.includes(item));
-
-/**
- * The operator console's row: rendered only for the instance operator (see
- * navItemsWithConsole). Non-operators keep the plain list — and the console
- * itself is a 404 for them, since the gate is the server's, not this item.
- */
-export const CONSOLE_NAV_ITEM: (typeof NAV_ITEMS)[number] = {
-  key: "console",
-  href: "/console",
-  icon: "console",
-};
-
-export const USERS_NAV_ITEM: (typeof NAV_ITEMS)[number] = {
-  key: "usersDirectory",
-  href: "/operations/users",
-  icon: "audience",
-};
+// Compatibility exports; route definitions and policy have one owner.
+export {
+  CONSOLE_NAV_ITEM,
+  MAIL_NAV_ITEM,
+  NAV_ITEMS,
+  ORGANIZATION_NAV_ITEMS,
+  SEND_NAV_ITEMS,
+  USERS_NAV_ITEM,
+} from "@/lib/product-navigation";
 
 // Hover state lives per link so a hover repaints one glyph, not the whole nav.
 function NavItem({
@@ -69,7 +36,7 @@ function NavItem({
   label,
   badge,
 }: {
-  item: (typeof NAV_ITEMS)[number];
+  item: ProductNavItem;
   active: boolean;
   label: string;
   /** Decorative pill after the label ("New"); the link's name stays the label. */
@@ -207,42 +174,11 @@ export function Sidebar({
   const t = useTranslations("nav");
   const tCommon = useTranslations("common");
   const pathname = usePathname();
-  const trpc = useTRPC();
-  const queries = useQueryClient();
+  const navigation = useProductNavigation();
   const [menuOpen, setMenuOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
-  const recoveryMounted = useRef(true);
-  useEffect(() => {
-    recoveryMounted.current = true;
-    return () => {
-      recoveryMounted.current = false;
-    };
-  }, []);
+
   useDismiss(accountRef, menuOpen, () => setMenuOpen(false));
-  // The console is the operator's own: the item appears only for them, and
-  // the gate is the server's (a 404 for anyone else), never this query.
-  const operatorOptions = trpc.system.operator.queryOptions();
-  const operator = useQuery(operatorOptions);
-  const mailboxCapability = useQuery(trpc.mailboxes.capabilities.queryOptions());
-  const mailEnabled =
-    mailboxCapability.data?.enabled === true || mailboxCapability.data?.offered === true;
-  // Until the current team's policy is known, keep private Send links out of view.
-  const showSending = operator.data?.isOperationsMember === false;
-  const operatorRecovery =
-    typeof operator.data?.isOperationsMember === "boolean"
-      ? null
-      : (queryRecoveryPhase(operator) ?? "loading");
-  const organizationBase = showSending
-    ? ORGANIZATION_NAV_ITEMS
-    : ORGANIZATION_NAV_ITEMS.filter((item) => item.key === "settings");
-  // These links describe the UI; the server gates remain the access control.
-  const organizationItems = navItemsWithConsole(
-    operator.data?.canReadUsers && !operator.data.isOperator
-      ? [...organizationBase, USERS_NAV_ITEM]
-      : organizationBase,
-    CONSOLE_NAV_ITEM,
-    operator.data?.isOperator === true,
-  );
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -304,7 +240,7 @@ export function Sidebar({
             : undefined
         }
       >
-        {mailEnabled ? (
+        {navigation.mailEnabled ? (
           <section className={styles.navSection} aria-label={t("products.mail")}>
             <div className={styles.navHeading} aria-hidden="true">
               {t("products.mail")}
@@ -317,29 +253,22 @@ export function Sidebar({
             />
           </section>
         ) : null}
-        {operatorRecovery ? (
+        {navigation.recoveryPhase ? (
           <section className={styles.navSection}>
             <QueryRecoveryNotice
-              phase={operatorRecovery}
-              message={t(`recovery.${operatorRecovery}`)}
+              phase={navigation.recoveryPhase}
+              message={t(`recovery.${navigation.recoveryPhase}`)}
               retryLabel={t("recovery.retry")}
-              retry={() =>
-                recoverQuery(
-                  queries,
-                  operatorOptions.queryKey,
-                  () => operator.refetch(),
-                  () => recoveryMounted.current,
-                )
-              }
+              retry={navigation.retry}
             />
           </section>
         ) : null}
-        {showSending ? (
+        {navigation.showSending ? (
           <section className={styles.navSection} aria-label={t("products.send")}>
             <div className={styles.navHeading} aria-hidden="true">
               {t("products.send")}
             </div>
-            {SEND_NAV_ITEMS.map((item) => (
+            {navigation.sendItems.map((item) => (
               <NavItem
                 key={item.key}
                 item={item}
@@ -353,7 +282,7 @@ export function Sidebar({
           <div className={styles.navHeading} aria-hidden="true">
             {t("products.organization")}
           </div>
-          {organizationItems.map((item) => (
+          {navigation.organizationItems.map((item) => (
             <NavItem
               key={item.key}
               item={item}
@@ -449,7 +378,7 @@ export function Sidebar({
             >
               {t("settings")}
             </Link>
-            {operator.data?.isOperator ? (
+            {navigation.showConsole ? (
               <Link
                 href="/console"
                 role="menuitem"
@@ -458,7 +387,7 @@ export function Sidebar({
               >
                 {t("console")}
               </Link>
-            ) : operator.data?.canReadUsers ? (
+            ) : navigation.showDirectory ? (
               <Link
                 href="/operations/users"
                 role="menuitem"
@@ -468,7 +397,7 @@ export function Sidebar({
                 {t("usersDirectory")}
               </Link>
             ) : null}
-            {showSending ? (
+            {navigation.canAdminister ? (
               <Link
                 href="/onboarding"
                 role="menuitem"

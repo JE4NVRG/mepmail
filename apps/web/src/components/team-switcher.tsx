@@ -9,6 +9,7 @@ import { ConfirmKeycap, ModalFooter } from "@/components/modal-footer";
 import { useDismiss } from "@/components/popover-menu";
 import { BtnSpinner } from "@/components/spinner";
 import { TeamLogo } from "@/components/team-logo";
+import { POST_LOGIN_PATH } from "@/lib/nav";
 import { useTRPC } from "@/lib/trpc";
 
 function PlanBadge({ plan }: { plan: string }) {
@@ -90,7 +91,7 @@ export function TeamSwitcher({
 
   const switchTeam = useMutation(
     trpc.team.switch.mutationOptions({
-      onSuccess: () => window.location.assign("/emails"),
+      onSuccess: () => window.location.assign(POST_LOGIN_PATH),
     }),
   );
   const createTeam = useMutation(

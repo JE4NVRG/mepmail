@@ -23,6 +23,9 @@ export function safeNextPath(next: string | null | undefined, fallback: string):
   return url.pathname + url.search + url.hash;
 }
 
+/** Shared entrypoint: the server resolves the live selected membership, never client roles. */
+export const POST_LOGIN_PATH = "/post-login";
+
 /** Destino após autenticação, sem ciclos nas telas intermediárias nem endpoints. */
 export function postAuthNext(
   value: unknown,
@@ -40,7 +43,7 @@ export function postAuthNext(
   }
   if (safeNextPath(path, "") !== path) return fallback;
   if (
-    /^\/(?:login|signup|forgot-password|reset-password|verify-email|onboarding|api)(?:\/|$)/.test(
+    /^\/(?:login|signup|forgot-password|reset-password|verify-email|onboarding|post-login|api)(?:\/|$)/.test(
       path,
     )
   )

@@ -16,6 +16,9 @@ const state = vi.hoisted(() => ({
   isOperationsMember: false as boolean | undefined,
   profile: "success" as "success" | "pending" | "paused" | "error",
   cachedProfile: false,
+  role: "owner" as "owner" | "admin" | "member" | undefined,
+  teamError: false,
+  mailOffered: false,
   retry: vi.fn(async () => ({})),
   cancel: vi.fn(async () => {}),
 }));
@@ -28,6 +31,7 @@ vi.mock("@/lib/trpc", () => ({
   useTRPC: () => ({
     system: { operator: { queryOptions: () => ({ query: "operator", queryKey: ["operator"] }) } },
     mailboxes: { capabilities: { queryOptions: () => ({ query: "mailboxes" }) } },
+    team: { list: { queryOptions: () => ({ query: "team", queryKey: ["team"] }) } },
   }),
 }));
 vi.mock("@tanstack/react-query", () => ({
@@ -42,11 +46,20 @@ vi.mock("@tanstack/react-query", () => ({
               canReadUsers: state.canReadUsers,
               isOperationsMember: state.isOperationsMember,
             }
-        : state.mailEnabled === undefined
-          ? undefined
-          : { enabled: state.mailEnabled },
+        : options.query === "team"
+          ? state.role === undefined
+            ? undefined
+            : {
+                activeTeamId: "active",
+                teams: [{ teamId: "active", role: state.role }],
+              }
+          : state.mailEnabled === undefined
+            ? undefined
+            : { enabled: state.mailEnabled, offered: state.mailOffered },
     isPending: options.query === "operator" && ["pending", "paused"].includes(state.profile),
-    isError: options.query === "operator" && state.profile === "error",
+    isError:
+      (options.query === "operator" && state.profile === "error") ||
+      (options.query === "team" && state.teamError),
     fetchStatus: options.query === "operator" && state.profile === "paused" ? "paused" : "idle",
     refetch: state.retry,
   }),
@@ -64,6 +77,9 @@ beforeEach(() => {
   state.isOperationsMember = false;
   state.profile = "success";
   state.cachedProfile = false;
+  state.role = "owner";
+  state.teamError = false;
+  state.mailOffered = false;
   state.retry.mockClear();
   state.cancel.mockClear();
 });
@@ -109,14 +125,45 @@ for (const locale of ["en", "pt-BR"] as const) {
       },
     );
 
-    it("retains a confirmed ordinary menu when a background check fails", () => {
+    it("does not trust cached policy privileges when a background policy check fails", () => {
       state.profile = "error";
       state.cachedProfile = true;
       state.operator = false;
       const { nav } = navMarkup(locale);
-      expect(hrefs(nav)).toContain("/emails");
-      expect(hrefs(nav)).toContain("/domains");
-      expect(nav).not.toContain('role="alert"');
+      expect(hrefs(nav)).not.toContain("/emails");
+      expect(hrefs(nav)).not.toContain("/domains");
+      expect(hrefs(nav)).toContain("/settings");
+      expect(nav).toContain('role="alert"');
+    });
+    it.each([undefined] as const)("hides private tools for an unresolved role (%s)", (role) => {
+      state.operator = false;
+      state.role = role;
+      const { nav } = navMarkup(locale);
+      for (const href of ["/emails", "/domains", "/api-keys", "/webhooks", "/console"])
+        expect(hrefs(nav)).not.toContain(href);
+      expect(hrefs(nav)).toContain("/settings");
+      expect(hrefs(nav)).toContain("/mail");
+    });
+    it("retains permitted ordinary-member read routes after the default /emails login", () => {
+      state.operator = false;
+      state.role = "member";
+      const links = hrefs(navMarkup(locale).nav);
+      for (const href of ["/emails", "/domains", "/api-keys", "/settings", "/mail"])
+        expect(links).toContain(href);
+      expect(links).not.toContain("/console");
+    });
+    it("shows a retry and hides privileged links after the team role read fails", () => {
+      state.operator = false;
+      state.teamError = true;
+      const { nav } = navMarkup(locale);
+      expect(nav).toContain('role="alert"');
+      expect(hrefs(nav)).not.toContain("/emails");
+      expect(hrefs(nav)).not.toContain("/domains");
+    });
+    it("includes an offered Mail product before activation", () => {
+      state.mailEnabled = false;
+      state.mailOffered = true;
+      expect(hrefs(navMarkup(locale).nav)).toContain("/mail");
     });
     it("preserves the full navigation and width when leaving Mail for a shared domain or settings page", () => {
       const first = navMarkup(locale);

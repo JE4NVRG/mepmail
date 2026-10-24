@@ -10,6 +10,10 @@ import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
 import { AgentKeyHealth, CorreioClientSetup, ExpiryPresets } from "./correio-client-setup";
 import styles from "./mailbox-agent-keys.module.css";
+import {
+  commonMailboxScopes,
+  MailboxCredentialPermissions,
+} from "./mailbox-credential-permissions";
 import registryStyles from "./mailboxes.module.css";
 
 type Mailbox = { id: string; address: string; label: string };
@@ -65,13 +69,16 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
   const [notice, setNotice] = useState("");
   // Editing one listed credential: the same form, saved in place (same token or grant).
   const [editing, setEditing] = useState<TeamKey | null>(null);
+  const [editingPermissions, setEditingPermissions] = useState<string | null>(null);
+  const [permissionsBusy, setPermissionsBusy] = useState(false);
+  const [permissionsTouched, setPermissionsTouched] = useState(false);
   const listing = useQuery(
     trpc.mailboxes.teamAgentKeys.queryOptions(undefined, { staleTime: 0, gcTime: 0 }),
   );
   const revoke = useMutation(trpc.mailboxes.revokeTeamAgentKey.mutationOptions({ gcTime: 0 }));
   const update = useMutation(trpc.mailboxes.updateTeamAgentKey.mutationOptions({ gcTime: 0 }));
   const resetRevoke = revoke.reset;
-  const busy = working || revoke.isPending || update.isPending;
+  const busy = permissionsBusy || working || revoke.isPending || update.isPending;
 
   useEffect(() => {
     active.current = true;
@@ -108,6 +115,7 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
     });
     // The Agentes panel behind this dialog lists the same credentials.
     void queries.invalidateQueries({ queryKey: trpc.mailboxAgents.overview.queryKey() });
+    void queries.invalidateQueries({ queryKey: trpc.mailboxes.agentKeys.queryKey() });
     return listing.refetch({ throwOnError: true });
   }
 
@@ -125,6 +133,9 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
   /** The form filled with a credential as it is now on the server. */
   function startEdit(key: TeamKey) {
     const live = liveMailboxes(key);
+    const common = commonMailboxScopes(key);
+    setEditingPermissions(null);
+    setPermissionsTouched(false);
     setEditing(key);
     setSecret(null);
     setConfirmingRevoke(null);
@@ -133,8 +144,8 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
     setLabel(key.label);
     setSelected(live.map((box) => box.mailboxId));
     setDefaultId(live.find((box) => box.isDefault)?.mailboxId ?? "");
-    setDraft(key.scopes.includes("draft"));
-    setSend(key.scopes.includes("send"));
+    setDraft(common.includes("draft"));
+    setSend(common.includes("send"));
     setExpiry(key.expiresAt ? localMinute(key.expiresAt) : "");
     setMinimumExpiry(localMinute(new Date(Date.now() + 60_000)));
     dialog.current?.scrollTo({ top: 0 });
@@ -148,13 +159,18 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
   }
 
   async function saveEdit(key: TeamKey, scopes: Scope[]) {
-    const changes = teamAgentKeyChanges(key, {
-      label,
-      mailboxIds: selected,
-      scopes,
-      defaultMailboxId: defaultId,
-      expiry,
-    });
+    const changes = teamAgentKeyChanges(
+      { ...key, scopes: commonMailboxScopes(key) },
+      {
+        label,
+        mailboxIds: selected,
+        scopes,
+        defaultMailboxId: defaultId,
+        expiry,
+      },
+    );
+    // A rename/expiry/membership edit must not flatten mixed per-mailbox permissions.
+    if (!permissionsTouched) delete changes.scopes;
     if (!Object.keys(changes).length) {
       setEditing(null);
       resetForm();
@@ -501,6 +517,7 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
             </label>
             <fieldset className={styles.scopes}>
               <legend>{t("permissions")}</legend>
+              {editing ? <p className={styles.description}>{t("perMailbox.legacyHint")}</p> : null}
               <label className={styles.scope}>
                 <input type="checkbox" checked disabled />
                 <span>
@@ -512,7 +529,10 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
                 <input
                   type="checkbox"
                   checked={draft}
-                  onChange={(event) => setDraft(event.target.checked)}
+                  onChange={(event) => {
+                    setDraft(event.target.checked);
+                    setPermissionsTouched(true);
+                  }}
                 />
                 <span>
                   <strong>{t("scopeDraft")}</strong>
@@ -523,7 +543,10 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
                 <input
                   type="checkbox"
                   checked={send}
-                  onChange={(event) => setSend(event.target.checked)}
+                  onChange={(event) => {
+                    setSend(event.target.checked);
+                    setPermissionsTouched(true);
+                  }}
                 />
                 <span>
                   <strong>{t("scopeSend")}</strong>
@@ -597,7 +620,7 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
               const expired = key.expiresAt !== null && key.expiresAt.getTime() <= Date.now();
               const status = key.revokedAt ? "revoked" : expired ? "expired" : "active";
               return (
-                <li key={key.id} className={styles.key}>
+                <li key={key.id} className={`${styles.key} ${styles.editableKey}`}>
                   <div className={styles.keyDetails}>
                     <div className={styles.keyHeading}>
                       <strong>{key.label}</strong>
@@ -612,7 +635,7 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
                       lastUsedAt={key.lastUsedAt}
                       lastSentAt={key.lastSentAt}
                     />
-                    <p>{key.scopes.map(scopeLabel).join(" · ")}</p>
+                    <p>{commonMailboxScopes(key).map(scopeLabel).join(" · ")}</p>
                     <p>
                       {key.mailboxes
                         .filter((box) => !box.revoked)
@@ -671,6 +694,22 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
                         <button
                           type="button"
                           className="ms-btn ms-btn-ghost"
+                          disabled={busy}
+                          aria-label={t("perMailbox.editLabel", { label: key.label })}
+                          aria-expanded={editingPermissions === key.id}
+                          onClick={() => {
+                            cancelEdit();
+                            setConfirmingRevoke(null);
+                            setEditingPermissions(key.id);
+                          }}
+                        >
+                          {t("perMailbox.action")}
+                        </button>
+                      ) : null}
+                      {status === "active" && key.version ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-ghost"
                           disabled={busy || editing?.id === key.id}
                           aria-label={t("team.edit.label", { label: key.label })}
                           onClick={() => startEdit(key)}
@@ -689,6 +728,13 @@ export function MailboxTeamAgentKeysDialog({ mailboxes, onClose, mcpUrl }: Props
                       </button>
                     </div>
                   )}
+                  {editingPermissions === key.id ? (
+                    <MailboxCredentialPermissions
+                      credentialId={key.id}
+                      onBusyChange={setPermissionsBusy}
+                      onClose={() => setEditingPermissions(null)}
+                    />
+                  ) : null}
                 </li>
               );
             })}

@@ -345,6 +345,77 @@
   color: var(--ms-danger);
 }
 
+/* The existing credential editor shares the dashboard's tokens and responsive rows. */
+.editableKey {
+  flex-wrap: wrap;
+}
+.permissionsEditor {
+  flex: 1 1 100%;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+  margin-top: 12px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: var(--ms-r-card);
+  background: var(--ms-inset);
+}
+.permissionsEditor h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.permissionsEditor h4:focus-visible,
+.permissionsEditor input:focus-visible,
+.permissionsEditor button:focus-visible {
+  outline: 2px solid var(--ms-steel);
+  outline-offset: 3px;
+}
+.permissionsEditor legend {
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: var(--ms-muted);
+}
+.permissionsEditor .actions {
+  margin-top: 12px;
+}
+.permissionRows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.permissionRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ms-line);
+}
+.permissionRow > div {
+  min-width: 0;
+  flex: 1 1 180px;
+}
+.permissionRow .description {
+  margin: 5px 0 0;
+}
+.permissionAddress {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.permissionToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.permissionToggle input {
+  flex: none;
+}
+
 /* A credential row's Editar + Revogar. */
 .keyActions {
   display: flex;

@@ -1,5 +1,6 @@
 "use client";
 
+import { ADMIN_MCP_SCOPES } from "@millionsend/core/oauth-scopes";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
@@ -23,7 +24,7 @@ const OFFLINE_ACCESS = "offline_access";
  * is never offered them, mirroring the API's role check on the tools behind
  * them.
  */
-const ADMIN_ONLY_SCOPES = ["domains:write", "webhooks:write", "api-keys:write"];
+const ADMIN_ONLY_SCOPES: ReadonlySet<string> = new Set(ADMIN_MCP_SCOPES);
 /**
  * Mail content scopes act only in the mailboxes ticked below (a credential bound to
  * this app is minted on Allow). Sending without asking is never pre-ticked.
@@ -91,7 +92,7 @@ export function ConsentForm({
   const teamBoxes = teamId === ALL_TEAMS ? [] : (mailboxes[teamId] ?? []);
   // Mail needs one team and a mailbox of the person's own in it; otherwise it is not offered.
   const visible = (
-    memberOnly ? scopes.filter((scope) => !ADMIN_ONLY_SCOPES.includes(scope)) : scopes
+    memberOnly ? scopes.filter((scope) => !ADMIN_ONLY_SCOPES.has(scope)) : scopes
   ).filter((scope) => !MAIL_SCOPES.includes(scope) || teamBoxes.length > 0);
   const mailWanted = visible.some((scope) => MAIL_SCOPES.includes(scope) && granted.has(scope));
   const nothingGranted = visible.every((scope) => scope === OFFLINE_ACCESS || !granted.has(scope));

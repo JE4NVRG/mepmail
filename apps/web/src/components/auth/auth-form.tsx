@@ -8,7 +8,7 @@ import { captchaHeaders, useTurnstile } from "@/components/turnstile";
 import { authClient } from "@/lib/auth-client";
 import { isDesktop } from "@/lib/desktop-bridge";
 import { isAppLocale, setLocaleCookie } from "@/lib/locale-cookie";
-import { postAuthNext, withNext } from "@/lib/nav";
+import { POST_LOGIN_PATH, postAuthNext, withNext } from "@/lib/nav";
 import { passwordStrength } from "@/lib/password-strength";
 import { inAppBrowser, openInBrowserHref } from "@/lib/public-intent";
 import { useInAndroidApp } from "@/lib/use-android-app";
@@ -129,10 +129,9 @@ export function AuthForm({
   // An invited user carries ?next=/invite/... — signup sends them to accept
   // the invite rather than /onboarding (which would create a new team).
   const nextParam = params.getAll("next").length === 1 ? params.get("next") : null;
-  // Inside the apps the Correio is home: a sign-in (or the sign-up linked from it) with no
-  // explicit destination lands there, not on the Send dashboard.
-  const loginHome = ownApp ? "/mail" : "/emails";
-  const next = postAuthNext(nextParam, mode === "login" ? loginHome : "/onboarding", true);
+  // Explicit OAuth/invite/deep links win. Only the default goes through the
+  // server, which resolves the live membership after the session is established.
+  const next = postAuthNext(nextParam, mode === "login" ? POST_LOGIN_PATH : "/onboarding", true);
   const recoveryHref = withNext("/forgot-password", nextParam);
   // better-auth bounces failed OAuth callbacks to errorCallbackURL?error=code.
   const socialError = params.get("error");
