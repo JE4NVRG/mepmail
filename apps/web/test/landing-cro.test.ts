@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { UmamiAnalytics } from "../src/components/umami-analytics";
+import { UMAMI_SCRIPT_URL, UMAMI_WEBSITE_ID } from "../src/lib/analytics";
 
 vi.mock("next-intl/server", () => ({
   getLocale: async () => "pt-BR",
@@ -46,12 +47,19 @@ describe("landing CRO contract", () => {
 
   it("never loads production analytics in explicit local preview", () => {
     vi.stubEnv("MEPMAIL_LOCAL_PREVIEW", "1");
-    expect(UmamiAnalytics()).toBeNull();
+    const html = renderToStaticMarkup(UmamiAnalytics());
+    expect(html).not.toMatch(/<script\b/i);
+    expect(html).not.toContain(UMAMI_SCRIPT_URL);
+    expect(html).not.toContain("data-website-id");
   });
 
   it("preserves production analytics by default", () => {
     vi.stubEnv("MEPMAIL_LOCAL_PREVIEW", "");
-    expect(UmamiAnalytics()?.type).toBe("script");
+    const html = renderToStaticMarkup(UmamiAnalytics());
+    expect(html.match(/<script\b/g)).toHaveLength(1);
+    expect(html).toContain(`src="${UMAMI_SCRIPT_URL}"`);
+    expect(html).toContain(`data-website-id="${UMAMI_WEBSITE_ID}"`);
+    expect(html).toContain('defer=""');
   });
 
   it("the proof gallery follows the visitor's language", () => {
