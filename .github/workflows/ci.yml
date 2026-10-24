@@ -50,6 +50,12 @@ jobs:
         run: pnpm check:npm-package-versions
       - run: pnpm lint
       - run: pnpm typecheck
+      # The web build only ran on a version tag, and tsc never sees the types Next
+      # generates, so a broken `next build` could sit unnoticed until a release.
+      - name: Production build (web)
+        run: pnpm --filter @millionsend/web build
+        env:
+          SKIP_ENV_VALIDATION: "1"
       # --continue: one run reports every package's failures, not just the first one.
       # The web app's suite runs in the test-web shards below.
       - run: pnpm exec turbo run test --continue --filter=!@millionsend/web
