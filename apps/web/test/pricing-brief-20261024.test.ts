@@ -119,7 +119,9 @@ describe("pricing brief 2026-10-24: server-rendered product choice", () => {
     vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "false");
     vi.stubEnv("MAILBOX_STANDALONE_OPEN", "false");
     const html = await render({ focus: "mail" });
-    expect(html).toContain('id="correio"');
+    expect(html).toContain('id="mail-availability"');
+    expect(html).toContain('href="/pricing?focus=mail#mail-availability"');
+    expect(html).not.toContain('id="correio"');
     expect(html).toContain(enPricing.choice.mailClosed);
     expect(html).not.toContain('href="/signup?next=%2Fsettings%2Fbilling%3FmailboxPlan');
     expect(html).not.toContain("Mail starts at US$ 2.90/month");

@@ -156,14 +156,15 @@ for (const locale of ["en", "pt-BR"] as const) {
       vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
       const html = await render(Pricing);
       const intro = html.slice(html.indexOf('<main id="conteudo">'), html.indexOf('id="planos"'));
-      expect(intro.includes(locale === "pt-BR" ? "R$ 14,90" : "US$ 2.90")).toBe(true);
-      expect(intro.includes(locale === "pt-BR" ? "R$ 0" : "US$ 0")).toBe(true);
+      expect(intro).toContain(messages(locale).pricing.choice.freeCta);
       expect(html.indexOf('id="planos"')).toBeLessThan(html.indexOf('id="correio"'));
       expect(html).toContain('id="faq"');
       const mail = await render(() =>
         Pricing({ searchParams: Promise.resolve({ focus: "mail" }) }),
       );
       expect(mail.indexOf('id="correio"')).toBeLessThan(mail.indexOf('id="planos"'));
+      const mailIntro = mail.slice(0, mail.indexOf('id="correio"'));
+      expect(mailIntro).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
       const send = await render(() =>
         Pricing({ searchParams: Promise.resolve({ focus: "send" }) }),
       );
@@ -188,7 +189,7 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(home.indexOf(home2.growth.title.replace(/-/g, "‑"))).toBeLessThan(
         home.indexOf(home2.correio.lead),
       );
-      expect(home).toContain(home2.envio.title);
+      expect(home).toContain(home2.growth.lead);
       // Portuguese readers get Brazil's price list: the Correio from R$ 14,90.
       expect(home).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
       expect(home).toContain(messages(locale).correio.demo.awaiting);

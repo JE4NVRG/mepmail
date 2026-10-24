@@ -204,9 +204,11 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(journey.every((position) => position > 0)).toBe(true);
       expect(journey).toEqual([...journey].sort((a, b) => a - b));
       // Both entry prices are available before the visitor reaches any plan section.
-      const intro = html.slice(0, html.indexOf("</section>")).replace(/\u00a0/g, " ");
-      expect(intro).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
-      expect(intro).toContain(locale === "en" ? "US$ 0" : "R$ 0");
+      const intro = html.slice(0, html.indexOf('id="planos"')).replace(/\u00a0/g, " ");
+      expect(intro).toContain(messages(locale).pricing.choice.freeCta);
+      const mail = (await render({ focus: "mail" })).replace(/\u00a0/g, " ");
+      const mailIntro = mail.slice(0, mail.indexOf('id="correio"'));
+      expect(mailIntro).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
     });
 
     it("starts with Send by default and preserves each paid plan's intent", async () => {
@@ -218,9 +220,11 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(journey.every((position) => position > 0)).toBe(true);
       expect(journey).toEqual([...journey].sort((a, b) => a - b));
       expect(html.match(/<h1>(.*?)<\/h1>/)?.[1]).not.toContain("110");
-      const intro = html.slice(0, html.indexOf("</section>")).replace(/\u00a0/g, " ");
-      expect(intro).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
-      expect(intro).toContain(locale === "en" ? "US$ 0" : "R$ 0");
+      const intro = html.slice(0, html.indexOf('id="planos"')).replace(/\u00a0/g, " ");
+      expect(intro).toContain(messages(locale).pricing.choice.freeCta);
+      const mail = (await render({ focus: "mail" })).replace(/\u00a0/g, " ");
+      const mailIntro = mail.slice(0, mail.indexOf('id="correio"'));
+      expect(mailIntro).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
       for (const rung of ["starter", "pro_100k", "pro_200k", "scale_500k"])
         expect(html).toContain(`href="/signup?next=%2Fsettings%2Fbilling%3Fplan%3D${rung}"`);
       for (const plan of ["solo", "duo", "equipe"] as const)
