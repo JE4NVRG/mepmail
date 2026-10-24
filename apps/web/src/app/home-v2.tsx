@@ -99,7 +99,8 @@ export async function HomeV2() {
   const free = PLAN_RUNGS.find((rung) => rung.key === "free");
   const starter = PLAN_RUNGS.find((rung) => rung.key === "starter");
   const largest = PLAN_RUNGS[PLAN_RUNGS.length - 1];
-  if (!duo || !equipe || !free || !starter || !largest) throw new Error("Missing a plan in the catalog");
+  if (!duo || !equipe || !free || !starter || !largest)
+    throw new Error("Missing a plan in the catalog");
   const sendLadder = plansWithCopy(
     l.raw("plans.items") as PlanCopy[],
     launchOfferEnabled,
@@ -144,15 +145,24 @@ export async function HomeV2() {
         <section className="v2-split" aria-label={t("doorsAria")}>
           <div className="v2-door v2-door-dark v2-dark">
             <p className="v2-eyebrow v2-eyebrow-mono">{t("envio.eyebrow")}</p>
-            <h1 className="v2-display-sans">{t("growth.title")}</h1>
+            <h1 className="v2-display-sans">{headline(t("growth.title"))}</h1>
             <p className="v2-lead">{t("growth.lead")}</p>
             <div className="v2-actions">
-              <SignupLink label={t("growth.cta", { free: freeVolume })} className="v2-btn v2-btn-bone" />
+              <SignupLink
+                label={t("growth.cta", { free: freeVolume })}
+                className="v2-btn v2-btn-bone"
+              />
               <a className="v2-link" href="/pricing?focus=send#planos">
                 {t("growth.sendPlans")}
               </a>
             </div>
-            <p className="v2-note">{t.rich("growth.note", { free: freeVolume, starter: money(starter.brlPriceCents, starter.priceCents), b })}</p>
+            <p className="v2-note">
+              {t.rich("growth.note", {
+                free: freeVolume,
+                starter: money(starter.brlPriceCents, starter.priceCents),
+                b,
+              })}
+            </p>
             <figure>
               <div className="v2-code">
                 <p className="v2-code-bar">
@@ -175,7 +185,9 @@ export async function HomeV2() {
             <h2 className="v2-display">{headline(t("correio.title"))}</h2>
             <p className="v2-lead">{t("correio.lead")}</p>
             <div className="v2-actions">
-              <a className="v2-btn v2-btn-ink" href="/pricing?focus=mail#correio">{t("growth.mailPlans")}</a>
+              <a className="v2-btn v2-btn-ink" href="/pricing?focus=mail#correio">
+                {t("growth.mailPlans")}
+              </a>
               <a className="v2-link" href="#correio">
                 {t("correio.more")}
               </a>
@@ -209,7 +221,6 @@ export async function HomeV2() {
               </a>
             </p>
           </div>
-
         </section>
 
         <section className="v2-growth-proof v2-dark" aria-label={t("growth.trustLabel")}>
@@ -218,19 +229,30 @@ export async function HomeV2() {
               <p className="v2-eyebrow">{t("growth.deliveryEyebrow")}</p>
               <h2 className="v2-h3-sm">{t("growth.deliveryTitle")}</h2>
               <p className="v2-body">{t("growth.deliveryBody")}</p>
-              <a className="v2-link-accent" href="/delivery">{t("growth.deliveryLink")} →</a>
+              <a className="v2-link-accent" href="/delivery">
+                {t("growth.deliveryLink")} →
+              </a>
             </article>
             <article>
               <p className="v2-eyebrow">{t("growth.safetyEyebrow")}</p>
               <h2 className="v2-h3-sm">{t("growth.safetyTitle")}</h2>
               <p className="v2-body">{t("growth.safetyBody")}</p>
-              <a className="v2-link-accent" href="/terms">{t("growth.safetyLink")} →</a>
+              <a className="v2-link-accent" href="/terms">
+                {t("growth.safetyLink")} →
+              </a>
             </article>
             <article>
               <p className="v2-eyebrow">{t("growth.founderEyebrow")}</p>
               <h2 className="v2-h3-sm">{t("growth.founderTitle")}</h2>
               <p className="v2-body">{t("growth.founderBody")}</p>
-              <a className="v2-link-accent" href="https://x.com/JE4NVRG" target="_blank" rel="noopener noreferrer">{t("growth.founderLink")} ↗</a>
+              <a
+                className="v2-link-accent"
+                href="https://x.com/JE4NVRG"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t("growth.founderLink")} ↗
+              </a>
             </article>
           </div>
         </section>

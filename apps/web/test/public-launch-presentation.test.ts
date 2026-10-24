@@ -150,16 +150,20 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(page).toContain(large);
     });
 
-    it("shows starting prices in the hero and puts Mail before Send unless a Send campaign leads", async () => {
+    it("shows both starting prices and makes Send the default while honoring Mail selection", async () => {
       current.locale = locale;
       vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
       vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");
       const html = await render(Pricing);
-      const intro = html.slice(html.indexOf('<main id="conteudo">'), html.indexOf("</section>"));
+      const intro = html.slice(html.indexOf('<main id="conteudo">'), html.indexOf('id="planos"'));
       expect(intro.includes(locale === "pt-BR" ? "R$ 14,90" : "US$ 2.90")).toBe(true);
       expect(intro.includes(locale === "pt-BR" ? "R$ 0" : "US$ 0")).toBe(true);
-      expect(html.indexOf('id="correio"')).toBeLessThan(html.indexOf('id="planos"'));
-      expect(html.includes('<details class="pricing-usage-details">')).toBe(true);
+      expect(html.indexOf('id="planos"')).toBeLessThan(html.indexOf('id="correio"'));
+      expect(html).toContain('id="faq"');
+      const mail = await render(() =>
+        Pricing({ searchParams: Promise.resolve({ focus: "mail" }) }),
+      );
+      expect(mail.indexOf('id="correio"')).toBeLessThan(mail.indexOf('id="planos"'));
       const send = await render(() =>
         Pricing({ searchParams: Promise.resolve({ focus: "send" }) }),
       );
@@ -178,19 +182,23 @@ for (const locale of ["en", "pt-BR"] as const) {
       // One headline, Correio's, with a non-breaking hyphen in "e-mail".
       const title = (headings[0] ?? "").replace(/<[^>]+>/g, "");
       expect(title).not.toMatch(/\p{L}-\p{L}/u);
-      expect(title.replace(/‑/g, "-")).toBe(home2.correio.title);
+      expect(title.replace(/‑/g, "-")).toBe(copy.home.growth.title);
       // Two doors: Correio first, then Envio, each with its own pitch.
       expect(home.match(/class="v2-door[ "]/g)).toHaveLength(2);
-      expect(home.indexOf(home2.correio.lead)).toBeLessThan(home.indexOf(home2.envio.title));
+      expect(home.indexOf(home2.growth.title.replace(/-/g, "‑"))).toBeLessThan(
+        home.indexOf(home2.correio.lead),
+      );
       expect(home).toContain(home2.envio.title);
       // Portuguese readers get Brazil's price list: the Correio from R$ 14,90.
       expect(home).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
       expect(home).toContain(messages(locale).correio.demo.awaiting);
-      // The first screen prices Equipe against AgentMail's dated Developer tier.
-      const hero = home.slice(0, home.indexOf('aria-label="' + home2.doorsAria + '"'));
-      expect(hero).toContain("AgentMail");
-      expect(hero).toContain(locale === "en" ? "US$ 12.90" : "R$ 64,90");
-      expect(hero).toContain(locale === "en" ? "US$ 20" : "R$ 101");
+      // Send leads with the actual free allowance; Mail stays a separate trial.
+      const hero = home.slice(
+        home.indexOf('<main id="conteudo">'),
+        home.indexOf("v2-growth-proof"),
+      );
+      expect(hero).toContain(locale === "en" ? "no card" : "sem cartão");
+      expect(hero).toContain('href="/pricing?focus=mail#correio"');
       // The counts come from the code they describe, never typed into the copy.
       const { CHECKS } = await import("../../../packages/core/src/email-insights");
       const { MCP_TOOLS } = await import("../../../packages/core/src/mcp-tools");

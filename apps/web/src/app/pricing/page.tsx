@@ -78,7 +78,7 @@ export default async function PricingPage({
       if (typeof value === "string") query.set(key, value);
     }
     query.set("focus", focus);
-    return `/pricing?${query.toString()}#${focus === "send" ? "planos" : "correio"}`;
+    return `/pricing?${query.toString()}#${focus === "send" ? "planos" : mailOpen ? "correio" : "mail-availability"}`;
   };
   const t = await getTranslations("pricing");
   const l = await getTranslations("landing");
@@ -367,11 +367,19 @@ export default async function PricingPage({
       </div>
     </section>
   ) : (
-    <section className="v2-light v2-sec-tight" id="correio" aria-labelledby="pricing-correio-title">
+    <section
+      className="v2-light v2-sec-tight"
+      id="mail-availability"
+      aria-labelledby="pricing-correio-title"
+    >
       <div className="v2-wrap">
-        <h2 id="pricing-correio-title" className="v2-h3">{t("choice.mailTitle")}</h2>
+        <h2 id="pricing-correio-title" className="v2-h3">
+          {t("choice.mailTitle")}
+        </h2>
         <p className="v2-note">{t("choice.mailClosed")}</p>
-        <a className="v2-link-accent" href="/correio">{t("correio.cta")}</a>
+        <a className="v2-link-accent" href="/correio">
+          {t("correio.cta")}
+        </a>
       </div>
     </section>
   );
@@ -383,7 +391,9 @@ export default async function PricingPage({
       <main id="conteudo">
         <section className="v2-dark pricing-choice" aria-labelledby="pricing-choice-title">
           <div className="v2-wrap">
-            <p id="pricing-choice-title" className="v2-eyebrow">{t("choice.title")}</p>
+            <p id="pricing-choice-title" className="v2-eyebrow">
+              {t("choice.title")}
+            </p>
             <nav className="pricing-focus" aria-label={t("choice.title")}>
               <a href={focusHref("send")} aria-current={sendFirst ? "true" : undefined}>
                 <strong>{t("choice.send")}</strong>
@@ -441,7 +451,9 @@ export default async function PricingPage({
                       mailboxPlan="choose"
                     />
                   ) : (
-                    <a className="v2-btn v2-btn-bone" href="/correio">{t("correio.cta")}</a>
+                    <a className="v2-btn v2-btn-bone" href="/correio">
+                      {t("correio.cta")}
+                    </a>
                   )}
                   <a className="v2-link" href="/alternatives/resend">
                     {t("alternatives.cta")}
@@ -514,7 +526,9 @@ export default async function PricingPage({
               {t("v2.scaleNote", { limits: allPlans[allPlans.length - 1]?.copy.limits ?? "" })}
             </p>
             <p className="v2-note v2-gap-sm">
-              <a className="v2-link-accent" href="#pricing-usage">{t("plans.details")}</a>
+              <a className="v2-link-accent" href="#pricing-usage">
+                {t("plans.details")}
+              </a>
             </p>
           </div>
         </section>
@@ -522,7 +536,9 @@ export default async function PricingPage({
         {launchOfferEnabled ? (
           <section className="v2-dark v2-sec-tight" aria-labelledby="pricing-entry-compare-title">
             <div className="v2-wrap">
-              <h2 id="pricing-entry-compare-title" className="v2-h3">{t("entryComparison.title")}</h2>
+              <h2 id="pricing-entry-compare-title" className="v2-h3">
+                {t("entryComparison.title")}
+              </h2>
               <p className="v2-note v2-gap-sm">{t("entryComparison.scope")}</p>
               <div className="v2-table-box v2-gap-sm">
                 <table className="v2-table pricing-entry-table">
@@ -539,11 +555,18 @@ export default async function PricingPage({
                     {ENTRY_PLAN_COMPARISON.map((row) => (
                       <tr key={row.volume}>
                         <th scope="row">{formatVolume(row.volume, locale)}</th>
-                        <td>{formatUsd(row.mepmailUsd, locale)} · {row.plan}</td>
+                        <td>
+                          {formatUsd(row.mepmailUsd, locale)} · {row.plan}
+                        </td>
                         <td>{formatUsd(row.resendUsd, locale)} · Pro 50K</td>
-                        <td>{row.condition === "daily"
-                          ? t("entryComparison.daily", { cap: row.dailyCap, days: row.minimumSendingDays })
-                          : t("entryComparison.monthly")}</td>
+                        <td>
+                          {row.condition === "daily"
+                            ? t("entryComparison.daily", {
+                                cap: row.dailyCap,
+                                days: row.minimumSendingDays,
+                              })
+                            : t("entryComparison.monthly")}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -552,9 +575,17 @@ export default async function PricingPage({
               <p className="v2-note v2-gap-sm">{t("entryComparison.notAlwaysCheaper")}</p>
               <p className="v2-fine v2-gap-sm">
                 {t("entryComparison.sources", { date: ENTRY_COMPARISON_SOURCE.checkedAt })}{" "}
-                <a className="v2-link-accent" href={ENTRY_COMPARISON_SOURCE.resend}>Resend</a>{" · "}
-                <a className="v2-link-accent" href={ENTRY_COMPARISON_SOURCE.mepmail}>MepMail Starter</a>{" · "}
-                <a className="v2-link-accent" href={ENTRY_COMPARISON_SOURCE.offer}>MepMail Pro 110K</a>
+                <a className="v2-link-accent" href={ENTRY_COMPARISON_SOURCE.resend}>
+                  Resend
+                </a>
+                {" · "}
+                <a className="v2-link-accent" href={ENTRY_COMPARISON_SOURCE.mepmail}>
+                  MepMail Starter
+                </a>
+                {" · "}
+                <a className="v2-link-accent" href={ENTRY_COMPARISON_SOURCE.offer}>
+                  MepMail Pro 110K
+                </a>
               </p>
             </div>
           </section>

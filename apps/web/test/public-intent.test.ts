@@ -195,8 +195,8 @@ for (const locale of ["en", "pt-BR"] as const) {
       current.locale = locale;
       const html = await render({ utm_campaign: "mepmail_send_us_20261013" });
       const h1 = html.match(/<h1>(.*?)<\/h1>/)?.[1] ?? "";
-      expect(h1).toContain(locale === "en" ? "110,000 a month for" : "110 mil por mês por");
-      expect(h1, h1).toMatch(locale === "en" ? /US\$\s29\./ : /R\$\s149\./);
+      expect(h1).toContain(locale === "en" ? "Start free." : "Comece grátis.");
+      expect(html).toContain(messages(locale).pricing.choice.freeCta);
       // The hero's main button signs up into Billing on Pro 110K.
       expect(html).toContain('href="/signup?next=%2Fsettings%2Fbilling%3Fplan%3Dpro_100k"');
       const at = (id: string) => html.indexOf(`id="${id}"`);
@@ -209,10 +209,10 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(intro).toContain(locale === "en" ? "US$ 0" : "R$ 0");
     });
 
-    it("starts with the scenarios elsewhere, then Mail and Send, preserving each paid plan's intent", async () => {
+    it("starts with Send by default and preserves each paid plan's intent", async () => {
       current.locale = locale;
       const html = await render({});
-      const journey = ["cenarios", "correio", "planos", "pro110k"].map((id) =>
+      const journey = ["planos", "pro110k", "correio", "cenarios"].map((id) =>
         html.indexOf(`id="${id}"`),
       );
       expect(journey.every((position) => position > 0)).toBe(true);

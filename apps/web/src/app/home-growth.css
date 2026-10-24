@@ -3,7 +3,9 @@
   grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
 }
 @media (max-width: 900px) {
-  .v2 .v2-split { grid-template-columns: minmax(0, 1fr); }
+  .v2 .v2-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .v2 .v2-growth-proof {
   padding: 32px 0;

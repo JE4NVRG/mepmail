@@ -18,9 +18,9 @@ vi.mock("next-intl/server", () => ({ getRequestConfig: (fn: unknown) => fn }));
 vi.mock("next-intl/plugin", () => ({ default: () => (config: unknown) => config }));
 vi.mock("@millionsend/config", () => ({ env: {} }));
 
-import requestConfig from "@/i18n/request";
 import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
+import requestConfig from "@/i18n/request";
 import { publicClientMessages } from "@/lib/client-messages";
 import { publicMarketingMessages } from "@/lib/public-message-scope";
 import { proxy } from "@/proxy";
@@ -38,7 +38,14 @@ describe("marketing client serialization is not server translation filtering", (
   it.each(["en", "pt-BR"])("preserves public/auth keys and drops app controls in %s", (locale) => {
     const original = publicClientMessages("/", locale)!;
     const serializedBefore = JSON.stringify(original);
-    for (const path of ["/", "/pricing", "/signup", "/login", "/support/chat", "/desktop/correio/linux"]) {
+    for (const path of [
+      "/",
+      "/pricing",
+      "/signup",
+      "/login",
+      "/support/chat",
+      "/desktop/correio/linux",
+    ]) {
       const selected = publicMarketingMessages(`${path}?lang=${locale}`, locale)!;
       expect(Object.keys(selected).sort()).toEqual(["auth", "common", "correio", "landing"]);
       expect(selected.auth).toEqual(original.auth);
@@ -57,9 +64,23 @@ describe("marketing client serialization is not server translation filtering", (
     expect(original.common).toHaveProperty("supportView");
   });
 
-  it.each([undefined, null, "", "//evil.invalid/", "https://mepmail.dev/", "/console", "/api", "/mailboxes", "/settings", "/guides/not-a-guide", "/pricing/private", "/%70ricing", "/pricing#private", "/pricing\\private"])(
-    "retains the app fallback for an absent, malformed or nonpublic target: %s",
-    (path) => expect(publicMarketingMessages(path, "en")).toBeUndefined(),
+  it.each([
+    undefined,
+    null,
+    "",
+    "//evil.invalid/",
+    "https://mepmail.dev/",
+    "/console",
+    "/api",
+    "/mailboxes",
+    "/settings",
+    "/guides/not-a-guide",
+    "/pricing/private",
+    "/%70ricing",
+    "/pricing#private",
+    "/pricing\\private",
+  ])("retains the app fallback for an absent, malformed or nonpublic target: %s", (path) =>
+    expect(publicMarketingMessages(path, "en")).toBeUndefined(),
   );
 
   it("does not invent a fallback language", () => {
@@ -68,9 +89,11 @@ describe("marketing client serialization is not server translation filtering", (
   });
 
   it("uses the proxy's overwritten request target, never caller pathname metadata", () => {
-    const response = proxy(new NextRequest("https://mepmail.dev/settings", {
-      headers: { "x-mepmail-next": "/pricing", "x-mepmail-url-locale": "en" },
-    }));
+    const response = proxy(
+      new NextRequest("https://mepmail.dev/settings", {
+        headers: { "x-mepmail-next": "/pricing", "x-mepmail-url-locale": "en" },
+      }),
+    );
     const target = response.headers.get("x-middleware-request-x-mepmail-next");
     expect(target).toBe("/settings");
     expect(publicMarketingMessages(target, "en")).toBeUndefined();
@@ -86,7 +109,9 @@ describe("marketing client serialization is not server translation filtering", (
     expect(resolved.messages).toHaveProperty("console");
     expect(resolved.messages).toHaveProperty("support");
     expect(resolved.messages?.common).toHaveProperty("supportView");
-    expect(resolved.messages?.pricing).toEqual((await import("../messages/en/pricing.json")).default);
+    expect(resolved.messages?.pricing).toEqual(
+      (await import("../messages/en/pricing.json")).default,
+    );
   });
 
   it("retains cookie negotiation for auth and unrecognized locale metadata", async () => {
@@ -107,7 +132,9 @@ describe("public SEO and security boundaries", () => {
     expect(rules).toMatchObject({ disallow: "/" });
     expect(rules).toMatchObject({ allow: expect.arrayContaining(["/status", "/_next/"]) });
     const entries = sitemap();
-    const status = entries.filter((entry) => entry.url.startsWith("https://fixture.invalid/status"));
+    const status = entries.filter((entry) =>
+      entry.url.startsWith("https://fixture.invalid/status"),
+    );
     expect(status).toHaveLength(2);
     for (const page of status) {
       expect(page.alternates?.languages).toEqual({
@@ -116,15 +143,19 @@ describe("public SEO and security boundaries", () => {
         "x-default": "https://fixture.invalid/status",
       });
     }
-    expect(entries.some((page) => /\/(console|settings|mailboxes|docs)(?:[/?]|$)/.test(page.url))).toBe(false);
+    expect(
+      entries.some((page) => /\/(console|settings|mailboxes|docs)(?:[/?]|$)/.test(page.url)),
+    ).toBe(false);
     expect(new Set(entries.map((page) => page.url)).size).toBe(entries.length);
   });
 
   it("preserves noindex gates and does not enable shared caching of cookie-themed documents", () => {
     const root = source("../src/app/layout.tsx");
-    expect(root).toContain('robots: { index: false, follow: false }');
-    expect(root).toContain('(await cookies()).get(THEME_KEY)');
-    expect(root).toContain('publicMarketingMessages((await headers()).get("x-mepmail-next"), locale)');
+    expect(root).toContain("robots: { index: false, follow: false }");
+    expect(root).toContain("(await cookies()).get(THEME_KEY)");
+    expect(root).toContain(
+      'publicMarketingMessages((await headers()).get("x-mepmail-next"), locale)',
+    );
     expect(root).not.toMatch(/force-static|s-maxage|unstable_cache|use cache/);
     expect(source("../src/i18n/request.ts")).not.toMatch(/unstable_cache|use cache/);
     expect(root).toContain("MepMail | Email API and mailboxes for apps and agents");
@@ -141,7 +172,9 @@ describe("public SEO and security boundaries", () => {
     expect(value("X-Frame-Options")).toBe("DENY");
     expect(value("X-Content-Type-Options")).toBe("nosniff");
     expect(value("Content-Security-Policy")).toContain("frame-ancestors 'none'");
-    expect(value("Content-Security-Policy")).toContain("ipc: http://ipc.localhost https://ipc.localhost");
+    expect(value("Content-Security-Policy")).toContain(
+      "ipc: http://ipc.localhost https://ipc.localhost",
+    );
     expect(value("Content-Security-Policy")).not.toContain("'unsafe-eval'");
   });
 });

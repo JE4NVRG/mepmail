@@ -12,9 +12,10 @@ const context = vi.hoisted(() => ({ locale: "en" }));
 vi.mock("next-intl/server", () => ({
   getLocale: async () => context.locale,
   getTranslations: async (namespace: "pricing" | "landing") => {
-    const messages = context.locale === "pt-BR"
-      ? { pricing: ptPricing, landing: ptLanding }
-      : { pricing: enPricing, landing: enLanding };
+    const messages =
+      context.locale === "pt-BR"
+        ? { pricing: ptPricing, landing: ptLanding }
+        : { pricing: enPricing, landing: enLanding };
     return createTranslator({ locale: context.locale, messages, namespace });
   },
 }));
@@ -34,7 +35,11 @@ vi.mock("@/components/site-chrome", () => ({
 }));
 vi.mock("@/components/structured-data", () => ({ StructuredData: () => null }));
 vi.mock("@/server/public-seo", () => ({
-  publicPageUrls: async () => ({ url: "https://mepmail.dev/pricing", alternates: {}, ogLocale: "en_US" }),
+  publicPageUrls: async () => ({
+    url: "https://mepmail.dev/pricing",
+    alternates: {},
+    ogLocale: "en_US",
+  }),
 }));
 
 import PricingPage from "../src/app/pricing/page";
@@ -57,7 +62,8 @@ describe("pricing brief 2026-10-24: server-rendered product choice", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it.each([{}, { focus: "send" }, { focus: "unknown" }, { focus: ["mail", "send"] }])(
-    "defaults to Send unless Mail is explicitly requested: %j", async (params) => {
+    "defaults to Send unless Mail is explicitly requested: %j",
+    async (params) => {
       const html = await render(params);
       expect(html.indexOf('id="planos"')).toBeLessThan(html.indexOf('id="correio"'));
       expect(html).toContain('href="/pricing?focus=send#planos" aria-current="true"');
@@ -77,21 +83,28 @@ describe("pricing brief 2026-10-24: server-rendered product choice", () => {
 
   it("keeps locale and campaign query values when switching, with existing anchors", async () => {
     const html = await render({ lang: "pt-BR", utm_campaign: "send_launch", focus: "mail" });
-    expect(html).toContain("/pricing?lang=pt-BR&amp;utm_campaign=send_launch&amp;focus=send#planos");
-    expect(html).toContain("/pricing?lang=pt-BR&amp;utm_campaign=send_launch&amp;focus=mail#correio");
+    expect(html).toContain(
+      "/pricing?lang=pt-BR&amp;utm_campaign=send_launch&amp;focus=send#planos",
+    );
+    expect(html).toContain(
+      "/pricing?lang=pt-BR&amp;utm_campaign=send_launch&amp;focus=mail#correio",
+    );
   });
 
-  it.each(["en", "pt-BR"])("has one collapsed queue/overage rule and working FAQ anchors in %s", async (locale) => {
-    context.locale = locale;
-    const html = await render();
-    expect(html.match(/50%/g)).toHaveLength(1);
-    expect(html.match(/3×/g)).toHaveLength(1);
-    expect(html).toContain('href="#pricing-usage"');
-    expect(html).toContain('id="pricing-usage"');
-    expect(html).toContain('id="faq"');
-    expect(html).toContain('id="pricing-faq-title"');
-    expect(html).toContain('id="pricing-faq-4"');
-  });
+  it.each(["en", "pt-BR"])(
+    "has one collapsed queue/overage rule and working FAQ anchors in %s",
+    async (locale) => {
+      context.locale = locale;
+      const html = await render();
+      expect(html.match(/50%/g)).toHaveLength(1);
+      expect(html.match(/3×/g)).toHaveLength(1);
+      expect(html).toContain('href="#pricing-usage"');
+      expect(html).toContain('id="pricing-usage"');
+      expect(html).toContain('id="faq"');
+      expect(html).toContain('id="pricing-faq-title"');
+      expect(html).toContain('id="pricing-faq-4"');
+    },
+  );
 
   it("separates the Brazilian Mail/Pix price from Send and from the card-only trial", async () => {
     context.locale = "pt-BR";
@@ -122,9 +135,12 @@ describe("pricing brief 2026-10-24: server-rendered product choice", () => {
   });
 
   it("compares only cataloged recurring prices and does not sell Starter as a 50K plan", async () => {
-    expect(ENTRY_PLAN_COMPARISON.map((row) => [row.volume, row.mepmailUsd, row.resendUsd])).toEqual([
-      [10_000, 9, 20], [50_000, 29, 20],
-    ]);
+    expect(ENTRY_PLAN_COMPARISON.map((row) => [row.volume, row.mepmailUsd, row.resendUsd])).toEqual(
+      [
+        [10_000, 9, 20],
+        [50_000, 29, 20],
+      ],
+    );
     expect(ENTRY_PLAN_COMPARISON[0].minimumSendingDays).toBe(7);
     vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "true");
     const html = await render();
@@ -140,6 +156,8 @@ describe("pricing brief 2026-10-24: server-rendered product choice", () => {
     expect(source).not.toContain("onClick=");
     expect(css).toContain(".pricing-focus a:focus-visible");
     expect(css).toContain("grid-template-columns: minmax(0, 1fr)");
-    expect(source.indexOf('className="v2-dark pricing-choice"')).toBeLessThan(source.indexOf("{sendFirst ? ("));
+    expect(source.indexOf('className="v2-dark pricing-choice"')).toBeLessThan(
+      source.indexOf("{sendFirst ? ("),
+    );
   });
 });

@@ -1,9 +1,9 @@
 {
   "meta": {
     "title": "MepMail | API de e-mail e caixas para apps e agentes",
-    "description": "Envie e-mails transacionais com API compatível com o Resend. Comece com 100 e-mails/dia grátis, sem cartão. Caixas para pessoas e agentes são um produto separado.",
+    "description": "Envie e-mails transacionais por API, SMTP ou MCP. Comece com 100 e-mails/dia grátis, sem cartão. Caixas para pessoas e agentes são um produto separado.",
     "domainTitle": "MepMail | API de e-mail e caixas para apps e agentes",
-    "domainDescription": "Envie e-mails transacionais com API compatível com o Resend. Comece com 100 e-mails/dia grátis, sem cartão. Caixas para pessoas e agentes são um produto separado."
+    "domainDescription": "Envie e-mails transacionais por API, SMTP ou MCP. Comece com 100 e-mails/dia grátis, sem cartão. Caixas para pessoas e agentes são um produto separado."
   },
   "skip": "Pular para o conteúdo",
   "brandAria": "MepMail início",

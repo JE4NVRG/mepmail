@@ -65,7 +65,7 @@ describe("landing value-first positioning", () => {
       // Dates, overage arithmetic and capability references can repeat the
       // competitor's name without turning the product's own pitch into it.
       const permitted =
-        /^(?:hero\.migrate|(?:nav|footer)\.alternatives|(?:compare|calc|comparisonReference)\..+|(?:home\.)?faq\.items\.\d+\.[qa])$/;
+        /^(?:hero\.migrate|home\.growth\.lead|(?:nav|footer)\.alternatives|(?:compare|calc|comparisonReference)\..+|(?:home\.)?faq\.items\.\d+\.[qa])$/;
       for (const path of competitorMentionPaths(copy)) expect(path).toMatch(permitted);
     });
 

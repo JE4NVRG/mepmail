@@ -1,9 +1,9 @@
 {
   "meta": {
     "title": "MepMail | Email API and mailboxes for apps and agents",
-    "description": "Send transactional email with a Resend-compatible API. Start with 100 emails/day free, no card. Mailboxes for people and agents are a separate product.",
+    "description": "Send transactional email through API, SMTP or MCP. Start with 100 emails/day free, no card. Mailboxes for people and agents are a separate product.",
     "domainTitle": "MepMail | Email API and mailboxes for apps and agents",
-    "domainDescription": "Send transactional email with a Resend-compatible API. Start with 100 emails/day free, no card. Mailboxes for people and agents are a separate product."
+    "domainDescription": "Send transactional email through API, SMTP or MCP. Start with 100 emails/day free, no card. Mailboxes for people and agents are a separate product."
   },
   "skip": "Skip to content",
   "brandAria": "MepMail home",
