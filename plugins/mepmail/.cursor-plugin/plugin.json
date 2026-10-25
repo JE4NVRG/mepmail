@@ -10,12 +10,6 @@
   "homepage": "https://docs.mepmail.dev/mcp",
   "repository": "https://github.com/JE4NVRG/mepmail",
   "license": "MIT",
-  "keywords": [
-    "email",
-    "transactional-email",
-    "mcp",
-    "inbox",
-    "agents"
-  ],
+  "keywords": ["email", "transactional-email", "mcp", "inbox", "agents"],
   "logo": "logo.png"
 }
