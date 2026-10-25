@@ -1,0 +1,21 @@
+{
+  "name": "mepmail",
+  "displayName": "MepMail",
+  "description": "Send email, check delivery status, and read or draft in selected MepMail mailboxes with OAuth-controlled access.",
+  "version": "0.1.0",
+  "author": {
+    "name": "MepMail",
+    "email": "suporte@mepmail.dev"
+  },
+  "homepage": "https://docs.mepmail.dev/mcp",
+  "repository": "https://github.com/JE4NVRG/mepmail",
+  "license": "MIT",
+  "keywords": [
+    "email",
+    "transactional-email",
+    "mcp",
+    "inbox",
+    "agents"
+  ],
+  "logo": "logo.png"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "mepmail-plugins",
+  "owner": {
+    "name": "JE4NDEV",
+    "email": "suporte@mepmail.dev"
+  },
+  "plugins": [
+    {
+      "name": "mepmail",
+      "source": "plugins/mepmail"
+    }
+  ]
+}
