@@ -1,18 +1,22 @@
 {
   "meta": {
     "title": "E-mail corporativo no seu domínio, com agentes de IA | MepMail",
-    "description": "E-mail profissional no seu domínio, sem servidor para manter. Você e seu agente de IA na mesma caixa. A partir de R$ 14,90/mês, com 7 dias grátis."
+    "description": "E-mail profissional no seu domínio, sem servidor para manter. Você e seu agente de IA na mesma caixa. A partir de R$ 14,90/mês, com 7 dias grátis no cartão no primeiro plano elegível da equipe."
   },
   "hero": {
     "eyebrow": "Correio · e-mail no seu domínio, para você e seus agentes",
-    "status": "Prévia de lançamento · acesso fechado",
+    "status": "Correio · com ou sem Envio",
     "title": "Seu domínio. Seu e-mail. Seus agentes.",
     "titleEnd": "Tudo no mesmo lugar.",
     "lead": "Comprou um domínio? Tenha e-mail nele sem contratar hospedagem. Use no navegador ou nos apps para Windows e Linux e conecte agentes às caixas que escolher: você e seu agente na mesma caixa.",
     "primary": "Ver como funciona",
     "secondary": "Conhecer planos de Envio",
-    "note": "Correio pago à parte. Acesso inicial exclusivo aos assinantes anteriores elegíveis; a nova oferta está nesta prévia.",
-    "audiences": ["Para você", "Para sua equipe", "Para seus agentes"]
+    "note": "Correio pago à parte. Escolha Solo, Duo ou Equipe pelo painel, com ou sem plano de Envio.",
+    "audiences": [
+      "Para você",
+      "Para sua equipe",
+      "Para seus agentes"
+    ]
   },
   "use": {
     "eyebrow": "O seu endereço. A sua conversa.",
@@ -70,8 +74,8 @@
     "body": "Você não precisa contratar hospedagem de site para ter um e-mail no seu domínio. Precisa controlar o domínio e configurar o caminho das mensagens.",
     "steps": [
       {
-        "title": "Confira seu plano de Envio",
-        "body": "A primeira abertura permanece para assinantes anteriores elegíveis de planos com preço recorrente acima de US$ 20/mês. A nova oferta de US$ 29 está em validação nesta prévia. Correio é pago à parte, por caixa."
+        "title": "Escolha seu plano de Correio",
+        "body": "Escolha Solo, Duo ou Equipe, com ou sem plano de Envio. Correio é cobrado à parte. O Envio Pro 110K custa US$ 29/mês; novos clientes elegíveis pagam US$ 20 somente na primeira mensalidade."
       },
       {
         "title": "Vincule um domínio seu",
@@ -99,7 +103,7 @@
         "kind": "Correio · API REST",
         "title": "Uma caixa para seu agente",
         "body": "A API do Correio permite consultar mensagens, criar rascunhos e enviar rascunhos autorizados, com uma chave dedicada à caixa.",
-        "status": "Em validação fechada",
+        "status": "Disponível para caixas ativadas",
         "link": "Ver a API de caixas",
         "path": "/mailboxes"
       },
@@ -125,7 +129,7 @@
   "plans": {
     "eyebrow": "Envio + Correio",
     "title": "Um plano para sua aplicação. Caixas para suas conversas.",
-    "body": "Envio cuida dos e-mails da aplicação e das campanhas. Correio acrescenta caixas com entrada e saída para pessoas e agentes, pago à parte. O acesso inicial continua fechado aos assinantes anteriores elegíveis.",
+    "body": "Envio cuida dos e-mails da aplicação e das campanhas. Correio oferece caixas com entrada e saída para pessoas e agentes, pago à parte, com ou sem plano de Envio.",
     "sending": {
       "label": "Para sua aplicação",
       "title": "Só Envio",
@@ -136,7 +140,7 @@
       "label": "Para suas conversas e agentes",
       "title": "Envio + Correio",
       "body": "Com um plano pago de Envio você escolhe os mesmos planos do Correio. Caixas já contratadas como adicional do Envio mantêm preço e condições.",
-      "note": "Oferta preparada para lançamento. A contratação pública do Correio ainda não está aberta; esta prévia não libera acesso."
+      "note": "As assinaturas do Correio estão abertas pelo painel. Escolha Solo, Duo ou Equipe; não é preciso ter plano de Envio."
     },
     "terms": "Correio é pago à parte. O upgrade é cobrado na hora; um plano menor vale quando o seu uso couber nele, sem reembolso do mês em curso. As mensagens guardadas são preservadas. Você pode continuar usando só Envio.",
     "solo": {
@@ -173,21 +177,21 @@
       {
         "label": "Cobrança",
         "sending": "Plano de Envio",
-        "combined": "Plano de Envio + adicional por caixa"
+        "combined": "Planos de Envio e Correio separados; contratos de adicionais existentes mantêm as condições"
       },
       {
         "label": "Disponibilidade",
         "sending": "Envio já disponível; assinaturas atuais preservadas",
-        "combined": "Acesso inicial fechado aos assinantes anteriores elegíveis"
+        "combined": "Correio disponível com ou sem plano de Envio"
       }
     ],
-    "earlyNote": "Correio exige um plano de Envio acima de US$ 20/mês pelo preço regular. A oferta Pro 110K de US$ 29 qualifica mesmo na primeira mensalidade promocional de US$ 20. Contratos antigos de US$ 20 mantêm o preço; contas anteriores autorizadas para o Correio podem manter o plano atual de Envio ao adicionar caixas."
+    "earlyNote": "Correio não exige plano pago de Envio. Solo, Duo e Equipe são cobrados à parte; contratos existentes de Envio e Correio mantêm as condições, sem migração automática."
   },
   "preview": {
-    "eyebrow": "Compare a nova oferta",
-    "title": "Seu plano. Suas caixas.",
-    "body": "Compare o preço da nova oferta de Envio com o adicional por caixa. São exemplos de orçamento; o painel confirma o seu contrato e acesso antecipado.",
-    "status": "Prévia · contratação indisponível",
+    "eyebrow": "Contratos de adicionais existentes",
+    "title": "Envio e adicionais de caixas existentes",
+    "body": "Estime Envio com os antigos adicionais por caixa. Novas assinaturas do Correio usam Solo, Duo ou Equipe pelo painel, com ou sem Envio; contratos existentes mantêm as condições.",
+    "status": "Só estimativa · contrate pelo painel",
     "periodLegend": "Período da comparação",
     "month": "Mensal",
     "year": "Anual · antecipado",
@@ -213,11 +217,11 @@
     "sendingAmount": "Envio: {amount}",
     "mailAmount": "{count, plural, one {# caixa} other {# caixas}} × {unit} = {amount}",
     "annualFormula": "10 × a mensalidade normal para 12 meses de acesso. O anual não acumula a promoção da primeira mensalidade.",
-    "annualConsumption": "As franquias renovam mensalmente na oferta anual proposta, não formam um saldo anual. A contratação e a separação dos ciclos ainda estão em preparação.",
+    "annualConsumption": "As franquias renovam mensalmente, não como saldo anual. O painel confirma as condições de cobrança do seu contrato.",
     "monthlyConsumption": "A franquia de 110 mil entregas de Envio é separada da franquia mensal de cada caixa de Correio. O espaço é por caixa.",
     "introTerms": "US$ 20 só na primeira mensalidade de Envio de quem nunca pagou o MepMail; depois US$ 29/mês. O Correio não recebe esse desconto.",
-    "eligibility": "O plano de US$ 29 qualifica para o Correio pelo preço regular, mesmo durante a promoção. Cada caixa ainda precisa de domínio verificado e ativação do recebimento.",
-    "monthlyNote": "Esta é a prévia de uma nova oferta. Correio continua em acesso fechado; checkout e contratação ainda não estão disponíveis aqui.",
+    "eligibility": "Correio funciona com ou sem plano de Envio. Cada caixa precisa de domínio verificado e recebimento ativado.",
+    "monthlyNote": "Esta calculadora não cria uma assinatura. As assinaturas do Correio estão disponíveis pelo painel, com ou sem Envio.",
     "noChange": "Esta comparação não contrata um plano nem altera sua assinatura. Valores em US$, antes de impostos e eventual consumo excedente."
   },
   "faq": {

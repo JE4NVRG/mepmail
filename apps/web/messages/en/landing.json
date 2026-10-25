@@ -190,7 +190,7 @@
         "cta": "Start free"
       },
       {
-        "volume": "1,500/day (~45k/month)",
+        "volume": "1,500/day · daily cap, not a monthly allowance",
         "limits": "10 domains · 3 workspaces · unlimited contacts",
         "overage": "none (daily limit)",
         "attachment": "1 MB",
@@ -299,7 +299,7 @@
       },
       {
         "q": "Can I pay with Pix?",
-        "a": "Yes, in Brazil. Send and Mail take Pix as well as card, in reais. With Pix you pay one period at a time: each renewal arrives as an invoice to pay with Pix within 5 days, never charged automatically. Mail's 7-day free trial is card only. Boleto is not accepted."
+        "a": "Yes, in Brazil. Send and Mail accept Pix through Stripe, in reais. With Pix you pay one period at a time: each renewal arrives as an invoice to pay within 5 days, never charged automatically. Mail’s 7-day free trial is available only with a card on the team’s first eligible plan; Pix starts with payment and has no free trial. Boleto is not accepted."
       },
       {
         "q": "How does the Free plan work?",

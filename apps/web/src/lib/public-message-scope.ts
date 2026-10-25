@@ -21,6 +21,9 @@ const APP_ONLY_COMMON_KEYS: ReadonlySet<string> = new Set([
   "supportView",
   "teamSwitcher",
   "commandPalette",
+  // The pause strip renders on the server only when its runtime flag is on.
+  // Do not serialize an inactive incident message into every public document.
+  "subscriptionsPaused",
 ]);
 
 /**

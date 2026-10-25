@@ -190,7 +190,7 @@
         "cta": "Começar grátis"
       },
       {
-        "volume": "1.500/dia (~45k/mês)",
+        "volume": "1.500/dia · limite diário, não franquia mensal",
         "limits": "10 domínios · 3 workspaces · contatos ilimitados",
         "overage": "sem (limite diário)",
         "attachment": "1 MB",
@@ -299,7 +299,7 @@
       },
       {
         "q": "Posso pagar com Pix?",
-        "a": "Sim. No Brasil, o Envio e o Correio aceitam Pix, além do cartão, sempre em reais. Com Pix você paga um período por vez: cada renovação chega como uma fatura para pagar com Pix em até 5 dias, sem cobrança automática. Os 7 dias grátis do Correio são só no cartão. Boleto não é aceito."
+        "a": "Sim. No Brasil, o Envio e o Correio aceitam Pix pelo Stripe, em reais. Com Pix você paga um período por vez: cada renovação chega como uma fatura para pagar em até 5 dias, sem cobrança automática. Os 7 dias grátis do Correio são só no cartão, no primeiro plano elegível da equipe; no Pix, o acesso começa com o pagamento, sem teste grátis. Boleto não é aceito."
       },
       {
         "q": "Como funciona o plano Free?",

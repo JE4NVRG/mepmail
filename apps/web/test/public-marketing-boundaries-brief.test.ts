@@ -57,7 +57,7 @@ describe("marketing client serialization is not server translation filtering", (
       expect(selected.common).not.toHaveProperty("teamSwitcher");
       expect(selected.common).not.toHaveProperty("commandPalette");
       expect(selected.common).toHaveProperty("advertising");
-      expect(selected.common).toHaveProperty("subscriptionsPaused");
+      expect(selected.common).not.toHaveProperty("subscriptionsPaused");
       expect(JSON.stringify(selected).length).toBeLessThan(serializedBefore.length);
     }
     expect(JSON.stringify(original)).toBe(serializedBefore);
