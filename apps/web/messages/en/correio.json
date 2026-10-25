@@ -12,11 +12,7 @@
     "primary": "See how it works",
     "secondary": "Explore Send plans",
     "note": "Mail is paid separately. Choose Solo, Duo or Equipe in the dashboard, with or without a Send plan.",
-    "audiences": [
-      "For you",
-      "For your team",
-      "For your agents"
-    ]
+    "audiences": ["For you", "For your team", "For your agents"]
   },
   "use": {
     "eyebrow": "Your address. Your conversation.",

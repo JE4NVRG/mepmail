@@ -12,11 +12,7 @@
     "primary": "Ver como funciona",
     "secondary": "Conhecer planos de Envio",
     "note": "Correio pago à parte. Escolha Solo, Duo ou Equipe pelo painel, com ou sem plano de Envio.",
-    "audiences": [
-      "Para você",
-      "Para sua equipe",
-      "Para seus agentes"
-    ]
+    "audiences": ["Para você", "Para sua equipe", "Para seus agentes"]
   },
   "use": {
     "eyebrow": "O seu endereço. A sua conversa.",
