@@ -5,7 +5,7 @@
   },
   "hero": {
     "eyebrow": "Correio · e-mail no seu domínio, para você e seus agentes",
-    "status": "Correio · com ou sem Envio",
+    "status": "Prévia de lançamento · acesso fechado",
     "title": "Seu domínio. Seu e-mail. Seus agentes.",
     "titleEnd": "Tudo no mesmo lugar.",
     "lead": "Comprou um domínio? Tenha e-mail nele sem contratar hospedagem. Use no navegador ou nos apps para Windows e Linux e conecte agentes às caixas que escolher: você e seu agente na mesma caixa.",
@@ -181,7 +181,7 @@
         "combined": "Correio disponível com ou sem plano de Envio"
       }
     ],
-    "earlyNote": "Correio não exige plano pago de Envio. Solo, Duo e Equipe são cobrados à parte; contratos existentes de Envio e Correio mantêm as condições, sem migração automática."
+    "earlyNote": "Correio exige um plano de Envio acima de US$ 20/mês pelo preço regular. A oferta Pro 110K de US$ 29 qualifica mesmo na primeira mensalidade promocional de US$ 20. Contratos antigos de US$ 20 mantêm o preço; contas anteriores autorizadas para o Correio podem manter o plano atual de Envio ao adicionar caixas."
   },
   "preview": {
     "eyebrow": "Contratos de adicionais existentes",

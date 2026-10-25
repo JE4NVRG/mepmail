@@ -52,6 +52,13 @@ export function publicMarketingMessages(
   const common = messages.common as Record<string, unknown>;
   return {
     ...messages,
+    // Legacy Mail sections are server-rendered only for the closed/add-on fallback.
+    // Its calculator is the only client consumer; do not leak inactive offer text.
+    correio: Object.fromEntries(
+      Object.entries(messages.correio as Record<string, unknown>).filter(([key]) =>
+        ["meta", "preview", "release", "v2"].includes(key),
+      ),
+    ),
     common: Object.fromEntries(
       Object.entries(common).filter(([key]) => !APP_ONLY_COMMON_KEYS.has(key)),
     ),

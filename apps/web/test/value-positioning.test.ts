@@ -87,7 +87,8 @@ describe("landing value-first positioning", () => {
       // Free and Starter keep their daily caps; the six paid rungs follow.
       expect(volumes[0]).toContain("100");
       expect(volumes[0]).toContain("3k");
-      expect(volumes[1]).toContain("45k");
+      expect(volumes[1]).toContain(locale === "en" ? "1,500/day" : "1.500/dia");
+      expect(volumes[1]).not.toContain("45k");
       expect(volumes.slice(2).map(digits)).toEqual(PAID_CARD_QUOTAS[locale].map(digits));
     });
   }

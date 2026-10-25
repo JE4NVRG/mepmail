@@ -5,7 +5,7 @@
   },
   "hero": {
     "eyebrow": "MepMail Mail · email on your domain, for you and your agents",
-    "status": "Mail · with or without Send",
+    "status": "Launch preview · closed access",
     "title": "Your domain. Your email. Your agents.",
     "titleEnd": "All in one place.",
     "lead": "Bought a domain? Get email on it without paying for hosting. Use it in the browser or the Windows and Linux apps, and connect agents to the mailboxes you choose: you and your agent in the same mailbox.",
@@ -181,7 +181,7 @@
         "combined": "Mail is available with or without a Send plan"
       }
     ],
-    "earlyNote": "Mail does not require a paid Send plan. Solo, Duo and Equipe are billed separately; existing Send and Mail contracts keep their terms without automatic migration."
+    "earlyNote": "Mail requires a Send plan above US$ 20/month at its regular price. The US$ 29 Pro 110K offer qualifies even during its US$ 20 first monthly bill. Existing US$ 20 contracts keep their price; earlier accounts authorized for Mail may keep their current Send plan when adding mailboxes."
   },
   "preview": {
     "eyebrow": "Existing add-on contracts",

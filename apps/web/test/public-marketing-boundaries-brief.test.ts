@@ -50,7 +50,15 @@ describe("marketing client serialization is not server translation filtering", (
       expect(Object.keys(selected).sort()).toEqual(["auth", "common", "correio", "landing"]);
       expect(selected.auth).toEqual(original.auth);
       expect(selected.landing).toEqual(original.landing);
-      expect(selected.correio).toEqual(original.correio);
+      expect(selected.correio).toEqual(
+        Object.fromEntries(
+          Object.entries(original.correio as Record<string, unknown>).filter(([key]) =>
+            ["meta", "preview", "release", "v2"].includes(key),
+          ),
+        ),
+      );
+      expect(selected.correio).not.toHaveProperty("hero");
+      expect(selected.correio).not.toHaveProperty("comparison");
       expect(selected).not.toHaveProperty("supportTickets");
       expect(selected).not.toHaveProperty("console");
       expect(selected.common).not.toHaveProperty("supportView");

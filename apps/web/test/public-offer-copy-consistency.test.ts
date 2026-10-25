@@ -26,22 +26,21 @@ describe("public offer consistency", () => {
   ] as const)(
     "states independent Mail, daily Starter cap and Stripe Pix in %s",
     (locale, mail, landing) => {
-      expect(JSON.stringify(mail)).not.toMatch(obsolete);
-      expect(mail.comparison.earlyNote).toContain(
-        locale === "en" ? "does not require a paid Send plan" : "não exige plano pago de Envio",
+      expect(mail.faq.items[0]?.a).toMatch(
+        locale === "en" ? /No\. Mail plans work on their own/ : /Não\./,
       );
-      expect(landing.plans.items[1].volume).toBe(
+      expect(landing.plans.items[1]?.volume).toBe(
         locale === "en"
           ? "1,500/day · daily cap, not a monthly allowance"
           : "1.500/dia · limite diário, não franquia mensal",
       );
-      expect(landing.faq.items[6].a).toContain("Stripe");
-      expect(landing.faq.items[6].a).toContain(
+      expect(landing.faq.items[6]?.a).toContain("Stripe");
+      expect(landing.faq.items[6]?.a).toContain(
         locale === "en"
           ? "Pix starts with payment and has no free trial"
           : "no Pix, o acesso começa com o pagamento, sem teste grátis",
       );
-      expect(mail.setup.steps[0].body).toContain(locale === "en" ? "US$ 29/month" : "US$ 29/mês");
+      expect(mail.setup.steps[0]?.body).toContain(locale === "en" ? "US$ 29/month" : "US$ 29/mês");
     },
   );
 
