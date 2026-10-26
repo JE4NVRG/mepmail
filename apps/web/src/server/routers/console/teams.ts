@@ -560,6 +560,9 @@ export const consoleTeamsRouter = router({
         .update(t)
         .set({
           dailySendCeiling: input.dailySendCeiling,
+          // An explicit operator decision supersedes the signup allowance,
+          // including reaffirming the same number or restoring the plan limit.
+          betaDailySendCeiling: null,
           broadcastsPausedByOperatorAt: input.broadcastsPaused
             ? (team.broadcastsPausedByOperatorAt ?? now)
             : null,
@@ -608,10 +611,14 @@ export const consoleTeamsRouter = router({
         (team.dailySendCeiling ?? Number.POSITIVE_INFINITY);
       if (
         lifted ||
+        (team.betaDailySendCeiling !== null && input.dailySendCeiling === null) ||
         (pausedBefore && !input.broadcastsPaused) ||
         raisesQuota(
           teamQuota(team, cloud),
-          teamQuota({ ...team, dailySendCeiling: input.dailySendCeiling }, cloud),
+          teamQuota(
+            { ...team, dailySendCeiling: input.dailySendCeiling, betaDailySendCeiling: null },
+            cloud,
+          ),
         )
       ) {
         await kickQuotaDrain();

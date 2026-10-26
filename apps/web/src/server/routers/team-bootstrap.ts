@@ -302,10 +302,9 @@ export const teamBootstrapRouter = router({
               .values({
                 name: input.name.trim(),
                 slug,
-                // Beta default: an operator-set ceiling so a self-serve team
-                // starts capped; unset on classic self-host and adjustable
-                // per team later in the operator console.
-                dailySendCeiling: betaDefaultDailyCeiling() ?? null,
+                // Automatic signup allowance is not an operator override.
+                // Effective paid entitlements must not inherit a Free beta cap.
+                betaDailySendCeiling: betaDefaultDailyCeiling() ?? null,
               })
               .returning({ id: schema.teams.id });
             if (!team) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });

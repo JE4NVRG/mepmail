@@ -227,6 +227,8 @@ export interface QuotaTeamRow {
   overageCentsPer1k?: number | null;
   /** Operator ceiling on the team's UTC day (instance console); null or absent = the plan decides. */
   dailySendCeiling?: number | null | undefined;
+  /** Automatic signup allowance, applied only while the effective quota is Free. */
+  betaDailySendCeiling?: number | null | undefined;
 }
 
 /** What limits a team's sends right now. */
@@ -377,7 +379,14 @@ function withCeiling(quota: TeamQuota, plan: Plan, ceiling: number | null): Team
 
 /** The cap that applies to a team row right now; every send surface derives it from here. */
 export function teamQuota(team: QuotaTeamRow, isCloud: boolean, now: Date = new Date()): TeamQuota {
-  return withCeiling(planQuota(team, isCloud, now), team.plan, team.dailySendCeiling ?? null);
+  const quota = planQuota(team, isCloud, now);
+  // Derive entitlement first: an expired or unverified annual contract falls
+  // back to Free and does not acquire a paid exemption from a plan label.
+  const signupCeiling =
+    isCloud && quota.kind === "day" && quota.plan === "free"
+      ? (team.betaDailySendCeiling ?? null)
+      : null;
+  return withCeiling(quota, team.plan, team.dailySendCeiling ?? signupCeiling);
 }
 
 /** Emails a quota lets through in a month (a daily cap times 30); Infinity without a cap. */

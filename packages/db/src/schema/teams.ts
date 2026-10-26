@@ -163,6 +163,9 @@ export const teams = pgTable(
     // Operator overrides (instance console). A ceiling caps the team's UTC
     // day under its plan's limit (min of the two), on monthly plans too.
     dailySendCeiling: integer("daily_send_ceiling"),
+    // Signup-only allowance. Unlike an intentional operator override, this
+    // never constrains an effective paid plan. Legacy overrides stay untouched.
+    betaDailySendCeiling: integer("beta_daily_send_ceiling"),
     // While set, broadcasts park like a guardrail pause; transactional mail flows.
     broadcastsPausedByOperatorAt: timestamp("broadcasts_paused_by_operator_at", {
       withTimezone: true,

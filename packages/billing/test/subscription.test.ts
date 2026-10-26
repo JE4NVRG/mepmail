@@ -1,3 +1,4 @@
+import { fetchTeamQuota, readPeriodUsage, reserveQuota } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
@@ -101,6 +102,64 @@ async function reportedOverage(teamId: string): Promise<number | undefined> {
 
 const callOrder = (first: string, second: string) =>
   expect(state.calls.indexOf(first)).toBeLessThan(state.calls.indexOf(second));
+
+describe("paid activation separates signup allowance from operator limits", () => {
+  async function activate(betaDailySendCeiling: number, dailySendCeiling: number | null = null) {
+    const teamId = await createTeam(db);
+    const sub = subscription("sub_beta", "cus_beta", "active", "millionsend_pro_100k_monthly");
+    await db
+      .update(schema.teams)
+      .set({ stripeCustomerId: "cus_beta", betaDailySendCeiling, dailySendCeiling })
+      .where(eq(schema.teams.id, teamId));
+    await applySubscription(db, sub, () => {});
+    const now = new Date(PERIOD_START * 1000 + 1000);
+    const quota = await fetchTeamQuota(db, teamId, true, now);
+    if (!quota || quota.kind !== "month") throw new Error("Paid quota not applied");
+    return { teamId, quota, now, sub };
+  }
+
+  it("accepts 165 real quota reservations after activating Pro with an inherited 100 signup allowance", async () => {
+    const { teamId, quota, now } = await activate(100);
+    expect(quota).toMatchObject({ kind: "month", included: 110000 });
+    expect(quota).not.toHaveProperty("dailyCeiling");
+    await reserveQuota(db, { teamId, count: 165, quota, at: now });
+    expect((await readPeriodUsage(db, teamId, quota.periodStart)).accepted).toBe(165);
+    expect(await team(teamId)).toMatchObject({ betaDailySendCeiling: 100, dailySendCeiling: null });
+  });
+
+  it("preserves a manual 100 ceiling, refusing a 165 reservation despite an active paid plan", async () => {
+    const { teamId, quota, now } = await activate(100, 100);
+    expect(quota).toMatchObject({ dailyCeiling: 100 });
+    await reserveQuota(db, { teamId, count: 165, quota, at: now });
+    expect((await readPeriodUsage(db, teamId, quota.periodStart)).accepted).toBe(0);
+    expect(await team(teamId)).toMatchObject({ dailySendCeiling: 100 });
+  });
+
+  it("does not release an independent content hold or suspension on activation", async () => {
+    const { teamId, sub } = await activate(100);
+    const heldAt = new Date(PERIOD_START * 1000);
+    await db
+      .update(schema.teams)
+      .set({ sendReviewAt: heldAt, sendReviewReason: "content", suspendedAt: heldAt })
+      .where(eq(schema.teams.id, teamId));
+    await applySubscription(db, sub, () => {});
+    expect(await team(teamId)).toMatchObject({
+      sendReviewAt: heldAt,
+      sendReviewReason: "content",
+      suspendedAt: heldAt,
+    });
+  });
+
+  it("keeps an operator decision made after payment, including the same numeric beta allowance", async () => {
+    const { teamId, now, sub } = await activate(100);
+    await db
+      .update(schema.teams)
+      .set({ dailySendCeiling: 100, betaDailySendCeiling: null })
+      .where(eq(schema.teams.id, teamId));
+    await applySubscription(db, sub, () => {});
+    expect(await fetchTeamQuota(db, teamId, true, now)).toMatchObject({ dailyCeiling: 100 });
+  });
+});
 
 describe("grandfathering during reconciliation", () => {
   it("does not add current-catalog overage to an old or unknown contract", async () => {
