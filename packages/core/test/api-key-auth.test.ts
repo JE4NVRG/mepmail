@@ -75,6 +75,7 @@ describe("authenticateApiKey billing", () => {
       currentPeriodEnd: null,
       overageEnabled: true,
       dailySendCeiling: null,
+      betaDailySendCeiling: null,
     });
     // A period around now: a fixed date range expires and the effective plan drops to free.
     const currentPeriodStart = new Date(Date.now() - 15 * 86_400_000);
@@ -88,6 +89,7 @@ describe("authenticateApiKey billing", () => {
         currentPeriodEnd,
         overageEnabled: true,
         dailySendCeiling: null,
+        betaDailySendCeiling: 100,
       })
       .where(eq(schema.teams.id, teamId));
     const auth = await authenticateApiKey(db, token);
@@ -104,7 +106,10 @@ describe("authenticateApiKey billing", () => {
       currentPeriodEnd,
       overageEnabled: true,
       dailySendCeiling: null,
+      betaDailySendCeiling: 100,
     });
+    if (!auth) throw new Error("API authentication failed");
+    expect(teamQuota(auth.billing, true)).not.toHaveProperty("dailyCeiling");
     expect(auth?.plan).toBe("pro");
   });
 
