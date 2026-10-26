@@ -1,3 +1,4 @@
+import { fetchTeamQuota } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTestDb } from "@millionsend/test-utils";
@@ -75,12 +76,39 @@ describe("beta default daily ceiling (BETA_DEFAULT_DAILY_CEILING)", () => {
     });
   }
 
-  it("stamps new teams with the operator ceiling", async () => {
+  it("stamps new teams with a distinct automatic signup allowance", async () => {
     vi.stubEnv("BETA_DEFAULT_DAILY_CEILING", "100");
     await db.insert(schema.user).values({ id: "u1", name: "u1", email: "u1@example.com" });
     const { teamId } = await callerFor("u1").team.createTeam({ name: "Ada Labs" });
     const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
-    expect(team?.dailySendCeiling).toBe(100);
+    expect(team?.dailySendCeiling).toBeNull();
+    expect(team?.betaDailySendCeiling).toBe(100);
+    await db
+      .update(schema.teams)
+      .set({ plan: "pro", planQuota: 110000 })
+      .where(eq(schema.teams.id, teamId));
+    const quota = await fetchTeamQuota(db, teamId, true);
+    expect(quota).toMatchObject({ kind: "month", included: 110000 });
+    expect(quota).not.toHaveProperty("dailyCeiling");
+  });
+
+  it("preserves an operator reaffirming the same 100 on later paid activation", async () => {
+    vi.stubEnv("BETA_DEFAULT_DAILY_CEILING", "100");
+    await db.insert(schema.user).values({ id: "u1", name: "u1", email: "u1@example.com" });
+    const caller = callerFor("u1");
+    const { teamId } = await caller.team.createTeam({ name: "Manual cap fixture" });
+    await caller.console.teams.adjustLimits({
+      id: teamId,
+      dailySendCeiling: 100,
+      broadcastsPaused: false,
+    });
+    await db
+      .update(schema.teams)
+      .set({ plan: "pro", planQuota: 110000 })
+      .where(eq(schema.teams.id, teamId));
+    const [stored] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    expect(stored).toMatchObject({ dailySendCeiling: 100, betaDailySendCeiling: null });
+    expect(await fetchTeamQuota(db, teamId, true)).toMatchObject({ dailyCeiling: 100 });
   });
 
   it("leaves new teams uncapped without the beta ceiling", async () => {

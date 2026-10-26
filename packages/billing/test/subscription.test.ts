@@ -104,6 +104,11 @@ const callOrder = (first: string, second: string) =>
   expect(state.calls.indexOf(first)).toBeLessThan(state.calls.indexOf(second));
 
 describe("paid activation separates signup allowance from operator limits", () => {
+  async function snapshot(teamId: string) {
+    const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    return row;
+  }
+
   async function activate(betaDailySendCeiling: number, dailySendCeiling: number | null = null) {
     const teamId = await createTeam(db);
     const sub = subscription("sub_beta", "cus_beta", "active", "millionsend_pro_100k_monthly");
@@ -114,7 +119,7 @@ describe("paid activation separates signup allowance from operator limits", () =
     await applySubscription(db, sub, () => {});
     const now = new Date(PERIOD_START * 1000 + 1000);
     const quota = await fetchTeamQuota(db, teamId, true, now);
-    if (!quota || quota.kind !== "month") throw new Error("Paid quota not applied");
+    if (quota?.kind !== "month") throw new Error("Paid quota not applied");
     return { teamId, quota, now, sub };
   }
 
@@ -124,7 +129,10 @@ describe("paid activation separates signup allowance from operator limits", () =
     expect(quota).not.toHaveProperty("dailyCeiling");
     await reserveQuota(db, { teamId, count: 165, quota, at: now });
     expect((await readPeriodUsage(db, teamId, quota.periodStart)).accepted).toBe(165);
-    expect(await team(teamId)).toMatchObject({ betaDailySendCeiling: 100, dailySendCeiling: null });
+    expect(await snapshot(teamId)).toMatchObject({
+      betaDailySendCeiling: 100,
+      dailySendCeiling: null,
+    });
   });
 
   it("preserves a manual 100 ceiling, refusing a 165 reservation despite an active paid plan", async () => {
@@ -132,7 +140,7 @@ describe("paid activation separates signup allowance from operator limits", () =
     expect(quota).toMatchObject({ dailyCeiling: 100 });
     await reserveQuota(db, { teamId, count: 165, quota, at: now });
     expect((await readPeriodUsage(db, teamId, quota.periodStart)).accepted).toBe(0);
-    expect(await team(teamId)).toMatchObject({ dailySendCeiling: 100 });
+    expect(await snapshot(teamId)).toMatchObject({ dailySendCeiling: 100 });
   });
 
   it("does not release an independent content hold or suspension on activation", async () => {
@@ -143,7 +151,7 @@ describe("paid activation separates signup allowance from operator limits", () =
       .set({ sendReviewAt: heldAt, sendReviewReason: "content", suspendedAt: heldAt })
       .where(eq(schema.teams.id, teamId));
     await applySubscription(db, sub, () => {});
-    expect(await team(teamId)).toMatchObject({
+    expect(await snapshot(teamId)).toMatchObject({
       sendReviewAt: heldAt,
       sendReviewReason: "content",
       suspendedAt: heldAt,
