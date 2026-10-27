@@ -38,6 +38,7 @@ function render(overrides: Partial<Props> = {}, locale = "pt-BR") {
   // next-intl requires children in the typed SSR provider props.
   const providerProps: ComponentProps<typeof NextIntlClientProvider> = {
     locale,
+    timeZone: "UTC",
     messages: { mailboxes: locale === "en" ? en : pt },
     children: createElement(MailboxRail, { ...props(), ...overrides }),
   };

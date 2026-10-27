@@ -91,6 +91,22 @@ function rail(input = props()) {
   const tree = MailboxRail(input);
   return { tree, html: renderToStaticMarkup(tree), input };
 }
+function openSwitcher(input = props()) {
+  const trigger = nodes(rail(input).tree).find(
+    (node) =>
+      node.type === "button" && node.props["aria-controls"] === "readability-fixture-box-picker",
+  );
+  if (!trigger) throw new Error("Missing mailbox switcher");
+  expect(trigger.props["aria-expanded"]).toBe(false);
+  (trigger.props.onClick as () => void)();
+  const opened = rail(input);
+  expect(
+    nodes(opened.tree).find(
+      (node) => node.props["aria-controls"] === "readability-fixture-box-picker",
+    )?.props["aria-expanded"],
+  ).toBe(true);
+  return opened;
+}
 beforeEach(() => {
   h.states = {};
   h.cursor = 0;
@@ -101,9 +117,9 @@ describe.each(["en", "pt-BR"] as const)("readable mailbox identity in %s", (loca
     h.locale = locale;
   });
   it("keeps the full name, secondary address and unread context available on the native selection button", () => {
-    const { tree, html, input } = rail();
+    const { tree, html, input } = openSwitcher();
     const button = nodes(tree).find(
-      (node) => node.type === "button" && String(node.props["aria-label"]).includes(target.address),
+      (node) => node.type === "button" && node.props["data-mailbox-id"] === target.id,
     );
     if (!button) throw new Error("Missing mailbox selection button");
     expect(button.props["aria-label"]).toContain(target.label);
@@ -129,7 +145,7 @@ describe.each(["en", "pt-BR"] as const)("readable mailbox identity in %s", (loca
         address: `sales${index}@example.test`,
       })),
     ];
-    const search = nodes(rail(input).tree).find(
+    const search = nodes(openSwitcher(input).tree).find(
       (node) => node.type === "input" && node.props.type === "search",
     );
     if (!search) throw new Error("Missing mailbox search");
