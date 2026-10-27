@@ -52,6 +52,7 @@ import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { recordAudit } from "../audit";
 import { resolveBaseUrl } from "../auth";
 import { getPixStripe, getStripe, mailPlanMove, pixPaymentsOpen } from "../billing";
+import { emptyBillingSummary, readBillingSummary } from "../billing-summary";
 import { emitFunnel } from "../funnel";
 import { newSubscriptionsPaused } from "../new-subscriptions";
 import { enforcePurchaseRateLimit } from "../purchase-rate-limit";
@@ -218,11 +219,16 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
       let effectiveRung = null;
       let effectiveInterval: "month" | "year" | null = null;
       let paidByPix = false;
+      let billingSummary = emptyBillingSummary(
+        team.plan === "free" || team.plan === "system" ? "not_applicable" : "unavailable",
+      );
       if (team.plan !== "free" && team.plan !== "system" && team.stripeSubscriptionId) {
         try {
-          const subscription = await deps
-            .stripe()
-            .subscriptions.retrieve(team.stripeSubscriptionId, { expand: SUBSCRIPTION_EXPAND });
+          const statusStripe = deps.stripe();
+          const subscription = await statusStripe.subscriptions.retrieve(
+            team.stripeSubscriptionId,
+            { expand: SUBSCRIPTION_EXPAND },
+          );
           const resolved = rungFromSubscription(subscription);
           const base = subscription.items.data.find(
             (item) => item.price.recurring?.usage_type === "licensed",
@@ -251,6 +257,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
             effectiveRung = resolved;
             effectiveInterval = interval === "year" ? "year" : "month";
             subscriptionState = "confirmed";
+            billingSummary = await readBillingSummary(statusStripe, subscription);
           }
         } catch {
           // Falha de leitura não autoriza usar preço do catálogo como contrato vigente.
@@ -283,6 +290,7 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
             }
           : operationalQuota;
       return {
+        billingSummary,
         effectiveRung,
         subscriptionState,
         plan: team.plan,

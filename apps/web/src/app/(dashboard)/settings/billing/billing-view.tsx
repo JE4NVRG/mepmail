@@ -26,7 +26,7 @@ import { Skeleton } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { Switch } from "@/components/switch";
 import { WarnCard } from "@/components/warn-card";
-import { formatDay, formatDayTime, formatUsd } from "@/lib/format";
+import { formatDay, formatUsd } from "@/lib/format";
 import { formatBrl } from "@/lib/landing-pricing";
 import {
   clearLaunchComboIntent,
@@ -46,6 +46,7 @@ import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { useInAndroidApp } from "@/lib/use-android-app";
 import { QuotaRow } from "../usage/usage-view";
+import { BillingSummaryPanel } from "./billing-summary-panel";
 import { LaunchComboMailStep } from "./launch-combo-step";
 import { PixInvoices } from "./pix-invoices";
 
@@ -569,17 +570,13 @@ export function BillingView({
                   : null}
             </div>
           </div>
-          {currentPeriodEnd && plan !== "free" ? (
-            <div>
-              <div className="ms-microlabel" style={{ fontSize: 10.5 }}>
-                {t("renewsOn")}
-              </div>
-              <div style={{ marginTop: 6, color: "var(--ms-bone)", fontSize: "var(--ms-fs-ui)" }}>
-                {formatDayTime(currentPeriodEnd, locale)}
-              </div>
-            </div>
-          ) : null}
         </div>
+
+        <BillingSummaryPanel
+          summary={status.data.billingSummary}
+          locale={locale}
+          onRetry={() => void status.refetch()}
+        />
 
         {pending && currentPeriodEnd ? (
           <div
