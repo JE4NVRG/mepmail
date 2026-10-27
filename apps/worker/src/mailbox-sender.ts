@@ -13,6 +13,7 @@ import { associateTenantResources, ensureTenant, type SesTenantClient } from "@m
 import { and, eq } from "drizzle-orm";
 import { simpleParser } from "mailparser";
 import type { SesSender } from "./handlers/send-email.js";
+import { isSesEnforcementRefusal, type SesQuotaGate } from "./handlers/ses-quota.js";
 import type { SesFailover } from "./ses-failover.js";
 
 export const mailboxWorkerMime: MailboxTransportMimeAdapter = {
@@ -109,17 +110,11 @@ export function createMailboxSesSender(
     tenants?: boolean;
     /** SES's own pause on the region (EnforcementStatus SHUTDOWN or sending off). */
     paused?: (region: string) => boolean;
-    /**
-     * The customer SMTP relay (CUSTOMER_SMTP_RELAY_URL). A mailbox on a domain
-     * the operator verified at the relay's provider (domains.relay_enabled_at)
-     * sends through it while SES has paused the region, as API mail does.
-     */
+    /** Real regional enforcement state and account refresh, not capacity alone. */
+    sesQuota?: SesQuotaGate;
+    /** Legacy configuration only: an SES account pause never authorizes relay use. */
     relay?: { name: string; sender: SesSender } | undefined;
-    /**
-     * SES_FAILOVER_REGION/SES_FAILOVER_DOMAINS: a listed domain, verified in
-     * the failover region with a Mail configuration set there, sends from it
-     * while SES has paused its own region (before any relay), untagged.
-     */
+    /** Legacy configuration only: an SES account pause never authorizes region failover. */
     failover?: SesFailover | undefined;
   } = {},
 ): MailboxOutboxSender {
@@ -186,43 +181,6 @@ export function createMailboxSesSender(
     }
     if (allowed !== true) throw new MailboxSendRejectedError();
   }
-  /**
-   * The same raw MIME and envelope over the relay, no SES pacing (the bucket is
-   * SES's rate). The relay's explicit SMTP reply says what it did with the
-   * message: a failed login or a 4xx reply means it accepted nothing, so the
-   * row is retried; a 5xx means it refused it. A timeout or a dropped
-   * connection proves nothing and stays ambiguous. Only the codes are logged:
-   * a reply can quote a recipient.
-   */
-  async function relaySend(
-    relay: { name: string; sender: SesSender },
-    input: Parameters<MailboxOutboxSender["send"]>[0],
-    recipients: string[],
-  ): Promise<{ messageId: string }> {
-    await refuseSesOverrides(input.raw);
-    await allowedRecipients(input.teamId, recipients);
-    try {
-      return await relay.sender.sendRaw({
-        raw: input.raw,
-        emailId: input.outboxId,
-        to: input.to,
-        cc: input.cc,
-        bcc: input.bcc,
-        envelopeFrom: input.from,
-      });
-    } catch (error) {
-      const e = error as { code?: unknown; responseCode?: unknown };
-      console.warn(
-        `mailbox.send: SMTP relay ${relay.name} failed (${String(e.code ?? "error")} ${String(e.responseCode ?? "-")})`,
-      );
-      if (e.code === "EAUTH") throw new MailboxSendDeferredError();
-      if (typeof e.responseCode === "number" && e.responseCode >= 400 && e.responseCode < 600)
-        throw e.responseCode < 500
-          ? new MailboxSendDeferredError()
-          : new MailboxSendRejectedError();
-      throw error;
-    }
-  }
   return {
     async send(input) {
       // Capture the same MIME/envelope whose recipient permits are reserved below. Bcc
@@ -274,21 +232,12 @@ export function createMailboxSesSender(
       // A send-review hold keeps the message for the operator's release, as
       // it keeps the team's API mail.
       if (domain.sendReviewAt) throw new MailboxSendDeferredError();
-      const homePaused = opts.paused?.(domain.region) === true;
-      // A listed domain leaves from the failover region while SES pauses its
-      // own; the tenant and the domain's sets stay home, so it goes untagged.
-      const failoverRegion =
-        opts.failover &&
-        homePaused &&
-        opts.failover.domains.has(domain.domainName) &&
-        opts.paused?.(opts.failover.region) !== true
-          ? opts.failover.region
-          : undefined;
-      // While SES has paused the region, a domain the operator verified at the
-      // relay's provider leaves through the relay, as the team's API mail does.
-      if (!failoverRegion && opts.relay && domain.relayEnabledAt && homePaused)
-        return relaySend(opts.relay, input, recipients);
-      const region = failoverRegion ?? domain.region;
+      const accountPaused = () =>
+        opts.paused?.(domain.region) === true ||
+        opts.sesQuota?.accountPaused?.(domain.region) === true;
+      // An SES enforcement stop never authorizes automatic relay/region failover.
+      if (accountPaused()) throw new MailboxSendDeferredError();
+      const region = domain.region;
       const configurationSet = configurationSets[region];
       if (!configurationSet) throw new MailboxSendDeferredError();
       // Campaign configuration can enable SES Open/Click body rewriting. Mail
@@ -315,12 +264,11 @@ export function createMailboxSesSender(
         client = opts.clientFactory ? opts.clientFactory(options) : new SESv2Client(options);
         clients.set(region, client);
       }
-      const tenantName = failoverRegion
-        ? undefined
-        : await sendingTenant(client, domain, configurationSet);
+      const tenantName = await sendingTenant(client, domain, configurationSet);
       // Tenant provisioning can wait on the network after the first gate.
       // A restriction introduced during that wait still precedes the send.
       await allowedRecipients(input.teamId, recipients);
+      if (accountPaused()) throw new MailboxSendDeferredError();
       let response: Awaited<ReturnType<MailboxSesClient["send"]>>;
       try {
         response = await client.send(
@@ -338,14 +286,14 @@ export function createMailboxSesSender(
         );
       } catch (error) {
         // Only explicit documented SES refusals prove there was no acceptance.
+        if (await isSesEnforcementRefusal(error, opts.sesQuota, region))
+          throw new MailboxSendDeferredError();
         const name = error instanceof Error ? error.name : "";
         if (
           [
             "MessageRejected",
             "MessageRejectedException",
             "BadRequestException",
-            "AccountSuspendedException",
-            "SendingPausedException",
             "MailFromDomainNotVerifiedException",
           ].includes(name)
         )

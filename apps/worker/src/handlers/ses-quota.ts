@@ -74,3 +74,34 @@ export function isSesThrottle(err: unknown): boolean {
 export function isSesQuotaRefusal(err: unknown): boolean {
   return isSesThrottle(err) && /daily (message|sending) quota/i.test((err as Error).message ?? "");
 }
+
+/** Only explicit, nonaccepted account enforcement refusals, never network wording. */
+export function isSesAccountPauseError(error: unknown): boolean {
+  const e = error as { name?: string; message?: string } | null;
+  if (e?.name === "AccountSuspendedException" || e?.name === "SendingPausedException") return true;
+  return (
+    (e?.name === "MessageRejected" || e?.name === "MessageRejectedException") &&
+    /sending (?:is )?(?:suspended|paused|disabled) for (?:this|your(?: entire)?(?: amazon ses)?) account|(?:your(?: entire)? (?:amazon ses )?account|account's) (?:is |has been )?(?:paused|suspended)|email sending is disabled for your entire amazon ses account/i.test(
+      e.message ?? "",
+    )
+  );
+}
+
+/** A full daily quota is NOT evidence that a rejected message was an account pause. */
+export async function isSesEnforcementRefusal(
+  error: unknown,
+  gate?: SesQuotaGate,
+  region?: string,
+): Promise<boolean> {
+  // Do not let an unavailable/stale account refresh erase a proven nonacceptance.
+  if (isSesAccountPauseError(error)) return true;
+  const name = (error as { name?: string } | null)?.name;
+  if (name !== "MessageRejected" && name !== "MessageRejectedException") return false;
+  if (gate?.accountPaused?.(region) === true) return true;
+  try {
+    await gate?.refresh(region);
+  } catch {
+    // Custom adapters may throw; their cached enforcement state still stands.
+  }
+  return gate?.accountPaused?.(region) === true;
+}

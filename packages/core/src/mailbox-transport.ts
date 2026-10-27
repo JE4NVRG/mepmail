@@ -109,8 +109,8 @@ export class MailboxSendRejectedError extends Error {
     super("mailbox_provider_rejected");
   }
 }
-/** Trusted adapter preflight only: no provider.send has been invoked yet.
- * This must never wrap a provider timeout, disconnect, 5xx or lost response.
+/** Trusted adapter: preflight or an explicit provider account-pause refusal
+ * proving nonacceptance. Never wrap a timeout, disconnect, 5xx or lost response.
  */
 export class MailboxSendDeferredError extends Error {
   constructor() {
@@ -1398,7 +1398,7 @@ export async function sendMailboxOutbox(
     });
   } catch (error) {
     if (error instanceof MailboxSendDeferredError) {
-      // The trusted adapter proves no external call occurred. Keep the exact
+      // The trusted adapter proves nonacceptance. Keep the exact
       // snapshot/reservation, clear only this claim, and let the runtime defer
       // its ID. A reconciled unknown/accepted row is never reset by a late job.
       const [deferred] = await db

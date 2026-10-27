@@ -190,6 +190,11 @@ const mailboxSes = mailboxTransportEnabled
       checkRecipients: (input) => checkMailboxRecipientBlocks(db, input),
       tenants: sesTenantsEnabled(),
       paused: (region) => sendControls.accountPaused?.(region) === true,
+      sesQuota: {
+        exhausted: (region) => sendControls.exhausted(region),
+        refresh: (region) => sendControls.refresh(region),
+        accountPaused: (region) => sendControls.accountPaused?.(region) === true,
+      },
       relay,
       failover,
     })

@@ -44,7 +44,12 @@ import { schema } from "@millionsend/db";
 import { type EmailSendPriority, emailSendPriority } from "@millionsend/queue";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { createTransport } from "nodemailer";
-import { isSesQuotaRefusal, isSesThrottle, type SendQuotaControls } from "./ses-quota.js";
+import {
+  isSesEnforcementRefusal,
+  isSesQuotaRefusal,
+  isSesThrottle,
+  type SendQuotaControls,
+} from "./ses-quota.js";
 
 /**
  * Sends one queued email through SES. The SES client is injected (tests use
@@ -98,29 +103,9 @@ export interface SendDeps {
     | undefined;
   /** SES's 24-hour quota and the broadcast share; absent in tests that never reach it. */
   sesQuota?: SendQuotaControls | undefined;
-  /**
-   * SMTP relay for the platform's own mail (the system team's domains and the
-   * shared onboarding sender) while SES has paused the account: sign-up,
-   * password and notice mail, and a new team's first test, keep flowing.
-   * Customer domains never use it (their DKIM lives with SES); they park,
-   * or take the customer relay below.
-   */
+  /** Legacy configured transports: an account pause never authorizes automatic use. */
   fallback?: SesSender | undefined;
-  /**
-   * A second provider's SMTP relay (CUSTOMER_SMTP_RELAY_URL) for customer
-   * mail while SES has paused the account: only a domain an operator marked
-   * verified there (domains.relay_enabled_at), only its transactional mail,
-   * and only past every hold, suppression and quota check a send through SES
-   * passes. A failed relay send parks the row as the pause itself would.
-   */
   relay?: { name: string; sender: SesSender } | undefined;
-  /**
-   * An operator's failover SES region (SES_FAILOVER_REGION) for the domains
-   * it lists (SES_FAILOVER_DOMAINS), verified there too: their transactional
-   * mail leaves from that region while SES has paused the domain's own. The
-   * row keeps its home region; only the send moves, with the default
-   * configuration set and no tenant (both are regional).
-   */
   failover?: { region: string; domains: ReadonlySet<string> } | undefined;
   /** Arms the webhook drain for the endpoints written; email.sent webhooks are skipped when absent. */
   enqueueWebhookDelivery?: WebhookEnqueue | undefined;
@@ -383,13 +368,12 @@ const hasListUnsubscribe = (headers: Record<string, string> | null | undefined):
 
 /**
  * SES errors that no retry can fix: the message itself (MessageRejected,
- * BadRequest) or the sending identity/account is refused. Throttling,
- * SendingPaused and 5xx stay retryable.
+ * BadRequest) or the sending identity is refused. Account enforcement
+ * refusals are classified first and preserve the queue.
  */
 const TERMINAL_SES_ERRORS = new Set([
   "MessageRejected",
   "MailFromDomainNotVerifiedException",
-  "AccountSuspendedException",
   "BadRequestException",
 ]);
 
@@ -451,7 +435,7 @@ export async function sendEmail(
     .where(eq(schema.emails.id, payload.emailId));
   // Only queued emails are sendable: quota-parked, already-sent, and failed
   // rows are skipped no matter how the job arrived.
-  if (email?.latestStatus !== "queued") return "skipped";
+  if (email?.latestStatus !== "queued" || email.sentAt !== null) return "skipped";
   if (email.scheduledAt && email.scheduledAt.getTime() > Date.now()) {
     // Returning without re-enqueueing would ack the job and strand the
     // email forever; hand it back to the queue for its due time.
@@ -531,35 +515,20 @@ export async function sendEmail(
   // window frees. A bulk row parks earlier, at the broadcast share (or while
   // the region's broadcasts are held), so transactional mail keeps the rest.
   const bulk = email.broadcastId !== null;
-  // A listed domain's transactional mail moves to the failover region while
-  // SES has paused its own and not that one; every check below then reads the
-  // region the send actually leaves from.
-  const failoverRegion =
-    deps.failover &&
-    !bulk &&
-    domain &&
-    deps.failover.domains.has(domain.name) &&
-    deps.sesQuota?.accountPaused?.(domain.region) === true &&
-    deps.sesQuota.accountPaused?.(deps.failover.region) !== true
-      ? deps.failover.region
-      : undefined;
-  const region = failoverRegion ?? domain?.region;
-  // The platform's own mail: a domain of the instance's system team, or the
-  // shared onboarding sender (no domain row).
-  const platformMail = !bulk && (email.domainId === null || domain?.ownerPlan === "system");
-  const sesPaused = deps.sesQuota?.accountPaused?.(region) === true;
-  const viaFallback = deps.fallback !== undefined && platformMail && sesPaused;
-  // A domain the operator verified at the customer relay's provider: its
-  // transactional mail leaves there while SES's own pause lasts, and only
-  // then. The holds above have already parked a suspended or held team.
-  const viaRelay =
-    deps.relay !== undefined && !bulk && !viaFallback && sesPaused && !!domain?.relayEnabledAt;
+  if (email.broadcastId && (await broadcastCanceled(db, email.broadcastId))) {
+    return refuse(db, email, "broadcast_canceled");
+  }
+  // A provider/account stop is not permission to replay through another account,
+  // region or relay. Capacity-only exhaustion retains its existing quota path.
+  if (deps.sesQuota?.accountPaused?.(domain?.region) === true) {
+    await parkQueued(db, email, "SES account paused");
+    if (!bulk) deps.sesQuota.noteTransactionalParked?.(domain?.region);
+    return "parked";
+  }
+  // Account pauses never select another provider. Operator-configured customer
+  // external-mailbox transports are a separate Correio adapter, not this lane.
+  const region = domain?.region;
   if (bulk) {
-    // Before any park: a row of a stopped broadcast must end canceled, never
-    // parked where no sweep looks again.
-    if (email.broadcastId && (await broadcastCanceled(db, email.broadcastId))) {
-      return refuse(db, email, "broadcast_canceled");
-    }
     if (deps.sesQuota?.bulkExhausted?.(region) || deps.sesQuota?.paused?.(region)) {
       await parkQueued(
         db,
@@ -568,7 +537,7 @@ export async function sendEmail(
       );
       return "parked";
     }
-  } else if (!viaFallback && !viaRelay && deps.sesQuota?.exhausted(region)) {
+  } else if (deps.sesQuota?.exhausted(region)) {
     await parkQueued(db, email, "SES 24h quota reached or account paused");
     deps.sesQuota.noteTransactionalParked?.(region);
     return "parked";
@@ -591,13 +560,8 @@ export async function sendEmail(
     return "failed";
   }
   // A domain's own set and its tenant live in its home region.
-  const configurationSet = failoverRegion
-    ? deps.defaultConfigurationSet
-    : (domain?.sesConfigurationSet ?? deps.defaultConfigurationSet);
-  // TenantName rides only when the set this send names is the one associated
-  // with the tenant: SES rejects a tenant send referencing an unassociated set.
+  const configurationSet = domain?.sesConfigurationSet ?? deps.defaultConfigurationSet;
   const tenantName =
-    !failoverRegion &&
     domain?.sesTenantAssociatedAt &&
     domain.sesTenantName &&
     (domain.sesTenantConfigSet ?? null) === (configurationSet ?? null)
@@ -832,6 +796,11 @@ export async function sendEmail(
     }
   }
 
+  if (deps.sesQuota?.accountPaused?.(domain?.region) === true) {
+    await parkQueued(db, email, "SES account paused");
+    return "parked";
+  }
+
   // Atomic claim (sentAt doubles as the claim marker): closes the
   // double-send windows — a concurrent worker on the same job, and a retry
   // after SES accepted but the post-send bookkeeping failed. Claimed rows
@@ -848,13 +817,17 @@ export async function sendEmail(
     )
     .returning({ id: schema.emails.id });
   if (claimed.length === 0) return "skipped";
+  // The claim itself awaits the DB; an account probe may close the gate then.
+  if (deps.sesQuota?.accountPaused?.(domain?.region) === true) {
+    await db
+      .update(schema.emails)
+      .set({ sentAt: null })
+      .where(and(eq(schema.emails.id, email.id), eq(schema.emails.latestStatus, "queued")));
+    await parkQueued(db, email, "SES account paused");
+    return "parked";
+  }
 
-  const sender =
-    viaRelay && deps.relay
-      ? deps.relay.sender
-      : viaFallback && deps.fallback
-        ? deps.fallback
-        : deps.ses;
+  const sender = deps.ses;
   let messageId: string;
   try {
     ({ messageId } = await sender.sendRaw({
@@ -866,51 +839,40 @@ export async function sendEmail(
       ...(configurationSet ? { configurationSetName: configurationSet } : {}),
       ...(region ? { region } : {}),
       ...(tenantName ? { tenantName } : {}),
-      ...(viaRelay ? { envelopeFrom: extractAddrSpec(email.from) } : {}),
     }));
   } catch (err) {
-    if (viaRelay) {
-      // The relay refused or never answered: the row parks as SES's pause
-      // parks it, never failed, and the drain hands it back while the pause
-      // lasts. Only the SMTP codes are logged: a reply can quote a recipient.
-      await db
-        .update(schema.emails)
-        .set({ sentAt: null })
-        .where(and(eq(schema.emails.id, email.id), eq(schema.emails.latestStatus, "queued")));
-      const e = err as { code?: unknown; responseCode?: unknown };
-      await parkQueued(
-        db,
-        email,
-        `SMTP relay ${deps.relay?.name} failed (${String(e.code ?? "error")} ${String(e.responseCode ?? "-")})`,
-      );
-      deps.sesQuota?.noteTransactionalParked?.(region);
-      return "parked";
-    }
-    // sendRaw threw ⇒ the SDK exhausted its own retries without an accept.
-    // A permanent refusal ends the email here; anything else releases the
-    // claim so the job retry can send. (After a SUCCESSFUL sendRaw the claim
+    // An explicit refusal proves nonacceptance; transport failure does not.
+    // A permanent refusal ends the email here; an ambiguous transport error
+    // keeps the claim, while a retryable explicit refusal releases it.
+    // (After a SUCCESSFUL sendRaw the claim
     // is never released — a bookkeeping failure then leaves the row claimed
     // rather than risking a duplicate delivery.)
     const name = (err as { name?: string }).name ?? "";
     // SES answers MessageRejected for every message while it has paused the
     // account; a fresh account read tells that apart from a refused message,
     // and the mail parks for the drain instead of failing for good.
-    if (
-      name === "MessageRejected" &&
-      deps.sesQuota !== undefined &&
-      (await deps.sesQuota.refresh(region))
-    ) {
+    if (await isSesEnforcementRefusal(err, deps.sesQuota, region)) {
       await db
         .update(schema.emails)
         .set({ sentAt: null })
         .where(and(eq(schema.emails.id, email.id), eq(schema.emails.latestStatus, "queued")));
       await parkQueued(db, email, "SES account paused");
-      if (!bulk) deps.sesQuota.noteTransactionalParked?.(region);
+      if (!bulk) deps.sesQuota?.noteTransactionalParked?.(region);
       return "parked";
     }
     if (TERMINAL_SES_ERRORS.has(name)) {
       await failQueuedEmail(db, email.id, `ses_${name}`);
       return "failed";
+    }
+    const transport = err as { name?: string; code?: string; syscall?: string };
+    if (
+      transport.name === "TimeoutError" ||
+      transport.name === "AbortError" ||
+      transport.syscall !== undefined ||
+      ["ETIMEDOUT", "ECONNRESET", "EPIPE", "ESOCKET"].includes(transport.code ?? "")
+    ) {
+      // Acceptance is unknown. Keep the claim so a queue retry cannot replay it.
+      throw err;
     }
     await db
       .update(schema.emails)

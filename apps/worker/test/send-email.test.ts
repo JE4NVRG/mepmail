@@ -1030,65 +1030,25 @@ it("an unresolved tracking subdomain falls back to the shared host where one is 
   expect(mime).not.toContain("track.pendingsub.dev");
 });
 
-it("while SES has paused the account, the platform's own mail leaves through the fallback and a customer's parks", async () => {
-  const systemTeam = await createTeam(db, "platform-team");
-  await db.update(schema.teams).set({ plan: "system" }).where(eq(schema.teams.id, systemTeam));
-  const [systemDomain] = await db
-    .insert(schema.domains)
-    .values({
-      teamId: systemTeam,
-      name: "platform.dev",
-      region: "us-east-1",
-      status: "verified",
-      verifiedAt: new Date(),
-    })
-    .returning({ id: schema.domains.id });
-  const { ses, sends } = fakeSes("must-not-be-used");
-  const relayed: string[] = [];
-  const fallback: SesSender = {
-    async sendRaw(params) {
-      relayed.push(params.emailId);
-      return { messageId: `smtp-fallback:${params.emailId}` };
-    },
-  };
-  const sesQuota = { exhausted: () => true, accountPaused: () => true, refresh: async () => true };
-  const onboardingEmailFrom = "MepMail <welcome@platform.dev>";
-  const deps: SendDeps = { keyring, ses, sesQuota, fallback, onboardingEmailFrom };
-
-  const account = await insertEmail({
-    teamId: systemTeam,
-    domainId: systemDomain?.id ?? null,
-    from: "MepMail <account@platform.dev>",
-  });
-  const onboarding = await insertEmail({ domainId: null, from: onboardingEmailFrom });
-  const customer = await insertEmail();
-  expect(await sendEmail(db, deps, { emailId: account })).toBe("sent");
-  expect(await sendEmail(db, deps, { emailId: onboarding })).toBe("sent");
-  expect(await sendEmail(db, deps, { emailId: customer })).toBe("parked");
-  expect(relayed).toEqual([account, onboarding]);
+it("an account pause parks platform and onboarding mail without fallback", async () => {
+  const { ses, sends } = fakeSes();
+  const fallback = fakeSes();
+  const emailId = await insertEmail({ domainId: null });
+  expect(
+    await sendEmail(
+      db,
+      {
+        keyring,
+        ses,
+        fallback: fallback.ses,
+        sesQuota: { exhausted: () => false, accountPaused: () => true, refresh: async () => false },
+      },
+      { emailId },
+    ),
+  ).toBe("parked");
   expect(sends).toHaveLength(0);
-  const [row] = await db.select().from(schema.emails).where(eq(schema.emails.id, account));
-  expect(row?.sesMessageId).toBe(`smtp-fallback:${account}`);
-  const [parked] = await db.select().from(schema.emails).where(eq(schema.emails.id, customer));
-  expect(parked?.latestStatus).toBe("queued_quota");
-
-  // Once SES sends again, the platform's mail is back on SES.
-  const healthy = {
-    exhausted: () => false,
-    accountPaused: () => false,
-    refresh: async () => false,
-  };
-  const later = await insertEmail({
-    teamId: systemTeam,
-    domainId: systemDomain?.id ?? null,
-    from: "MepMail <account@platform.dev>",
-  });
-  const { ses: back, sends: viaSes } = fakeSes("ses-again");
-  expect(await sendEmail(db, { ...deps, ses: back, sesQuota: healthy }, { emailId: later })).toBe(
-    "sent",
-  );
-  expect(viaSes).toHaveLength(1);
-  expect(relayed).toHaveLength(2);
+  expect(fallback.sends).toHaveLength(0);
+  expect(await rowOf(emailId)).toMatchObject({ latestStatus: "queued_quota", sentAt: null });
 });
 
 /** A customer team with one verified domain; `relay` stamps relay_enabled_at. */
@@ -1141,61 +1101,17 @@ async function rowOf(emailId: string) {
   return row;
 }
 
-it("while SES has paused the account, a domain marked for the relay leaves through it, and only that one", async () => {
+it("an account pause parks relay-enabled customer mail and never selects the relay", async () => {
   const marked = await relayTeam("relayed-shop", true);
-  const unmarked = await relayTeam("plain-shop", false);
-  const { ses, sends } = fakeSes("must-not-be-used");
+  const { ses, sends } = fakeSes();
   const { relay, sends: relayed } = fakeRelay();
-  const deps: SendDeps = { keyring, ses, sesQuota: pausedSes(), relay };
-
-  const out = await marked.send({ cc: ["c@example.com"] });
-  expect(await sendEmail(db, deps, { emailId: out })).toBe("sent");
-  expect(relayed.map((p) => p.emailId)).toEqual([out]);
-  expect(relayed[0]?.envelopeFrom).toBe("billing@relayed-shop.dev");
-  expect(relayed[0]?.cc).toEqual(["c@example.com"]);
-  expect(relayed[0]?.raw.toString("utf8")).toContain("billing@relayed-shop.dev");
-  expect(await rowOf(out)).toMatchObject({
-    latestStatus: "sent",
-    sesMessageId: `smtp-relay:azure:${out}`,
-  });
-
-  // An unmarked domain parks as before.
-  const waits = await unmarked.send();
-  expect(await sendEmail(db, deps, { emailId: waits })).toBe("parked");
-  expect((await rowOf(waits))?.latestStatus).toBe("queued_quota");
-
-  // No relay configured: the marked domain parks too.
-  const noRelay = await marked.send();
-  expect(await sendEmail(db, { keyring, ses, sesQuota: pausedSes() }, { emailId: noRelay })).toBe(
+  const emailId = await marked.send();
+  expect(await sendEmail(db, { keyring, ses, relay, sesQuota: pausedSes() }, { emailId })).toBe(
     "parked",
   );
-  expect((await rowOf(noRelay))?.latestStatus).toBe("queued_quota");
-
-  // A broadcast row never takes the relay: it parks on the held share.
-  const [bc] = await db
-    .insert(schema.broadcasts)
-    .values({ teamId: marked.team, from: "Shop <billing@relayed-shop.dev>", subject: "news" })
-    .returning({ id: schema.broadcasts.id });
-  const bulk = await marked.send({ broadcastId: bc?.id });
-  expect(
-    await sendEmail(
-      db,
-      { ...deps, sesQuota: { ...pausedSes(), bulkExhausted: () => true } },
-      { emailId: bulk },
-    ),
-  ).toBe("parked");
-
-  // A quota full while SES still sends is not the pause: the relay waits too.
-  const full = await marked.send();
-  expect(
-    await sendEmail(
-      db,
-      { ...deps, sesQuota: { ...pausedSes(), accountPaused: () => false } },
-      { emailId: full },
-    ),
-  ).toBe("parked");
-  expect(relayed).toHaveLength(1);
+  expect(relayed).toHaveLength(0);
   expect(sends).toHaveLength(0);
+  expect(await rowOf(emailId)).toMatchObject({ latestStatus: "queued_quota", sentAt: null });
 });
 
 it("while SES sends, a domain marked for the relay sends through SES as before", async () => {
@@ -1215,76 +1131,30 @@ it("while SES sends, a domain marked for the relay sends through SES as before",
   expect((await rowOf(emailId))?.sesMessageId).toBe("ses-mid");
 });
 
-it("while SES has paused a listed domain's region, its mail leaves from the failover region before any relay", async () => {
+it("a paused home region cannot fail over to healthy SES or relay", async () => {
   const listed = await relayTeam("failover-shop", true);
-  const unlisted = await relayTeam("unlisted-shop", false);
-  // The domain's own set and tenant live at home and must not ride along.
-  await db
-    .update(schema.domains)
-    .set({
-      sesConfigurationSet: "home-set",
-      sesTenantAssociatedAt: new Date(),
-      sesTenantConfigSet: "home-set",
-    })
-    .where(eq(schema.domains.id, listed.domain));
-  await db
-    .update(schema.teams)
-    .set({ sesTenantName: "tenant-home" })
-    .where(eq(schema.teams.id, listed.team));
-  const { ses, sends } = fakeSes("eu-mid");
+  const { ses, sends } = fakeSes();
   const { relay, sends: relayed } = fakeRelay();
-  const throttled: (string | undefined)[] = [];
-  const homePaused = {
-    exhausted: (region?: string) => region !== "eu-west-1",
-    accountPaused: (region?: string) => region !== "eu-west-1",
-    refresh: async () => false,
-  };
-  const deps: SendDeps = {
-    keyring,
-    ses,
-    sesQuota: homePaused,
-    relay,
-    defaultConfigurationSet: "mepmail",
-    throttle: async (region) => {
-      throttled.push(region);
-    },
-    failover: { region: "eu-west-1", domains: new Set(["failover-shop.dev"]) },
-  };
-
-  const out = await listed.send();
-  expect(await sendEmail(db, deps, { emailId: out })).toBe("sent");
-  expect(sends).toHaveLength(1);
-  expect(sends[0]).toMatchObject({ region: "eu-west-1", configurationSetName: "mepmail" });
-  expect(sends[0]?.tenantName).toBeUndefined();
-  expect(throttled).toEqual(["eu-west-1"]);
+  const emailId = await listed.send();
+  expect(
+    await sendEmail(
+      db,
+      {
+        keyring,
+        ses,
+        relay,
+        sesQuota: {
+          exhausted: () => false,
+          accountPaused: (region) => region === "us-east-1",
+          refresh: async () => false,
+        },
+        failover: { region: "eu-west-1", domains: new Set(["failover-shop.dev"]) },
+      },
+      { emailId },
+    ),
+  ).toBe("parked");
+  expect(sends).toHaveLength(0);
   expect(relayed).toHaveLength(0);
-  expect((await rowOf(out))?.sesMessageId).toBe("eu-mid");
-
-  // An unlisted domain keeps its own path: parked.
-  const waits = await unlisted.send();
-  expect(await sendEmail(db, deps, { emailId: waits })).toBe("parked");
-
-  // The failover region paused too: the listed domain takes the relay.
-  const both = await listed.send();
-  expect(await sendEmail(db, { ...deps, sesQuota: pausedSes() }, { emailId: both })).toBe("sent");
-  expect(relayed.map((p) => p.emailId)).toEqual([both]);
-
-  // Home healthy: back to its own region, set and tenant.
-  const healthy = {
-    exhausted: () => false,
-    accountPaused: () => false,
-    refresh: async () => false,
-  };
-  const { ses: homeSes, sends: homeSends } = fakeSes("home-mid");
-  const home = await listed.send();
-  expect(await sendEmail(db, { ...deps, ses: homeSes, sesQuota: healthy }, { emailId: home })).toBe(
-    "sent",
-  );
-  expect(homeSends[0]).toMatchObject({
-    region: "us-east-1",
-    configurationSetName: "home-set",
-    tenantName: "tenant-home",
-  });
 });
 
 it("a suspended or held team is never relayed, nor a suppressed recipient", async () => {
@@ -1328,13 +1198,19 @@ it("a suspended or held team is never relayed, nor a suppressed recipient", asyn
     reason: "hard_bounce",
   });
   const suppressed = await marked.send({ to: ["gone@example.com"] });
-  expect(await sendEmail(db, deps, { emailId: suppressed })).toBe("suppressed");
+  expect(
+    await sendEmail(
+      db,
+      { ...deps, sesQuota: { exhausted: () => false, refresh: async () => false } },
+      { emailId: suppressed },
+    ),
+  ).toBe("suppressed");
 
   expect(relayed).toHaveLength(0);
   expect(sends).toHaveLength(0);
-  // Once the holds are gone, the same team's mail is relayed.
-  expect(await sendEmail(db, deps, { emailId: await marked.send() })).toBe("sent");
-  expect(relayed).toHaveLength(1);
+  // Removing a team hold does not lift the provider hold.
+  expect(await sendEmail(db, deps, { emailId: await marked.send() })).toBe("parked");
+  expect(relayed).toHaveLength(0);
 });
 
 it("a failed relay send parks the row, never fails it, and the probe hears it", async () => {
@@ -1388,7 +1264,7 @@ it("parks instead of failing while SES has paused the account", async () => {
   };
   const emailId = await insertEmail();
   expect(await sendEmail(db, { keyring, ses, sesQuota }, { emailId })).toBe("parked");
-  expect(refreshed).toBe(1);
+  expect(refreshed).toBe(0);
   const [row] = await db.select().from(schema.emails).where(eq(schema.emails.id, emailId));
   expect(row?.latestStatus).toBe("queued_quota");
   expect(row?.sentAt).toBeNull();
@@ -1968,4 +1844,107 @@ it("a row of a canceled broadcast is canceled, not sent", async () => {
     .from(schema.emailEvents)
     .where(eq(schema.emailEvents.emailId, emailId));
   expect(events).toHaveLength(0);
+});
+
+for (const name of ["AccountSuspendedException", "SendingPausedException", "MessageRejected"]) {
+  it(`preserves explicit ${name} despite failed refresh and never replays it`, async () => {
+    let calls = 0;
+    const emailId = await insertEmail();
+    const deps: SendDeps = {
+      keyring,
+      ses: {
+        async sendRaw() {
+          calls++;
+          throw Object.assign(new Error("Sending suspended for this account."), { name });
+        },
+      },
+      sesQuota: {
+        exhausted: () => false,
+        refresh: async () => {
+          throw new Error("offline");
+        },
+      },
+    };
+    expect(await sendEmail(db, deps, { emailId })).toBe("parked");
+    expect(await rowOf(emailId)).toMatchObject({
+      latestStatus: "queued_quota",
+      sentAt: null,
+      sesMessageId: null,
+    });
+    expect(await sendEmail(db, deps, { emailId })).toBe("skipped");
+    expect(calls).toBe(1);
+  });
+}
+it("capacity exhaustion cannot turn message rejection into an enforcement pause", async () => {
+  const emailId = await insertEmail();
+  const ses: SesSender = {
+    async sendRaw() {
+      throw Object.assign(new Error("identity not verified"), { name: "MessageRejected" });
+    },
+  };
+  expect(
+    await sendEmail(
+      db,
+      {
+        keyring,
+        ses,
+        sesQuota: { exhausted: () => false, refresh: async () => true, accountPaused: () => false },
+      },
+      { emailId },
+    ),
+  ).toBe("failed");
+});
+it("a pause introduced during throttle parks before the claim and provider", async () => {
+  let paused = false;
+  const { ses, sends } = fakeSes();
+  const emailId = await insertEmail();
+  expect(
+    await sendEmail(
+      db,
+      {
+        keyring,
+        ses,
+        throttle: async () => {
+          paused = true;
+        },
+        sesQuota: {
+          exhausted: () => false,
+          refresh: async () => false,
+          accountPaused: () => paused,
+        },
+      },
+      { emailId },
+    ),
+  ).toBe("parked");
+  expect(sends).toHaveLength(0);
+  expect(await rowOf(emailId)).toMatchObject({ latestStatus: "queued_quota", sentAt: null });
+});
+it("ambiguous timeout acceptance keeps the claim and cannot replay", async () => {
+  let calls = 0;
+  const emailId = await insertEmail();
+  const deps: SendDeps = {
+    keyring,
+    ses: {
+      async sendRaw() {
+        calls++;
+        throw Object.assign(new Error("lost acknowledgement"), { name: "TimeoutError" });
+      },
+    },
+  };
+  await expect(sendEmail(db, deps, { emailId })).rejects.toThrow("lost acknowledgement");
+  expect((await rowOf(emailId))?.sentAt).toBeInstanceOf(Date);
+  expect(await sendEmail(db, deps, { emailId })).toBe("skipped");
+  expect(
+    await sendEmail(
+      db,
+      {
+        ...deps,
+        sesQuota: { exhausted: () => true, accountPaused: () => true, refresh: async () => true },
+      },
+      { emailId },
+    ),
+  ).toBe("skipped");
+  expect(await rowOf(emailId)).toMatchObject({ latestStatus: "queued" });
+  expect((await rowOf(emailId))?.sentAt).toBeInstanceOf(Date);
+  expect(calls).toBe(1);
 });

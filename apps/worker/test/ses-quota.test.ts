@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   createSesQuotaGate,
+  isSesAccountPauseError,
+  isSesEnforcementRefusal,
   isSesQuotaRefusal,
   isSesThrottle,
   SES_QUOTA_MARGIN,
@@ -64,4 +66,52 @@ describe("SES quota gate", () => {
       false,
     );
   });
+});
+
+it("retains a proven account pause through a failed account read", async () => {
+  let fail = false;
+  const gate = createSesQuotaGate(
+    async () => {
+      if (fail) throw new Error("unavailable");
+      return { max24h: 1000, sentLast24h: 0, accountPaused: true };
+    },
+    () => {},
+  );
+  await gate.refresh();
+  fail = true;
+  await gate.refresh();
+  expect(gate.accountPaused?.()).toBe(true);
+  expect(gate.exhausted()).toBe(true);
+});
+
+it("only SES account enforcement wording proves nonacceptance, never network text", async () => {
+  for (const message of [
+    "Sending suspended for this account.",
+    "Email sending is disabled for your entire Amazon SES account.",
+  ]) {
+    expect(isSesAccountPauseError({ name: "MessageRejected", message })).toBe(true);
+  }
+  expect(
+    isSesAccountPauseError({
+      name: "TimeoutError",
+      message: "Sending suspended for this account.",
+    }),
+  ).toBe(false);
+  expect(
+    isSesAccountPauseError({ name: "MessageRejected", message: "Email address not verified" }),
+  ).toBe(false);
+  let paused = false;
+  expect(
+    await isSesEnforcementRefusal(
+      { name: "MessageRejected" },
+      {
+        exhausted: () => false,
+        accountPaused: () => paused,
+        refresh: async () => {
+          paused = true;
+          return true;
+        },
+      },
+    ),
+  ).toBe(true);
 });

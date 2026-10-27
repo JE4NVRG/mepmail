@@ -6,13 +6,17 @@ import { type Db, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { createMailboxExternalAwareSender } from "../../../apps/worker/src/mailbox-external-sender.js";
+import { createMailboxSesSender } from "../../../apps/worker/src/mailbox-sender.js";
 import { EnvKeyring } from "../src/crypto/keyring.js";
+import { createMailboxExternalAccount } from "../src/mailbox-external-accounts.js";
 import { saveMailboxDraft } from "../src/mailbox-private-store.js";
 import {
   acceptMailboxOutbox,
   checkMailboxRecipientBlocks,
   getMailboxOutboundSummary,
   type MailboxOutboundEvidence,
+  MailboxSendDeferredError,
   type MailboxTransportMimeAdapter,
   mailboxBlockedRecipients,
   mailboxRecipientHash,
@@ -480,4 +484,166 @@ describe("private Correio outbound outcomes", () => {
       )[0]!.recipientHashes,
     ).toEqual(f.snapshot);
   });
+});
+
+describe("Correio SES account enforcement", () => {
+  for (const name of ["AccountSuspendedException", "SendingPausedException", "MessageRejected"]) {
+    it(`preserves the sealed queue on ${name}, even when refresh fails`, async () => {
+      const f = await setup();
+      const queued = await f.queued();
+      const send = vi.fn(async () => {
+        throw Object.assign(new Error("Sending suspended for this account."), { name });
+      });
+      const sender = createMailboxSesSender(db, {
+        configurationSets: { "us-east-1": "private_fixture" },
+        clientFactory: () => ({ send }),
+        sesQuota: {
+          exhausted: () => false,
+          refresh: async () => {
+            throw new Error("offline");
+          },
+        },
+      });
+      const before = (
+        await db.select().from(schema.mailboxOutbox).where(eq(schema.mailboxOutbox.id, queued.id))
+      )[0]!;
+      const result = await sendMailboxOutbox(db, keys, queued.id, sender, mime);
+      expect(result.status).toBe("queued");
+      const after = (
+        await db.select().from(schema.mailboxOutbox).where(eq(schema.mailboxOutbox.id, queued.id))
+      )[0]!;
+      expect(after.attemptId).toBeNull();
+      expect(after.ciphertext).not.toBeNull();
+      expect(after.ciphertext).toEqual(before.ciphertext);
+      expect(after.wrappedDek).toEqual(before.wrappedDek);
+      expect(after.recipientHashes).toEqual(before.recipientHashes);
+      expect(after.rawSha256).toEqual(before.rawSha256);
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+  }
+  it("blocks automatic SES failover and relay on a manual account pause", async () => {
+    const f = await setup();
+    await db
+      .update(schema.domains)
+      .set({ relayEnabledAt: new Date() })
+      .where(eq(schema.domains.teamId, f.teamId));
+    const queued = await f.queued();
+    const send = vi.fn();
+    const relay = vi.fn();
+    const domain = (
+      await db.select().from(schema.domains).where(eq(schema.domains.teamId, f.teamId))
+    )[0]!;
+    const sender = createMailboxSesSender(db, {
+      configurationSets: { "us-east-1": "private_fixture", "eu-west-1": "alternate_fixture" },
+      paused: (region) => region === "us-east-1",
+      failover: { region: "eu-west-1", domains: new Set([domain.name]) },
+      relay: { name: "fixture", sender: { sendRaw: relay } },
+      clientFactory: () => ({ send }),
+    });
+    expect((await sendMailboxOutbox(db, keys, queued.id, sender, mime)).status).toBe("queued");
+    expect(send).not.toHaveBeenCalled();
+    expect(relay).not.toHaveBeenCalled();
+  });
+  it("rechecks account pause after asynchronous throttling", async () => {
+    const f = await setup();
+    const queued = await f.queued();
+    let paused = false;
+    const send = vi.fn();
+    const sender = createMailboxSesSender(db, {
+      configurationSets: { "us-east-1": "private_fixture" },
+      paused: () => paused,
+      throttle: async () => {
+        paused = true;
+      },
+      clientFactory: () => ({ send }),
+    });
+    expect((await sendMailboxOutbox(db, keys, queued.id, sender, mime)).status).toBe("queued");
+    expect(send).not.toHaveBeenCalled();
+  });
+  it("does not convert capacity-only or identity rejection to an account pause", async () => {
+    const f = await setup();
+    const queued = await f.queued();
+    const send = vi.fn(async () => {
+      throw Object.assign(new Error("identity not verified"), { name: "MessageRejected" });
+    });
+    const sender = createMailboxSesSender(db, {
+      configurationSets: { "us-east-1": "private_fixture" },
+      sesQuota: { exhausted: () => false, refresh: async () => true, accountPaused: () => false },
+      clientFactory: () => ({ send }),
+    });
+    expect((await sendMailboxOutbox(db, keys, queued.id, sender, mime)).status).toBe("failed");
+  });
+  it("keeps ambiguous acceptance unknown and never replays it", async () => {
+    const f = await setup();
+    const queued = await f.queued();
+    const send = vi.fn(async () => {
+      throw Object.assign(new Error("lost acknowledgement"), { name: "TimeoutError" });
+    });
+    const sender = createMailboxSesSender(db, {
+      configurationSets: { "us-east-1": "private_fixture" },
+      clientFactory: () => ({ send }),
+    });
+    expect((await sendMailboxOutbox(db, keys, queued.id, sender, mime)).status).toBe("unknown");
+    await sendMailboxOutbox(db, keys, queued.id, sender, mime);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+  it("a late safe deferral cannot reset an already accepted claim", async () => {
+    const f = await setup();
+    const queued = await f.queued();
+    const result = await sendMailboxOutbox(
+      db,
+      keys,
+      queued.id,
+      {
+        async send(input) {
+          await acceptMailboxOutbox(db, queued.id, {
+            attemptId: input.attemptId,
+            messageId: "accepted-fixture",
+          });
+          throw new MailboxSendDeferredError();
+        },
+      },
+      mime,
+    );
+    expect(result.status).toBe("accepted");
+  });
+});
+
+it("independently configured customer external mail still sends while platform SES is paused", async () => {
+  const f = await setup();
+  const { mailboxId } = await createMailboxExternalAccount(db, keys, f.actor, {
+    address: "customer@gmail.com",
+    label: "Independent fixture",
+    servers: {
+      provider: "gmail",
+      imapHost: "imap.gmail.com",
+      smtpHost: "smtp.gmail.com",
+      smtpPort: 465,
+      smtpSecurity: "tls",
+      username: "customer@gmail.com",
+    },
+    secret: "synthetic-fixture-password",
+  });
+  const ses = vi.fn(createMailboxSesSender(db, { paused: () => true }).send);
+  const smtp = vi.fn(async () => ({ messageId: "independent-fixture" }));
+  const sender = createMailboxExternalAwareSender(db, keys, { send: ses }, undefined, {
+    lookup: (async () => [{ address: "142.250.0.109", family: 4 }]) as never,
+    createTransport: (() => ({ sendMail: smtp, close() {} })) as never,
+  });
+  expect(
+    await sender.send({
+      idempotencyKey: "fixture",
+      outboxId: "fixture",
+      attemptId: "fixture",
+      teamId: f.teamId,
+      mailboxId,
+      from: "customer@gmail.com",
+      to: f.recipients,
+      cc: [],
+      bcc: [],
+      raw: f.raw,
+    }),
+  ).toEqual({ messageId: "independent-fixture" });
+  expect(smtp).toHaveBeenCalledTimes(1);
+  expect(ses).not.toHaveBeenCalled();
 });

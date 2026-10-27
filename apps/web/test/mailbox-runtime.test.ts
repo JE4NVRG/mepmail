@@ -1,12 +1,12 @@
 import { MailboxSendDeferredError, MailboxSendRejectedError } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mailboxTransportMime } from "@/server/mailbox-transport";
 import {
   createMailboxSesSender,
   mailboxWorkerMime,
   parseMailboxSesConfigurationSets,
 } from "../../worker/src/mailbox-sender.js";
+import { mailboxTransportMime } from "../src/server/mailbox-transport.js";
 
 const provider = vi.hoisted(() => ({
   options: [] as unknown[],
@@ -275,35 +275,18 @@ describe("private Mail runtime adapters", () => {
     ).rejects.toBeInstanceOf(MailboxSendRejectedError);
     expect(provider.send).not.toHaveBeenCalled();
   });
-  it("while SES has paused the region, a relay-marked domain sends through the relay, not SES", async () => {
-    const sendRaw = vi.fn().mockResolvedValue({ messageId: "smtp-relay:fixture:<id@relay>" });
-    const throttle = vi.fn();
-    const checkRecipients = vi.fn().mockResolvedValue(true);
-    const relayInput = { ...input, cc: ["copy@example.invalid"], bcc: ["hidden@example.invalid"] };
-    const result = await createMailboxSesSender(database({ relayEnabledAt: new Date() }), {
-      configurationSets,
-      exhausted: () => true,
-      throttle,
-      checkRecipients,
-      paused: () => true,
-      relay: { name: "fixture", sender: { sendRaw } },
-      clientFactory,
-    }).send(relayInput);
-    expect(result).toEqual({ messageId: "smtp-relay:fixture:<id@relay>" });
-    expect(sendRaw).toHaveBeenCalledWith({
-      raw: relayInput.raw,
-      emailId: input.outboxId,
-      to: input.to,
-      cc: ["copy@example.invalid"],
-      bcc: ["hidden@example.invalid"],
-      envelopeFrom: input.from,
-    });
-    expect(checkRecipients).toHaveBeenCalledWith({
-      teamId: input.teamId,
-      recipients: [...input.to, "copy@example.invalid", "hidden@example.invalid"],
-    });
-    expect(throttle).not.toHaveBeenCalled();
-    expect(provider.options).toHaveLength(0);
+  it("an account pause blocks the configured customer relay before any send", async () => {
+    const sendRaw = vi.fn();
+    await expect(
+      createMailboxSesSender(database({ relayEnabledAt: new Date() }), {
+        configurationSets,
+        exhausted: () => true,
+        paused: () => true,
+        relay: { name: "fixture", sender: { sendRaw } },
+        clientFactory,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    expect(sendRaw).not.toHaveBeenCalled();
     expect(provider.send).not.toHaveBeenCalled();
   });
   it("keeps SES when the region is not paused or the domain is not marked, and holds still apply", async () => {
@@ -339,54 +322,43 @@ describe("private Mail runtime adapters", () => {
         checkRecipients: async () => false,
         clientFactory,
       }).send(input),
-    ).rejects.toBeInstanceOf(MailboxSendRejectedError);
+    ).rejects.toBeInstanceOf(MailboxSendDeferredError);
     expect(sendRaw).not.toHaveBeenCalled();
   });
-  it("a listed domain sends from the failover region while its own is paused, untagged and before the relay", async () => {
+  it("a paused home region cannot automatically fail over to another SES region", async () => {
     const sendRaw = vi.fn();
-    const throttle = vi.fn().mockResolvedValue(undefined);
-    const failover = { region: "eu-west-1", domains: new Set(["example.invalid"]) };
-    const result = await createMailboxSesSender(database({ relayEnabledAt: new Date() }), {
-      configurationSets: { "us-east-1": "private_mail_fixture", "eu-west-1": "private_mail_eu" },
-      throttle,
-      paused: (region) => region === "us-east-1",
-      relay: { name: "fixture", sender: { sendRaw } },
-      failover,
-      tenants: true,
-      clientFactory,
-    }).send(input);
-    expect(result).toEqual({ messageId: "accepted_fixture" });
-    expect(provider.options[0]).toMatchObject({ region: "eu-west-1" });
-    expect(provider.inputs[0]).toMatchObject({ ConfigurationSetName: "private_mail_eu" });
-    expect(provider.inputs[0]).not.toHaveProperty("TenantName");
-    expect(throttle).toHaveBeenCalledWith("eu-west-1", 1);
-    expect(sendRaw).not.toHaveBeenCalled();
-    // No Mail set in the failover region: deferred, never sent elsewhere.
+    const throttle = vi.fn();
     await expect(
-      createMailboxSesSender(database(), {
-        configurationSets,
+      createMailboxSesSender(database({ relayEnabledAt: new Date() }), {
+        configurationSets: { "us-east-1": "private_mail_fixture", "eu-west-1": "private_mail_eu" },
+        throttle,
         paused: (region) => region === "us-east-1",
-        failover,
+        relay: { name: "fixture", sender: { sendRaw } },
+        failover: { region: "eu-west-1", domains: new Set(["example.invalid"]) },
         clientFactory,
       }).send(input),
     ).rejects.toBeInstanceOf(MailboxSendDeferredError);
-    expect(provider.send).toHaveBeenCalledTimes(1);
+    expect(sendRaw).not.toHaveBeenCalled();
+    expect(provider.send).not.toHaveBeenCalled();
+    expect(throttle).not.toHaveBeenCalled();
   });
-  it("reads the relay's SMTP reply: login or 4xx retries, 5xx refuses, silence stays ambiguous", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    const attempt = (error: unknown) =>
-      createMailboxSesSender(database({ relayEnabledAt: new Date() }), {
-        paused: () => true,
-        relay: { name: "fixture", sender: { sendRaw: vi.fn().mockRejectedValue(error) } },
-        clientFactory,
-      }).send(input);
-    const smtp = (code: string, responseCode?: number) =>
-      Object.assign(new Error("smtp fixture"), { code, responseCode });
-    await expect(attempt(smtp("EAUTH", 535))).rejects.toBeInstanceOf(MailboxSendDeferredError);
-    await expect(attempt(smtp("EENVELOPE", 451))).rejects.toBeInstanceOf(MailboxSendDeferredError);
-    await expect(attempt(smtp("EMESSAGE", 550))).rejects.toBeInstanceOf(MailboxSendRejectedError);
-    const timeout = smtp("ETIMEDOUT");
-    await expect(attempt(timeout)).rejects.toBe(timeout);
+  it("never invokes a relay during an account pause regardless of its configured outcome", async () => {
+    for (const error of [
+      { code: "EAUTH", responseCode: 535 },
+      { responseCode: 451 },
+      { responseCode: 550 },
+      { code: "ETIMEDOUT" },
+    ]) {
+      const sendRaw = vi.fn().mockRejectedValue(error);
+      await expect(
+        createMailboxSesSender(database({ relayEnabledAt: new Date() }), {
+          paused: () => true,
+          relay: { name: "fixture", sender: { sendRaw } },
+          clientFactory,
+        }).send(input),
+      ).rejects.toBeInstanceOf(MailboxSendDeferredError);
+      expect(sendRaw).not.toHaveBeenCalled();
+    }
   });
   it("with SES_TENANTS, associates the Mail set with the team tenant once, then tags sends", async () => {
     provider.send.mockImplementation(async (command: { constructor: { name: string } }) => {
