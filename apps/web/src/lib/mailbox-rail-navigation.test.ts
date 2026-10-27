@@ -35,13 +35,13 @@ const props = (count = 40): Props => ({
   usage: null,
 });
 function render(overrides: Partial<Props> = {}, locale = "pt-BR") {
-  return renderToStaticMarkup(
-    createElement(
-      NextIntlClientProvider,
-      { locale, messages: { mailboxes: locale === "en" ? en : pt } },
-      createElement(MailboxRail, { ...props(), ...overrides }),
-    ),
-  );
+  // next-intl requires children in the typed SSR provider props.
+  const providerProps: ComponentProps<typeof NextIntlClientProvider> = {
+    locale,
+    messages: { mailboxes: locale === "en" ? en : pt },
+    children: createElement(MailboxRail, { ...props(), ...overrides }),
+  };
+  return renderToStaticMarkup(createElement(NextIntlClientProvider, providerProps));
 }
 function folderOrder(html: string) {
   return [...html.matchAll(/data-mailbox-folder="([^"]+)"/g)].map((m) => m[1]);

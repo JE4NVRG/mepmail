@@ -33,6 +33,9 @@ type OverviewFixture = {
 type NodeProps = Record<string, unknown> & {
   children?: unknown;
   onClick?: () => void | Promise<void>;
+  disabled?: boolean;
+  "aria-label"?: string;
+  "aria-describedby"?: string;
 };
 // Offline component/handler fixture, not an authenticated browser or server test.
 const fixture = vi.hoisted(() => ({
@@ -70,7 +73,9 @@ vi.mock("next-intl", async (load) => {
   return {
     ...actual,
     useLocale: () => fixture.locale,
-    useTranslations: (namespace: string) =>
+    useTranslations: (
+      namespace: "mailboxes-agent" | "mailboxes-agent.panel" | "mailboxes-activity",
+    ) =>
       actual.createTranslator({
         locale: fixture.locale,
         messages: {
@@ -133,7 +138,10 @@ function nodes(node: unknown): ReactElement<NodeProps>[] {
   if (!isValidElement<NodeProps>(node)) return [];
   return [node, ...nodes(node.props.children)];
 }
-function button(root: ReactElement, label: string) {
+function button(
+  root: ReactElement,
+  label: string,
+): NodeProps & { onClick: () => void | Promise<void> } {
   const match = nodes(root).find((node) => node.type === "button" && node.props.children === label);
   if (!match || typeof match.props.onClick !== "function") {
     throw new Error(`Missing actionable button: ${label}`);
