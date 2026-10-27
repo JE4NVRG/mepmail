@@ -185,6 +185,20 @@ describe.each(["en", "pt-BR"])("customer billing summary (%s)", (locale) => {
     expect(html).not.toContain(t.reload);
     expect(render(fixture(), locale, vi.fn())).not.toContain("<button");
   });
+  it("keeps legacy or cached status without a summary recoverable, never a render crash", () => {
+    const content = createElement(BillingSummaryPanel, { locale });
+    const props = {
+      locale,
+      timeZone: "UTC",
+      messages: { settings: catalogs[locale] ?? catalogs.en },
+      children: content,
+    };
+    const html = renderToStaticMarkup(createElement(NextIntlClientProvider, props, content));
+    expect(html).toContain(t.unavailable);
+    expect(html).toContain('role="status"');
+    expect(html).not.toContain("dateTime=");
+    expect(html).not.toContain(t.nextPlanCharge);
+  });
   it("renders nothing when billing is not applicable", () => {
     expect(render(fixture({ state: "not_applicable" }), locale)).toBe("");
   });

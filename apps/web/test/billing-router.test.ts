@@ -716,6 +716,15 @@ describe("billing router", () => {
   it("status reports the entitlement to any member", async () => {
     const teamId = await createTeam(db);
     expect(await callerFor(teamId, "member").billing.status()).toEqual({
+      billingSummary: {
+        state: "not_applicable",
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        renewalAt: null,
+        accessEndsAt: null,
+        nextInvoice: null,
+        benefit: null,
+      },
       plan: "free",
       effectiveRung: null,
       subscriptionState: "none",

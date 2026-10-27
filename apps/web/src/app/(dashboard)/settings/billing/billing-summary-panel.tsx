@@ -28,14 +28,23 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
 
 /** Read-only server projection. No billing amounts or benefit eligibility are inferred here. */
 export function BillingSummaryPanel({
-  summary,
+  summary: providedSummary,
   locale,
   onRetry,
 }: {
-  summary: BillingSummary;
+  summary?: BillingSummary;
   locale: string;
   onRetry?: () => void;
 }) {
+  const summary: BillingSummary = providedSummary ?? {
+    state: "unavailable",
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    renewalAt: null,
+    accessEndsAt: null,
+    nextInvoice: null,
+    benefit: null,
+  };
   const t = useTranslations("settings.billing.summary");
   const titleId = useId();
   // Pin calendar dates to UTC so SSR and hydration never disagree at midnight.
