@@ -21,31 +21,31 @@ export function campaignDns(name: string) {
         group: "verification",
         type: "TXT",
         name: `fixture._domainkey.${name}`,
-        value: "v=DKIM1; p=synthetic",
+
         status: "found",
       },
       {
         group: "sending",
         type: "TXT",
         name: `send.${name}`,
-        value: "v=spf1 include:amazonses.com ~all",
+
         status: "found",
       },
       {
         group: "sending",
         type: "MX",
         name: `send.${name}`,
-        value: "10 feedback-smtp.us-east-1.amazonses.com",
+
         status: "found",
       },
       {
         group: "dmarc",
         type: "TXT",
         name: `_dmarc.${name}`,
-        value: "v=DMARC1; p=none",
+
         status: "found",
       },
-    ] as schema.DomainDnsRecord[],
+    ] satisfies schema.DomainDnsRecord[],
   };
 }
 
@@ -58,10 +58,10 @@ export async function approveCampaignFixture(db: Db, teamId: string, importDomai
     {
       id: operatorId,
       name: "Synthetic independent operator",
-      role: "admin",
+
       email: `${operatorId}@example.test`,
     },
-  ]);
+  ] satisfies (typeof schema.user.$inferInsert)[]);
   await db.insert(schema.teamMembers).values({ teamId, userId: ownerId, role: "owner" });
   const dossier = await submitCampaignConsent(db, {
     teamId,
