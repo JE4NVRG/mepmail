@@ -1,6 +1,5 @@
 /* Agentes: approvals waiting, agents with access, recent activity. */
 .panel {
-  min-width: 0;
   display: grid;
   gap: 28px;
 }
@@ -13,7 +12,6 @@
   display: flex;
   gap: 10px;
   justify-content: space-between;
-  flex-wrap: wrap;
 }
 .head h3 {
   align-items: center;
@@ -86,12 +84,6 @@
   gap: 8px;
   margin-top: 4px;
 }
-fieldset.actions {
-  border: 0;
-  padding: 0;
-  min-inline-size: 0;
-  margin-inline: 0;
-}
 .list li {
   align-items: center;
   border-bottom: 1px solid var(--ms-line);
@@ -102,13 +94,9 @@ fieldset.actions {
   padding: 10px 0;
 }
 .agent {
-  flex: 1 1 240px;
   display: grid;
   gap: 3px;
   min-width: 0;
-}
-.agent strong {
-  overflow-wrap: anywhere;
 }
 .agent small {
   color: var(--ms-muted);
@@ -194,61 +182,4 @@ fieldset.actions {
 }
 .sendError p {
   margin: 0;
-}
-.address {
-  font-size: var(--ms-fs-label);
-  overflow-wrap: anywhere;
-}
-.approvalState {
-  color: var(--ms-accent);
-  font-size: var(--ms-fs-label);
-  font-weight: 600;
-  margin: 0;
-}
-.mailboxes {
-  display: grid;
-  gap: 3px;
-  font-size: 12px;
-  margin: 4px 0;
-}
-.mailbox {
-  display: grid;
-  gap: 4px;
-  padding: 4px 0;
-}
-.mailboxes dt {
-  color: var(--ms-muted);
-}
-.mailboxes dd {
-  display: grid;
-  gap: 3px;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-.panel button {
-  min-height: 44px;
-}
-.panel button:focus-visible,
-.actions[data-confirmation]:focus {
-  outline: 2px solid var(--ms-accent);
-  outline-offset: 3px;
-}
-.panel button:active:not(:disabled) {
-  filter: brightness(0.9);
-}
-.card,
-.list > li,
-.timeline > li {
-  min-width: 0;
-}
-.timeline small {
-  overflow-wrap: anywhere;
-}
-@media (max-width: 560px) {
-  .actions {
-    width: 100%;
-  }
-  .actions > span {
-    flex-basis: 100%;
-  }
 }

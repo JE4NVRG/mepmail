@@ -31,93 +31,7 @@
   padding: 12px 8px 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-}
-
-.picker {
-  position: relative;
-  flex: none;
-  min-width: 0;
-}
-.pickerHeader {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  border: 1px solid var(--ms-line);
-  border-radius: var(--ms-r-input);
-  background: color-mix(in srgb, var(--ms-panel-raised) 50%, transparent);
-}
-.pickerTrigger {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-  min-height: 48px;
-  gap: 9px;
-  padding: 8px 9px;
-  border: 0;
-  border-radius: var(--ms-r-input);
-  background: none;
-  color: var(--ms-bone);
-  font: 400 var(--ms-fs-ui) var(--ms-font-sans);
-  text-align: left;
-  cursor: pointer;
-}
-.pickerTrigger > svg {
-  flex: none;
-}
-.pickerTrigger:hover,
-.pickerTrigger[aria-expanded="true"] {
-  background: var(--ms-panel-raised);
-}
-.pickerIdentity {
-  display: grid;
-  gap: 2px;
-}
-.pickerIdentity strong {
-  overflow: hidden;
-  font-size: var(--ms-fs-ui);
-  font-weight: 550;
-  text-overflow: ellipsis;
-}
-.pickerIdentity small {
-  overflow: hidden;
-  color: var(--ms-muted);
-  font-size: 12px;
-  text-overflow: ellipsis;
-}
-.pickerChevron {
-  display: flex;
-  flex: none;
-  color: var(--ms-muted);
-  transition: transform var(--ms-dur-fast) var(--ms-ease);
-}
-.pickerTrigger[aria-expanded="true"] .pickerChevron {
-  transform: rotate(180deg);
-}
-.selectedMenu {
-  flex: none;
-  margin-right: 3px;
-}
-.pickerPanel {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  left: 0;
-  z-index: var(--ms-z-popover);
-  box-sizing: border-box;
-  max-height: min(50dvh, 380px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 8px 5px;
-  border: 1px solid var(--ms-line-strong);
-  border-radius: var(--ms-r-input);
-  background: var(--ms-panel);
-  box-shadow: 0 10px 28px rgb(0 0 0 / 18%);
-}
-.foldersHeading {
-  margin: 0 0 5px;
-  padding: 0 10px;
+  gap: 16px;
 }
 
 .section,
@@ -430,7 +344,6 @@
   font: 600 11px var(--ms-font-sans);
 }
 
-.pickerTrigger:focus-visible,
 .item:focus-visible,
 .groupHeader:focus-visible,
 .showAll:focus-visible,
@@ -444,9 +357,6 @@
   :global(html[data-rail="collapsed"]) .rail {
     width: 56px;
   }
-  :global(html[data-rail="collapsed"]) .rail .pickerChevron,
-  :global(html[data-rail="collapsed"]) .rail .selectedMenu,
-  :global(html[data-rail="collapsed"]) .rail .foldersHeading,
   :global(html[data-rail="collapsed"]) .rail .quietCount,
   :global(html[data-rail="collapsed"]) .rail .label,
   :global(html[data-rail="collapsed"]) .rail .sectionHeader,
@@ -466,7 +376,6 @@
     padding: 12px 6px;
     gap: 10px;
   }
-  :global(html[data-rail="collapsed"]) .rail .pickerTrigger,
   :global(html[data-rail="collapsed"]) .rail .item {
     justify-content: center;
     gap: 0;
@@ -544,9 +453,6 @@
   .groupHeader,
   .showAll {
     min-height: 44px;
-  }
-  .pickerTrigger {
-    min-height: 52px;
   }
   .toolButton {
     width: 44px;

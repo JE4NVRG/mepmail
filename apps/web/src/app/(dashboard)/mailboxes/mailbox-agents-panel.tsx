@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useId, useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "@/components/toast";
 import { useTRPC } from "@/lib/trpc";
 import { ACTIVITY_ACTION_KEYS } from "./mailbox-activity";
@@ -30,16 +30,11 @@ export function MailboxAgentsPanel({
   const tAgent = useTranslations("mailboxes-agent");
   const tActivity = useTranslations("mailboxes-activity");
   const locale = useLocale();
-  const panelId = useId();
-  const panel = useRef<HTMLElement>(null);
-  const previousConfirmation = useRef<string | null>(null);
   const router = useRouter();
   const trpc = useTRPC();
   const queries = useQueryClient();
   const overview = useQuery(
-    trpc.mailboxAgents.overview.queryOptions(undefined, {
-      refetchInterval: 60_000,
-    }),
+    trpc.mailboxAgents.overview.queryOptions(undefined, { refetchInterval: 60_000 }),
   );
   const send = useMutation(trpc.mailboxes.queueDraft.mutationOptions());
   const discard = useMutation(trpc.mailboxes.setTrash.mutationOptions());
@@ -50,17 +45,6 @@ export function MailboxAgentsPanel({
   const [confirming, setConfirming] = useState<string | null>(null);
   const [editingCredential, setEditingCredential] = useState<string | null>(null);
   const [permissionsBusy, setPermissionsBusy] = useState(false);
-  useEffect(() => {
-    if (confirming) {
-      panel.current?.querySelector<HTMLElement>("[data-confirmation]")?.focus();
-    } else if (previousConfirmation.current) {
-      const action = previousConfirmation.current;
-      Array.from(panel.current?.querySelectorAll<HTMLButtonElement>("[data-confirm-action]") ?? [])
-        .find((button) => button.dataset.confirmAction === action)
-        ?.focus();
-    }
-    previousConfirmation.current = confirming;
-  }, [confirming]);
   // Why the last approval of a card did not go out, shown on that card.
   const [sendError, setSendError] = useState<{
     itemId: string;
@@ -77,14 +61,11 @@ export function MailboxAgentsPanel({
     revokeKey.isPending ||
     revokeCredential.isPending;
   const when = (value: Date | string) =>
-    new Intl.DateTimeFormat(locale, {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(new Date(value));
+    new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(
+      new Date(value),
+    );
   const refresh = () =>
-    queries.invalidateQueries({
-      queryKey: trpc.mailboxAgents.overview.queryKey(),
-    });
+    queries.invalidateQueries({ queryKey: trpc.mailboxAgents.overview.queryKey() });
   const failed = (cause: unknown) => {
     const code = (cause as { data?: { code?: string } })?.data?.code;
     toast(t(code === "CONFLICT" ? "changed" : "error"), "warn");
@@ -131,12 +112,7 @@ export function MailboxAgentsPanel({
   };
   const data = overview.data;
 
-  if (overview.isPending)
-    return (
-      <p className={styles.hint} role="status">
-        {t("loading")}
-      </p>
-    );
+  if (overview.isPending) return <p className={styles.hint}>{t("loading")}</p>;
   if (overview.isError || !data)
     return (
       <div role="alert">
@@ -148,18 +124,7 @@ export function MailboxAgentsPanel({
     );
 
   return (
-    <section
-      className={own.panel}
-      aria-label={tAgent("title")}
-      ref={panel}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && confirming && !busy) {
-          event.preventDefault();
-          event.stopPropagation();
-          setConfirming(null);
-        }
-      }}
-    >
+    <div className={own.panel}>
       <section aria-labelledby="agents-approvals">
         <header className={own.head}>
           <h3 id="agents-approvals">
@@ -178,10 +143,6 @@ export function MailboxAgentsPanel({
               const recipients = item.to.length + item.cc.length + item.bcc.length;
               return (
                 <li key={item.itemId} className={own.card}>
-                  <p className={own.approvalState}>{t("approvals.title")}</p>
-                  <strong className={own.address} id={`${panelId}-${item.itemId}-mailbox`}>
-                    {item.address}
-                  </strong>
                   <p className={own.meta}>
                     {t("approvals.asked", {
                       agent: item.agentLabel ?? tActivity("actors.agent"),
@@ -189,7 +150,7 @@ export function MailboxAgentsPanel({
                       date: when(item.requestedAt),
                     })}
                   </p>
-                  <strong className={own.subject} id={`${panelId}-${item.itemId}-subject`}>
+                  <strong className={own.subject}>
                     {item.subject || t("approvals.noSubject")}
                   </strong>
                   <dl className={own.recipients}>
@@ -242,12 +203,7 @@ export function MailboxAgentsPanel({
                     </div>
                   ) : null}
                   {confirming === key ? (
-                    <fieldset
-                      className={own.actions}
-                      data-confirmation
-                      tabIndex={-1}
-                      aria-labelledby={`${panelId}-${item.itemId}-mailbox ${panelId}-${item.itemId}-subject`}
-                    >
+                    <div className={own.actions}>
                       <span>{t("approvals.confirm", { count: recipients })}</span>
                       <button
                         type="button"
@@ -280,14 +236,9 @@ export function MailboxAgentsPanel({
                       >
                         {t("approvals.send")}
                       </button>
-                    </fieldset>
+                    </div>
                   ) : confirming === `discard:${item.itemId}` ? (
-                    <fieldset
-                      className={own.actions}
-                      data-confirmation
-                      tabIndex={-1}
-                      aria-labelledby={`${panelId}-${item.itemId}-mailbox ${panelId}-${item.itemId}-subject`}
-                    >
+                    <div className={own.actions}>
                       <span>{t("approvals.discardConfirm")}</span>
                       <button
                         type="button"
@@ -319,15 +270,13 @@ export function MailboxAgentsPanel({
                       >
                         {t("approvals.discard")}
                       </button>
-                    </fieldset>
+                    </div>
                   ) : (
                     <div className={own.actions}>
                       <button
                         type="button"
                         className="ms-btn ms-btn-primary ms-btn-sm"
                         disabled={busy || !recipients}
-                        data-confirm-action={key}
-                        aria-describedby={`${panelId}-${item.itemId}-mailbox ${panelId}-${item.itemId}-subject`}
                         onClick={() => setConfirming(key)}
                       >
                         {t("approvals.send")}
@@ -347,8 +296,6 @@ export function MailboxAgentsPanel({
                         type="button"
                         className="ms-btn ms-btn-ghost ms-btn-sm"
                         disabled={busy}
-                        data-confirm-action={`discard:${item.itemId}`}
-                        aria-describedby={`${panelId}-${item.itemId}-mailbox ${panelId}-${item.itemId}-subject`}
                         onClick={() => setConfirming(`discard:${item.itemId}`)}
                       >
                         {t("approvals.discard")}
@@ -378,41 +325,18 @@ export function MailboxAgentsPanel({
             {data.credentials.map((agent) => {
               const key = `revoke:${agent.credentialId}`;
               return (
-                <li
-                  key={agent.credentialId}
-                  aria-labelledby={`${panelId}-${agent.credentialId}-agent`}
-                >
+                <li key={agent.credentialId}>
                   <div className={own.agent}>
-                    <strong id={`${panelId}-${agent.credentialId}-agent`}>{agent.label}</strong>
+                    <strong>{agent.label}</strong>
                     <span className={own.tags}>
                       <span className={own.tag}>{t(`agents.kind.${agent.kind}`)}</span>
+                      {agent.scopes.map((scope) => (
+                        <span key={scope} className={own.tag}>
+                          {t(`agents.scope.${scope}`)}
+                        </span>
+                      ))}
                     </span>
-                    <dl className={own.mailboxes} id={`${panelId}-${agent.credentialId}-mailboxes`}>
-                      <dt>{tAgent("team.mailboxes")}</dt>
-                      <dd>
-                        {agent.mailboxes.map((mailbox) => {
-                          const scopes =
-                            mailbox.scopes ?? (agent.kind === "mailbox" ? agent.scopes : []);
-                          return (
-                            <div key={mailbox.mailboxId} className={own.mailbox}>
-                              <strong>{mailbox.address}</strong>
-                              <span className={own.tags}>
-                                {scopes.map((scope) => (
-                                  <span key={scope} className={own.tag}>
-                                    {scope === "send"
-                                      ? tAgent("perMailbox.send")
-                                      : t(`agents.scope.${scope}`)}
-                                  </span>
-                                ))}
-                              </span>
-                              {scopes.includes("draft") && !scopes.includes("send") ? (
-                                <span className={own.meta}>{t("agents.asksYou")}</span>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </dd>
-                    </dl>
+                    <small>{agent.mailboxes.map((m) => m.address).join(", ")}</small>
                     <small>
                       {agent.lastUsedAt
                         ? t("agents.used", { date: when(agent.lastUsedAt) })
@@ -420,22 +344,12 @@ export function MailboxAgentsPanel({
                       {agent.lastSentAt
                         ? ` · ${t("agents.sent", { date: when(agent.lastSentAt) })}`
                         : ""}
-                      {agent.kind !== "mailbox" ? ` · ${tAgent("perMailbox.summary")}` : ""}
+                      {` · ${tAgent("perMailbox.summary")}`}
                     </small>
                   </div>
                   {confirming === key ? (
-                    <fieldset
-                      className={own.actions}
-                      data-confirmation
-                      tabIndex={-1}
-                      aria-labelledby={`${panelId}-${agent.credentialId}-agent`}
-                      aria-describedby={`${panelId}-${agent.credentialId}-mailboxes`}
-                    >
-                      <span>
-                        {t("agents.revokeConfirm", {
-                          count: agent.mailboxes.length,
-                        })}
-                      </span>
+                    <div className={own.actions}>
+                      <span>{t("agents.revokeConfirm", { count: agent.mailboxes.length })}</span>
                       <button
                         type="button"
                         className="ms-btn ms-btn-sm"
@@ -455,10 +369,7 @@ export function MailboxAgentsPanel({
                                 mailboxId: agent.mailboxes[0]!.mailboxId,
                                 id: agent.credentialId,
                               });
-                            else
-                              await revokeCredential.mutateAsync({
-                                id: agent.credentialId,
-                              });
+                            else await revokeCredential.mutateAsync({ id: agent.credentialId });
                             setConfirming(null);
                             toast(t("agents.revoked", { agent: agent.label }));
                             await refresh();
@@ -469,7 +380,7 @@ export function MailboxAgentsPanel({
                       >
                         {t("agents.revoke")}
                       </button>
-                    </fieldset>
+                    </div>
                   ) : (
                     <div className={own.actions}>
                       {agent.kind !== "mailbox" ? (
@@ -477,9 +388,7 @@ export function MailboxAgentsPanel({
                           type="button"
                           className="ms-btn ms-btn-sm"
                           disabled={busy}
-                          aria-label={tAgent("perMailbox.editLabel", {
-                            label: agent.label,
-                          })}
+                          aria-label={tAgent("perMailbox.editLabel", { label: agent.label })}
                           aria-expanded={editingCredential === agent.credentialId}
                           onClick={() => {
                             setConfirming(null);
@@ -493,11 +402,6 @@ export function MailboxAgentsPanel({
                         type="button"
                         className="ms-btn ms-btn-ghost ms-btn-sm"
                         disabled={busy}
-                        data-confirm-action={key}
-                        aria-label={tAgent("revokeLabel", {
-                          label: agent.label,
-                        })}
-                        aria-describedby={`${panelId}-${agent.credentialId}-mailboxes`}
                         onClick={() => setConfirming(key)}
                       >
                         {t("agents.revoke")}
@@ -544,6 +448,6 @@ export function MailboxAgentsPanel({
           </ol>
         )}
       </section>
-    </section>
+    </div>
   );
 }

@@ -25,8 +25,17 @@ import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import { MailboxHelpMenu } from "./mailbox-help-menu";
 import styles from "./mailbox-rail.module.css";
 
-const PRIMARY: MailboxFolder[] = ["inbox", "sent", "drafts", "favorites", "archive"];
-const MORE: MailboxFolder[] = ["snoozed", "followups", "scheduled", "spam", "quarantine"];
+const PRIMARY: MailboxFolder[] = [
+  "inbox",
+  "favorites",
+  "snoozed",
+  "followups",
+  "drafts",
+  "scheduled",
+  "sent",
+  "archive",
+];
+const MORE: MailboxFolder[] = ["spam", "quarantine"];
 const DROPPABLE = new Set<MailboxFolder>(["inbox", "favorites", "archive", "spam", "trash"]);
 
 type DropProps = Record<string, unknown>;
@@ -34,8 +43,7 @@ type DropProps = Record<string, unknown>;
 /**
  * The Correio side rail: every mailbox grouped by use with its unread count,
  * the selected mailbox and its actions, the system folders and the person's
- * own folders. Everyday folders stay first; mailboxes open in a bounded picker.
- * It collapses to icons by choice on this device, keeps a compact
+ * own folders. It collapses to icons by choice on this device, keeps a compact
  * readable width on tablets, and becomes a full-screen drawer on a phone.
  */
 export function MailboxRail({
@@ -85,9 +93,6 @@ export function MailboxRail({
   const t = useTranslations("mailboxes");
   const id = useId();
   const rail = useRef<HTMLElement>(null);
-  const picker = useRef<HTMLDivElement>(null);
-  const pickerButton = useRef<HTMLButtonElement>(null);
-  const [boxesOpen, setBoxesOpen] = useState(false);
   const hover = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState<Partial<Record<"person" | "agent", boolean>>>({});
@@ -120,12 +125,6 @@ export function MailboxRail({
     return () => previous?.focus?.();
   }, [expanded]);
   function onKeyDown(event: KeyboardEvent) {
-    if (boxesOpen && event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      closePicker(true);
-      return;
-    }
     if (!expanded || !drawer()) return;
     if (event.key === "Escape") {
       event.stopPropagation();
@@ -150,48 +149,6 @@ export function MailboxRail({
     }
   }
 
-  function closePicker(restoreFocus = false) {
-    setBoxesOpen(false);
-    setQuery("");
-    if (restoreFocus) pickerButton.current?.focus({ preventScroll: true });
-  }
-  // The mailbox switcher is a disclosure, not a second long navigation rail.
-  // Its bounded panel never moves the everyday folders below a growing list.
-  useEffect(() => {
-    if (!boxesOpen) return;
-    const panel = picker.current?.querySelector<HTMLElement>("[data-mailbox-picker-panel]");
-    (
-      panel?.querySelector<HTMLInputElement>('input[type="search"]') ??
-      panel?.querySelector<HTMLButtonElement>("[data-mailbox-scope]")
-    )?.focus({
-      preventScroll: true,
-    });
-    const dismiss = (event: PointerEvent) => {
-      if (event.target instanceof Node && !picker.current?.contains(event.target)) {
-        setBoxesOpen(false);
-        setQuery("");
-      }
-    };
-    const handlePickerEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      setBoxesOpen(false);
-      setQuery("");
-      pickerButton.current?.focus({ preventScroll: true });
-    };
-    document.addEventListener("pointerdown", dismiss);
-    document.addEventListener("keydown", handlePickerEscape);
-    return () => {
-      document.removeEventListener("pointerdown", dismiss);
-      document.removeEventListener("keydown", handlePickerEscape);
-      applyRailCollapsed(readRailCollapsed(), false);
-    };
-  }, [boxesOpen]);
-  useEffect(() => {
-    if (!expanded) setBoxesOpen(false);
-  }, [expanded]);
-
   const groups = mailboxRailGroups(boxes, { query, expanded: showAll, selectedId });
   const selected = boxes.find((box) => box.id === selectedId) ?? null;
   const unreadLabel = (count: number) => t("organization.unreadCount", { count });
@@ -208,26 +165,6 @@ export function MailboxRail({
         {count > 999 ? "999+" : count}
       </span>
     ) : null;
-  const folderAccessibleLabel = (entry: MailboxFolder) => {
-    const waiting =
-      entry === "snoozed"
-        ? schedules?.snoozed
-        : entry === "scheduled"
-          ? schedules?.scheduled
-          : entry === "followups"
-            ? schedules?.followUps
-            : 0;
-    return [
-      t(entry),
-      entry === "inbox" && inboxUnread > 0
-        ? unreadLabel(inboxUnread)
-        : waiting
-          ? t("rail.waiting", { count: waiting })
-          : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-  };
   const folderButton = (entry: MailboxFolder) => (
     <button
       type="button"
@@ -235,12 +172,7 @@ export function MailboxRail({
       className={styles.item}
       aria-current={entry === folder ? "page" : undefined}
       title={t(entry)}
-      data-mailbox-folder={entry}
-      aria-label={folderAccessibleLabel(entry)}
-      onClick={() => {
-        closePicker();
-        onFolder(entry);
-      }}
+      onClick={() => onFolder(entry)}
       onPointerEnter={() => {
         if (hover.current) clearTimeout(hover.current);
         hover.current = setTimeout(() => onPrefetch?.(entry), 120);
@@ -266,9 +198,6 @@ export function MailboxRail({
       id="mailbox-folders-navigation"
       className={styles.rail}
       data-expanded={expanded}
-      data-mailbox-id={selectedId ?? undefined}
-      data-mailbox-scope={selectedId ? "selected" : scope}
-      data-folder={folder}
       aria-label={t("organization.boxesAndFolders")}
       onKeyDown={onKeyDown}
     >
@@ -285,151 +214,108 @@ export function MailboxRail({
         </button>
       </div>
       <div className={styles.scroll}>
-        <div className={styles.picker} ref={picker}>
-          <div className={styles.pickerHeader}>
-            <button
-              type="button"
-              ref={pickerButton}
-              className={styles.pickerTrigger}
-              aria-label={`${t("rail.boxes")}: ${selected ? `${selected.label} · ${selected.address}` : t(`scope.boxes.${scope}`)}`}
-              title={
-                selected ? `${selected.label} · ${selected.address}` : t(`scope.boxes.${scope}`)
-              }
-              aria-expanded={boxesOpen}
-              aria-controls={`${id}-box-picker`}
-              onClick={() => {
-                if (narrow) applyRailCollapsed(false, false);
-                setBoxesOpen((open) => !open);
-              }}
-            >
-              <MailboxFolderIcon name="stack" />
-              <span className={`${styles.label} ${styles.pickerIdentity}`}>
-                <strong>{selected?.label ?? t(`scope.boxes.${scope}`)}</strong>
-                {selected ? <small>{selected.address}</small> : null}
-              </span>
-              <span className={styles.pickerChevron} aria-hidden="true">
-                <MailboxFolderIcon name="chevronDown" />
-              </span>
-            </button>
-            {selected && boxMenu.length ? (
-              <span className={styles.selectedMenu}>
-                <PopoverMenu
-                  ariaLabel={t("rail.boxMenu", { name: selected.label })}
-                  items={boxMenu}
-                />
-              </span>
+        <section className={styles.section} aria-labelledby={`${id}-boxes`}>
+          <div className={styles.sectionHeader}>
+            <h3 id={`${id}-boxes`} className="ms-microlabel">
+              {t("rail.boxes")}
+            </h3>
+            {boxesMenu.length ? (
+              <PopoverMenu ariaLabel={t("rail.boxesMenu")} items={boxesMenu} />
             ) : null}
           </div>
-          {boxesOpen ? (
-            <section
-              id={`${id}-box-picker`}
-              className={`${styles.section} ${styles.pickerPanel}`}
-              aria-labelledby={`${id}-boxes`}
-              data-mailbox-picker-panel
-            >
-              <div className={styles.sectionHeader}>
-                <h3 id={`${id}-boxes`} className="ms-microlabel">
-                  {t("rail.boxes")}
-                </h3>
-                {boxesMenu.length ? (
-                  <PopoverMenu ariaLabel={t("rail.boxesMenu")} items={boxesMenu} />
-                ) : null}
-              </div>
-              {boxes.length > RAIL_SEARCH_THRESHOLD ? (
-                <input
-                  type="search"
-                  className={`ms-input ${styles.search}`}
-                  value={query}
-                  placeholder={t("rail.searchBoxes")}
-                  aria-label={t("rail.searchBoxes")}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              ) : null}
+          {boxes.length > RAIL_SEARCH_THRESHOLD ? (
+            <input
+              type="search"
+              className={`ms-input ${styles.search}`}
+              value={query}
+              placeholder={t("rail.searchBoxes")}
+              aria-label={t("rail.searchBoxes")}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          ) : null}
+          <button
+            type="button"
+            className={styles.item}
+            aria-current={!selectedId && scope === "all" ? "page" : undefined}
+            title={t("scope.boxes.all")}
+            onClick={() => onScope("all")}
+          >
+            <MailboxFolderIcon name="stack" />
+            <span className={styles.label}>{t("scope.boxes.all")}</span>
+          </button>
+          {groups.map((group) => (
+            <div className={styles.group} key={group.kind}>
               <button
                 type="button"
-                className={styles.item}
-                aria-current={!selectedId && scope === "all" ? "page" : undefined}
-                data-mailbox-scope="all"
-                title={t("scope.boxes.all")}
-                onClick={() => {
-                  onScope("all");
-                  closePicker(true);
-                }}
+                className={styles.groupHeader}
+                aria-current={!selectedId && scope === group.kind ? "page" : undefined}
+                title={t(`scope.boxes.${group.kind}`)}
+                onClick={() => onScope(group.kind)}
               >
-                <MailboxFolderIcon name="stack" />
-                <span className={styles.label}>{t("scope.boxes.all")}</span>
+                <span className={styles.label}>{t(`scope.${group.kind}`)}</span>
               </button>
-              {groups.map((group) => (
-                <div className={styles.group} key={group.kind}>
-                  <button
-                    type="button"
-                    className={styles.groupHeader}
-                    aria-current={!selectedId && scope === group.kind ? "page" : undefined}
-                    data-mailbox-scope={group.kind}
-                    title={t(`scope.boxes.${group.kind}`)}
-                    onClick={() => {
-                      onScope(group.kind);
-                      closePicker(true);
-                    }}
+              {group.boxes.map((box) => (
+                <button
+                  type="button"
+                  key={box.id}
+                  className={styles.item}
+                  aria-current={selectedId === box.id ? "page" : undefined}
+                  title={`${box.label} · ${box.address}`}
+                  aria-label={`${box.label} · ${box.address}${unread[box.id] ? ` · ${unreadLabel(unread[box.id] ?? 0)}` : ""}`}
+                  onClick={() => onSelectBox(box.id)}
+                >
+                  <span
+                    className={styles.boxInitial}
+                    aria-hidden="true"
+                    style={{ "--avatar-hue": mailboxAvatarHue(box.address) } as CSSProperties}
                   >
-                    <span className={styles.label}>{t(`scope.${group.kind}`)}</span>
-                  </button>
-                  {group.boxes.map((box) => (
-                    <button
-                      type="button"
-                      key={box.id}
-                      className={styles.item}
-                      aria-current={selectedId === box.id ? "page" : undefined}
-                      data-mailbox-id={box.id}
-                      data-mailbox-kind={box.kind}
-                      title={`${box.label} · ${box.address}`}
-                      aria-label={`${box.label} · ${box.address}${unread[box.id] ? ` · ${unreadLabel(unread[box.id] ?? 0)}` : ""}`}
-                      onClick={() => {
-                        onSelectBox(box.id);
-                        closePicker(true);
-                      }}
-                    >
-                      <span
-                        className={styles.boxInitial}
-                        aria-hidden="true"
-                        style={{ "--avatar-hue": mailboxAvatarHue(box.address) } as CSSProperties}
-                      >
-                        {mailboxInitials(box.label, box.address)}
-                      </span>
-                      <span className={`${styles.label} ${styles.boxIdentity}`}>
-                        <span className={styles.boxName}>{box.label}</span>
-                        <span className={styles.boxAddress}>{box.address}</span>
-                      </span>
-                      {pill(unread[box.id] ?? 0)}
-                    </button>
-                  ))}
-                  {group.hidden > 0 ? (
-                    <button
-                      type="button"
-                      className={styles.showAll}
-                      onClick={() => setShowAll((current) => ({ ...current, [group.kind]: true }))}
-                    >
-                      {t("rail.showAll", { count: group.total })}
-                    </button>
-                  ) : showAll[group.kind] && !query ? (
-                    <button
-                      type="button"
-                      className={styles.showAll}
-                      onClick={() => setShowAll((current) => ({ ...current, [group.kind]: false }))}
-                    >
-                      {t("rail.showFewer")}
-                    </button>
-                  ) : null}
-                </div>
+                    {mailboxInitials(box.label, box.address)}
+                  </span>
+                  <span className={`${styles.label} ${styles.boxIdentity}`}>
+                    <span className={styles.boxName}>{box.label}</span>
+                    <span className={styles.boxAddress}>{box.address}</span>
+                  </span>
+                  {pill(unread[box.id] ?? 0)}
+                </button>
               ))}
-              {query && !groups.length ? (
-                <p className={styles.empty}>{t("rail.noBoxMatches")}</p>
+              {group.hidden > 0 ? (
+                <button
+                  type="button"
+                  className={styles.showAll}
+                  onClick={() => setShowAll((current) => ({ ...current, [group.kind]: true }))}
+                >
+                  {t("rail.showAll", { count: group.total })}
+                </button>
+              ) : showAll[group.kind] && !query ? (
+                <button
+                  type="button"
+                  className={styles.showAll}
+                  onClick={() => setShowAll((current) => ({ ...current, [group.kind]: false }))}
+                >
+                  {t("rail.showFewer")}
+                </button>
               ) : null}
-            </section>
+            </div>
+          ))}
+          {query && !groups.length ? (
+            <p className={styles.empty}>{t("rail.noBoxMatches")}</p>
           ) : null}
-        </div>
+        </section>
+        {selected ? (
+          <div className={styles.boxHeader}>
+            <div>
+              <strong title={selected.label}>{selected.label}</strong>
+              <small title={selected.address}>{selected.address}</small>
+            </div>
+            {boxMenu.length ? (
+              <PopoverMenu
+                ariaLabel={t("rail.boxMenu", { name: selected.label })}
+                items={boxMenu}
+              />
+            ) : null}
+          </div>
+        ) : null}
         <nav className={styles.folders} aria-label={t("folders")}>
-          <h3 className={`ms-microlabel ${styles.foldersHeading}`}>{t("folders")}</h3>
           {PRIMARY.map(folderButton)}
           <button
             type="button"
