@@ -1,4 +1,8 @@
-import { utcDay } from "@millionsend/core";
+import {
+  checkCampaignConsent,
+  reviewCampaignConsent,
+  submitCampaignConsent,
+} from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
@@ -33,6 +37,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await close();
 });
 
@@ -88,6 +93,84 @@ async function seedDraft(teamId: string) {
 async function broadcastRow(id: string) {
   const [row] = await db.select().from(schema.broadcasts).where(eq(schema.broadcasts.id, id));
   return row ?? null;
+}
+
+/** Legitimate synthetic opt-in, independently reviewed; no business gate is mocked. */
+async function approveCampaignFixture(teamId: string, name = "example.com") {
+  const at = new Date();
+  const dnsRecords = [
+    {
+      group: "verification",
+      name: `fixture._domainkey.${name}`,
+      type: "TXT",
+      status: "found" as const,
+    },
+    { group: "sending", name: `send.${name}`, type: "TXT", status: "found" as const },
+    { group: "sending", name: `send.${name}`, type: "MX", status: "found" as const },
+    { group: "dmarc", name: `_dmarc.${name}`, type: "TXT", status: "found" as const },
+  ];
+  await db
+    .insert(schema.domains)
+    .values({
+      teamId,
+      name,
+      region: "us-east-1",
+      status: "verified",
+      dkimSelector: "fixture",
+      mailFromSubdomain: "send",
+      dmarcPolicy: "none",
+      dmarcCheckedAt: at,
+      dnsRecords,
+    })
+    .onConflictDoUpdate({
+      target: [schema.domains.teamId, schema.domains.name],
+      set: {
+        status: "verified",
+        dkimSelector: "fixture",
+        mailFromSubdomain: "send",
+        dmarcPolicy: "none",
+        dmarcCheckedAt: at,
+        dnsRecords,
+      },
+    });
+  const dossier = await submitCampaignConsent(db, {
+    teamId,
+    actorId: "u1",
+    evidence: {
+      listReference: "list-fixture-42",
+      source: "First-party registration on the public website",
+      method: "Explicit unchecked opt-in checkbox",
+      formUrl: "https://example.test/signup",
+      permissionText: "I agree to receive the Example product newsletter.",
+      permissionScope: "Monthly Example product news only",
+      samples: [
+        {
+          reference: "record-masked-42",
+          registeredAt: "2020-01-01T12:00:00.000Z",
+          ipAvailable: false,
+        },
+      ],
+    },
+  });
+  await reviewCampaignConsent(db, {
+    teamId,
+    dossierId: dossier.id,
+    operatorId: "independent-fixture-operator",
+    decision: "approved",
+    reason: "Verified first-party opt-in and permission scope",
+  });
+  await db
+    .update(schema.teams)
+    .set({ sendReviewClearedAt: at, sendReviewClearedBy: "independent-fixture-operator" })
+    .where(eq(schema.teams.id, teamId));
+  expect(
+    await checkCampaignConsent(db, {
+      teamId,
+      from: `sender@${name}`,
+      operation: "campaign",
+      isCloud: true,
+    }),
+  ).toMatchObject({ allowed: true, dossierId: dossier.id });
 }
 
 describe("broadcasts.create / get / list", () => {
@@ -400,19 +483,44 @@ describe("broadcasts.send", () => {
 });
 
 describe("broadcasts.send deliverability guard", () => {
-  async function seedWindowCounter(
-    teamId: string,
-    counts: { sent: number; complained?: number; bounced?: number },
-  ) {
-    await db.insert(schema.usageCounters).values({ teamId, day: utcDay(Date.now()), ...counts });
+  async function seedConfirmedWindow(teamId: string, sent: number, events: number) {
+    const at = new Date(Date.now() - 60_000);
+    const emails = await db
+      .insert(schema.emails)
+      .values(
+        Array.from({ length: sent }, (_, i) => ({
+          teamId,
+          from: "sender@example.com",
+          to: [`r${i}@example.test`],
+          subject: "Fixture",
+          sesMessageId: `synthetic-ses-${teamId}-${i}`,
+          sentAt: at,
+          createdAt: at,
+        })),
+      )
+      .returning({ id: schema.emails.id });
+    await db.insert(schema.emailEvents).values(
+      emails.slice(0, events).map((email, i) => ({
+        emailId: email.id,
+        type: "complained" as const,
+        snsMessageId: `synthetic-sns-${teamId}-${i}`,
+        occurredAt: at,
+        createdAt: at,
+      })),
+    );
   }
 
+  async function preparedDraft(teamId: string) {
+    const draft = await seedDraft(teamId);
+    await approveCampaignFixture(teamId);
+    return draft;
+  }
   it("blocks the send when the window complaint rate is over the pause line", async () => {
+    vi.stubEnv("IS_CLOUD", "true");
     const teamId = await createTeam(db, "team-a");
-    const { id } = await seedDraft(teamId);
-    // 3/2000 = 0.15% > 0.1% pause line, 3 complaints = the minimum count.
-    await seedWindowCounter(teamId, { sent: 2000, complained: 3 });
-
+    const { id } = await preparedDraft(teamId);
+    // 3/2000 = 0.15%, strictly above internal policy 0.08%.
+    await seedConfirmedWindow(teamId, 2000, 3);
     const enqueued: string[] = [];
     const caller = callerFor(teamId, {
       enqueueBroadcastSend: async (broadcastId) => {
@@ -421,30 +529,33 @@ describe("broadcasts.send deliverability guard", () => {
     });
     await expect(caller.broadcasts.send({ id })).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
-      message: expect.stringContaining("0.1%"),
+      message: expect.stringContaining("0.08%"),
     });
     expect(enqueued).toEqual([]);
     expect((await broadcastRow(id))?.status).toBe("draft");
   });
-
-  it("does not pause on a pause-line rate without the minimum complaint count", async () => {
+  it("warns but does not pause at exactly the complaint pause line", async () => {
+    vi.stubEnv("IS_CLOUD", "true");
     const teamId = await createTeam(db, "team-a");
-    const { id } = await seedDraft(teamId);
-    // 2/2000 = exactly 0.1%, but 2 < 3 complaints.
-    await seedWindowCounter(teamId, { sent: 2000, complained: 2 });
-
+    const { id } = await preparedDraft(teamId);
+    await seedConfirmedWindow(teamId, 2500, 2); // Exactly 0.08%, not strictly above.
     await callerFor(teamId).broadcasts.send({ id });
     expect((await broadcastRow(id))?.status).toBe("scheduled");
   });
-
-  it("does not pause a tiny sample below the volume floor", async () => {
+  it("pauses a tiny confirmed sample below the warning-only volume floor", async () => {
+    vi.stubEnv("IS_CLOUD", "true");
     const teamId = await createTeam(db, "team-a");
-    const { id } = await seedDraft(teamId);
-    // 3/50 = 6% with enough complaints, but 50 < the 100-send floor.
-    await seedWindowCounter(teamId, { sent: 50, complained: 3 });
-
-    await callerFor(teamId).broadcasts.send({ id });
-    expect((await broadcastRow(id))?.status).toBe("scheduled");
+    const { id } = await preparedDraft(teamId);
+    await seedConfirmedWindow(teamId, 50, 3);
+    const enqueueBroadcastSend = vi.fn(async () => {});
+    await expect(
+      callerFor(teamId, { enqueueBroadcastSend }).broadcasts.send({ id }),
+    ).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: expect.stringContaining("0.08%"),
+    });
+    expect(enqueueBroadcastSend).not.toHaveBeenCalled();
+    expect((await broadcastRow(id))?.status).toBe("draft");
   });
 });
 

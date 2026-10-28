@@ -91,16 +91,16 @@ function health(overrides: Partial<Health> = {}): Health {
   return {
     status: "paused",
     sent: 1000,
-    windowDays: 7,
+    windowDays: 1,
     bounceRate: 0.02,
     complaintRate: 0.001,
-    pause: { sent: 200, hardBounced: 10, complained: 0, windowDays: 2 },
-    reasons: [{ metric: "bounce", rate: 0.05, tier: "paused", windowDays: 2 }],
+    pause: { sent: 200, hardBounced: 10, complained: 0, windowDays: 1 },
+    reasons: [{ metric: "bounce", rate: 0.05, tier: "paused", windowDays: 1 }],
     thresholds: {
-      warnBounce: 0.04,
+      warnBounce: 0.015,
       warnComplaint: 0.0005,
-      pauseBounce: 0.05,
-      pauseComplaint: 0.001,
+      pauseBounce: 0.02,
+      pauseComplaint: 0.0008,
     },
     recovery: {
       evaluatedAt: instant,
@@ -193,10 +193,10 @@ describe.each(["en", "pt-BR"] as const)("deliverability recovery in %s", (locale
 
   it("shows both pause causes, real counts, exact floors and safe recovery actions", () => {
     const current = health({
-      pause: { sent: 200, hardBounced: 10, complained: 3, windowDays: 2 },
+      pause: { sent: 200, hardBounced: 10, complained: 3, windowDays: 1 },
       reasons: [
-        { metric: "bounce", rate: 0.05, tier: "paused", windowDays: 2 },
-        { metric: "complaint", rate: 0.015, tier: "paused", windowDays: 2 },
+        { metric: "bounce", rate: 0.05, tier: "paused", windowDays: 1 },
+        { metric: "complaint", rate: 0.015, tier: "paused", windowDays: 1 },
       ],
     });
     const html = render(locale, createElement(DeliverabilityRecovery, { health: current }));
@@ -204,10 +204,10 @@ describe.each(["en", "pt-BR"] as const)("deliverability recovery in %s", (locale
     expect(text).toContain(t("recovery.pauseWindow"));
     expect(text).toContain(t("recovery.criteriaVolume", { sent: fmt.format(100) }));
     expect(text).toContain(
-      t("recovery.bounceCriteria", { count: fmt.format(10), rate: pct.format(0.05) }),
+      t("recovery.bounceCriteria", { count: fmt.format(1), rate: pct.format(0.02) }),
     );
     expect(text).toContain(
-      t("recovery.complaintCriteria", { count: fmt.format(3), rate: pct.format(0.001) }),
+      t("recovery.complaintCriteria", { count: fmt.format(1), rate: pct.format(0.0008) }),
     );
     for (const reason of current.reasons) {
       expect(text).toContain(
@@ -216,7 +216,7 @@ describe.each(["en", "pt-BR"] as const)("deliverability recovery in %s", (locale
           rate: pct.format(reason.rate),
           count: fmt.format(reason.metric === "bounce" ? 10 : 3),
           sent: fmt.format(200),
-          days: 2,
+          days: 1,
         }),
       );
     }
@@ -232,19 +232,19 @@ describe.each(["en", "pt-BR"] as const)("deliverability recovery in %s", (locale
     expect(fixture.mutations).not.toHaveBeenCalled();
   });
 
-  it("keeps the warning's seven-day window separate from the pause criteria", () => {
+  it("uses the rolling 24-hour warning window without a low-volume pause exemption", () => {
     const current = health({
       status: "warning",
-      reasons: [{ metric: "bounce", rate: 0.04, tier: "warning", windowDays: 7 }],
+      reasons: [{ metric: "bounce", rate: 0.04, tier: "warning", windowDays: 1 }],
     });
     const text = plain(render(locale, createElement(DeliverabilityRecovery, { health: current })));
     expect(text).toContain(t("recovery.status.warning"));
-    expect(text).toContain(t("recovery.warningWindow", { days: 7 }));
+    expect(text).toContain(t("recovery.warningWindow", { days: 1 }));
     expect(text).toContain(
       t("recovery.warningEvidence", {
         metric: t("metric.bounce"),
         rate: pct.format(0.04),
-        days: 7,
+        days: 1,
       }),
     );
     expect(text).not.toContain(t("recovery.status.paused"));

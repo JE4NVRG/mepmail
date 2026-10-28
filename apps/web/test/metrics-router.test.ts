@@ -250,11 +250,39 @@ describe("metrics.window", () => {
   });
 });
 
+async function seedConfirmedWindow(teamId: string, sent: number, events: number) {
+  const at = new Date(Date.now() - 60_000);
+  const emails = await db
+    .insert(schema.emails)
+    .values(
+      Array.from({ length: sent }, (_, i) => ({
+        teamId,
+        from: "sender@example.com",
+        to: [`r${i}@example.test`],
+        subject: "Fixture",
+        sesMessageId: `synthetic-ses-${teamId}-${i}`,
+        sentAt: at,
+        createdAt: at,
+      })),
+    )
+    .returning({ id: schema.emails.id });
+  await db.insert(schema.emailEvents).values(
+    emails.slice(0, events).map((email, i) => ({
+      emailId: email.id,
+      type: "bounced" as const,
+      bounceType: "Permanent",
+      snsMessageId: `synthetic-sns-${teamId}-${i}`,
+      occurredAt: at,
+      createdAt: at,
+    })),
+  );
+}
+
 describe("metrics.health", () => {
-  it("pauses when the hard-bounce rate crosses the SES enforcement line", async () => {
+  it("pauses when confirmed hard bounces cross the internal rolling 24-hour line", async () => {
     const teamId = await createTeam(db, "acme");
-    // 120/2000 = 6% > 5% pause line, over the floor and the minimum count.
-    await insertCounter(teamId, utcDay(0), { sent: 2000, bounced: 120, hardBounced: 120 });
+    // 120/2000 = 6%, strictly above internal policy 2%.
+    await seedConfirmedWindow(teamId, 2000, 120);
 
     const result = await callerFor(teamId).metrics.health();
 
@@ -264,24 +292,31 @@ describe("metrics.health", () => {
       metric: "bounce",
       rate: 0.06,
       tier: "paused",
-      windowDays: 2,
+      windowDays: 1,
     });
     expect(result.thresholds).toEqual({
-      warnBounce: 0.04,
+      warnBounce: 0.015,
       warnComplaint: 0.0005,
-      pauseBounce: 0.05,
-      pauseComplaint: 0.001,
+      pauseBounce: 0.02,
+      pauseComplaint: 0.0008,
     });
   });
 
-  it("stays ok below the volume floor regardless of rate", async () => {
+  it("does not exempt low-volume confirmed sends from pausing", async () => {
     const teamId = await createTeam(db, "acme");
-    await insertCounter(teamId, utcDay(0), { sent: 99, bounced: 50, hardBounced: 50 });
+    await seedConfirmedWindow(teamId, 99, 50);
 
     const result = await callerFor(teamId).metrics.health();
 
-    expect(result.status).toBe("ok");
-    expect(result.reasons).toEqual([]);
+    expect(result.status).toBe("paused");
+    expect(result.sent).toBe(99);
+    expect(result.bounceRate).toBeCloseTo(50 / 99);
+    expect(result.reasons).toContainEqual({
+      metric: "bounce",
+      rate: 50 / 99,
+      tier: "paused",
+      windowDays: 1,
+    });
   });
 });
 

@@ -62,18 +62,16 @@ it.each(["same transaction timestamp", "prior marker ahead of the wall clock"])(
         schedule === "same transaction timestamp"
           ? "ffffffff-ffff-4fff-bfff-ffffffffffff"
           : randomUUID();
-      await tx
-        .insert(schema.campaignConsentDossiers)
-        .values({
-          id: priorId,
-          teamId,
-          evidence,
-          submittedBy: "synthetic-owner",
-          submittedAt:
-            schedule === "same transaction timestamp"
-              ? sql`now()`
-              : sql`clock_timestamp() + interval '1 hour'`,
-        });
+      await tx.insert(schema.campaignConsentDossiers).values({
+        id: priorId,
+        teamId,
+        evidence,
+        submittedBy: "synthetic-owner",
+        submittedAt:
+          schedule === "same transaction timestamp"
+            ? sql`now()`
+            : sql`clock_timestamp() + interval '1 hour'`,
+      });
       await reviewCampaignConsent(transactionalDb, {
         teamId,
         dossierId: priorId,

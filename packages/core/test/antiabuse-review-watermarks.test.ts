@@ -93,16 +93,14 @@ describe("reputation review evidence is not a seven-day amnesty", () => {
         })),
       )
       .returning({ id: schema.emails.id });
-    await db
-      .insert(schema.emailEvents)
-      .values({
-        emailId: accepted[0]!.id,
-        type: "bounced",
-        bounceType: "Permanent",
-        snsMessageId: randomUUID(),
-        occurredAt: new Date(at.getTime() - 30000),
-        createdAt: new Date(at.getTime() - 30000),
-      });
+    await db.insert(schema.emailEvents).values({
+      emailId: accepted[0]!.id,
+      type: "bounced",
+      bounceType: "Permanent",
+      snsMessageId: randomUUID(),
+      occurredAt: new Date(at.getTime() - 30000),
+      createdAt: new Date(at.getTime() - 30000),
+    });
     const health = await fetchDeliverabilityHealth(db, teamId, { now: at });
     expect(health).toMatchObject({ sent: 20, status: "paused", bounceRate: 0.05 });
     expect(

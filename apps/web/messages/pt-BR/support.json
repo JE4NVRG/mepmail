@@ -164,7 +164,7 @@
       },
       {
         "q": "Qual é a taxa de entrega de vocês?",
-        "a": "Não publicamos um número da plataforma: ele depende do domínio, da lista e do conteúdo de cada remetente. O que aplicamos no lugar: o envio de um time pausa quando os bounces duros chegam a 5% (pelo menos 10) ou as reclamações a 0,1% (pelo menos 3), em hoje e ontem, a partir de 100 envios, com um aviso em 4% e 0,05% em 7 dias. Essas linhas protegem a reputação que todos os remetentes dividem.",
+        "a": "Não publicamos uma taxa de entrega da plataforma. Política interna MepMail, não limites do AWS SES: nas últimas 24 horas móveis (1 dia decorrido), novos envios pausam com taxa estritamente superior a 2% de rejeições permanentes ou 0,08% de reclamações, com ao menos 1 mensagem confirmada e 1 evento correspondente. Os avisos começam em 1,5% e 0,05% após 100 mensagens confirmadas na mesma janela. O piso exclusivo de aviso nunca isenta remetentes de baixo volume da pausa. Ficar abaixo do limite não libera mensagens retidas, não reativa contas suspensas nem retoma filas; outros controles continuam válidos.",
         "link": {
           "label": "Pausas de envio",
           "href": "https://docs.mepmail.dev/pt-BR/errors#pausas-e-bloqueios-de-envio"

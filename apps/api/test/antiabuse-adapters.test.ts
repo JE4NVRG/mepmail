@@ -34,25 +34,21 @@ async function setup(isCloud = true) {
     .set({ createdAt: new Date(Date.now() - 40 * 86400000), sendReviewClearedAt: new Date() })
     .where(eq(schema.teams.id, teamId));
   const domain = `${randomUUID()}.example.test`;
-  await db
-    .insert(schema.domains)
-    .values({
-      teamId,
-      name: domain,
-      region: "us-east-1",
-      status: "verified",
-      verifiedAt: new Date(),
-    });
+  await db.insert(schema.domains).values({
+    teamId,
+    name: domain,
+    region: "us-east-1",
+    status: "verified",
+    verifiedAt: new Date(),
+  });
   const key = generateApiKey();
-  await db
-    .insert(schema.apiKeys)
-    .values({
-      teamId,
-      name: "synthetic",
-      tokenPrefix: key.tokenPrefix,
-      keyHash: key.keyHash,
-      last4: key.last4,
-    });
+  await db.insert(schema.apiKeys).values({
+    teamId,
+    name: "synthetic",
+    tokenPrefix: key.tokenPrefix,
+    keyHash: key.keyHash,
+    last4: key.last4,
+  });
   const enqueued: string[] = [];
   const app = createApi({
     db,

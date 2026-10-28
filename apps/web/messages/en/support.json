@@ -164,7 +164,7 @@
       },
       {
         "q": "What is your delivery rate?",
-        "a": "We do not publish a platform-wide number: it depends on each sender's domain, list and content. What we enforce instead: a team's sending pauses when its hard bounces reach 5% (at least 10) or its complaints reach 0.1% (at least 3), over today and yesterday once there are 100 sends, with a warning at 4% and 0.05% over 7 days. Those lines protect the reputation every sender shares.",
+        "a": "We do not publish a platform-wide delivery rate. Internal MepMail policy, not AWS SES limits: over the rolling last 24 hours (1 elapsed day), new sends pause strictly above 2% hard bounces or 0.08% complaints, with at least 1 confirmed message and 1 corresponding event. Warnings start at 1.5% and 0.05% after 100 confirmed messages in that same window. The warning-only floor never exempts low-volume senders from a pause. Falling below a threshold does not release held mail, reactivate suspended accounts or resume queues; other safety controls still apply.",
         "link": {
           "label": "Sending pauses",
           "href": "https://docs.mepmail.dev/errors#sending-pauses-and-holds"

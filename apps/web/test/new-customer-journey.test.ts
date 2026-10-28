@@ -11,7 +11,7 @@ import type { SystemMailMessage } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { dnsChecklist } from "@millionsend/ses";
 import { createTestDb } from "@millionsend/test-utils";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAuth } from "@/server/auth";
@@ -49,6 +49,12 @@ vi.mock("@/server/billing", async (original) => {
     },
   };
 });
+
+// Only the external queue transport is synthetic; authorization/release stay real.
+vi.mock("@/server/queue", async (original) => ({
+  ...(await original<typeof import("@/server/queue")>()),
+  getQueue: async () => ({ runCronNow: async () => {} }),
+}));
 
 const BASE = "http://localhost:3000";
 const PASSWORD = "synthetic correct horse battery";
@@ -206,7 +212,9 @@ beforeEach(async () => {
       .split("--> statement-breakpoint")
       .map((s) => s.trim())
       .filter(Boolean))
-      await db.execute(sql.raw(statement));
+      await (db as Db & { $client: { exec(sql: string): Promise<unknown> } }).$client.exec(
+        statement,
+      );
   sent = [];
   stripeCalls = [];
   sesVerified = false;
@@ -437,11 +445,20 @@ describe("new customer: real auth and routers before a synthetic payment", () =>
         expect(JSON.stringify(receipt)).not.toContain(use);
         expect((await teamRow(teamId)).sendReviewAt).toBeInstanceOf(Date);
         await refuseFourMethods(buyer, "domain_review", teamId);
+        const hold = (await teamRow(teamId)).sendReviewAt;
+        expect(hold).toBeInstanceOf(Date);
+        if (!hold) throw new Error("Expected the observed signup review hold");
         await expect(
-          customer.console.teams.releaseSendReview({ id: teamId }),
+          customer.console.teams.releaseSendReview({
+            id: teamId,
+            expectedHoldAt: hold.toISOString(),
+          }),
         ).rejects.toMatchObject({ code: "NOT_FOUND" });
         const console = await caller(operator);
-        await console.console.teams.releaseSendReview({ id: teamId });
+        await console.console.teams.releaseSendReview({
+          id: teamId,
+          expectedHoldAt: hold.toISOString(),
+        });
         await console.console.teams.resolveSignupReview({ id: teamId, reviewed: true });
         expect(await teamRow(teamId)).toMatchObject({
           sendReviewAt: null,

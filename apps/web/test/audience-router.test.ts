@@ -1,8 +1,11 @@
 import {
+  checkCampaignConsent,
   deriveUnsubscribeKey,
   hashRecipient,
   makeUnsubscribeToken,
   PLAN_CONTACT_LIMIT,
+  reviewCampaignConsent,
+  submitCampaignConsent,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
@@ -67,6 +70,84 @@ const markCounted = (segmentId: string) =>
     .update(schema.segments)
     .set({ countedAt: new Date() })
     .where(eq(schema.segments.id, segmentId));
+
+/** Legitimate synthetic opt-in, independently reviewed; no business gate is mocked. */
+async function approveCampaignFixture(teamId: string, name = "example.com") {
+  const at = new Date();
+  const dnsRecords = [
+    {
+      group: "verification",
+      name: `fixture._domainkey.${name}`,
+      type: "TXT",
+      status: "found" as const,
+    },
+    { group: "sending", name: `send.${name}`, type: "TXT", status: "found" as const },
+    { group: "sending", name: `send.${name}`, type: "MX", status: "found" as const },
+    { group: "dmarc", name: `_dmarc.${name}`, type: "TXT", status: "found" as const },
+  ];
+  await db
+    .insert(schema.domains)
+    .values({
+      teamId,
+      name,
+      region: "us-east-1",
+      status: "verified",
+      dkimSelector: "fixture",
+      mailFromSubdomain: "send",
+      dmarcPolicy: "none",
+      dmarcCheckedAt: at,
+      dnsRecords,
+    })
+    .onConflictDoUpdate({
+      target: [schema.domains.teamId, schema.domains.name],
+      set: {
+        status: "verified",
+        dkimSelector: "fixture",
+        mailFromSubdomain: "send",
+        dmarcPolicy: "none",
+        dmarcCheckedAt: at,
+        dnsRecords,
+      },
+    });
+  const dossier = await submitCampaignConsent(db, {
+    teamId,
+    actorId: "u1",
+    evidence: {
+      listReference: "list-fixture-42",
+      source: "First-party registration on the public website",
+      method: "Explicit unchecked opt-in checkbox",
+      formUrl: "https://example.test/signup",
+      permissionText: "I agree to receive the Example product newsletter.",
+      permissionScope: "Monthly Example product news only",
+      samples: [
+        {
+          reference: "record-masked-42",
+          registeredAt: "2020-01-01T12:00:00.000Z",
+          ipAvailable: false,
+        },
+      ],
+    },
+  });
+  await reviewCampaignConsent(db, {
+    teamId,
+    dossierId: dossier.id,
+    operatorId: "independent-fixture-operator",
+    decision: "approved",
+    reason: "Verified first-party opt-in and permission scope",
+  });
+  await db
+    .update(schema.teams)
+    .set({ sendReviewClearedAt: at, sendReviewClearedBy: "independent-fixture-operator" })
+    .where(eq(schema.teams.id, teamId));
+  expect(
+    await checkCampaignConsent(db, {
+      teamId,
+      from: `sender@${name}`,
+      operation: "campaign",
+      isCloud: true,
+    }),
+  ).toMatchObject({ allowed: true, dossierId: dossier.id });
+}
 
 describe("audience.contacts.stats", () => {
   it("counts the team's contacts and unsubscribed for the stat strip", async () => {
@@ -195,6 +276,7 @@ describe("plan contact cap", () => {
   it("in cloud, a free team at the cap cannot add a contact", async () => {
     vi.stubEnv("IS_CLOUD", "true");
     const teamId = await createTeam(db, "team-a");
+    await approveCampaignFixture(teamId);
     await fill(teamId, PLAN_CONTACT_LIMIT.free ?? 0);
     await expect(
       callerFor(teamId).audience.contacts.add({ email: "over@example.com" }),
@@ -207,6 +289,7 @@ describe("plan contact cap", () => {
   it("in cloud, an import larger than the room left is refused whole", async () => {
     vi.stubEnv("IS_CLOUD", "true");
     const teamId = await createTeam(db, "team-a");
+    await approveCampaignFixture(teamId);
     const limit = PLAN_CONTACT_LIMIT.free ?? 0;
     await fill(teamId, limit - 1);
     const caller = callerFor(teamId);
@@ -225,6 +308,7 @@ describe("plan contact cap", () => {
   it("in cloud, a paid plan is uncapped", async () => {
     vi.stubEnv("IS_CLOUD", "true");
     const teamId = await createTeam(db, "team-a");
+    await approveCampaignFixture(teamId);
     await db.update(schema.teams).set({ plan: "pro" }).where(eq(schema.teams.id, teamId));
     await fill(teamId, PLAN_CONTACT_LIMIT.free ?? 0);
     await expect(
