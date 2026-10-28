@@ -61,8 +61,6 @@ export const ABUSE_JUDGE_TIMEOUT_MS_DEFAULT = 20_000;
 const emailAddress = z.email();
 
 /** CUSTOMER_SMTP_RELAY_NAME: a short label, safe inside a message id. */
-    // Operator-owned per-team/type routing. Parsed strictly by the worker.
-    SENDING_PROVIDER_POLICY_JSON: z.string().optional(),
 const CUSTOMER_SMTP_RELAY_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/;
 
 const oauthIssuerSchema = z.string().refine(
@@ -246,6 +244,8 @@ export const env = createEnv({
     // customerSmtpRelay().
     CUSTOMER_SMTP_RELAY_URL: z.url({ protocol: /^smtps?$/ }).optional(),
     CUSTOMER_SMTP_RELAY_NAME: z.string().regex(CUSTOMER_SMTP_RELAY_NAME_RE).optional(),
+    // Operator-owned per-team/type routing. Parsed strictly by the worker.
+    SENDING_PROVIDER_POLICY_JSON: z.string().optional(),
     // Share of every served region's rolling 24-hour SES quota that
     // broadcasts never touch, as a percent. Transactional mail may use all
     // of it and borrow beyond it; broadcasts get the rest and are paced over
