@@ -1,260 +1,186 @@
+import { randomUUID } from "node:crypto";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  broadcastSendSpacingMs,
   evaluateDeliverability,
   fetchDeliverabilityHealth,
-  GUARDRAIL_WINDOW_DAYS,
-  MIN_GUARDRAIL_VOLUME,
-  MIN_PAUSE_COMPLAINTS,
-  MIN_PAUSE_HARD_BOUNCES,
-  PAUSE_WINDOW_DAYS,
-  THROTTLED_BROADCAST_RATE_PER_SECOND,
   type WindowCounts,
 } from "../src/deliverability.js";
-import { DAY_MS, utcDay } from "../src/utc-day.js";
 
-const counts = (sent: number, hardBounced = 0, complained = 0): WindowCounts => ({
-  sent,
-  hardBounced,
-  complained,
-});
-/** The same counts in both windows: everything happened today. */
-const today = (sent: number, hardBounced = 0, complained = 0) => ({
-  warn: counts(sent, hardBounced, complained),
-  pause: counts(sent, hardBounced, complained),
-});
-
-describe("evaluateDeliverability", () => {
-  it("computes rates and stays ok when both metrics are clean", () => {
-    const r = evaluateDeliverability(today(10_000, 100));
-    expect(r.bounceRate).toBeCloseTo(0.01);
-    expect(r.complaintRate).toBe(0);
-    expect(r.status).toBe("ok");
-    expect(r.reasons).toEqual([]);
+const windows = (sent: number, hardBounced = 0, complained = 0) => {
+  const counts: WindowCounts = { sent, hardBounced, complained };
+  return { warn: counts, pause: counts };
+};
+describe("MepMail internal rolling-window policy", () => {
+  it.each([
+    [10000, 210, 0],
+    [10000, 0, 9],
+    [200, 5, 0],
+    [100, 0, 1],
+  ])("pauses above the line with explicit noise floors (%i/%i/%i)", (sent, hard, complaints) => {
+    expect(evaluateDeliverability(windows(sent, hard, complaints)).status).toBe("paused");
   });
-
-  it("stays ok just under the warning line", () => {
-    // 399/10000 = 3.99% < 4% WARN
-    expect(evaluateDeliverability(today(10_000, 399)).status).toBe("ok");
+  it.each([
+    [10000, 200, 0],
+    [10000, 0, 8],
+  ])("strict equality is warning, not pause", (s, b, c) => {
+    expect(evaluateDeliverability(windows(s, b, c)).status).toBe("warning");
   });
-
-  it("warns at exactly the warning line, naming the warning window", () => {
-    // 400/10000 = 4.00% == WARN_BOUNCE_RATE
-    const r = evaluateDeliverability(today(10_000, 400));
-    expect(r.status).toBe("warning");
-    expect(r.reasons).toEqual([
-      { metric: "bounce", rate: 0.04, tier: "warning", windowDays: GUARDRAIL_WINDOW_DAYS },
-    ]);
-  });
-
-  it("pauses at exactly the pause line, naming the pause window", () => {
-    // 500/10000 = 5.00% == PAUSE_BOUNCE_RATE, 500 >= MIN_PAUSE_HARD_BOUNCES
-    const r = evaluateDeliverability(today(10_000, 500));
-    expect(r.status).toBe("paused");
-    expect(r.reasons).toEqual([
-      { metric: "bounce", rate: 0.05, tier: "paused", windowDays: PAUSE_WINDOW_DAYS },
-    ]);
-  });
-
-  it("reports two reasons and pauses when both metrics are over PAUSE", () => {
-    const r = evaluateDeliverability(today(10_000, 600, 20));
-    expect(r.status).toBe("paused");
-    expect(r.reasons).toEqual([
-      { metric: "bounce", rate: 0.06, tier: "paused", windowDays: PAUSE_WINDOW_DAYS },
-      { metric: "complaint", rate: 0.002, tier: "paused", windowDays: PAUSE_WINDOW_DAYS },
-    ]);
-  });
-
-  it("a single complaint never warns, however small the week", () => {
-    // 1 in 1,000 is 0.1%, twice the warning line, but one event is not a pattern.
-    expect(evaluateDeliverability(today(1_000, 0, 1)).status).toBe("ok");
-    // Two complaints in 4,000 (0.05%) are.
-    expect(evaluateDeliverability(today(4_000, 0, 2)).status).toBe("warning");
-  });
-
-  it("mixes a paused bounce with a warning complaint, overall paused", () => {
-    // bounce 6% (paused), complaint 0.05% (>= 0.05% WARN with 5 complaints, < 0.1% PAUSE)
-    const r = evaluateDeliverability(today(10_000, 600, 5));
-    expect(r.status).toBe("paused");
-    expect(r.reasons).toEqual([
-      { metric: "bounce", rate: 0.06, tier: "paused", windowDays: PAUSE_WINDOW_DAYS },
-      { metric: "complaint", rate: 0.0005, tier: "warning", windowDays: GUARDRAIL_WINDOW_DAYS },
-    ]);
-  });
-
-  it("never fires a tier below the volume floor even at 100% bounce", () => {
-    const r = evaluateDeliverability(today(MIN_GUARDRAIL_VOLUME - 1, MIN_GUARDRAIL_VOLUME - 1));
-    expect(r.bounceRate).toBe(1);
-    expect(r.status).toBe("ok");
-    expect(r.reasons).toEqual([]);
-  });
-
-  it("crosses into a decision exactly at the volume floor", () => {
-    const r = evaluateDeliverability(today(MIN_GUARDRAIL_VOLUME, MIN_GUARDRAIL_VOLUME));
-    expect(r.status).toBe("paused");
-    expect(r.reasons).toEqual([
-      { metric: "bounce", rate: 1, tier: "paused", windowDays: PAUSE_WINDOW_DAYS },
-    ]);
-  });
-
-  it("two complaints at 150 sends is a warning, not a pause; one alone is nothing", () => {
-    expect(evaluateDeliverability(today(150, 0, 1)).status).toBe("ok");
-    // 1.33% is far over the 0.1% line, but 2 < MIN_PAUSE_COMPLAINTS.
-    const r = evaluateDeliverability(today(150, 0, 2));
-    expect(r.status).toBe("warning");
-    expect(r.reasons).toEqual([
-      { metric: "complaint", rate: 2 / 150, tier: "warning", windowDays: GUARDRAIL_WINDOW_DAYS },
-    ]);
-  });
-
-  it("three complaints at 200 sends pauses", () => {
-    const r = evaluateDeliverability(today(200, 0, MIN_PAUSE_COMPLAINTS));
-    expect(r.status).toBe("paused");
-    expect(r.reasons).toEqual([
-      { metric: "complaint", rate: 0.015, tier: "paused", windowDays: PAUSE_WINDOW_DAYS },
-    ]);
-  });
-
-  it("a pause-line rate without the minimum event count only warns", () => {
-    // 2/2000 = exactly 0.1%, but 2 < 3 complaints.
-    expect(evaluateDeliverability(today(2000, 0, 2)).status).toBe("warning");
-    // 6/100 = 6% >= 5%, but 6 < 10 hard bounces.
-    expect(evaluateDeliverability(today(100, MIN_PAUSE_HARD_BOUNCES - 4)).status).toBe("warning");
-  });
-
-  it("judges the pause on the short window and the warning on the long one", () => {
-    // Long window 6% (over the pause line) but the short window is clean:
-    // a warning, never a pause.
-    const cooled = evaluateDeliverability({ warn: counts(10_000, 600), pause: counts(1000, 10) });
-    expect(cooled.status).toBe("warning");
-    expect(cooled.reasons).toEqual([
-      { metric: "bounce", rate: 0.06, tier: "warning", windowDays: GUARDRAIL_WINDOW_DAYS },
-    ]);
-    // Long window 0.5% (clean) but the last two days are a 10% spike with
-    // enough hard bounces: paused, and the reason reports the short window.
-    const spiking = evaluateDeliverability({ warn: counts(10_000, 50), pause: counts(200, 20) });
-    expect(spiking.status).toBe("paused");
-    expect(spiking.bounceRate).toBeCloseTo(0.005);
-    expect(spiking.reasons).toEqual([
-      { metric: "bounce", rate: 0.1, tier: "paused", windowDays: PAUSE_WINDOW_DAYS },
-    ]);
-  });
-
-  it("is zero-send safe (no divide-by-zero)", () => {
-    const r = evaluateDeliverability(today(0));
-    expect(r.bounceRate).toBe(0);
-    expect(r.complaintRate).toBe(0);
-    expect(r.status).toBe("ok");
-    expect(r.reasons).toEqual([]);
+  it.each([
+    [25, 1, 0],
+    [25, 0, 1],
+    [1, 1, 0],
+    [1, 0, 1],
+    [99, 99, 99],
+  ])(
+    "does not exempt trial-volume senders from a real over-limit outcome (%i/%i/%i)",
+    (sent, hard, complaints) => {
+      expect(evaluateDeliverability(windows(sent, hard, complaints)).status).toBe("paused");
+    },
+  );
+  it("applies the floor only to statistical warnings and stays zero-safe", () => {
+    expect(evaluateDeliverability(windows(99, 1, 0)).status).toBe("ok");
+    expect(evaluateDeliverability(windows(0))).toMatchObject({
+      status: "ok",
+      bounceRate: 0,
+      complaintRate: 0,
+    });
+    expect(evaluateDeliverability(windows(10000, 150)).status).toBe("warning");
+    expect(evaluateDeliverability(windows(10000, 149)).status).toBe("ok");
   });
 });
 
-describe("broadcastSendSpacingMs", () => {
-  const spacing = Math.ceil(1000 / THROTTLED_BROADCAST_RATE_PER_SECOND);
-
-  it("fans out at full rate (no spacing) when ok", () => {
-    expect(broadcastSendSpacingMs("ok")).toBe(0);
-  });
-
-  it("drips at the throttled rate for warning and paused", () => {
-    expect(broadcastSendSpacingMs("warning")).toBe(spacing);
-    expect(broadcastSendSpacingMs("paused")).toBe(spacing);
-  });
-});
-
-describe("fetchDeliverabilityHealth", () => {
+describe("fetchDeliverabilityHealth production SQL", () => {
   let db: Db;
   let close: () => Promise<void>;
-  const now = new Date("2026-08-14T12:00:00.000Z");
-  const nowMs = now.getTime();
-
+  const now = new Date("2026-10-28T00:01:00Z");
+  const at = (hours: number) => new Date(now.getTime() - hours * 3600000);
   beforeAll(async () => {
     ({ db, close } = await createTestDb());
   });
-  afterAll(() => close());
-
-  it("sums both windows in one pass and pauses on the short one", async () => {
-    const teamId = await createTeam(db, "deliverability-window");
-    const inEdge = utcDay(nowMs - 6 * DAY_MS); // oldest day of the 7-day window
-    const outEdge = utcDay(nowMs - 7 * DAY_MS); // just outside it
-
-    await db.insert(schema.usageCounters).values([
-      // Today: 300 hard bounces over 5000 sends (6%) — the pause window.
-      { teamId, day: utcDay(nowMs), accepted: 6_000, sent: 5_000, bounced: 300, hardBounced: 300 },
-      // Six days ago: clean volume that halves the 7-day rate.
-      { teamId, day: inEdge, accepted: 6_000, sent: 5_000, bounced: 0, hardBounced: 0 },
-      // Out of window: huge clean volume that would dilute everything if counted.
-      { teamId, day: outEdge, accepted: 1_000_000, sent: 1_000_000, bounced: 0, hardBounced: 0 },
-    ]);
-
-    const health = await fetchDeliverabilityHealth(db, teamId, { now });
-    expect(health.sent).toBe(10_000);
-    expect(health.windowDays).toBe(GUARDRAIL_WINDOW_DAYS);
-    expect(health.bounceRate).toBeCloseTo(0.03);
-    expect(health.pause).toEqual({
-      sent: 5_000,
-      hardBounced: 300,
-      complained: 0,
-      windowDays: PAUSE_WINDOW_DAYS,
-    });
-    expect(health.status).toBe("paused");
-    expect(health.reasons).toEqual([
-      { metric: "bounce", rate: 0.06, tier: "paused", windowDays: PAUSE_WINDOW_DAYS },
-    ]);
+  afterAll(async () => {
+    await close?.();
   });
-
-  it("ignores transient bounces", async () => {
-    const teamId = await createTeam(db, "deliverability-transient");
-    await db.insert(schema.usageCounters).values({
-      teamId,
-      day: utcDay(nowMs),
-      sent: 200,
-      bounced: 20,
-      hardBounced: 0,
+  async function seed(teamId: string, n: number, acceptedAt = at(12), confirmed = true) {
+    return db
+      .insert(schema.emails)
+      .values(
+        Array.from({ length: n }, () => ({
+          teamId,
+          from: "from@example.test",
+          to: ["a@example.test", "b@example.test"],
+          cc: ["c@example.test"],
+          bcc: ["d@example.test"],
+          subject: "Synthetic",
+          createdAt: at(48),
+          sentAt: acceptedAt,
+          sesMessageId: confirmed ? randomUUID() : null,
+        })),
+      )
+      .returning({ id: schema.emails.id });
+  }
+  async function event(
+    emailId: string | undefined,
+    type: "bounced" | "complained" | "sent",
+    opts: {
+      occurredAt?: Date;
+      createdAt?: Date;
+      bounceType?: string;
+      provider?: boolean;
+    } = {},
+  ) {
+    if (!emailId) throw new Error("Missing fixture email");
+    await db.insert(schema.emailEvents).values({
+      emailId,
+      type,
+      occurredAt: opts.occurredAt ?? at(1),
+      createdAt: opts.createdAt ?? at(0),
+      bounceType: opts.bounceType ?? null,
+      snsMessageId: opts.provider === false ? null : randomUUID(),
     });
-    const health = await fetchDeliverabilityHealth(db, teamId, { now });
-    expect(health.bounceRate).toBe(0);
-    expect(health.status).toBe("ok");
-  });
-
-  it("counts yesterday toward the pause window but not the day before", async () => {
-    const yesterday = await createTeam(db, "deliverability-yesterday");
-    await db.insert(schema.usageCounters).values({
-      teamId: yesterday,
-      day: utcDay(nowMs - DAY_MS),
+  }
+  it("crosses midnight without UTC-day dilution; dedupes callbacks and counts messages not recipients", async () => {
+    const team = await createTeam(db, `window-${randomUUID()}`);
+    const rows = await seed(team, 200);
+    await seed(team, 500, at(24)); // exact lower edge excluded
+    await seed(team, 500, at(25));
+    await seed(team, 500, at(2), false); // network/claim ambiguity, NOT accepted
+    for (const row of rows.slice(0, 5)) {
+      await event(row.id, "bounced", { bounceType: "Permanent" });
+      await event(row.id, "bounced", { bounceType: "Permanent" }); // different SNS ID too
+    }
+    await event(rows[6]?.id, "bounced", { bounceType: "Transient" });
+    await event(rows[7]?.id, "bounced", { bounceType: "Undetermined" });
+    await event(rows[8]?.id, "bounced", { bounceType: "Permanent", occurredAt: at(24) });
+    const other = await createTeam(db, `other-${randomUUID()}`);
+    const foreign = await seed(other, 100);
+    await event(foreign[0]?.id, "complained");
+    const health = await fetchDeliverabilityHealth(db, team, { now });
+    expect(health).toMatchObject({
       sent: 200,
-      bounced: 20,
-      hardBounced: 20,
-    });
-    expect((await fetchDeliverabilityHealth(db, yesterday, { now })).status).toBe("paused");
-
-    const older = await createTeam(db, "deliverability-two-days");
-    await db.insert(schema.usageCounters).values({
-      teamId: older,
-      day: utcDay(nowMs - 2 * DAY_MS),
-      sent: 200,
-      bounced: 20,
-      hardBounced: 20,
-    });
-    // Same 10% over 7 days, but the pause window is empty: warning only.
-    const health = await fetchDeliverabilityHealth(db, older, { now });
-    expect(health.status).toBe("warning");
-    expect(health.pause.sent).toBe(0);
-  });
-
-  it("returns ok with zero rates for a team that has never sent", async () => {
-    const teamId = await createTeam(db, "deliverability-empty");
-    expect(await fetchDeliverabilityHealth(db, teamId, { now })).toEqual({
-      sent: 0,
-      windowDays: GUARDRAIL_WINDOW_DAYS,
-      bounceRate: 0,
+      status: "paused",
+      bounceRate: 0.025,
       complaintRate: 0,
-      status: "ok",
-      reasons: [],
-      pause: { sent: 0, hardBounced: 0, complained: 0, windowDays: PAUSE_WINDOW_DAYS },
+      windowDays: 1,
+      pause: { sent: 200, hardBounced: 5, complained: 0, windowDays: 1 },
+      rollingWindow: {
+        start: at(24),
+        end: now,
+        hours: 24,
+        countingUnit: "message",
+        outcomeWatermark: now,
+      },
     });
+    expect(
+      (await fetchDeliverabilityHealth(db, team, { now: new Date(now.getTime() + 86400000) })).pause
+        .hardBounced,
+    ).toBe(0);
+  });
+  it("late callbacks use occurrence, not arrival; provider evidence resolves an ambiguous claim once", async () => {
+    const team = await createTeam(db, `delayed-${randomUUID()}`);
+    const rows = await seed(team, 100);
+    const [ambiguous] = await seed(team, 1, at(2), false);
+    expect((await fetchDeliverabilityHealth(db, team, { now })).sent).toBe(100);
+    await event(ambiguous?.id, "sent", { occurredAt: at(2), provider: false });
+    await event(ambiguous?.id, "complained", { occurredAt: at(1), createdAt: at(0.5) });
+    await event(ambiguous?.id, "complained", { occurredAt: at(1) });
+    await event(rows[0]?.id, "bounced", { bounceType: "Permanent", occurredAt: at(25) });
+    await event(rows[1]?.id, "bounced", { bounceType: "Permanent", occurredAt: at(-1) });
+    const health = await fetchDeliverabilityHealth(db, team, { now });
+    expect(health).toMatchObject({
+      sent: 101,
+      status: "paused",
+      pause: { hardBounced: 0, complained: 1 },
+    });
+    expect(health.rollingWindow?.outcomeWatermark).toEqual(at(0.5));
+  });
+  it("does not hide a delayed in-window outcome for an older confirmed send", async () => {
+    const team = await createTeam(db, `older-${randomUUID()}`);
+    await seed(team, 100);
+    const [old] = await seed(team, 1, at(30));
+    await event(old?.id, "complained", { occurredAt: at(2), createdAt: now });
+    const health = await fetchDeliverabilityHealth(db, team, { now });
+    expect(health).toMatchObject({ sent: 100, status: "paused", pause: { complained: 1 } });
+  });
+  it("uses confirmed send event time rather than a pre-network claim when available", async () => {
+    const team = await createTeam(db, `acceptance-${randomUUID()}`);
+    const rows = await seed(team, 100, at(25));
+    for (const row of rows) await event(row.id, "sent", { occurredAt: at(12), provider: false });
+    expect((await fetchDeliverabilityHealth(db, team, { now })).sent).toBe(100);
+    const before = new Date(now.getTime() - 60_000);
+    expect((await fetchDeliverabilityHealth(db, team, { now: before })).sent).toBe(0);
+  });
+  it("is empty-safe and rejects invalid evaluation time", async () => {
+    const team = await createTeam(db, `empty-${randomUUID()}`);
+    expect(await fetchDeliverabilityHealth(db, team, { now })).toMatchObject({
+      sent: 0,
+      status: "ok",
+      bounceRate: 0,
+    });
+    await expect(fetchDeliverabilityHealth(db, team, { now: new Date("invalid") })).rejects.toThrow(
+      RangeError,
+    );
   });
 });

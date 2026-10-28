@@ -1,9 +1,11 @@
 import { isCloudDeployment } from "@millionsend/config";
 import {
+  CAMPAIGN_CONSENT_MESSAGE,
   CONTACT_PROPERTY_KEY_MAX_LENGTH,
   CONTACT_PROPERTY_MAX_KEYS,
   CONTACT_PROPERTY_VALUE_MAX_LENGTH,
   type ContactEventContext,
+  checkCampaignConsent,
   clearUnsubscribeSuppression,
   contactPropertiesChange,
   contactRoom,
@@ -27,6 +29,7 @@ import { CONTACT_STATUSES } from "@/lib/contact-status";
 import { escapeLike } from "@/lib/sql";
 import { beforeCursor, createdAtCursorField, cursorSchema, paginate } from "../keyset";
 import { adminProcedure, router, teamProcedure } from "../trpc";
+import { campaignConsentRouter } from "./campaign-consent";
 import { assertSegment, segmentPredicate } from "./segments";
 import { assertTopic, topicMembershipSql } from "./topics";
 
@@ -60,6 +63,13 @@ async function assertContact(ctx: { db: Db; teamId: string }, contactId: string)
  * import is judged whole: the user is never left with half a file in.
  */
 async function assertContactRoom(ctx: { db: Db; teamId: string }, count: number): Promise<void> {
+  const consent = await checkCampaignConsent(ctx.db, {
+    teamId: ctx.teamId,
+    operation: "import",
+    isCloud: isCloudDeployment(),
+  });
+  if (!consent.allowed)
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: CAMPAIGN_CONSENT_MESSAGE });
   if (!isCloudDeployment()) return;
   const plan = await fetchEffectivePlan(ctx.db, ctx.teamId);
   if (!plan) return;
@@ -101,6 +111,7 @@ const dashboardEvents = (ctx: {
 }): ContactEventContext => ({ source: "dashboard", enqueue: ctx.enqueueWebhookDeliveries });
 
 export const audienceRouter = router({
+  consent: campaignConsentRouter,
   contacts: router({
     /** The stat strip's three counts over the team's contact base. */
     stats: teamProcedure.query(async ({ ctx }) => {

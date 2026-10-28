@@ -1,6 +1,6 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { and, eq, gte, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { parseMailbox } from "./sender-address.js";
 import { DAY_MS, utcDay } from "./utc-day.js";
 
@@ -13,11 +13,11 @@ import { DAY_MS, utcDay } from "./utc-day.js";
  *   wholly in look-alike Cyrillic or Greek letters beside Latin words
  *   ("Banco СТТ"), or invisible and direction-override characters in the name.
  *   No legitimate sender needs any of these.
- * - A young team whose sender name or subject reads as a bank, a carrier, a
+ * - A team whose sender name or subject reads as a bank, a carrier, a
  *   tax office or an account-security notice is held for review: its mail is
  *   accepted and parked, and an operator releases it (it then drains) or
- *   suspends the team (it never leaves). A released team is not held again by
- *   this screen.
+ *   suspends the team (it never leaves). New suspicious content is screened
+ *   regardless of account age or a previous release.
  *
  * A young team's sending pattern holds it too (screenNewSender: probation
  * volume, rotating senders, an abuse-prone sending domain), and so does a
@@ -31,6 +31,19 @@ import { DAY_MS, utcDay } from "./utc-day.js";
 export const SEND_REVIEW_NEW_TEAM_DAYS = 30;
 
 export type SendReviewReason = (typeof schema.sendReviewReasonEnum.enumValues)[number];
+
+/** Hold and clearance are watermarks, not nullable boolean flags. */
+export function isSendReviewHeld(team: {
+  sendReviewAt: Date | null;
+  sendReviewClearedAt?: Date | null;
+}): boolean {
+  return (
+    !!team.sendReviewAt &&
+    (!team.sendReviewClearedAt || team.sendReviewAt.getTime() > team.sendReviewClearedAt.getTime())
+  );
+}
+
+const activeReview = sql`${schema.teams.sendReviewAt} is not null and (${schema.teams.sendReviewClearedAt} is null or ${schema.teams.sendReviewAt} > ${schema.teams.sendReviewClearedAt})`;
 
 /** Alphabets with letters that pass for Latin ones; any two in one word is a disguise. */
 const LOOKALIKE_SCRIPTS = [
@@ -437,12 +450,21 @@ export async function holdTeamForReview(
   const held = await db
     .update(schema.teams)
     .set({
-      sendReviewAt: now,
+      // Millisecond precision is shared by JS readers and the SQL watermark.
+      sendReviewAt: sql`greatest(${now}, coalesce(${schema.teams.sendReviewClearedAt} + interval '1 millisecond', ${now}))`,
       sendReviewReason: input.reason,
       sendReviewNote: input.note.slice(0, 500),
       sendReviewNotifiedAt: null,
     })
-    .where(and(eq(schema.teams.id, input.teamId), isNull(schema.teams.sendReviewAt)))
+    .where(
+      and(
+        eq(schema.teams.id, input.teamId),
+        sql`not (${activeReview})`,
+        // A verdict begun before a newer clearance must not undo that decision.
+        // The message still blocks locally and its next attempt is re-screened.
+        or(isNull(schema.teams.sendReviewClearedAt), lte(schema.teams.sendReviewClearedAt, now)),
+      ),
+    )
     .returning({ id: schema.teams.id });
   if (held.length === 0) return false;
   await db
@@ -453,7 +475,7 @@ export async function holdTeamForReview(
 }
 
 /**
- * Screen a young team's send for impersonation and hold the team when it
+ * Screen a team's send for impersonation and hold the team when it
  * matches. Reads the team only when the text matches, so the common send pays
  * nothing. Returns whether the team is held after the call.
  */
@@ -473,11 +495,8 @@ export async function screenImpersonation(
     })
     .from(schema.teams)
     .where(eq(schema.teams.id, input.teamId));
-  if (!team || team.plan === "system") return false;
-  if (team.sendReviewAt) return true;
-  if (team.sendReviewClearedAt) return false;
-  const ageMs = now.getTime() - team.createdAt.getTime();
-  if (ageMs > SEND_REVIEW_NEW_TEAM_DAYS * 86_400_000) return false;
+  if (!team) return false;
+  if (isSendReviewHeld(team)) return true;
   await holdTeamForReview(db, {
     teamId: input.teamId,
     reason: "impersonation",
@@ -610,7 +629,7 @@ export async function screenNewSender(
     .from(schema.teams)
     .where(eq(schema.teams.id, input.teamId));
   if (!team || team.plan === "system") return false;
-  if (team.sendReviewAt) return true;
+  if (isSendReviewHeld(team)) return true;
   if (team.sendReviewClearedAt) return false;
   const ageMs = now.getTime() - team.createdAt.getTime();
   if (ageMs > SEND_REVIEW_NEW_TEAM_DAYS * DAY_MS) return false;
@@ -622,14 +641,15 @@ export async function screenNewSender(
 
 /**
  * Every team whose guardrail stands at "paused" (hard bounces or complaints
- * past SES's own review lines over the pause window) has all of its sending
+ * past MepMail's internal pause lines over the rolling 24-hour window) has all of its sending
  * held for review, transactional mail included: the guardrail alone only
  * stops broadcasts, and SES judges the whole account by the mail that still
- * goes out. A team an operator released within the last REPUTATION_RELEASE_DAYS
- * keeps sending (their call stands until the next run of bad days after it).
+ * goes out. A release suppresses only the same already-reviewed evidence;
+ * a newly arrived distinct adverse outcome immediately permits a new hold.
  * Returns the teams it held.
  */
-export const REPUTATION_RELEASE_DAYS = 7;
+/** @deprecated No fixed review-release amnesty remains. */
+export const REPUTATION_RELEASE_DAYS = 0;
 
 export async function holdReputationRuns(
   db: Db,
@@ -639,6 +659,7 @@ export async function holdReputationRuns(
     guardrailMetric: "complaint" | "hard_bounce" | null;
     complaintRate7d: number;
     hardBounceRate7d: number;
+    outcomeWatermark?: Date | null;
   }[],
   now: Date = new Date(),
 ): Promise<string[]> {
@@ -654,16 +675,17 @@ export async function holdReputationRuns(
       })
       .from(schema.teams)
       .where(eq(schema.teams.id, s.teamId));
-    if (!team || team.plan === "system" || team.sendReviewAt || team.suspendedAt) continue;
+    if (!team || team.plan === "system" || isSendReviewHeld(team) || team.suspendedAt) continue;
     if (
       team.sendReviewClearedAt &&
-      now.getTime() - team.sendReviewClearedAt.getTime() < REPUTATION_RELEASE_DAYS * DAY_MS
+      s.outcomeWatermark &&
+      s.outcomeWatermark.getTime() <= team.sendReviewClearedAt.getTime()
     ) {
       continue;
     }
     const complaint = s.guardrailMetric === "complaint";
     const rate = complaint ? s.complaintRate7d : s.hardBounceRate7d;
-    const note = `Guardrail paused: ${complaint ? "complaint" : "hard bounce"} rate ${(rate * 100).toFixed(2)}% over 7 days`;
+    const note = `MepMail internal guardrail paused: ${complaint ? "complaint" : "hard bounce"} rate ${(rate * 100).toFixed(2)}% over rolling 24 hours`;
     if (await holdTeamForReview(db, { teamId: s.teamId, reason: "reputation", note, now })) {
       // The run's automatic flag would clear itself once the rates recover,
       // while the hold stays until an operator releases it: relabel it so
@@ -686,11 +708,11 @@ export async function holdReputationRuns(
 
 /**
  * A near-certain abuse verdict of the content monitor (CONTENT_HOLD_SCORE and
- * up) on a team inside its first SEND_REVIEW_NEW_TEAM_DAYS holds all of its
+ * up) holds all of a team's
  * sending, transactional included: the monitor reads the body, which the
  * sender-name and subject screens never see. Unlike those screens it holds a
  * team an operator released before — the verdict is about this message.
- * Established teams keep the monitor's alert and broadcast pause only.
+ * Account age is not a content-safety exemption.
  */
 export const CONTENT_HOLD_SCORE = 95;
 
@@ -698,7 +720,7 @@ export async function holdOnContentVerdict(
   db: Db,
   input: { teamId: string; score: number; categories: readonly string[]; now?: Date },
 ): Promise<boolean> {
-  if (input.score < CONTENT_HOLD_SCORE) return false;
+  if (!Number.isFinite(input.score) || input.score < CONTENT_HOLD_SCORE) return false;
   const now = input.now ?? new Date();
   const [team] = await db
     .select({
@@ -709,7 +731,7 @@ export async function holdOnContentVerdict(
     .from(schema.teams)
     .where(eq(schema.teams.id, input.teamId));
   if (!team || team.plan === "system" || team.suspendedAt) return false;
-  if (now.getTime() - team.createdAt.getTime() > SEND_REVIEW_NEW_TEAM_DAYS * DAY_MS) return false;
+
   const kind = input.categories[0] ?? "abuse";
   return holdTeamForReview(db, {
     teamId: input.teamId,
@@ -730,7 +752,7 @@ export async function unnotifiedSendReviews(db: Db) {
       at: schema.teams.sendReviewAt,
     })
     .from(schema.teams)
-    .where(and(isNotNull(schema.teams.sendReviewAt), isNull(schema.teams.sendReviewNotifiedAt)))
+    .where(and(activeReview, isNull(schema.teams.sendReviewNotifiedAt)))
     .orderBy(schema.teams.sendReviewAt)
     .limit(50);
 }
@@ -741,11 +763,7 @@ export async function markSendReviewNotified(db: Db, teamId: string, now: Date):
     .update(schema.teams)
     .set({ sendReviewNotifiedAt: now })
     .where(
-      and(
-        eq(schema.teams.id, teamId),
-        isNotNull(schema.teams.sendReviewAt),
-        isNull(schema.teams.sendReviewNotifiedAt),
-      ),
+      and(eq(schema.teams.id, teamId), activeReview, isNull(schema.teams.sendReviewNotifiedAt)),
     )
     .returning({ id: schema.teams.id });
   return rows.length > 0;

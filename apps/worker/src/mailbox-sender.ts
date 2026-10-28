@@ -1,17 +1,30 @@
 import { SESv2Client, type SESv2ClientConfig, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import {
   checkSignupSend,
+  evaluateEmailInsights,
   MailboxContentError,
   type MailboxOutboxSender,
   MailboxSendDeferredError,
   MailboxSendRejectedError,
   type MailboxTransportMimeAdapter,
+  parseSingleSender,
+  resolveSendingProvider,
+  type SendingProviderPolicy,
   stripMailboxPrivateHeaders,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { associateTenantResources, ensureTenant, type SesTenantClient } from "@millionsend/ses";
 import { and, eq } from "drizzle-orm";
 import { simpleParser } from "mailparser";
+import {
+  campaignMessage,
+  checkCampaignMessage,
+} from "../../../packages/core/src/campaign-consent.js";
+import { screenPreSendContent } from "../../../packages/core/src/pre-send-content-policy.js";
+import { releaseQuota, reserveQuota } from "../../../packages/core/src/quota.js";
+import { isSendReviewHeld } from "../../../packages/core/src/send-review.js";
+import { applySenderProbationQuota } from "../../../packages/core/src/sender-probation.js";
+import { utcDay } from "../../../packages/core/src/utc-day.js";
 import type { SesSender } from "./handlers/send-email.js";
 import { isSesEnforcementRefusal, type SesQuotaGate } from "./handlers/ses-quota.js";
 import type { SesFailover } from "./ses-failover.js";
@@ -39,6 +52,179 @@ export const mailboxWorkerMime: MailboxTransportMimeAdapter = {
     };
   },
 };
+async function checkMailboxContent(
+  db: Db,
+  input: Parameters<MailboxOutboxSender["send"]>[0],
+): Promise<void> {
+  try {
+    const parsed = await simpleParser(input.raw, { skipImageLinks: true, skipTextToHtml: true });
+    if (
+      (
+        await screenPreSendContent(db, {
+          teamId: input.teamId,
+          from: parsed.from?.text ?? input.from,
+          subject: parsed.subject ?? "",
+          html: typeof parsed.html === "string" ? parsed.html : null,
+          text: parsed.text ?? null,
+        })
+      ).action === "hold"
+    )
+      throw new MailboxSendDeferredError();
+  } catch {
+    throw new MailboxSendDeferredError();
+  }
+  try {
+    const parsed = await simpleParser(input.raw, { skipImageLinks: true, skipTextToHtml: true });
+    const consent = await checkCampaignMessage(db, {
+      teamId: input.teamId,
+      from: parsed.from?.text ?? input.from,
+      to: input.to,
+      cc: input.cc,
+      bcc: input.bcc,
+      subject: parsed.subject ?? "",
+      html: typeof parsed.html === "string" ? parsed.html : null,
+      text: parsed.text ?? null,
+      headers: Object.fromEntries(parsed.headerLines.map((line) => [line.key, line.line])),
+    });
+    if (!consent.allowed) throw new MailboxSendDeferredError();
+  } catch {
+    throw new MailboxSendDeferredError();
+  }
+}
+
+// Private identity marker, not a client-declared option. Outer router and SES
+// share one reservation using the existing Send day ledger, not a new counter.
+const probationReserved = new WeakSet<object>();
+function withMailboxProbation(
+  db: Db,
+  sender: MailboxOutboxSender,
+  isCloud: boolean,
+): MailboxOutboxSender {
+  return {
+    async send(input) {
+      if (!isCloud || probationReserved.has(input)) return sender.send(input);
+      await checkMailboxContent(db, input);
+      const [team] = await db
+        .select({
+          suspendedAt: schema.teams.suspendedAt,
+          sendReviewAt: schema.teams.sendReviewAt,
+          sendReviewClearedAt: schema.teams.sendReviewClearedAt,
+        })
+        .from(schema.teams)
+        .where(eq(schema.teams.id, input.teamId));
+      if (
+        !team ||
+        team.suspendedAt ||
+        isSendReviewHeld(team) ||
+        !(await checkSignupSend(db, input.teamId, [...input.to, ...input.cc, ...input.bcc])).allowed
+      )
+        throw new MailboxSendDeferredError();
+      const quota = await applySenderProbationQuota(db, input.teamId, { kind: "none" }, true);
+      const count = new Set([...input.to, ...input.cc, ...input.bcc].map((s) => s.toLowerCase()))
+        .size;
+      const at = new Date();
+      const day = utcDay(at);
+      if (!(await reserveQuota(db, { teamId: input.teamId, count, quota, at, day })).reserved)
+        throw new MailboxSendDeferredError();
+      probationReserved.add(input);
+      try {
+        await checkMailboxContent(db, input);
+        return await sender.send(input);
+      } catch (error) {
+        // Unknown outcome keeps the charge. Only a proven non-acceptance releases.
+        if (error instanceof MailboxSendDeferredError || error instanceof MailboxSendRejectedError)
+          await releaseQuota(db, { teamId: input.teamId, count, quota, at, day });
+        throw error;
+      } finally {
+        probationReserved.delete(input);
+      }
+    },
+  };
+}
+
+/** Wrap the OUTERMOST Correio router so connected external SMTP is covered too. */
+export function createMailboxContentPolicySender(
+  db: Db,
+  sender: MailboxOutboxSender,
+  isCloud: boolean,
+  policy: SendingProviderPolicy | null = null,
+): MailboxOutboxSender {
+  return {
+    async send(input) {
+      input = {
+        ...input,
+        raw: Buffer.from(input.raw),
+        to: [...input.to],
+        cc: [...input.cc],
+        bcc: [...input.bcc],
+      };
+      if (isCloud) await checkMailboxContent(db, input);
+      if (policy) {
+        const parsed = await simpleParser(input.raw, {
+          skipImageLinks: true,
+          skipTextToHtml: true,
+        });
+        const from = parsed.from?.text ?? input.from;
+        const html = typeof parsed.html === "string" ? parsed.html : null;
+        const insight = evaluateEmailInsights({
+          html,
+          preTrackingHtml: html,
+          text: parsed.text ?? null,
+          from,
+          senderDomain: parseSingleSender(from)?.domain ?? "",
+          subject: parsed.subject ?? "",
+          finalHeaders: {},
+          hasAttachments: parsed.attachments.length > 0,
+          replyTo: null,
+          isBroadcast: false,
+          hasTopic: false,
+          tracking: {
+            clickEnabled: false,
+            openEnabled: false,
+            brandedHostUsed: false,
+            sharedFallbackUsed: false,
+            shippedUntracked: true,
+          },
+          domainSnapshot: null,
+          now: new Date(),
+        });
+        const [box] = await db
+          .select({ origin: schema.mailboxes.origin })
+          .from(schema.mailboxes)
+          .where(
+            and(
+              eq(schema.mailboxes.id, input.mailboxId),
+              eq(schema.mailboxes.teamId, input.teamId),
+            ),
+          );
+        // Router only exposes its existing adapter. Policy cannot turn on a new
+        // relay or reroute SES mail via a connected external identity.
+        const provider = box?.origin === "external" ? "customer_smtp" : "ses";
+        const route = resolveSendingProvider(policy, {
+          teamId: input.teamId,
+          messageClass:
+            insight.marketing ||
+            campaignMessage({
+              to: input.to,
+              cc: input.cc,
+              bcc: input.bcc,
+              subject: parsed.subject,
+              html,
+              text: parsed.text,
+              headers: Object.fromEntries(parsed.headerLines.map((line) => [line.key, line.line])),
+            })
+              ? "campaign"
+              : "transactional",
+          legacyProvider: provider,
+          availableProviders: new Set(box ? [provider] : []),
+        });
+        if (route.kind === "held") throw new MailboxSendDeferredError();
+      }
+      return withMailboxProbation(db, sender, isCloud).send(input);
+    },
+  };
+}
+
 interface MailboxSesClient {
   send(command: SendEmailCommand): Promise<{ MessageId?: string | undefined }>;
 }
@@ -97,6 +283,8 @@ export function parseMailboxSesConfigurationSets(
 export function createMailboxSesSender(
   db: Db,
   opts: {
+    /** Cloud-only abuse policy; self-hosted transport contract stays unchanged. */
+    isCloud?: boolean;
     configurationSets?: MailboxSesConfigurationSets | null | undefined;
     exhausted?: (region: string) => boolean;
     throttle?: (region: string, recipients: number) => Promise<void>;
@@ -160,12 +348,16 @@ export function createMailboxSesSender(
   }
   async function allowedRecipients(teamId: string, recipients: string[]): Promise<void> {
     const [team] = await db
-      .select({ held: schema.teams.sendReviewAt, suspended: schema.teams.suspendedAt })
+      .select({
+        sendReviewAt: schema.teams.sendReviewAt,
+        sendReviewClearedAt: schema.teams.sendReviewClearedAt,
+        suspended: schema.teams.suspendedAt,
+      })
       .from(schema.teams)
       .where(eq(schema.teams.id, teamId));
     if (
       !team ||
-      team.held ||
+      isSendReviewHeld(team) ||
       team.suspended ||
       !(await checkSignupSend(db, teamId, recipients)).allowed
     ) {
@@ -181,127 +373,141 @@ export function createMailboxSesSender(
     }
     if (allowed !== true) throw new MailboxSendRejectedError();
   }
-  return {
-    async send(input) {
-      // Capture the same MIME/envelope whose recipient permits are reserved below. Bcc
-      // and the format marker stay on the sealed copies and never leave (SES or relay).
-      input = {
-        ...input,
-        raw: stripMailboxPrivateHeaders(Buffer.from(input.raw)),
-        to: [...input.to],
-        cc: [...input.cc],
-        bcc: [...input.bcc],
-      };
-      const recipients = [...new Set([...input.to, ...input.cc, ...input.bcc])];
-      const recipientCount = recipients.length;
-      if (!input.to.length || recipientCount < 1 || recipientCount > 20)
-        throw new MailboxSendRejectedError();
-      const [domain] = await db
-        .select({
-          region: schema.domains.region,
-          domainName: schema.domains.name,
-          status: schema.domains.status,
-          configurationSet: schema.domains.sesConfigurationSet,
-          address: schema.mailboxes.address,
-          suspendedAt: schema.teams.suspendedAt,
-          sendReviewAt: schema.teams.sendReviewAt,
-          tenantName: schema.teams.sesTenantName,
-          tenantAssociatedAt: schema.domains.sesTenantAssociatedAt,
-          tenantConfigSet: schema.domains.sesTenantConfigSet,
-          relayEnabledAt: schema.domains.relayEnabledAt,
-        })
-        .from(schema.mailboxes)
-        .innerJoin(
-          schema.domains,
-          and(
-            eq(schema.domains.id, schema.mailboxes.domainId),
-            eq(schema.domains.teamId, schema.mailboxes.teamId),
-          ),
-        )
-        .innerJoin(schema.teams, eq(schema.teams.id, schema.mailboxes.teamId))
-        .where(
-          and(eq(schema.mailboxes.id, input.mailboxId), eq(schema.mailboxes.teamId, input.teamId)),
-        );
-      if (
-        !domain ||
-        domain.suspendedAt ||
-        domain.status !== "verified" ||
-        domain.address !== input.from
-      )
-        throw new MailboxSendRejectedError();
-      // A send-review hold keeps the message for the operator's release, as
-      // it keeps the team's API mail.
-      if (domain.sendReviewAt) throw new MailboxSendDeferredError();
-      const accountPaused = () =>
-        opts.paused?.(domain.region) === true ||
-        opts.sesQuota?.accountPaused?.(domain.region) === true;
-      // An SES enforcement stop never authorizes automatic relay/region failover.
-      if (accountPaused()) throw new MailboxSendDeferredError();
-      const region = domain.region;
-      const configurationSet = configurationSets[region];
-      if (!configurationSet) throw new MailboxSendDeferredError();
-      // Campaign configuration can enable SES Open/Click body rewriting. Mail
-      // always requires its own explicit regional operator configuration.
-      if (configurationSet === domain.configurationSet) throw new MailboxSendRejectedError();
-      await refuseSesOverrides(input.raw);
-      if (opts.exhausted?.(region)) throw new MailboxSendDeferredError();
-      try {
-        await opts.throttle?.(region, recipientCount);
-      } catch {
-        // Cancellation or a failed local permit cannot have accepted this message.
-        throw new MailboxSendDeferredError();
-      }
-      if (opts.exhausted?.(region)) throw new MailboxSendDeferredError();
-      await allowedRecipients(input.teamId, recipients);
-      let client = clients.get(region);
-      if (!client) {
-        const options: SESv2ClientConfig = {
-          region,
-          maxAttempts: 1,
-          ignoreConfiguredEndpointUrls: true,
-          requestHandler: { connectionTimeout: 10000, requestTimeout: 30000 },
+  return withMailboxProbation(
+    db,
+    {
+      async send(input) {
+        // Capture the same MIME/envelope whose recipient permits are reserved below. Bcc
+        // and the format marker stay on the sealed copies and never leave (SES or relay).
+        input = {
+          ...input,
+          raw: stripMailboxPrivateHeaders(Buffer.from(input.raw)),
+          to: [...input.to],
+          cc: [...input.cc],
+          bcc: [...input.bcc],
         };
-        client = opts.clientFactory ? opts.clientFactory(options) : new SESv2Client(options);
-        clients.set(region, client);
-      }
-      const tenantName = await sendingTenant(client, domain, configurationSet);
-      // Tenant provisioning can wait on the network after the first gate.
-      // A restriction introduced during that wait still precedes the send.
-      await allowedRecipients(input.teamId, recipients);
-      if (accountPaused()) throw new MailboxSendDeferredError();
-      let response: Awaited<ReturnType<MailboxSesClient["send"]>>;
-      try {
-        response = await client.send(
-          new SendEmailCommand({
-            FromEmailAddress: input.from,
-            Content: { Raw: { Data: input.raw } },
-            Destination: { ToAddresses: input.to, CcAddresses: input.cc, BccAddresses: input.bcc },
-            EmailTags: [
-              { Name: "mepmail_outbox_id", Value: input.outboxId },
-              { Name: "mepmail_attempt_id", Value: input.attemptId },
-            ],
-            ConfigurationSetName: configurationSet,
-            ...(tenantName ? { TenantName: tenantName } : {}),
-          }),
-        );
-      } catch (error) {
-        // Only explicit documented SES refusals prove there was no acceptance.
-        if (await isSesEnforcementRefusal(error, opts.sesQuota, region))
-          throw new MailboxSendDeferredError();
-        const name = error instanceof Error ? error.name : "";
+        const recipients = [...new Set([...input.to, ...input.cc, ...input.bcc])];
+        const recipientCount = recipients.length;
+        if (!input.to.length || recipientCount < 1 || recipientCount > 20)
+          throw new MailboxSendRejectedError();
+        const [domain] = await db
+          .select({
+            region: schema.domains.region,
+            domainName: schema.domains.name,
+            status: schema.domains.status,
+            configurationSet: schema.domains.sesConfigurationSet,
+            address: schema.mailboxes.address,
+            suspendedAt: schema.teams.suspendedAt,
+            sendReviewAt: schema.teams.sendReviewAt,
+            sendReviewClearedAt: schema.teams.sendReviewClearedAt,
+            tenantName: schema.teams.sesTenantName,
+            tenantAssociatedAt: schema.domains.sesTenantAssociatedAt,
+            tenantConfigSet: schema.domains.sesTenantConfigSet,
+            relayEnabledAt: schema.domains.relayEnabledAt,
+          })
+          .from(schema.mailboxes)
+          .innerJoin(
+            schema.domains,
+            and(
+              eq(schema.domains.id, schema.mailboxes.domainId),
+              eq(schema.domains.teamId, schema.mailboxes.teamId),
+            ),
+          )
+          .innerJoin(schema.teams, eq(schema.teams.id, schema.mailboxes.teamId))
+          .where(
+            and(
+              eq(schema.mailboxes.id, input.mailboxId),
+              eq(schema.mailboxes.teamId, input.teamId),
+            ),
+          );
         if (
-          [
-            "MessageRejected",
-            "MessageRejectedException",
-            "BadRequestException",
-            "MailFromDomainNotVerifiedException",
-          ].includes(name)
+          !domain ||
+          domain.suspendedAt ||
+          domain.status !== "verified" ||
+          domain.address !== input.from
         )
           throw new MailboxSendRejectedError();
-        throw error;
-      }
-      if (!response.MessageId) throw new Error("mailbox_provider_unknown");
-      return { messageId: response.MessageId };
+        // A send-review hold keeps the message for the operator's release, as
+        // it keeps the team's API mail.
+        if (isSendReviewHeld(domain)) throw new MailboxSendDeferredError();
+        if (opts.isCloud) await checkMailboxContent(db, input);
+        const accountPaused = () =>
+          opts.paused?.(domain.region) === true ||
+          opts.sesQuota?.accountPaused?.(domain.region) === true;
+        // An SES enforcement stop never authorizes automatic relay/region failover.
+        if (accountPaused()) throw new MailboxSendDeferredError();
+        const region = domain.region;
+        const configurationSet = configurationSets[region];
+        if (!configurationSet) throw new MailboxSendDeferredError();
+        // Campaign configuration can enable SES Open/Click body rewriting. Mail
+        // always requires its own explicit regional operator configuration.
+        if (configurationSet === domain.configurationSet) throw new MailboxSendRejectedError();
+        await refuseSesOverrides(input.raw);
+        if (opts.exhausted?.(region)) throw new MailboxSendDeferredError();
+        try {
+          await opts.throttle?.(region, recipientCount);
+        } catch {
+          // Cancellation or a failed local permit cannot have accepted this message.
+          throw new MailboxSendDeferredError();
+        }
+        if (opts.exhausted?.(region)) throw new MailboxSendDeferredError();
+        await allowedRecipients(input.teamId, recipients);
+        let client = clients.get(region);
+        if (!client) {
+          const options: SESv2ClientConfig = {
+            region,
+            maxAttempts: 1,
+            ignoreConfiguredEndpointUrls: true,
+            requestHandler: { connectionTimeout: 10000, requestTimeout: 30000 },
+          };
+          client = opts.clientFactory ? opts.clientFactory(options) : new SESv2Client(options);
+          clients.set(region, client);
+        }
+        const tenantName = await sendingTenant(client, domain, configurationSet);
+        // Tenant provisioning can wait on the network after the first gate.
+        // A restriction introduced during that wait still precedes the send.
+        await allowedRecipients(input.teamId, recipients);
+        if (accountPaused()) throw new MailboxSendDeferredError();
+        if (opts.isCloud) await checkMailboxContent(db, input);
+        let response: Awaited<ReturnType<MailboxSesClient["send"]>>;
+        try {
+          response = await client.send(
+            new SendEmailCommand({
+              FromEmailAddress: input.from,
+              Content: { Raw: { Data: input.raw } },
+              Destination: {
+                ToAddresses: input.to,
+                CcAddresses: input.cc,
+                BccAddresses: input.bcc,
+              },
+              EmailTags: [
+                { Name: "mepmail_outbox_id", Value: input.outboxId },
+                { Name: "mepmail_attempt_id", Value: input.attemptId },
+              ],
+              ConfigurationSetName: configurationSet,
+              ...(tenantName ? { TenantName: tenantName } : {}),
+            }),
+          );
+        } catch (error) {
+          // Only explicit documented SES refusals prove there was no acceptance.
+          if (await isSesEnforcementRefusal(error, opts.sesQuota, region))
+            throw new MailboxSendDeferredError();
+          const name = error instanceof Error ? error.name : "";
+          if (
+            [
+              "MessageRejected",
+              "MessageRejectedException",
+              "BadRequestException",
+              "MailFromDomainNotVerifiedException",
+            ].includes(name)
+          )
+            throw new MailboxSendRejectedError();
+          throw error;
+        }
+        if (!response.MessageId) throw new Error("mailbox_provider_unknown");
+        return { messageId: response.MessageId };
+      },
     },
-  };
+    opts.isCloud ?? false,
+  );
 }

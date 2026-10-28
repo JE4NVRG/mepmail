@@ -3,10 +3,12 @@ import {
   type AccountMailKind,
   accountMailPhrase,
   applyMergeFields,
+  applySenderProbationQuota,
   broadcastSendSpacingMs,
   buildAccountMail,
   buildUnsubscribeHeaders,
   cancelBroadcastRows,
+  checkCampaignConsent,
   claimNotification,
   drawBroadcastCopy,
   encryptEmailBody,
@@ -162,6 +164,22 @@ export async function sendBroadcast(
   if (!broadcast || (broadcast.status !== "scheduled" && broadcast.status !== "sending")) {
     return "skipped";
   }
+  // Provider-independent and authoritative for legacy/restored rows: a client
+  // cannot turn a broadcast into transactional mail. Revocation parks only;
+  // no consent decision or retry releases another safety hold.
+  if (
+    !(
+      await checkCampaignConsent(db, {
+        teamId: broadcast.teamId,
+        from: broadcast.from,
+        operation: "campaign",
+        isCloud: deps.isCloud ?? false,
+      })
+    ).allowed
+  ) {
+    await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
+    return "deferred";
+  }
   if (
     broadcast.status === "scheduled" &&
     broadcast.scheduledAt &&
@@ -299,7 +317,7 @@ export async function sendBroadcast(
   const initialQuota = await fetchTeamQuota(db, broadcast.teamId, deps.isCloud);
   if (!initialQuota)
     throw new Error(`broadcast ${broadcast.id}: team ${broadcast.teamId} not found`);
-  let quota = initialQuota;
+  let quota = await applySenderProbationQuota(db, broadcast.teamId, initialQuota, deps.isCloud);
 
   // Topic-scoped send: fetch the topic's default once (it gates every contact
   // with no explicit override) and hydrate per-batch override rows below. A
@@ -418,9 +436,27 @@ export async function sendBroadcast(
     for (;;) {
       // Checked after the previous page's enqueue, so no enqueued page is lost.
       if (deps.signal?.aborted) throw new Error(`broadcast ${broadcast.id}: fan-out aborted`);
+      if (
+        !(
+          await checkCampaignConsent(db, {
+            teamId: broadcast.teamId,
+            from: broadcast.from,
+            operation: "campaign",
+            isCloud: deps.isCloud ?? false,
+          })
+        ).allowed
+      ) {
+        await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
+        return "deferred";
+      }
       // A billing period can renew under a long walk (the daily counter follows
       // the clock by itself); each page reserves against the period current now.
-      quota = (await fetchTeamQuota(db, broadcast.teamId, deps.isCloud)) ?? quota;
+      quota = await applySenderProbationQuota(
+        db,
+        broadcast.teamId,
+        (await fetchTeamQuota(db, broadcast.teamId, deps.isCloud)) ?? quota,
+        deps.isCloud,
+      );
       const contacts = await db
         .select({
           id: schema.contacts.id,

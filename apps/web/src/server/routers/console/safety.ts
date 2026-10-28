@@ -14,6 +14,7 @@ import {
   fetchDeliverabilityHealth,
   getMonitorSettingsRow,
   getSignupSendingRestriction,
+  isSendReviewHeld,
   listSignupRiskReviewCandidates,
   MAILBOX_ACTIVITY_ACTIONS,
   parseAuditActor,
@@ -444,9 +445,10 @@ export const consoleSafetyRouter = router({
         suspendedAt: team.suspendedAt,
         suspensionReason: team.suspensionReason,
         broadcastsPausedByOperatorAt: team.broadcastsPausedByOperatorAt,
-        sendReview: team.sendReviewAt
-          ? { at: team.sendReviewAt, reason: team.sendReviewReason, note: team.sendReviewNote }
-          : null,
+        sendReview:
+          team.sendReviewAt && isSendReviewHeld(team)
+            ? { at: team.sendReviewAt, reason: team.sendReviewReason, note: team.sendReviewNote }
+            : null,
         region: region.region,
         domains: region.domains,
         contacts,

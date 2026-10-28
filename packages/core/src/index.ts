@@ -192,6 +192,19 @@ export {
   type SendingBroadcast,
   sendingBroadcasts,
 } from "./broadcast-pacing.js";
+export {
+  CAMPAIGN_CONSENT_MESSAGE,
+  type CampaignConsentVerdict,
+  type CampaignMessage,
+  campaignConsentEvidenceSchema,
+  campaignDomainDnsReady,
+  campaignMessage,
+  checkCampaignConsent,
+  checkCampaignMessage,
+  latestCampaignConsent,
+  reviewCampaignConsent,
+  submitCampaignConsent,
+} from "./campaign-consent.js";
 export { canonicalBodyHash, canonicalStringify } from "./canonical-json.js";
 export { forwardedClientIp } from "./client-ip.js";
 export { type ContactActivityRow, recordContactActivity } from "./contact-activities.js";
@@ -849,6 +862,7 @@ export {
   holdTeamForReview,
   type ImpersonationFinding,
   impersonationNote,
+  isSendReviewHeld,
   markSendReviewNotified,
   SEND_REVIEW_NEW_TEAM_DAYS,
   type SendReviewReason,
@@ -858,6 +872,14 @@ export {
   unnotifiedSendReviews,
 } from "./send-review.js";
 export { formatMailbox, type Mailbox, parseMailbox, parseSingleSender } from "./sender-address.js";
+export { applySenderProbationQuota, probationCeiling } from "./sender-probation.js";
+export {
+  parseSendingProviderPolicy,
+  resolveSendingProvider,
+  type SendingMessageClass,
+  type SendingProviderDecision,
+  type SendingProviderPolicy,
+} from "./sending-provider-policy.js";
 export {
   type BroadcastEstimate,
   bulkShare,

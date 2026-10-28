@@ -172,7 +172,7 @@ describe("holds", () => {
     expect(after).toMatchObject([{ reason: "review", status: "open" }]);
   });
 
-  it("leaves established and released teams alone", async () => {
+  it("re-screens established and released teams for new impersonation", async () => {
     const old = await createTeam(db, "old-bank");
     await db
       .update(schema.teams)
@@ -180,7 +180,7 @@ describe("holds", () => {
       .where(eq(schema.teams.id, old));
     expect(
       await screenImpersonation(db, { teamId: old, from: "Banco <a@old.dev>", subject: "Olá" }),
-    ).toBe(false);
+    ).toBe(true);
     const released = await createTeam(db, "released-bank");
     await db
       .update(schema.teams)
@@ -192,10 +192,10 @@ describe("holds", () => {
         from: "Banco <a@released.dev>",
         subject: "Olá",
       }),
-    ).toBe(false);
+    ).toBe(true);
     for (const id of [old, released]) {
       const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
-      expect(row?.sendReviewAt).toBeNull();
+      expect(row?.sendReviewAt).toBeInstanceOf(Date);
     }
   });
 
@@ -354,7 +354,7 @@ describe("new sender patterns", () => {
     );
   });
 
-  it("holds every send of a team whose guardrail paused, unless released this week", async () => {
+  it("holds paused teams except for the same evidence the operator already reviewed", async () => {
     const bad = await youngTeam("bounce-run", 60);
     const releasedLately = await youngTeam("released-lately", 60);
     await db
@@ -371,7 +371,7 @@ describe("new sender patterns", () => {
     });
     const held = await holdReputationRuns(db, [
       paused(bad),
-      paused(releasedLately),
+      { ...paused(releasedLately), outcomeWatermark: new Date(Date.now() - 2 * 86_400_000) },
       { ...paused(fine), guardrail: "ok" },
     ]);
     expect(held).toEqual([bad]);
@@ -447,9 +447,9 @@ describe("content verdict hold", () => {
     expect((await fetchTeamStanding(db, teamId))?.sendReview?.reason).toBe("content");
   });
 
-  it("leaves established, suspended and system teams to the monitor's own alert", async () => {
+  it("holds established teams too while leaving suspended and system teams to their own alert", async () => {
     const old = await aged("content-old", SEND_REVIEW_NEW_TEAM_DAYS + 1);
-    expect(await holdOnContentVerdict(db, { teamId: old, score: 100, categories: [] })).toBe(false);
+    expect(await holdOnContentVerdict(db, { teamId: old, score: 100, categories: [] })).toBe(true);
     const suspended = await aged("content-suspended", 1);
     await db
       .update(schema.teams)

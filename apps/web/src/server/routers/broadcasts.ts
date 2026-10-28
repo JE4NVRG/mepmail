@@ -2,7 +2,9 @@ import { env, isCloudDeployment } from "@millionsend/config";
 import {
   acceptEmail,
   applyMergeFields,
+  CAMPAIGN_CONSENT_MESSAGE,
   cancelBroadcastRows,
+  checkCampaignConsent,
   DAY_MS,
   disguiseMessage,
   emailInsightsView,
@@ -536,6 +538,14 @@ export const broadcastsRouter = router({
           message: "Only drafts can be sent.",
         });
       }
+      const consent = await checkCampaignConsent(ctx.db, {
+        teamId: ctx.teamId,
+        from: row.from,
+        operation: "campaign",
+        isCloud: isCloudDeployment(),
+      });
+      if (!consent.allowed)
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: CAMPAIGN_CONSENT_MESSAGE });
       if (!env.APP_BASE_URL) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",

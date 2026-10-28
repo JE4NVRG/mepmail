@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { utcDay } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
@@ -22,6 +23,33 @@ beforeAll(async () => {
     { teamId: noisy, day: DAY, sent: 200, complained: 4 },
     { teamId: clean, day: DAY, sent: 200 },
   ]);
+  for (const teamId of [noisy, clean]) {
+    const messages = await db
+      .insert(schema.emails)
+      .values(
+        Array.from({ length: 200 }, () => ({
+          teamId,
+          from: "fixture@example.test",
+          to: ["recipient@example.test"],
+          subject: "Fixture",
+          sesMessageId: randomUUID(),
+          sentAt: NOW,
+          createdAt: NOW,
+        })),
+      )
+      .returning({ id: schema.emails.id });
+    if (teamId === noisy) {
+      await db.insert(schema.emailEvents).values(
+        messages.slice(0, 4).map((m) => ({
+          emailId: m.id,
+          type: "complained" as const,
+          occurredAt: NOW,
+          createdAt: NOW,
+          snsMessageId: randomUUID(),
+        })),
+      );
+    }
+  }
   await db.insert(schema.contacts).values([
     { teamId: clean, email: "stay@example.com" },
     { teamId: clean, email: "left@example.com", unsubscribed: true },
@@ -49,6 +77,15 @@ it("flags and holds the noisy team only, stands both, and records the unsubscrib
   expect(held).toMatchObject({ sendReviewReason: "reputation" });
   expect(held?.sendReviewNote).toContain("complaint rate 2.00%");
   expect(await flagsOf(clean)).toEqual([]);
+  const audits = await db.select().from(schema.auditLog).where(eq(schema.auditLog.teamId, noisy));
+  expect(
+    audits.some(
+      (a) =>
+        a.action === "team.send_review_held" &&
+        a.data?.windowHours === 24 &&
+        a.data?.policy === "mepmail_internal",
+    ),
+  ).toBe(true);
 
   const standings = await db.select().from(schema.teamStandings);
   expect(standings.map((s) => s.teamId).sort()).toEqual([noisy, clean].sort());
@@ -76,8 +113,8 @@ it("flags and holds the noisy team only, stands both, and records the unsubscrib
   expect(probes).toMatchObject([{ value: 1, ok: true }]);
 });
 
-it("keeps the hold and its flag once the counters are fixed, until an operator releases", async () => {
-  const later = new Date(NOW.getTime() + 15 * 60_000);
+it("keeps the hold and its flag after rolling events age out, until an operator releases", async () => {
+  const later = new Date(NOW.getTime() + 24 * 60 * 60_000 + 1);
   await db
     .update(schema.usageCounters)
     .set({ complained: 0 })

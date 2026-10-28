@@ -4,7 +4,10 @@ import {
   claimNotification,
   computeTeamStandings,
   holdReputationRuns,
+  MIN_GUARDRAIL_VOLUME,
   markSendReviewNotified,
+  PAUSE_BOUNCE_RATE,
+  PAUSE_COMPLAINT_RATE,
   pruneTeamStandings,
   recordAudit,
   recordProbes,
@@ -19,7 +22,7 @@ import { eq, sql } from "drizzle-orm";
 import { alertOperator, mailOwners, type SystemMailer } from "../system-mail.js";
 
 /**
- * Refresh every active team's standing (score, guardrail, 7-day rates) and
+ * Refresh every active team's standing (score, guardrail, rolling 24-hour rates) and
  * open or clear the automatic trust & safety flags from it. The unsubscribed
  * contact count rides along: it is a scan of the contacts table, too heavy
  * for the minute probe and cheap enough every quarter hour.
@@ -77,7 +80,22 @@ export async function notifySendReviews(
       actor: hold.reason === "payment_risk" ? "stripe" : "system",
       action: "team.send_review_held",
       target: { type: "team", id: hold.id },
-      metadata: { reason: hold.reason },
+      metadata: {
+        reason: hold.reason,
+        ...(hold.reason === "reputation"
+          ? {
+              policy: "mepmail_internal",
+              windowHours: 24,
+              countingUnit: "message",
+              pauseComparison: "strictly_greater",
+              hardBounceRate: PAUSE_BOUNCE_RATE,
+              complaintRate: PAUSE_COMPLAINT_RATE,
+              minimumConfirmedMessages: MIN_GUARDRAIL_VOLUME,
+              // Hold time records the evaluation, not the later notification run.
+              evaluatedAt: hold.at?.toISOString() ?? null,
+            }
+          : {}),
+      },
     });
     if (!opts.mailer) continue;
     try {

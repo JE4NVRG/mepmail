@@ -9,6 +9,7 @@ import {
   beginIdempotent,
   broadcastSendSpacingMs,
   buildUnsubscribeUrl,
+  CAMPAIGN_CONSENT_MESSAGE,
   CONTACT_PROPERTY_MAX_KEYS,
   CONTACT_PROPERTY_VALUE_MAX_LENGTH,
   type ContactActivityRow,
@@ -16,6 +17,7 @@ import {
   type ContactSnapshot,
   cancelBroadcastRows,
   canonicalBodyHash,
+  checkCampaignConsent,
   checkSignupSend,
   clearUnsubscribeSuppression,
   completeIdempotent,
@@ -361,6 +363,14 @@ function monthlyQuotaMessage(result: { periodEnd: Date; overage: boolean }): str
 /** Wire status + body for an accept the pipeline refused. */
 function acceptRejection(result: Exclude<AcceptEmailResult, { ok: true }>) {
   switch (result.reason) {
+    case "campaign_consent_required":
+    case "campaign_manual_review_required":
+    case "campaign_domain_required":
+    case "team_restricted":
+      return {
+        status: 403 as const,
+        body: errorBody(403, result.reason, CAMPAIGN_CONSENT_MESSAGE),
+      };
     case "signup_sandbox":
     case "signup_review_required":
       return {
@@ -401,6 +411,8 @@ function acceptRejection(result: Exclude<AcceptEmailResult, { ok: true }>) {
         body: errorBody(422, "validation_error", disguiseMessage(result)),
       };
   }
+  const unhandled: never = result;
+  throw new Error(`Unhandled accept rejection: ${JSON.stringify(unhandled)}`);
 }
 
 /**
@@ -962,6 +974,18 @@ function registerContactRootRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
     items: (CreateContactRequest | BatchItemError)[],
     opts: { onConflict: ContactConflictMode; strict: boolean; plan: ApiKeyAuth["plan"] },
   ): Promise<(BatchItemResult | undefined)[]> => {
+    const consent = await checkCampaignConsent(db, {
+      teamId,
+      operation: "import",
+      isCloud: deps.isCloud,
+    });
+    if (!consent.allowed)
+      return items.map(() => ({
+        ok: false as const,
+        status: 403,
+        name: consent.reason,
+        message: CAMPAIGN_CONSENT_MESSAGE,
+      }));
     const { onConflict, strict, plan } = opts;
     const results: (BatchItemResult | undefined)[] = items.map(() => undefined);
     const types = await loadContactPropertyTypes(db, teamId);
@@ -2731,6 +2755,13 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
     // Same boundary as /emails: only a verified team domain may appear as
     // the sender.
     const domain = await verifySenderDomain(db, auth.teamId, broadcast.from);
+    const consent = await checkCampaignConsent(db, {
+      teamId: auth.teamId,
+      from: broadcast.from,
+      operation: "campaign",
+      isCloud: deps.isCloud,
+    });
+    if (!consent.allowed) return fail(403, consent.reason, CAMPAIGN_CONSENT_MESSAGE);
     if (!domain.ok) {
       return fail(422, "validation_error", senderVerdictMessage(domain));
     }
@@ -3895,7 +3926,6 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
         if (idemKey) await releaseIdempotent(deps.db, { teamId: auth.teamId, key: idemKey });
         return c.json(paused, 403);
       }
-      const quota = teamQuota(auth.billing, deps.isCloud);
       const accepted = await deps.db.transaction(async (dbTx) => {
         const txDb = dbTx as unknown as Db;
         const out: {
@@ -3905,6 +3935,7 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
           index: number;
           day: string;
           recipientCount: number;
+          quota: Extract<AcceptEmailResult, { ok: true }>["quota"];
         }[] = [];
         for (const { payload, index } of payloads) {
           const result = await acceptEmail(deps, auth, payload, { tx: txDb, quota: "deferred" });
@@ -3915,6 +3946,7 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
             index,
             day: result.day,
             recipientCount: result.recipientCount,
+            quota: result.quota,
             ...(payload.scheduledAt ? { startAfter: payload.scheduledAt } : {}),
           });
         }
@@ -3932,6 +3964,9 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
         for (const items of groups) {
           const first = items[0];
           if (!first) continue;
+          // acceptEmail applied the server-owned probation cap in this transaction.
+          // Keep that effective quota for both the bulk attempt and fitting head.
+          const quota = first.quota;
           // Items in one group share a delivery day; the first one's instant
           // places the hourly mirror like a single send's would.
           const at = first.startAfter ?? new Date();

@@ -9,6 +9,7 @@ import {
   formatMailDateTime,
   getSignupSendingRestriction,
   getTeamSignupRisk,
+  isSendReviewHeld,
   liveSupportViewForTeam,
   type MailLocale,
   PLAN_RUNGS,
@@ -806,16 +807,35 @@ export const consoleTeamsRouter = router({
     }),
 
   /**
-   * Ends a send-review hold: the parked mail drains, and the impersonation
-   * screen leaves the team alone from now on (a new payment block still
-   * holds it). Suspending instead keeps the mail parked.
+   * Releases only the hold the operator actually observed. New content,
+   * consent, quota and provider guards still apply to every parked delivery.
    */
   releaseSendReview: operatorProcedure
-    .input(z.object({ id: z.uuid() }))
+    .input(z.object({ id: z.uuid(), expectedHoldAt: z.iso.datetime() }))
     .mutation(async ({ ctx, input }) => {
       const team = await loadTeam(ctx.db, input.id);
-      if (!team.sendReviewAt) return;
+      if (!isSendReviewHeld(team) || !team.sendReviewAt) return;
+      if (team.suspendedAt) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "A suspended team cannot have its sending review released.",
+        });
+      }
+      if (team.sendReviewAt.toISOString() !== input.expectedHoldAt) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "The sending review changed. Refresh and inspect the current hold before releasing it.",
+        });
+      }
       const now = new Date();
+      const health = await fetchDeliverabilityHealth(ctx.db, team.id, { now });
+      if (health.status === "paused") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "The rolling 24-hour sending safety policy is still paused.",
+        });
+      }
       const [released] = await ctx.db
         .update(t)
         .set({

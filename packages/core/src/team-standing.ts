@@ -1,6 +1,7 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
+import { isSendReviewHeld } from "./send-review.js";
 
 export type SuspensionReason = (typeof schema.suspensionReasonEnum.enumValues)[number];
 type SendReviewReason = (typeof schema.sendReviewReasonEnum.enumValues)[number];
@@ -21,6 +22,7 @@ export const STANDING_COLUMNS = {
   suspensionReason: schema.teams.suspensionReason,
   suspensionNote: schema.teams.suspensionNote,
   sendReviewAt: schema.teams.sendReviewAt,
+  sendReviewClearedAt: schema.teams.sendReviewClearedAt,
   sendReviewReason: schema.teams.sendReviewReason,
   broadcastsPausedByOperatorAt: schema.teams.broadcastsPausedByOperatorAt,
   dailySendCeiling: schema.teams.dailySendCeiling,
@@ -31,6 +33,7 @@ export function teamStandingOf(row: {
   suspensionReason: SuspensionReason | null;
   suspensionNote: string | null;
   sendReviewAt?: Date | null;
+  sendReviewClearedAt?: Date | null;
   sendReviewReason?: SendReviewReason | null;
   broadcastsPausedByOperatorAt: Date | null;
   dailySendCeiling: number | null;
@@ -41,7 +44,12 @@ export function teamStandingOf(row: {
         ? { at: row.suspendedAt, reason: row.suspensionReason, note: row.suspensionNote }
         : null,
     sendReview:
-      row.sendReviewAt && row.sendReviewReason
+      row.sendReviewAt &&
+      row.sendReviewReason &&
+      isSendReviewHeld({
+        sendReviewAt: row.sendReviewAt,
+        sendReviewClearedAt: row.sendReviewClearedAt ?? null,
+      })
         ? { at: row.sendReviewAt, reason: row.sendReviewReason }
         : null,
     broadcastsPausedByOperatorAt: row.broadcastsPausedByOperatorAt,

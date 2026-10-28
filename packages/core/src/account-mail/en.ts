@@ -199,7 +199,8 @@ export const en = {
     ],
     button: "Open broadcasts",
     extra: {
-      complaints: "the complaint rate passed 0.1% over the last 7 days.",
+      complaints:
+        "the complaint rate exceeded the internal MepMail policy of 0.08% in the rolling 24-hour window.",
       report: "an abuse report was received.",
       manual: "see the note below.",
       note: "Note from the operator: {note}",

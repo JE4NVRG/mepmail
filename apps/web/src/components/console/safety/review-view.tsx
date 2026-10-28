@@ -118,6 +118,7 @@ export function ReviewView({ teamId }: { teamId: string }) {
 
   const { team, flag, standing, checks, flaggedEmails, audit, monitor, grants, contentReveal } =
     query.data;
+  const expectedHoldAt = team.sendReview?.at.toISOString();
   const grantFor = (emailId: string) => grants.find((g) => g.emailIds.includes(emailId));
   const revealRequest = (email: (typeof flaggedEmails)[number] | null) => () =>
     reveal.request({
@@ -289,18 +290,19 @@ export function ReviewView({ teamId }: { teamId: string }) {
           <button
             type="button"
             className="ms-btn ms-btn-primary"
-            disabled={releaseReview.isPending || !!team.suspendedAt}
-            onClick={() =>
+            disabled={releaseReview.isPending || !!team.suspendedAt || !expectedHoldAt}
+            onClick={() => {
+              if (!expectedHoldAt) return;
               releaseReview.mutate(
-                { id: team.id },
+                { id: team.id, expectedHoldAt },
                 {
                   onSuccess: () => {
                     toast(t("sendReview.released", { team: team.name }));
                     refetch();
                   },
                 },
-              )
-            }
+              );
+            }}
           >
             <BtnSpinner on={releaseReview.isPending} />
             {t("sendReview.release")}

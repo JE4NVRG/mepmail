@@ -341,7 +341,7 @@
       "domains": "Domínios",
       "sent24h": "Enviados 24h",
       "bounce7d": "Bounce 7d",
-      "complaints7d": "Reclamações 7d",
+      "complaints7d": "Reclamações 24h",
       "breaker": "Breaker"
     },
     "planCell": {
@@ -708,7 +708,7 @@
   },
   "safety": {
     "title": "Confiança e segurança",
-    "info": "Uma equipe entra aqui quando o guardrail de entregabilidade vira alerta ou pausa, as reclamações passam de 0,1% ou os hard bounces de 5% em 7 dias, o risco do monitor de conteúdo cruza a linha de sinalização (conteúdo amostrado julgado pelo modelo), o score da conta cai abaixo de 5, ou um operador a sinaliza à mão. Sinalizações automáticas somem sozinhas quando o gatilho passa; uma que você limpa fica limpa enquanto o mesmo gatilho durar.",
+    "info": "Uma equipe entra aqui quando o guardrail de entregabilidade vira alerta ou pausa, as reclamações passam de 0,08% ou os hard bounces de 2% em uma janela móvel de 24 horas (política interna MepMail, não limites da AWS), o risco do monitor de conteúdo cruza a linha de sinalização (conteúdo amostrado julgado pelo modelo), o score da conta cai abaixo de 5, ou um operador a sinaliza à mão. Sinalizações automáticas somem sozinhas quando o gatilho passa; uma que você limpa fica limpa enquanto o mesmo gatilho durar.",
     "proof": "{open} abertas · {guardrailPaused} pausadas pelo guardrail · {suspended} suspensas · {revealsThisWeek, plural, one {# revelação de conteúdo} other {# revelações de conteúdo}} esta semana",
     "search": "Buscar equipes, proprietários, domínios",
     "filters": {
@@ -734,7 +734,7 @@
     },
     "reasonTip": {
       "monitor": "O monitor de conteúdo: conteúdo amostrado julgado pelo modelo levou o risco interno acima da linha de sinalização.",
-      "complaints": "A taxa de reclamações passou de 0,1% ou a de hard bounces de 5% nos últimos 7 dias (o SES revisa contas nessas linhas).",
+      "complaints": "A taxa de reclamações passou de 0,08% ou a de hard bounces de 2% nas últimas 24 horas móveis. Política interna MepMail, não limites da AWS.",
       "guardrail": "O guardrail de entregabilidade virou alerta ou pausou a equipe pelas taxas de bounce ou reclamação.",
       "score": "O score da conta caiu abaixo de 5 em 10.",
       "report": "Um provedor de e-mail ou um destinatário denunciou abuso.",
@@ -742,8 +742,8 @@
       "review": "Envio retido antes do SES: conta nova imitando banco, operadora ou segurança da conta, ou pagamento bloqueado pelo antifraude da Stripe."
     },
     "reasonLabel": {
-      "complaint": "Reclamações {rate} · 7d",
-      "hard_bounce": "Hard bounces {rate} · 7d",
+      "complaint": "Reclamações {rate} · 24h",
+      "hard_bounce": "Hard bounces {rate} · 24h",
       "guardrailWarning": "{metric} {rate} · alerta do guardrail",
       "guardrailPaused": "{metric} {rate} · pausada pelo guardrail",
       "score": "Score {score} / 10",
@@ -756,8 +756,8 @@
       "team": "Equipe",
       "type": "Tipo",
       "score": "Score",
-      "complaints": "Reclamações 7d",
-      "bounces": "Hard bounces 7d",
+      "complaints": "Reclamações 24h",
+      "bounces": "Hard bounces 24h",
       "guardrail": "Guardrail",
       "reason": "Sinalizada por",
       "status": "Status",
@@ -802,18 +802,18 @@
         "impersonation": "Conta nova com remetente ou assunto imitando banco, operadora ou segurança da conta.",
         "payment_risk": "O antifraude da Stripe bloqueou um pagamento desta conta.",
         "new_sender": "Padrão de envio de conta nova: passou do limite do período de teste, troca de endereço de remetente ou domínio em extensão muito usada em golpes.",
-        "reputation": "Devoluções ou reclamações acima das linhas de revisão do SES: todo o e-mail desta conta fica retido, inclusive o transacional.",
+        "reputation": "Rejeições permanentes acima de 2% ou reclamações acima de 0,08% nas últimas 24 horas móveis: política interna MepMail, não limites da AWS. Todo o e-mail desta conta fica retido, inclusive o transacional.",
         "content": "O monitor de conteúdo julgou uma mensagem de conta nova como abuso quase certo (phishing, imitação de marca ou golpe).",
-        "body": "Os e-mails aceitos ficam guardados e nada sai para o SES. Liberar o envio solta os retidos em até 15 minutos; suspender a equipe mantém tudo retido.",
+        "body": "Os e-mails aceitos ficam retidos e nada sai para o SES. Registrar a revisão não envia uma fila, não reativa uma conta e não garante liberação permanente. Os controles de segurança são reavaliados antes de novos envios.",
         "release": "Liberar envio",
         "released": "{team} · envio liberado"
       },
       "tiles": {
         "score": "Score",
         "scoreTip": "Score da conta que o cliente vê, em 30 dias.",
-        "complaints": "Reclamações 7d",
-        "bounces": "Hard bounces 7d",
-        "sent7d": "Enviados 7d",
+        "complaints": "Reclamações 24h",
+        "bounces": "Hard bounces 24h",
+        "sent7d": "Enviados 24h",
         "contacts": "Contatos",
         "scoreOf": "{score} / 10",
         "risk": "Risco do monitor",

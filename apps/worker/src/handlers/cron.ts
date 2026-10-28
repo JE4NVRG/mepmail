@@ -1,5 +1,6 @@
 import { isMissingStripeCustomer } from "@millionsend/billing";
 import {
+  applySenderProbationQuota,
   broadcastSendSpacingMs,
   claimNotification,
   countDistinctRecipients,
@@ -557,13 +558,14 @@ async function releaseParked(
   throttleAt: Date | null,
 ): Promise<MovedEmail | null> {
   if (run.exhaustedTeams.has(email.teamId)) return null;
-  const quota = teamQuota({ ...email, id: email.teamId }, deps.isCloud);
+  let quota = teamQuota({ ...email, id: email.teamId }, deps.isCloud);
   // Charged the way accept charged it: one unit per distinct mailbox.
   const units = countDistinctRecipients(email.to, email.cc, email.bcc);
   try {
     const outcome = await db
       .transaction(async (tx) => {
         const txDb = tx as unknown as Db;
+        quota = await applySenderProbationQuota(txDb, email.teamId, quota, deps.isCloud);
         const reservation = await reserveQuota(txDb, { teamId: email.teamId, count: units, quota });
         if (!reservation.reserved) return "exhausted" as const;
         const moved = await transitionQueueState(txDb, email.id, {

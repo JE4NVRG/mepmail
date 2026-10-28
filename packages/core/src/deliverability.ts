@@ -3,65 +3,27 @@ import type { Db } from "@millionsend/db";
 // postgres driver (node:net), which breaks any client bundle that imports this
 // module's thresholds. The type-only Db import above is erased.
 import * as schema from "@millionsend/db/schema";
-import { and, eq, gte, sql } from "drizzle-orm";
-import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import { DAY_MS, utcDay } from "./utc-day.js";
+import { sql } from "drizzle-orm";
+import { firstRow } from "./driver-result.js";
+import { DAY_MS } from "./utc-day.js";
 
-/**
- * Single source of truth for deliverability thresholds and standing. The
- * Metrics page and BOTH send guards (tRPC broadcast + public API) import from
- * here — thresholds must never be re-hardcoded at a call site or they drift.
- *
- * Two tiers:
- * - WARN_* are the product "RISK" lines shown on the rate cards. Banner and a
- *   reduced broadcast rate, never a block.
- * - PAUSE_* mirror SES's own review lines; crossing one blocks new sends
- *   before SES pauses the whole account.
- * Bounce rates count hard (permanent) bounces only, as SES does: greylisting
- * and full mailboxes are not a reputation signal.
+/** Internal MepMail anti-abuse policy, NOT provider limits or guarantees.
+ * Warning and pause both use an exact rolling 24-hour window (start, end].
+ * Pause is strictly above the line; equality warns but does not pause.
  */
-export const WARN_BOUNCE_RATE = 0.04;
+export const WARN_BOUNCE_RATE = 0.015;
 export const WARN_COMPLAINT_RATE = 0.0005;
-export const PAUSE_BOUNCE_RATE = 0.05;
-export const PAUSE_COMPLAINT_RATE = 0.001;
-
-/**
- * Below this many sends in a window no tier fires regardless of rate: a
- * handful of bounces in a tiny sample must never pause an account.
- */
+export const PAUSE_BOUNCE_RATE = 0.02;
+export const PAUSE_COMPLAINT_RATE = 0.0008;
+/** Warning-only anti-noise floor. It must not exempt trial senders from pauses. */
 export const MIN_GUARDRAIL_VOLUME = 100;
-
-/**
- * The pause tier also needs this many events in its window. With the floor
- * at 100 sends a rate alone would let one complaint pause a team; the count
- * is what makes a small sample's rate mean something.
- */
-export const MIN_PAUSE_COMPLAINTS = 3;
-export const MIN_PAUSE_HARD_BOUNCES = 10;
-/**
- * The warning tier's own floor for complaints: one complaint in a small week
- * clears 0.05% on its own and would throttle a team's broadcasts for seven
- * days; two make it a pattern.
- */
-export const MIN_WARN_COMPLAINTS = 2;
-
-/** Trailing window, in UTC calendar days, the warning tier and the displayed rates use. */
-export const GUARDRAIL_WINDOW_DAYS = 7;
-
-/**
- * Window the pause tier is judged on: today and yesterday. usage_counters is
- * keyed by UTC day, so this is the honest "last 24 hours" — a one-day window
- * would hold five minutes of data just after midnight. A team that fixes its
- * list recovers in a day instead of waiting out the warning window.
- */
-export const PAUSE_WINDOW_DAYS = 2;
-
-/**
- * Reduced per-second fan-out rate for a team in the "tolerance" band (warning
- * or paused): sends continue but are dripped so reputation can recover. One a
- * second is SES's own sandbox pace; a 36k campaign still drains within a day,
- * just never in a burst.
- */
+export const MIN_PAUSE_COMPLAINTS = 1;
+export const MIN_PAUSE_HARD_BOUNCES = 1;
+export const MIN_WARN_COMPLAINTS = 1;
+/** Compatibility day labels: these mean 24 elapsed hours, not UTC buckets. */
+export const GUARDRAIL_WINDOW_DAYS = 1;
+export const PAUSE_WINDOW_DAYS = 1;
+export const GUARDRAIL_WINDOW_MS = DAY_MS;
 export const THROTTLED_BROADCAST_RATE_PER_SECOND = 1;
 
 export type DeliverabilityStatus = "ok" | "warning" | "paused";
@@ -94,6 +56,16 @@ export interface DeliverabilityHealth extends DeliverabilityEvaluation {
   sent: number;
   windowDays: number;
   pause: WindowCounts & { windowDays: number };
+  /** Present on live health; daily counters cannot reconstruct this window. */
+  rollingWindow?: {
+    start: Date;
+    end: Date;
+    hours: 24;
+    basis: "confirmed_messages_and_distinct_outcomes";
+    countingUnit: "message";
+    /** Arrival watermark, not occurrence time: catches late callbacks after review release. */
+    outcomeWatermark: Date | null;
+  };
 }
 
 /**
@@ -108,12 +80,8 @@ export function broadcastSendSpacingMs(status: DeliverabilityStatus): number {
 
 const rateOf = (events: number, sent: number): number => (sent > 0 ? events / sent : 0);
 
-/**
- * Pure guardrail decision. The pause tier reads the short window: rate at or
- * over the pause line AND at least MIN_PAUSE_* events. The warning tier reads
- * the long window: rate at or over the warning line. Neither fires under
- * `minVolume` sends in its own window. The rates returned for display are the
- * long window's; zero sends yields zero rates, never NaN.
+/** Pure policy decision. Strict > pauses; warnings use >=. Both use the
+ * rolling window supplied by the caller. Zero sends is safe, never NaN.
  */
 export function evaluateDeliverability(
   windows: { warn: WindowCounts; pause: WindowCounts },
@@ -127,11 +95,7 @@ export function evaluateDeliverability(
   ) => {
     const events = metric === "bounce" ? "hardBounced" : "complained";
     const pauseRate = rateOf(pause[events], pause.sent);
-    if (
-      pause.sent >= minVolume &&
-      pauseRate >= lines.pause &&
-      pause[events] >= lines.minPauseEvents
-    ) {
+    if (pause.sent > 0 && pauseRate > lines.pause && pause[events] >= lines.minPauseEvents) {
       reasons.push({ metric, rate: pauseRate, tier: "paused", windowDays: PAUSE_WINDOW_DAYS });
       return;
     }
@@ -168,55 +132,112 @@ export function evaluateDeliverability(
 }
 
 /**
- * A team's current deliverability standing. Sums usage_counters over both
- * windows in one round-trip (the pause window is the recent slice of the
- * warning window), using the successful SES send count as the denominator,
- * with the windows' lower bounds derived from utcDay so rows join on the exact
- * same UTC-day key production writes.
+ * Exact event-time window (now - 24h, now], tenant scoped. One accepted
+ * message is one denominator unit regardless of To/Cc/Bcc size; each outcome
+ * counts at most once per message/metric, even across different SNS IDs.
+ * A sentAt claim alone is NOT acceptance: require a provider message ID or
+ * a durable provider event. Only Permanent bounces count. Delayed callbacks
+ * use occurredAt, never arrival/day buckets; createdAt excludes future reads.
+ * Outcomes may refer to older accepted sends. They still count in their own
+ * occurrence window; rates are intentionally not clamped to hide that risk.
  */
 export async function fetchDeliverabilityHealth(
   db: Db,
   teamId: string,
   opts?: { now?: Date },
 ): Promise<DeliverabilityHealth> {
-  const now = (opts?.now ?? new Date()).getTime();
-  const sinceWarn = utcDay(now - (GUARDRAIL_WINDOW_DAYS - 1) * DAY_MS);
-  const sincePause = utcDay(now - (PAUSE_WINDOW_DAYS - 1) * DAY_MS);
-
-  const c = schema.usageCounters;
-  // ::bigint — a busy sender's window sum can overflow int4. The driver
-  // returns bigint as a string; Number() is exact up to 2^53.
-  const total = (col: AnyPgColumn) => sql<string>`coalesce(sum(${col}), 0)::bigint`;
-  const recent = (col: AnyPgColumn) =>
-    sql<string>`coalesce(sum(case when ${c.day} >= ${sincePause} then ${col} else 0 end), 0)::bigint`;
-  const [row] = await db
-    .select({
-      sent: total(c.sent),
-      hardBounced: total(c.hardBounced),
-      complained: total(c.complained),
-      pauseSent: recent(c.sent),
-      pauseHardBounced: recent(c.hardBounced),
-      pauseComplained: recent(c.complained),
-    })
-    .from(c)
-    .where(and(eq(c.teamId, teamId), gte(c.day, sinceWarn)));
-
-  const n = (v: string | undefined) => Number(v ?? 0);
-  const warn = {
-    sent: n(row?.sent),
-    hardBounced: n(row?.hardBounced),
-    complained: n(row?.complained),
+  const now = opts?.now ?? new Date();
+  if (!Number.isFinite(now.getTime())) throw new RangeError("Invalid evaluation time");
+  const start = new Date(now.getTime() - GUARDRAIL_WINDOW_MS);
+  const e = schema.emails;
+  const v = schema.emailEvents;
+  const row = firstRow<{
+    sent: string;
+    hardBounced: string;
+    complained: string;
+    watermark: string | Date | null;
+  }>(
+    await db.execute(sql`
+    -- Bound acceptance probes to the window, not the tenant's lifetime history.
+    -- Keep all durable-event types here: a recent sent event can override an
+    -- old claim, and an outcome can belong to a much older accepted message.
+    -- LATERAL/LIMIT fences keep tenant lookups keyed by ID; one correlated
+    -- evidence aggregate avoids OR/EXISTS becoming a lifetime event hash scan.
+    with window_events as materialized (
+      select ${v.emailId} as email_id, ${v.type} as type,
+        ${v.bounceType} as bounce_type, ${v.createdAt} as created_at
+      from ${v} inner join lateral (
+        select ${e.id} from ${e}
+        where ${e.id} = ${v.emailId} and ${e.teamId} = ${teamId}
+          and ${e.createdAt} <= ${now}
+        limit 1
+      ) tenant_email on true
+      where ${v.occurredAt} > ${start} and ${v.occurredAt} <= ${now}
+        and ${v.createdAt} <= ${now}
+        and ${v.type} in ('sent', 'delivered', 'bounced', 'complained', 'delivery_delayed')
+    ), candidate_ids as materialized (
+      select ${e.id} as id from ${e}
+      where ${e.teamId} = ${teamId} and ${e.createdAt} <= ${now}
+        and ${e.sentAt} > ${start} and ${e.sentAt} <= ${now}
+      union
+      select email_id as id from window_events
+    ), confirmed as materialized (
+      select candidate_email.id,
+        coalesce(proof.sent_at, candidate_email.sent_at, proof.provider_at) as accepted_at
+      from candidate_ids candidates inner join lateral (
+        select ${e.id} as id, ${e.sentAt} as sent_at, ${e.sesMessageId} as ses_message_id
+        from ${e}
+        where ${e.id} = candidates.id and ${e.teamId} = ${teamId}
+          and ${e.createdAt} <= ${now}
+        limit 1
+      ) candidate_email on true
+      inner join lateral (
+        select min(${v.occurredAt}) filter (where ${v.type} = 'sent') as sent_at,
+          min(${v.occurredAt}) filter (
+            where ${v.type} = 'sent' or ${v.snsMessageId} is not null
+          ) as provider_at
+        from ${v}
+        where ${v.emailId} = candidate_email.id
+          and ${v.type} in ('sent', 'delivered', 'bounced', 'complained', 'delivery_delayed')
+          and ${v.createdAt} <= ${now} and ${v.occurredAt} <= ${now}
+      ) proof on true
+      where candidate_email.ses_message_id is not null or proof.provider_at is not null
+    ), outcomes as (
+      select w.email_id,
+        bool_or(w.type = 'bounced' and w.bounce_type = 'Permanent') as hard,
+        bool_or(w.type = 'complained') as complaint,
+        greatest(
+          min(w.created_at) filter (where w.type = 'bounced' and w.bounce_type = 'Permanent'),
+          min(w.created_at) filter (where w.type = 'complained')
+        ) as arrived_at
+      from window_events w inner join confirmed c on c.id = w.email_id
+      where ((w.type = 'bounced' and w.bounce_type = 'Permanent') or w.type = 'complained')
+      group by w.email_id
+    )
+    select count(*) filter (where c.accepted_at > ${start} and c.accepted_at <= ${now})::text as sent,
+      count(*) filter (where o.hard)::text as "hardBounced",
+      count(*) filter (where o.complaint)::text as complained,
+      max(o.arrived_at) as watermark
+    from confirmed c left join outcomes o on o.email_id = c.id
+  `),
+  );
+  const counts: WindowCounts = {
+    sent: Number(row?.sent ?? 0),
+    hardBounced: Number(row?.hardBounced ?? 0),
+    complained: Number(row?.complained ?? 0),
   };
-  const pause = {
-    sent: n(row?.pauseSent),
-    hardBounced: n(row?.pauseHardBounced),
-    complained: n(row?.pauseComplained),
-  };
-
   return {
-    ...evaluateDeliverability({ warn, pause }),
-    sent: warn.sent,
+    ...evaluateDeliverability({ warn: counts, pause: counts }),
+    sent: counts.sent,
     windowDays: GUARDRAIL_WINDOW_DAYS,
-    pause: { ...pause, windowDays: PAUSE_WINDOW_DAYS },
+    pause: { ...counts, windowDays: PAUSE_WINDOW_DAYS },
+    rollingWindow: {
+      start,
+      end: now,
+      hours: 24,
+      basis: "confirmed_messages_and_distinct_outcomes",
+      countingUnit: "message",
+      outcomeWatermark: row?.watermark ? new Date(row.watermark) : null,
+    },
   };
 }

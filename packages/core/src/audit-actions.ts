@@ -114,6 +114,10 @@ export const AUDIT_ACTIONS = [
   // team gains seven days later, dated at the access.
   "content.revealed",
   "content.accessed",
+  "campaign.consent_submitted",
+  "campaign.consent_approved",
+  "campaign.consent_rejected",
+  "campaign.consent_revoked",
   "console.flag_opened",
   "console.flag_cleared",
   "console.flag_reopened",

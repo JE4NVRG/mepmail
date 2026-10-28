@@ -94,13 +94,61 @@ async function fixture(reason: "new_sender" | "payment_risk" = "new_sender") {
 }
 
 describe("send review release notices", () => {
+  it("rejects a stale operator snapshot without clearing a newer hold or draining", async () => {
+    const id = await fixture();
+    const newer = new Date(heldAt.getTime() + 1000);
+    await db.update(schema.teams).set({ sendReviewAt: newer }).where(eq(schema.teams.id, id));
+    await expect(
+      operator().console.teams.releaseSendReview({ id, expectedHoldAt: heldAt.toISOString() }),
+    ).rejects.toThrow("review changed");
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
+    expect(team?.sendReviewAt).toEqual(newer);
+    expect(h.sent).toHaveLength(0);
+    expect(h.runCronNow).not.toHaveBeenCalled();
+  });
+
+  it("does not let a manual release override an actively paused rolling metric", async () => {
+    const id = await fixture();
+    const now = Date.now();
+    const accepted = await db
+      .insert(schema.emails)
+      .values(
+        Array.from({ length: 100 }, () => ({
+          teamId: id,
+          from: "service@example.test",
+          to: ["recipient@example.test"],
+          subject: "Synthetic outcome",
+          createdAt: new Date(now - 7200000),
+          sentAt: new Date(now - 3600000),
+          sesMessageId: crypto.randomUUID(),
+        })),
+      )
+      .returning({ id: schema.emails.id });
+    await db.insert(schema.emailEvents).values(
+      accepted.slice(0, 3).map((email) => ({
+        emailId: email.id,
+        type: "bounced" as const,
+        bounceType: "Permanent",
+        snsMessageId: crypto.randomUUID(),
+        occurredAt: new Date(now - 1800000),
+        createdAt: new Date(now - 1800000),
+      })),
+    );
+    await expect(
+      operator().console.teams.releaseSendReview({ id, expectedHoldAt: heldAt.toISOString() }),
+    ).rejects.toThrow("24-hour sending safety");
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
+    expect(team?.sendReviewAt).toEqual(heldAt);
+    expect(h.runCronNow).not.toHaveBeenCalled();
+    expect(h.sent).toHaveLength(0);
+  });
   it("releases once and tells the owner once across concurrent requests and replay", async () => {
     const id = await fixture();
     await Promise.all([
-      operator().console.teams.releaseSendReview({ id }),
-      operator().console.teams.releaseSendReview({ id }),
+      operator().console.teams.releaseSendReview({ id, expectedHoldAt: heldAt.toISOString() }),
+      operator().console.teams.releaseSendReview({ id, expectedHoldAt: heldAt.toISOString() }),
     ]);
-    await operator().console.teams.releaseSendReview({ id });
+    await operator().console.teams.releaseSendReview({ id, expectedHoldAt: heldAt.toISOString() });
     expect(h.sent).toHaveLength(1);
     expect(h.sent[0]).toMatchObject({ to: "owner@example.test", kind: "review.released" });
     expect(h.sent[0]?.text).toContain(".online");
@@ -131,7 +179,9 @@ describe("send review release notices", () => {
         .update(schema.teams)
         .set({ suspendedAt: heldAt, suspensionReason: reason })
         .where(eq(schema.teams.id, id));
-      await operator().console.teams.releaseSendReview({ id });
+      await expect(
+        operator().console.teams.releaseSendReview({ id, expectedHoldAt: heldAt.toISOString() }),
+      ).rejects.toThrow("suspended team");
       expect(h.sent).toHaveLength(0);
       const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
       expect(team).toMatchObject({ suspendedAt: heldAt, suspensionReason: reason });
@@ -140,7 +190,7 @@ describe("send review release notices", () => {
 
   it("keeps payment-screening evidence out of the owner's release message", async () => {
     const id = await fixture("payment_risk");
-    await operator().console.teams.releaseSendReview({ id });
+    await operator().console.teams.releaseSendReview({ id, expectedHoldAt: heldAt.toISOString() });
     expect(h.sent).toHaveLength(1);
     expect(h.sent[0]?.text).not.toContain("PRIVATE-PAYMENT-EVIDENCE");
     expect(h.sent[0]?.text).not.toContain("fraud");
@@ -152,7 +202,10 @@ describe("send review release notices", () => {
     h.failPreparation = true;
     const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      await operator().console.teams.releaseSendReview({ id });
+      await operator().console.teams.releaseSendReview({
+        id,
+        expectedHoldAt: heldAt.toISOString(),
+      });
       const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
       expect(team?.sendReviewAt).toBeNull();
       const audits = await db.select().from(schema.auditLog).where(eq(schema.auditLog.teamId, id));

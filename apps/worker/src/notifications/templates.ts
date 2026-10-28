@@ -150,7 +150,7 @@ export function deliverabilityWarningMail(input: {
   return layout({
     subject: `${input.team}: ${metricName(input.metric)} at risk`,
     paragraphs: [
-      `${input.team}'s ${metricName(input.metric)} over the last ${input.windowDays} UTC calendar days, including today, is ${percent(input.rate)}, at or above the ${percent(input.limit)} risk line. Sending continues, but broadcasts are slowed while it stays there.`,
+      `${input.team}'s ${metricName(input.metric)} over the rolling ${input.windowDays * 24}-hour window, is ${percent(input.rate)}, at or above the ${percent(input.limit)} risk line. Sending continues, but broadcasts are slowed while it stays there.`,
       input.metric === "bounce"
         ? "Hard bounces are permanent delivery failures. Remove invalid or unverified addresses from your lists. Hard-bounced addresses are automatically added to your suppression list; transient bounces alone do not add an address."
         : "Complaints come from recipients who did not expect the email. Send only to people who opted in, keep the unsubscribe link visible, and pause lists that have not heard from you in months.",
@@ -168,18 +168,15 @@ export function deliverabilityPausedMail(input: {
   windowDays: number;
   url: string;
 }): MailContent {
-  const window =
-    input.windowDays === 2
-      ? "today and yesterday (UTC)"
-      : `the last ${input.windowDays} UTC calendar days, including today`;
+  const window = `the rolling ${input.windowDays * 24}-hour window`;
   const minimumEvents = input.metric === "bounce" ? MIN_PAUSE_HARD_BOUNCES : MIN_PAUSE_COMPLAINTS;
   const events = input.metric === "bounce" ? "hard bounces" : "complaints";
   return layout({
     subject: `${input.team}: sending paused (${metricName(input.metric)})`,
     paragraphs: [
-      `${input.team}'s ${metricName(input.metric)} over ${window} reached ${percent(input.rate)}, at or above the ${percent(input.limit)} pause line.`,
-      `This automatic pause requires all three conditions in that same window: at least ${MIN_GUARDRAIL_VOLUME} successfully sent messages, at least ${minimumEvents} ${events}, and a rate at or above ${percent(input.limit)}. New API and batch sends and new broadcast starts are refused while these conditions apply.`,
-      "This automatic pause lifts when neither hard bounces nor complaints still meet all of their pause conditions. Clean your recipient list first. The deliverability score and the seven-day display do not unlock sending; warning throttles and operator or regional restrictions can still apply.",
+      `${input.team}'s ${metricName(input.metric)} over ${window} reached ${percent(input.rate)}, strictly above the ${percent(input.limit)} internal MepMail pause line.`,
+      `This automatic pause requires all three conditions in that same window: at least ${MIN_GUARDRAIL_VOLUME} provider-confirmed accepted messages, at least ${minimumEvents} ${events}, and a rate strictly above ${percent(input.limit)}. New API and batch sends and new broadcast starts are refused while these conditions apply.`,
+      "When neither hard bounces nor complaints meet all of their pause conditions, the rolling metric can recover. A persisted safety-review hold still requires operator release. Clean your recipient list first; scores do not unlock sending, and warning throttles and operator or regional restrictions can still apply.",
     ],
     button: { label: "Open metrics", url: input.url },
     footnote: "You get this once per episode.",

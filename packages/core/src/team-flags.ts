@@ -10,6 +10,9 @@ import {
   fetchDeliverabilityHealth,
   GUARDRAIL_WINDOW_DAYS,
   MIN_GUARDRAIL_VOLUME,
+  PAUSE_BOUNCE_RATE,
+  PAUSE_COMPLAINT_RATE,
+  WARN_BOUNCE_RATE,
 } from "./deliverability.js";
 import { DAY_MS, utcDay } from "./utc-day.js";
 
@@ -18,14 +21,14 @@ export type TeamFlagStatus = (typeof schema.teamFlagStatusEnum.enumValues)[numbe
 export const TEAM_FLAG_REASONS = schema.teamFlagReasonEnum.enumValues;
 
 /**
- * The automatic trust & safety triggers, on the 7-day rates the guardrail
- * shows the team itself. Complaints flag at SES's own review line, hard
- * bounces at its 5% line, both only past the guardrail's volume floor so a
+ * The automatic trust & safety triggers use the same rolling 24-hour internal
+ * MepMail policy as the guardrail. These are not provider thresholds.
+ * Both metrics respect the guardrail's volume floor so a
  * handful of sends cannot flag a team; a score under 5 is the "at risk"
  * band of the account score.
  */
-export const FLAG_COMPLAINT_RATE = 0.001;
-export const FLAG_HARD_BOUNCE_RATE = 0.05;
+export const FLAG_COMPLAINT_RATE = PAUSE_COMPLAINT_RATE;
+export const FLAG_HARD_BOUNCE_RATE = PAUSE_BOUNCE_RATE;
 export const FLAG_SCORE_TENTHS = 50;
 /** Teams that sent in this many days get a standing row; the others have nothing to judge. */
 export const STANDING_WINDOW_DAYS = 30;
@@ -37,6 +40,8 @@ export interface TeamStandingRow {
   guardrailMetric: "complaint" | "hard_bounce" | null;
   complaintRate7d: number;
   hardBounceRate7d: number;
+  /** Live arrival watermark; not persisted in the legacy *7d projection. */
+  outcomeWatermark?: Date | null;
   sent7d: number;
   sent30d: number;
   /** The content monitor's risk and the judged samples of the last week; null and 0 when it never drew. */
@@ -96,6 +101,7 @@ export async function computeTeamStandings(
       guardrailMetric: guardrailMetricOf(health),
       complaintRate7d: health.complaintRate,
       hardBounceRate7d: health.bounceRate,
+      outcomeWatermark: health.rollingWindow?.outcomeWatermark ?? null,
       sent7d: health.sent,
       sent30d: team.sent30d,
       monitorRisk: risks.get(team.teamId) ?? null,
@@ -120,7 +126,12 @@ export async function saveTeamStandings(
   if (rows.length === 0) return;
   await db
     .insert(schema.teamStandings)
-    .values(rows.map(({ monitorSamples: _samples, ...r }) => ({ ...r, computedAt: now })))
+    .values(
+      rows.map(({ monitorSamples: _samples, outcomeWatermark: _watermark, ...r }) => ({
+        ...r,
+        computedAt: now,
+      })),
+    )
     .onConflictDoUpdate({
       target: schema.teamStandings.teamId,
       set: {
@@ -163,8 +174,7 @@ export interface FlagTriggerOptions {
 export function flagTrigger(s: TeamStandingRow, opts: FlagTriggerOptions = {}): FlagTrigger | null {
   if (s.guardrail !== "ok") {
     const metric =
-      s.guardrailMetric ??
-      (s.hardBounceRate7d >= FLAG_HARD_BOUNCE_RATE ? "hard_bounce" : "complaint");
+      s.guardrailMetric ?? (s.hardBounceRate7d >= WARN_BOUNCE_RATE ? "hard_bounce" : "complaint");
     return {
       reason: "guardrail",
       detail: {
@@ -175,10 +185,10 @@ export function flagTrigger(s: TeamStandingRow, opts: FlagTriggerOptions = {}): 
     };
   }
   if (s.sent7d >= MIN_GUARDRAIL_VOLUME) {
-    if (s.complaintRate7d >= FLAG_COMPLAINT_RATE) {
+    if (s.complaintRate7d > FLAG_COMPLAINT_RATE) {
       return { reason: "complaints", detail: { metric: "complaint", rate: s.complaintRate7d } };
     }
-    if (s.hardBounceRate7d >= FLAG_HARD_BOUNCE_RATE) {
+    if (s.hardBounceRate7d > FLAG_HARD_BOUNCE_RATE) {
       return { reason: "complaints", detail: { metric: "hard_bounce", rate: s.hardBounceRate7d } };
     }
   }

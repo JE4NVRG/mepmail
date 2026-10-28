@@ -527,7 +527,7 @@ it("missing body (e.g. purged before send) marks the email failed", async () => 
   expect(row?.latestStatus).toBe("failed");
 });
 
-it("SES failure leaves the email queued for the job retry", async () => {
+it("an unclassified provider failure keeps its claim and cannot replay on retry", async () => {
   const ses: SesSender = {
     async sendRaw() {
       throw new Error("throttled");
@@ -538,8 +538,11 @@ it("SES failure leaves the email queued for the job retry", async () => {
   const [row] = await db.select().from(schema.emails).where(eq(schema.emails.id, emailId));
   expect(row?.latestStatus).toBe("queued");
   expect(row?.sesMessageId).toBeNull();
-  // The claim must be released, or the retry would skip and strand the email.
-  expect(row?.sentAt).toBeNull();
+  // A plain Error is not a documented provider refusal, regardless of its text.
+  expect(row?.sentAt).toBeInstanceOf(Date);
+  const retry = fakeSes();
+  expect(await sendEmail(db, { keyring, ses: retry.ses }, { emailId })).toBe("skipped");
+  expect(retry.sends).toHaveLength(0);
 });
 
 it("no-ops a canceled email: no SES call, status stays canceled", async () => {

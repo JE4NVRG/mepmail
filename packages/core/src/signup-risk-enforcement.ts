@@ -1,6 +1,7 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq, isNull } from "drizzle-orm";
+import { campaignDomainDnsReady } from "./campaign-consent.js";
 import { getTeamSignupRisk } from "./signup-risk.js";
 import { extractAddrSpec, normalizeAddress } from "./suppressions.js";
 
@@ -9,8 +10,8 @@ export type SignupSendingRestriction =
   | { kind: "review" }
   | { kind: "sandbox"; principalEmail: string | null; principalVerified: boolean };
 
-/** Payment is one signal. A provider-verified active contract AND a verified
- * sending domain may clear sandbox eligibility, never a review or an existing hold. */
+/** Payment never substitutes for a human sending review. This compatibility
+ * path requires prior operator clearance plus current complete DNS proof. */
 async function activeContractAndDomain(db: Db, teamId: string): Promise<boolean> {
   const [team] = await db
     .select({
@@ -21,11 +22,13 @@ async function activeContractAndDomain(db: Db, teamId: string): Promise<boolean>
       periodEnd: schema.teams.currentPeriodEnd,
       held: schema.teams.sendReviewAt,
       suspended: schema.teams.suspendedAt,
+      reviewedAt: schema.teams.sendReviewClearedAt,
     })
     .from(schema.teams)
     .where(eq(schema.teams.id, teamId));
   if (
     !team ||
+    !team.reviewedAt ||
     team.plan === "free" ||
     team.plan === "system" ||
     team.status !== "active" ||
@@ -35,16 +38,15 @@ async function activeContractAndDomain(db: Db, teamId: string): Promise<boolean>
     !Number.isFinite(Date.parse(team.contract.verifiedAt)) ||
     !team.periodEnd ||
     team.periodEnd.getTime() <= Date.now() ||
-    team.held ||
+    (team.held && team.held > team.reviewedAt) ||
     team.suspended
   )
     return false;
-  const [domain] = await db
-    .select({ id: schema.domains.id })
+  const domains = await db
+    .select()
     .from(schema.domains)
-    .where(and(eq(schema.domains.teamId, teamId), eq(schema.domains.status, "verified")))
-    .limit(1);
-  return Boolean(domain);
+    .where(and(eq(schema.domains.teamId, teamId), eq(schema.domains.status, "verified")));
+  return domains.some(campaignDomainDnsReady);
 }
 
 /** This record is server-owned and bound to the team's original principal.
@@ -118,6 +120,17 @@ export async function clearTeamSignupRisk(
   if (principal && (!principal.principalEmail || !principal.principalVerified)) {
     throw new Error("signup_review_verified_principal_required");
   }
+  const [identity] = await db
+    .select({ userId: schema.teamSignupRisk.principalUserId })
+    .from(schema.teamSignupRisk)
+    .where(eq(schema.teamSignupRisk.teamId, input.teamId));
+  if (identity?.userId === input.operatorId)
+    throw new Error("signup_review_independent_operator_required");
+  const domains = await db
+    .select()
+    .from(schema.domains)
+    .where(eq(schema.domains.teamId, input.teamId));
+  if (!domains.some(campaignDomainDnsReady)) throw new Error("signup_review_verified_dns_required");
   return db.transaction(async (tx) => {
     const [risk] = await tx
       .update(schema.teamSignupRisk)

@@ -407,6 +407,20 @@
       "when": 1793048316259,
       "tag": "0057_beta_signup_ceiling",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793189739166,
+      "tag": "0058_campaign_consent",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793189739167,
+      "tag": "0059_reputation_window_indexes",
+      "breakpoints": true
     }
   ]
 }

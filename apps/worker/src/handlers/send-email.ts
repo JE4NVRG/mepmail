@@ -30,8 +30,10 @@ import {
   parseSingleSender,
   purgedEmailBodyColumns,
   releaseQuota,
+  resolveSendingProvider,
   rewriteForTracking,
   SCORE_VERSION,
+  type SendingProviderPolicy,
   SYSTEM_MAIL_TAG,
   sampleAcceptedEmail,
   substituteUnsubscribeUrl,
@@ -44,6 +46,11 @@ import { schema } from "@millionsend/db";
 import { type EmailSendPriority, emailSendPriority } from "@millionsend/queue";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { createTransport } from "nodemailer";
+import {
+  campaignMessage,
+  checkCampaignMessage,
+} from "../../../../packages/core/src/campaign-consent.js";
+import { screenPreSendContent } from "../../../../packages/core/src/pre-send-content-policy.js";
 import {
   isSesEnforcementRefusal,
   isSesQuotaRefusal,
@@ -80,6 +87,7 @@ export interface SesSender {
 }
 
 export interface SendDeps {
+  sendingProviderPolicy?: SendingProviderPolicy | null;
   /** Optional fixture transport; deployment configuration is used when absent. */
   funnel?: FunnelEventTarget | undefined;
   keyring: Keyring;
@@ -597,6 +605,44 @@ export async function sendEmail(
     return "failed";
   }
 
+  // Inspect original destinations BEFORE tracking/MIME, claims or any transport.
+  // Synchronous deterministic policy failures propagate before the claim: no
+  // classifier outage is a clean verdict and no encrypted evidence is purged.
+  if (
+    deps.isCloud &&
+    (
+      await screenPreSendContent(db, {
+        teamId: email.teamId,
+        from: email.from,
+        subject: email.subject,
+        html: body.html,
+        text: body.text,
+      })
+    ).action === "hold"
+  ) {
+    await parkQueued(db, email, "pre-send content policy");
+    return "parked";
+  }
+
+  const campaignInput = {
+    teamId: email.teamId,
+    isCloud: deps.isCloud ?? false,
+    from: email.from,
+    broadcastId: email.broadcastId,
+    topicId: email.topicId,
+    to: email.to,
+    cc: email.cc ?? undefined,
+    bcc: email.bcc ?? undefined,
+    subject: email.subject,
+    html: body.html,
+    text: body.text,
+    headers: email.headers,
+  };
+  if (!(await checkCampaignMessage(db, campaignInput)).allowed) {
+    await parkQueued(db, email, "campaign consent required");
+    return "parked";
+  }
+
   // App-layer engagement tracking: when the domain has click or open tracking
   // on, WE rewrite links through our redirect endpoint and inject our pixel
   // before the MIME is built — SES never touches the body. Both off ships the
@@ -747,6 +793,47 @@ export async function sendEmail(
     headers["Auto-Submitted"] = "auto-generated";
   }
 
+  const routingInsights = evaluateEmailInsights({
+    html,
+    preTrackingHtml,
+    text,
+    from: email.from,
+    senderDomain: parseSingleSender(email.from)?.domain ?? "",
+    subject: email.subject,
+    finalHeaders: headers,
+    hasAttachments: !!attachments?.length,
+    replyTo: email.replyTo,
+    isBroadcast: !!(email.contactId || email.broadcastId),
+    hasTopic: !!email.topicId,
+    tracking: {
+      clickEnabled: click,
+      openEnabled: open,
+      brandedHostUsed,
+      sharedFallbackUsed,
+      shippedUntracked,
+      trackingPending,
+    },
+    domainSnapshot: domain
+      ? { dmarcPolicy: domain.dmarcPolicy, dmarcCheckedAt: domain.dmarcCheckedAt }
+      : null,
+    now: new Date(),
+  });
+  const route = resolveSendingProvider(deps.sendingProviderPolicy ?? null, {
+    teamId: email.teamId,
+    messageClass:
+      routingInsights.marketing || campaignMessage(campaignInput) ? "campaign" : "transactional",
+    legacyProvider: "ses",
+    availableProviders: new Set([
+      "ses",
+      ...(deps.relay && domain?.relayEnabledAt ? ["customer_smtp"] : []),
+    ]),
+    blockedProviders: new Set(deps.sesQuota?.accountPaused?.(region) ? ["ses"] : []),
+  });
+  if (route.kind === "held") {
+    await parkQueued(db, email, `sending policy: ${route.reason}`);
+    return "parked";
+  }
+
   const mime = await buildRawMime({
     from: email.from,
     to: email.to,
@@ -801,6 +888,12 @@ export async function sendEmail(
     return "parked";
   }
 
+  // Consent can be revoked while MIME construction or throttling waits.
+  if (!(await checkCampaignMessage(db, campaignInput)).allowed) {
+    await parkQueued(db, email, "campaign consent required");
+    return "parked";
+  }
+
   // Atomic claim (sentAt doubles as the claim marker): closes the
   // double-send windows — a concurrent worker on the same job, and a retry
   // after SES accepted but the post-send bookkeeping failed. Claimed rows
@@ -817,6 +910,24 @@ export async function sendEmail(
     )
     .returning({ id: schema.emails.id });
   if (claimed.length === 0) return "skipped";
+  // Claim acquisition also awaits the DB. A revoked approval is still a
+  // proven non-send, so release this claim without purging the sealed payload.
+  try {
+    if (!(await checkCampaignMessage(db, campaignInput)).allowed) {
+      await db
+        .update(schema.emails)
+        .set({ sentAt: null })
+        .where(and(eq(schema.emails.id, email.id), eq(schema.emails.latestStatus, "queued")));
+      await parkQueued(db, email, "campaign consent required");
+      return "parked";
+    }
+  } catch (error) {
+    await db
+      .update(schema.emails)
+      .set({ sentAt: null })
+      .where(and(eq(schema.emails.id, email.id), eq(schema.emails.latestStatus, "queued")));
+    throw error;
+  }
   // The claim itself awaits the DB; an account probe may close the gate then.
   if (deps.sesQuota?.accountPaused?.(domain?.region) === true) {
     await db
@@ -827,7 +938,8 @@ export async function sendEmail(
     return "parked";
   }
 
-  const sender = deps.ses;
+  const sender = route.provider === "customer_smtp" ? deps.relay?.sender : deps.ses;
+  if (!sender) throw new Error("selected_sending_provider_unavailable");
   let messageId: string;
   try {
     ({ messageId } = await sender.sendRaw({
@@ -836,6 +948,7 @@ export async function sendEmail(
       to: email.to,
       cc: email.cc,
       bcc: email.bcc,
+      envelopeFrom: extractAddrSpec(email.from),
       ...(configurationSet ? { configurationSetName: configurationSet } : {}),
       ...(region ? { region } : {}),
       ...(tenantName ? { tenantName } : {}),
@@ -874,6 +987,10 @@ export async function sendEmail(
       // Acceptance is unknown. Keep the claim so a queue retry cannot replay it.
       throw err;
     }
+    // An unclassified error also has unknown acceptance. Only an explicit
+    // quota/rate refusal below permits releasing this claim; never replay it
+    // via another provider (SMTP included).
+    if (!isSesQuotaRefusal(err) && !isSesThrottle(err)) throw err;
     await db
       .update(schema.emails)
       .set({ sentAt: null })

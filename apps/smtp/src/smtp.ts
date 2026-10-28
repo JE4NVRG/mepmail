@@ -3,6 +3,7 @@ import {
   type ApiKeyAuth,
   acceptEmail,
   authenticateApiKey,
+  CAMPAIGN_CONSENT_MESSAGE,
   disguiseMessage,
   formatMailbox,
   isTeamSuspended,
@@ -152,6 +153,14 @@ async function handleMessage(
     domainId: domain.domainId,
   });
   if (!result.ok) {
+    if (
+      result.reason === "campaign_consent_required" ||
+      result.reason === "campaign_manual_review_required" ||
+      result.reason === "campaign_domain_required" ||
+      result.reason === "team_restricted"
+    ) {
+      throw smtpError(550, `${result.reason}: ${CAMPAIGN_CONSENT_MESSAGE}`);
+    }
     if (result.reason === "signup_sandbox" || result.reason === "signup_review_required") {
       throw smtpError(550, signupSendMessage(result.reason));
     }
@@ -168,7 +177,9 @@ async function handleMessage(
     }
     if (result.reason === "attachments_too_large") throw smtpError(552, "Attachments too large");
     if (result.reason === "disguised_sender") throw smtpError(554, disguiseMessage(result));
-    throw smtpError(550, "All recipients are suppressed");
+    if (result.reason === "all_suppressed") throw smtpError(550, "All recipients are suppressed");
+    const unhandled: never = result.reason;
+    throw new Error(`Unhandled accept rejection: ${JSON.stringify(unhandled)}`);
   }
   return `Queued as ${result.id}`;
 }

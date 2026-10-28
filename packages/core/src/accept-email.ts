@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, count, eq, sql } from "drizzle-orm";
+import { checkCampaignMessage } from "./campaign-consent.js";
 import { type EmailAttachment, encryptEmailBody, sealAttachments } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
 import type { FunnelEventTarget } from "./funnel-events.js";
@@ -9,6 +10,7 @@ import { attachmentLimit, type QuotaTeamRow, type TeamQuota, teamQuota } from ".
 import { reserveQuota } from "./quota.js";
 import { findDisguise, screenImpersonation, screenNewSender } from "./send-review.js";
 import { parseSingleSender } from "./sender-address.js";
+import { applySenderProbationQuota } from "./sender-probation.js";
 import { checkSignupSend } from "./signup-risk-enforcement.js";
 import { extractAddrSpec, findSuppressed, normalizeAddress } from "./suppressions.js";
 import { findTopicOptOuts } from "./topics.js";
@@ -272,6 +274,14 @@ export type AcceptEmailResult =
   | { ok: false; reason: "attachments_too_large"; maxBytes: number }
   | { ok: false; reason: "quota_backlog_full" }
   | { ok: false; reason: "signup_sandbox" | "signup_review_required" }
+  | {
+      ok: false;
+      reason:
+        | "campaign_consent_required"
+        | "campaign_manual_review_required"
+        | "campaign_domain_required"
+        | "team_restricted";
+    }
   /**
    * A monthly plan at its cap: the included volume with overage off, or the
    * hard cap past it with overage on. Refused outright, nothing parks for a month.
@@ -310,6 +320,12 @@ export async function acceptEmail(
     quota?: "deferred" | undefined;
   } = {},
 ): Promise<AcceptEmailResult> {
+  const consent = await checkCampaignMessage(opts.tx ?? deps.db, {
+    ...payload,
+    teamId: auth.teamId,
+    isCloud: deps.isCloud,
+  });
+  if (!consent.allowed) return { ok: false, reason: consent.reason };
   // Before content encryption, quota, row creation or queue admission. Full
   // keys, onboarding senders and every recipient field share this restriction.
   if (deps.isCloud && auth.billing !== "uncapped") {
@@ -397,7 +413,7 @@ export async function acceptEmail(
       ? await sealAttachments(payload.attachments, deps.keyring, owner)
       : null;
 
-  const quota: TeamQuota =
+  let quota: TeamQuota =
     auth.billing === "uncapped" ? { kind: "none" } : teamQuota(auth.billing, deps.isCloud);
   // Quota reservation, email insert, and the caller's in-transaction hook
   // commit atomically (the quota contract). Over a DAILY cap mail is parked
@@ -408,6 +424,7 @@ export async function acceptEmail(
   const deliveryAt = payload.scheduledAt ?? new Date();
   const day = utcDay(deliveryAt);
   const runAccept = async (txDb: Db) => {
+    quota = await applySenderProbationQuota(txDb, auth.teamId, quota, deps.isCloud);
     const reservation =
       opts.quota === "deferred"
         ? { reserved: true }

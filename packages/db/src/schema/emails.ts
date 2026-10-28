@@ -125,6 +125,8 @@ export const emails = pgTable(
     index("emails_body_unpurged_idx").on(t.createdAt).where(isNull(t.bodyPurgedAt)),
     // Events-health window: sends in the last hours, without scanning the table.
     index("emails_sent_at_idx").on(t.sentAt).where(isNotNull(t.sentAt)),
+    // Shared-pool reputation reads this tenant's real rolling send window.
+    index("emails_team_sent_window_idx").on(t.teamId, t.sentAt).where(isNotNull(t.sentAt)),
     // Accept counts a team's parked rows whenever its daily quota is exhausted.
     index("emails_team_quota_parked_idx")
       .on(t.teamId)
@@ -174,6 +176,9 @@ export const emailEvents = pgTable(
   },
   (t) => [
     index("email_events_email_idx").on(t.emailId, t.occurredAt),
+    index("email_events_reputation_window_idx")
+      .on(t.occurredAt, t.emailId)
+      .where(sql`${t.type} in ('sent', 'delivered', 'bounced', 'complained', 'delivery_delayed')`),
     uniqueIndex("email_events_sns_message_id_idx")
       .on(t.snsMessageId)
       .where(sql`${t.snsMessageId} is not null`),

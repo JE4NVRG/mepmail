@@ -341,7 +341,7 @@
       "domains": "Domains",
       "sent24h": "Sent 24h",
       "bounce7d": "Bounce 7d",
-      "complaints7d": "Complaints 7d",
+      "complaints7d": "Complaints 24h",
       "breaker": "Breaker"
     },
     "planCell": {
@@ -708,7 +708,7 @@
   },
   "safety": {
     "title": "Trust & safety",
-    "info": "A team lands here when the deliverability guardrail turns warning or paused, complaints pass 0.1% or hard bounces 5% over 7 days, the content monitor's risk crosses its flag line (sampled content judged by the model), the account score drops under 5, or an operator flags it by hand. Automatic flags clear on their own once the trigger goes away; a flag you clear stays cleared while the same trigger holds.",
+    "info": "A team lands here when the deliverability guardrail turns warning or paused, complaints exceed 0.08% or hard bounces exceed 2% in a rolling 24-hour window (internal MepMail policy, not AWS limits), the content monitor's risk crosses its flag line (sampled content judged by the model), the account score drops under 5, or an operator flags it by hand. Automatic flags clear on their own once the trigger goes away; a flag you clear stays cleared while the same trigger holds.",
     "proof": "{open} open · {guardrailPaused} paused by guardrail · {suspended} suspended · {revealsThisWeek, plural, one {# content reveal} other {# content reveals}} this week",
     "search": "Search teams, owners, domains",
     "filters": {
@@ -734,7 +734,7 @@
     },
     "reasonTip": {
       "monitor": "The content monitor: sampled content judged by the model pushed the internal risk over the flag line.",
-      "complaints": "The complaint rate passed 0.1% or the hard-bounce rate 5% over the last 7 days (SES reviews accounts at those lines).",
+      "complaints": "The complaint rate exceeded 0.08% or the hard-bounce rate exceeded 2% in the rolling last 24 hours. Internal MepMail policy, not AWS limits.",
       "guardrail": "The deliverability guardrail turned warning or paused the team on its bounce or complaint rates.",
       "score": "The account score dropped under 5 out of 10.",
       "report": "A mailbox provider or a recipient reported abuse.",
@@ -742,8 +742,8 @@
       "review": "Sending held before SES: a young team imitating a bank, a carrier or an account-security notice, or a payment Stripe's fraud screening blocked."
     },
     "reasonLabel": {
-      "complaint": "Complaints {rate} · 7d",
-      "hard_bounce": "Hard bounces {rate} · 7d",
+      "complaint": "Complaints {rate} · 24h",
+      "hard_bounce": "Hard bounces {rate} · 24h",
       "guardrailWarning": "{metric} {rate} · guardrail warning",
       "guardrailPaused": "{metric} {rate} · paused by guardrail",
       "score": "Score {score} / 10",
@@ -756,8 +756,8 @@
       "team": "Team",
       "type": "Type",
       "score": "Score",
-      "complaints": "Complaints 7d",
-      "bounces": "Hard bounces 7d",
+      "complaints": "Complaints 24h",
+      "bounces": "Hard bounces 24h",
       "guardrail": "Guardrail",
       "reason": "Flagged for",
       "status": "Status",
@@ -802,18 +802,18 @@
         "impersonation": "A young team whose sender or subject imitates a bank, a carrier or an account-security notice.",
         "payment_risk": "Stripe's fraud screening blocked a payment from this team.",
         "new_sender": "A young team's sending pattern: past its probation day, rotating sender addresses, or a sending domain under an abuse-prone TLD.",
-        "reputation": "Hard bounces or complaints past SES's review lines: all of this team's mail is held, transactional included.",
+        "reputation": "Hard bounces above 2% or complaints above 0.08% in the rolling last 24 hours: internal MepMail policy, not AWS limits. All of this team’s mail is held, transactional included.",
         "content": "The content monitor judged a young team's message as near-certain abuse (phishing, impersonation or scam).",
-        "body": "Accepted mail is kept and nothing reaches SES. Releasing sending lets the held mail out within 15 minutes; suspending the team keeps it all held.",
+        "body": "Accepted mail stays held and nothing reaches SES. Recording a review does not send a queue, reinstate an account or guarantee permanent release. Safety controls are evaluated again before new sends.",
         "release": "Release sending",
         "released": "{team} · sending released"
       },
       "tiles": {
         "score": "Score",
         "scoreTip": "Customer-facing account score over 30 days.",
-        "complaints": "Complaints 7d",
-        "bounces": "Hard bounces 7d",
-        "sent7d": "Sent 7d",
+        "complaints": "Complaints 24h",
+        "bounces": "Hard bounces 24h",
+        "sent7d": "Sent 24h",
         "contacts": "Contacts",
         "scoreOf": "{score} / 10",
         "risk": "Monitor risk",

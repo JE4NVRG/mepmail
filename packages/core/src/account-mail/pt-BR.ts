@@ -199,7 +199,8 @@ export const ptBR = {
     ],
     button: "Abrir broadcasts",
     extra: {
-      complaints: "a taxa de reclamações passou de 0,1% nos últimos 7 dias.",
+      complaints:
+        "a taxa de reclamações superou a política interna MepMail de 0,08% na janela móvel de 24 horas.",
       report: "uma denúncia de abuso foi recebida.",
       manual: "veja a observação abaixo.",
       note: "Observação do operador: {note}",

@@ -74,6 +74,7 @@ import {
 } from "@millionsend/ses";
 import { and, eq } from "drizzle-orm";
 import { parseMailboxLaunchCohort } from "../../../packages/core/src/mailbox-launch-cohort.js";
+import { parseSendingProviderPolicy } from "../../../packages/core/src/sending-provider-policy.js";
 import { createAbuseJudge } from "./abuse-judge/index.js";
 import { judgeSample } from "./handlers/abuse-judge.js";
 import {
@@ -123,6 +124,7 @@ import { createMailboxExternalAwareSender } from "./mailbox-external-sender.js";
 import { createMailboxIngress, parseMailboxInboundConfiguration } from "./mailbox-ingress.js";
 import { readMailboxSearchDocument } from "./mailbox-search-document.js";
 import {
+  createMailboxContentPolicySender,
   createMailboxSesSender,
   mailboxWorkerMime,
   parseMailboxSesConfigurationSets,
@@ -131,6 +133,9 @@ import { parseSesFailover } from "./ses-failover.js";
 import { createSesSender } from "./ses-sender.js";
 import { startSqsPoller } from "./sqs-poller.js";
 import { createSystemMailer } from "./system-mail.js";
+
+// Operator-owned, parsed once. Invalid configuration aborts startup.
+const sendingProviderPolicy = parseSendingProviderPolicy(process.env.SENDING_PROVIDER_POLICY_JSON);
 
 if (!env.MASTER_ENCRYPTION_KEY) {
   // Required even when cloud wraps DEKs with KMS: tracking/unsubscribe token
@@ -183,6 +188,7 @@ const relay = relayConfig
 if (relay) console.log(`customer SMTP relay: ${relay.name}`);
 const mailboxSes = mailboxTransportEnabled
   ? createMailboxSesSender(db, {
+      isCloud: env.IS_CLOUD,
       configurationSets:
         parseMailboxSesConfigurationSets(process.env.MAILBOX_SES_CONFIGURATION_SETS) ?? undefined,
       exhausted: (region) => sendControls.exhausted(region),
@@ -842,7 +848,12 @@ await queue.workDeadLetter("abuse.judge", async ({ sampleId }) => {
 // worker runs with the Correio registry even where SES sending is off.
 const mailboxSender =
   mailboxSes || mailboxRegistryEnabled
-    ? createMailboxExternalAwareSender(db, keyring, mailboxSes ?? null)
+    ? createMailboxContentPolicySender(
+        db,
+        createMailboxExternalAwareSender(db, keyring, mailboxSes ?? null),
+        env.IS_CLOUD,
+        sendingProviderPolicy,
+      )
     : null;
 if (mailboxSender) {
   await queue.workDeadLetter("mailbox.send", async ({ outboxId }) => {
@@ -879,6 +890,7 @@ await queue.work(
         ses,
         isCloud: env.IS_CLOUD,
         defaultConfigurationSet: env.SES_CONFIGURATION_SET,
+        sendingProviderPolicy,
         onboardingEmailFrom: env.ONBOARDING_EMAIL_FROM,
         throttle: (region) => sendControls.throttle(region),
         reschedule: (emailId, at, priority) => enqueueSend(emailId, at, priority),
