@@ -6,6 +6,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 /**
  * Segment membership + resolution endpoints: contacts.segments.add/remove,
@@ -37,6 +38,7 @@ async function call(token: string, method: string, path: string, body?: unknown)
 
 async function seedTeam(slug: string): Promise<{ teamId: string; token: string }> {
   const teamId = await createTeam(db, slug);
+  await approveCampaignFixture(db, teamId, "consent-fixture.example.test");
   const key = generateApiKey();
   await db.insert(schema.apiKeys).values({
     teamId,

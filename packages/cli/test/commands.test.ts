@@ -115,7 +115,12 @@ beforeAll(async () => {
   delete process.env.FORCE_COLOR;
   [fake, api] = await Promise.all([
     startFakeResend(),
-    startLiveApi({ isCloud: true, appBaseUrl: "https://app.example.test", plan: "starter" }),
+    startLiveApi({
+      isCloud: true,
+      appBaseUrl: "https://app.example.test",
+      plan: "starter",
+      reviewedImport: true,
+    }),
   ]);
   cwd = mkdtempSync(join(tmpdir(), "mepmail-cli-"));
   writeFileSync(join(cwd, ".gitignore"), "node_modules\n");
@@ -417,7 +422,11 @@ describe("mepmail migrate", () => {
         "/templates",
         "/suppressions",
       ]) {
-        expect(await apiList(path), path).toEqual([]);
+        expect(await apiList(path), path).toEqual(
+          path === "/domains"
+            ? [expect.objectContaining({ name: "cli-consent.example.test" })]
+            : [],
+        );
       }
       const again = await run(["migrate", "rollback", "--yes"]);
       expect(again.code).toBe(0);

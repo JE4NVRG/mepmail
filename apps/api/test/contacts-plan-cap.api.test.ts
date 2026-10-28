@@ -6,6 +6,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 /**
  * The Free plan's contact cap: new contacts stop at the limit with
@@ -30,6 +31,7 @@ const call = (method: string, path: string, body?: unknown, headers: Record<stri
 beforeAll(async () => {
   ({ db, close } = await createTestDb());
   teamId = await createTeam(db, "capped");
+  await approveCampaignFixture(db, teamId, "consent-fixture.example.test");
   const key = generateApiKey();
   token = key.token;
   await db.insert(schema.apiKeys).values({

@@ -16,6 +16,7 @@ import type { Snapshot } from "../src/model.js";
 import { buildPlan } from "../src/plan.js";
 import { TARGET_WEBHOOK_EVENTS } from "../src/translate.js";
 import { createApiKey, type LiveApi, startLiveApi } from "./helpers/live-api.js";
+import { approveImportFixture } from "./helpers/reviewed-import.js";
 
 let cloud: LiveApi;
 let selfHost: LiveApi;
@@ -313,6 +314,7 @@ describe("writers", () => {
   });
 
   it("batch upserts contacts with inline associations, re-runs as updates, records per-item errors", async () => {
+    await approveImportFixture(cloud.db, cloud.teamId, ids.domain);
     const items = [
       {
         email: "ada@example.com",
@@ -422,7 +424,7 @@ describe("readState", () => {
         id: ids.domain,
         name: "acme.dev",
         region: "us-east-1",
-        status: "pending",
+        status: "verified",
         records: expect.arrayContaining([
           expect.objectContaining({ record: "DKIM", type: "TXT" }),
           expect.objectContaining({ record: "Tracking", name: "track.acme.dev" }),

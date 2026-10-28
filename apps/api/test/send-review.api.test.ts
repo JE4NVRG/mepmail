@@ -6,6 +6,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -31,12 +32,14 @@ async function call(method: string, path: string, payload?: unknown) {
 beforeAll(async () => {
   ({ db, close } = await createTestDb());
   teamId = await createTeam(db, "review-team");
+  await approveCampaignFixture(db, teamId);
   await db.insert(schema.domains).values({
     teamId,
     name: "acme.dev",
     region: "us-east-1",
     status: "verified",
     verifiedAt: new Date(),
+    ...campaignDns("acme.dev"),
   });
   const key = generateApiKey();
   token = key.token;

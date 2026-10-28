@@ -16,6 +16,7 @@ import {
   STRIPE_CUSTOMER_MISSING,
   stripExpiredEventPayloads,
 } from "../src/handlers/cron.js";
+import { reviewedSender, rollingHistory } from "./fixtures/antiabuse.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -63,6 +64,10 @@ async function statusOf(emailId: string): Promise<string> {
 }
 
 it("drain reserves against the NEW day's cap — parking is not a quota bypass", async () => {
+  await db
+    .insert(schema.domains)
+    .values({ teamId, name: "acme.dev", region: "us-east-1", status: "verified" });
+  await reviewedSender(db, teamId, "acme.dev");
   // Free ceiling is 150 (100 + tolerance); today's counter already holds one less
   // → only ONE parked email may drain, oldest first.
   await db
@@ -1490,6 +1495,7 @@ it("drain still releases the plan-parked rows of a broadcast that already reads 
 });
 
 it("drain caps a throttled team at one cadence of rows per run", async () => {
+  await rollingHistory(db, teamId, { sent: 2_000, hardBounced: 35 });
   await db
     .insert(schema.usageCounters)
     .values({ teamId, day: today(), sent: 2_000, hardBounced: 90 });
@@ -1528,7 +1534,8 @@ it("drain caps a throttled team at one cadence of rows per run", async () => {
 }, 60_000);
 
 it("drain gives a throttled team one cadence of rows per run, spaced on the rows themselves", async () => {
-  // 90/2000 = 4.5% hard bounces: over the warning line, under the pause line.
+  // 35/2000 = 1.75%: warn, not pause. Evidence is inside the live rolling window.
+  await rollingHistory(db, teamId, { sent: 2_000, hardBounced: 35 });
   await db
     .insert(schema.usageCounters)
     .values({ teamId, day: today(), sent: 2_000, hardBounced: 90 });

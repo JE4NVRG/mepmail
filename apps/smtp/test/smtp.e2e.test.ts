@@ -14,6 +14,7 @@ import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/t
 import { eq } from "drizzle-orm";
 import nodemailer from "nodemailer";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { reviewedSender } from "../../worker/test/fixtures/antiabuse.js";
 import {
   createSmtpServer,
   MAX_CONNECTIONS_PER_IP,
@@ -49,6 +50,7 @@ beforeAll(async () => {
     status: "verified",
     verifiedAt: new Date(),
   });
+  await reviewedSender(db, teamId, "acme.dev");
   const key = generateApiKey();
   token = key.token;
   await db.insert(schema.apiKeys).values({

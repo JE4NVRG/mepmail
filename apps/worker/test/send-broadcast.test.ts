@@ -25,6 +25,7 @@ import {
   sendBroadcast,
 } from "../src/handlers/send-broadcast.js";
 import { type SesSender, sendEmail } from "../src/handlers/send-email.js";
+import { reviewedSender, rollingHistory } from "./fixtures/antiabuse.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -56,6 +57,7 @@ async function seedTeam(
     verifiedAt: new Date(),
     sesConfigurationSet: "ms-set",
   });
+  await reviewedSender(db, tId, `${label}.dev`);
   const ids: Record<string, string> = {};
   if (contacts.length > 0) {
     const inserted = await db
@@ -742,6 +744,7 @@ async function seedThrottleTeam(
     { email: "t3@example.com" },
   ]);
   await db.insert(schema.usageCounters).values({ teamId: tId, day: utcDay(), ...counter });
+  await rollingHistory(db, tId, { sent: counter.sent ?? 0, hardBounced: counter.hardBounced ?? 0 });
   const broadcastId = await insertBroadcast({
     teamId: tId,
     from: `Acme <hi@${label}.dev>`,
@@ -750,11 +753,11 @@ async function seedThrottleTeam(
 }
 
 it("throttles the fan-out drip when the team is over the risk line, one enqueue per page", async () => {
-  // 90/2000 = 4.5% hard bounces: over WARN (4%), under PAUSE (5%), volume >= floor.
+  // 35/2000 = 1.75% hard bounces: over WARN (1.5%), under PAUSE (2%), volume >= floor.
   const { broadcastId } = await seedThrottleTeam("bc-throttle", {
     sent: 2000,
-    bounced: 90,
-    hardBounced: 90,
+    bounced: 35,
+    hardBounced: 35,
   });
   const { deps, startAfters, batches } = makeDeps({ batchSize: 2 });
 
@@ -797,8 +800,8 @@ it("fans out at full rate (no startAfter) when the team is ok", async () => {
 it("an aborted signal fails the walk at the next page so the job retries; the resumed walk skips fanned-out contacts and keeps its drip tight", async () => {
   const { broadcastId } = await seedThrottleTeam("bc-resume", {
     sent: 2000,
-    bounced: 90,
-    hardBounced: 90,
+    bounced: 35,
+    hardBounced: 35,
   });
   const ac = new AbortController();
   const first = makeDeps({ signal: ac.signal });

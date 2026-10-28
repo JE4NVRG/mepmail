@@ -6,6 +6,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -30,12 +31,14 @@ const base = { from: "Acme <a@acme.dev>", subject: "s", text: "t" };
 beforeAll(async () => {
   ({ db, close } = await createTestDb());
   teamId = await createTeam(db, "sec-team");
+  await approveCampaignFixture(db, teamId);
   await db.insert(schema.domains).values({
     teamId,
     name: "acme.dev",
     region: "us-east-1",
     status: "verified",
     verifiedAt: new Date(),
+    ...campaignDns("acme.dev"),
   });
   await db.insert(schema.domains).values({
     teamId,

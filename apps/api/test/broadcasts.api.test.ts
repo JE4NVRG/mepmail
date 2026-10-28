@@ -6,6 +6,8 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
+import { providerReputationFixture } from "./provider-reputation-fixture.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -39,6 +41,7 @@ const draftBody = () => ({
 // happy-path tests.
 async function makeSendableTeam(slug: string) {
   const teamId = await createTeam(db, slug);
+  await approveCampaignFixture(db, teamId);
   const key = generateApiKey();
   await db.insert(schema.apiKeys).values({
     teamId,
@@ -53,6 +56,7 @@ async function makeSendableTeam(slug: string) {
     region: "us-east-1",
     status: "verified",
     verifiedAt: new Date(),
+    ...campaignDns("acme.dev"),
   });
   const [bc] = await db
     .insert(schema.broadcasts)
@@ -69,6 +73,7 @@ beforeAll(async () => {
     ["bc-team-b", (t: string) => (tokenB = t)],
   ] as const) {
     const teamId = await createTeam(db, slug);
+    await approveCampaignFixture(db, teamId);
     if (slug === "bc-team-a") teamA = teamId;
     const key = generateApiKey();
     setToken(key.token);
@@ -86,6 +91,7 @@ beforeAll(async () => {
     region: "us-east-1",
     status: "verified",
     verifiedAt: new Date(),
+    ...campaignDns("acme.dev"),
   });
   app = createApi({
     db,
@@ -327,13 +333,14 @@ describe("broadcasts API deliverability guardrail", () => {
 
   it("403s sending_paused when past the complaint pause line, leaving the draft unsent", async () => {
     const { teamId, token, broadcastId } = await makeSendableTeam("bc-paused");
-    // Over the floor (1000) and over the 0.1% complaint pause line.
+    // Provider-confirmed 24h history exceeds the strict complaint pause line.
     await db.insert(schema.usageCounters).values({
       teamId,
       day: utcDay(),
       sent: 2000,
       complained: 5,
     });
+    await providerReputationFixture(db, teamId, { sent: 2000, complained: 5 });
 
     const res = await sendGuarded(token, broadcastId);
     expect(res.status).toBe(403);
@@ -356,6 +363,7 @@ describe("broadcasts API deliverability guardrail", () => {
       sent: 2000,
       bounced: 1,
     });
+    await providerReputationFixture(db, teamId, { sent: 2000, hardBounced: 1 });
 
     const res = await sendGuarded(token, broadcastId);
     expect(res.status).toBe(200);
@@ -548,6 +556,7 @@ describe("broadcasts send-on-create", () => {
       sent: 2000,
       complained: 5,
     });
+    await providerReputationFixture(db, teamId, { sent: 2000, complained: 5 });
     const res = await post(token, { ...draftBody(), subject: "paused-create", send: true });
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ statusCode: 403, name: "sending_paused" });
@@ -615,6 +624,7 @@ describe("domain-scoped keys cannot cross domains on broadcasts", () => {
       region: "us-east-1",
       status: "verified",
       verifiedAt: new Date(),
+      ...campaignDns("other-scope.dev"),
     });
     const key = generateApiKey();
     scopedToken = key.token;

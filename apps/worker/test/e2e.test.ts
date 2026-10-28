@@ -17,6 +17,7 @@ import { Resend } from "resend";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { processSesEvent } from "../src/handlers/process-ses-event.js";
 import { type SesSender, sendEmail } from "../src/handlers/send-email.js";
+import { reviewedSender } from "./fixtures/antiabuse.js";
 
 /**
  * The whole loop, end to end: the OFFICIAL resend SDK sends through a live
@@ -56,6 +57,7 @@ beforeAll(async () => {
     status: "verified",
     verifiedAt: new Date(),
   });
+  await reviewedSender(db, teamId, "e2e.dev");
   const key = generateApiKey();
   await db.insert(schema.apiKeys).values({
     teamId,
@@ -206,6 +208,22 @@ it("the SDK sees the bounce on GET", async () => {
 });
 
 it("the next send to the bounced recipient is refused or stripped", async () => {
+  // The new rolling pause wins immediately after a real hard bounce.
+  const paused = await resend.emails.send({
+    from: "hello@e2e.dev",
+    to: [VICTIM],
+    subject: "again",
+    text: "hi",
+  });
+  expect(paused.data).toBeNull();
+  expect(paused.error?.message).toContain("paused");
+  // Model the next day: reputation expires; durable recipient suppression does not.
+  const yesterday = new Date(Date.now() - 25 * 3_600_000);
+  await db
+    .update(schema.emailEvents)
+    .set({ occurredAt: yesterday })
+    .where(eq(schema.emailEvents.emailId, emailId));
+  await db.update(schema.emails).set({ sentAt: yesterday }).where(eq(schema.emails.id, emailId));
   // Alone: nothing left to deliver to.
   const refused = await resend.emails.send({
     from: "E2E <hello@e2e.dev>",

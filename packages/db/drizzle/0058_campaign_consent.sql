@@ -11,4 +11,5 @@ CREATE TABLE campaign_consent_dossiers (
  reason text,
  CONSTRAINT campaign_consent_review_audit CHECK (status = 'pending' OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL AND length(reason) >= 15))
 );
+--> statement-breakpoint
 CREATE INDEX campaign_consent_team_submitted_idx ON campaign_consent_dossiers(team_id, submitted_at);

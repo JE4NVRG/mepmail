@@ -9,9 +9,11 @@ import {
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
+import { providerReputationFixture } from "./provider-reputation-fixture.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -43,12 +45,14 @@ const validBody = {
 beforeAll(async () => {
   ({ db, close } = await createTestDb());
   teamId = await createTeam(db, "api-team");
+  await approveCampaignFixture(db, teamId);
   await db.insert(schema.domains).values({
     teamId,
     name: "acme.dev",
     region: "us-east-1",
     status: "verified",
     verifiedAt: new Date(),
+    ...campaignDns("acme.dev"),
   });
   const key = generateApiKey();
   token = key.token;
@@ -176,6 +180,7 @@ describe("send edge cases", () => {
     const res = await post(validBody);
     const { id } = (await res.json()) as { id: string };
     const otherTeam = await createTeam(db, "intruder");
+    await approveCampaignFixture(db, otherTeam);
     const otherKey = generateApiKey();
     await db.insert(schema.apiKeys).values({
       teamId: otherTeam,
@@ -283,12 +288,14 @@ describe("batch send", () => {
 describe("batch send is atomic (no double-send on retry)", () => {
   it("a mid-batch failure after item 1 does not re-send item 1 on retry", async () => {
     const atomicTeam = await createTeam(db, "batch-atomic");
+    await approveCampaignFixture(db, atomicTeam);
     await db.insert(schema.domains).values({
       teamId: atomicTeam,
       name: "atomic.dev",
       region: "us-east-1",
       status: "verified",
       verifiedAt: new Date(),
+      ...campaignDns("atomic.dev"),
     });
     const key = generateApiKey();
     await db.insert(schema.apiKeys).values({
@@ -408,12 +415,14 @@ describe("cancel scheduled email", () => {
   it("404s a cross-team email rather than canceling it", async () => {
     // A fresh team's scheduled email must be invisible to this token.
     const otherTeam = await createTeam(db, "cancel-other");
+    await approveCampaignFixture(db, otherTeam);
     await db.insert(schema.domains).values({
       teamId: otherTeam,
       name: "other-cancel.dev",
       region: "us-east-1",
       status: "verified",
       verifiedAt: new Date(),
+      ...campaignDns("other-cancel.dev"),
     });
     const [foreign] = await db
       .insert(schema.emails)
@@ -518,6 +527,7 @@ describe("reschedule scheduled email (PATCH /emails/{id})", () => {
 
   it("404s a cross-team email without touching it", async () => {
     const otherTeam = await createTeam(db, "resched-other");
+    await approveCampaignFixture(db, otherTeam);
     const [foreign] = await db
       .insert(schema.emails)
       .values({
@@ -1033,12 +1043,14 @@ describe("deliverability guardrail on transactional sends", () => {
 
   beforeAll(async () => {
     pausedTeam = await createTeam(db, "paused-team");
+    await approveCampaignFixture(db, pausedTeam);
     await db.insert(schema.domains).values({
       teamId: pausedTeam,
       name: "paused.dev",
       region: "us-east-1",
       status: "verified",
       verifiedAt: new Date(),
+      ...campaignDns("paused.dev"),
     });
     const key = generateApiKey();
     pausedToken = key.token;
@@ -1060,6 +1072,7 @@ describe("deliverability guardrail on transactional sends", () => {
       hardBounced: 20,
       complained: 0,
     });
+    await providerReputationFixture(db, pausedTeam, { sent: 200, hardBounced: 20 });
   });
 
   const body = { from: "P <a@paused.dev>", to: ["x@example.com"], subject: "s", text: "t" };
@@ -1071,6 +1084,11 @@ describe("deliverability guardrail on transactional sends", () => {
     });
 
   it("403s sending_paused on POST /emails and /emails/batch for a paused cloud team", async () => {
+    const history = await db
+      .select({ id: schema.emails.id })
+      .from(schema.emails)
+      .where(eq(schema.emails.teamId, pausedTeam));
+    expect(history).toHaveLength(200);
     const single = await send(app, "/emails", body);
     expect(single.status).toBe(403);
     expect(await single.json()).toMatchObject({ statusCode: 403, name: "sending_paused" });
@@ -1079,8 +1097,21 @@ describe("deliverability guardrail on transactional sends", () => {
     const rows = await db
       .select({ id: schema.emails.id })
       .from(schema.emails)
-      .where(eq(schema.emails.teamId, pausedTeam));
+      .where(
+        and(
+          eq(schema.emails.teamId, pausedTeam),
+          notInArray(
+            schema.emails.id,
+            history.map((r) => r.id),
+          ),
+        ),
+      );
     expect(rows).toHaveLength(0);
+    const retained = await db
+      .select({ id: schema.emails.id })
+      .from(schema.emails)
+      .where(eq(schema.emails.teamId, pausedTeam));
+    expect(retained.map((r) => r.id).sort()).toEqual(history.map((r) => r.id).sort());
   });
 
   it("applies the same rule on self-host — plans play no part", async () => {
@@ -1090,12 +1121,14 @@ describe("deliverability guardrail on transactional sends", () => {
 
   it("never pauses on transient bounces alone", async () => {
     const teamId = await createTeam(db, "transient-team");
+    await approveCampaignFixture(db, teamId);
     await db.insert(schema.domains).values({
       teamId,
       name: "transient.dev",
       region: "us-east-1",
       status: "verified",
       verifiedAt: new Date(),
+      ...campaignDns("transient.dev"),
     });
     const key = generateApiKey();
     await db.insert(schema.apiKeys).values({
@@ -1115,6 +1148,7 @@ describe("deliverability guardrail on transactional sends", () => {
       hardBounced: 0,
       complained: 0,
     });
+    await providerReputationFixture(db, teamId, { sent: 200, softBounced: 20 });
     const res = await app.request("/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${key.token}`, "content-type": "application/json" },
@@ -1154,6 +1188,7 @@ describe("DELETE /emails/{id}", () => {
 
   it("404s a cross-team email without touching it", async () => {
     const otherTeam = await createTeam(db, "delete-other");
+    await approveCampaignFixture(db, otherTeam);
     const [foreign] = await db
       .insert(schema.emails)
       .values({
@@ -1228,6 +1263,27 @@ describe("a recipient's own unsubscribe and transactional mail", () => {
 
 describe("POST /emails/batch quota", () => {
   it("reserves once for the batch, sends the prefix that fits and parks the rest", async () => {
+    // Earlier cases intentionally retain bounced outcomes. This quota case owns
+    // a clean, reviewed, graduated tenant instead of bypassing its probation.
+    const teamId = await createTeam(db, "isolated-batch-quota");
+    await approveCampaignFixture(db, teamId, "batch-quota.example.test");
+    await db
+      .update(schema.teams)
+      .set({
+        createdAt: new Date(Date.now() - 40 * 86_400_000),
+        dailySendCeiling: 150,
+      })
+      .where(eq(schema.teams.id, teamId));
+    const key = generateApiKey();
+    const token = key.token;
+    await db.insert(schema.apiKeys).values({
+      teamId,
+      name: "isolated batch quota",
+      tokenPrefix: key.tokenPrefix,
+      keyHash: key.keyHash,
+      last4: key.last4,
+    });
+    const batchBody = { ...validBody, from: "Quota <q@batch-quota.example.test>" };
     // Free plan: 100/day, ceiling 150. With 149 used, a two-recipient batch
     // does not fit as a whole: the first email still goes (one unit of room),
     // the second parks, and the counter moves once, to the ceiling.
@@ -1243,8 +1299,8 @@ describe("POST /emails/batch quota", () => {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify([
-        { ...validBody, to: ["q1@example.com"] },
-        { ...validBody, to: ["q2@example.com"] },
+        { ...batchBody, to: ["q1@example.com"] },
+        { ...batchBody, to: ["q2@example.com"] },
       ]),
     });
     expect(res.status).toBe(200);

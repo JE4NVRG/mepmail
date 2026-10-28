@@ -15,6 +15,7 @@ import { eq, like, sql } from "drizzle-orm";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { sweepNotifications } from "../src/handlers/notify.js";
 import { createSystemMailer } from "../src/system-mail.js";
+import { rollingHistory } from "./fixtures/antiabuse.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -69,6 +70,7 @@ async function counters(
   values: Partial<typeof schema.usageCounters.$inferInsert>,
   day = utcDay(),
   team = teamId,
+  at = new Date(),
 ) {
   await db
     .insert(schema.usageCounters)
@@ -77,6 +79,17 @@ async function counters(
       target: [schema.usageCounters.teamId, schema.usageCounters.day],
       set: values,
     });
+  if (values.sent)
+    await rollingHistory(
+      db,
+      team,
+      {
+        sent: values.sent,
+        hardBounced: values.hardBounced ?? 0,
+        complained: values.complained ?? 0,
+      },
+      at,
+    );
 }
 
 async function deliveries() {
@@ -267,7 +280,7 @@ it("deliverability pause fires once per episode and again after recovery", async
   const [row] = await deliveries();
   expect(row?.type).toBe("deliverability.paused");
   expect(row?.payload).toMatchObject({
-    data: { metric: "complaint", limit: 0.001, window_days: 2 },
+    data: { metric: "complaint", limit: 0.0008, window_days: 1 },
   });
   expect(await sweepNotifications(db, deps())).toEqual({ sent: 0 });
 
@@ -294,21 +307,21 @@ it("a quiet week ends the episode even though the team is never observed healthy
     .insert(schema.teamNotifications)
     .values({ teamId, kind: "activation.help", periodKey: "once" });
   expect(await sweepNotifications(db, deps(true, later))).toEqual({ sent: 0 });
-  await counters({ sent: 200, complained: 3 }, utcDay(later.getTime()));
+  await counters({ sent: 200, complained: 3 }, utcDay(later.getTime()), teamId, later);
   expect(await sweepNotifications(db, deps(true, later))).toEqual({ sent: 1 });
   expect(sends).toHaveLength(2);
 });
 
 it("hovering at the warning line is one episode; it ends only well under the line", async () => {
-  await counters({ sent: 1000, hardBounced: 40 }); // 4.00%: warning
+  await counters({ sent: 1000, hardBounced: 15 }); // 1.50%: warning
   expect(await sweepNotifications(db, deps())).toEqual({ sent: 1 });
-  await counters({ sent: 1010, hardBounced: 40 }); // 3.96%: ok, but not cleared
+  await counters({ sent: 1010, hardBounced: 15 }); // 1.49%: ok, but not cleared
   expect(await sweepNotifications(db, deps())).toEqual({ sent: 0 });
-  await counters({ sent: 1010, hardBounced: 41 }); // 4.06%: same episode
+  await counters({ sent: 1010, hardBounced: 16 }); // 1.58%: same episode
   expect(await sweepNotifications(db, deps())).toEqual({ sent: 0 });
-  await counters({ sent: 1000, hardBounced: 35 }); // 3.5% < 0.9 × 4%: episode over
+  await counters({ sent: 1000, hardBounced: 13 }); // 1.3% < 0.9 × 1.5%: episode over
   expect(await sweepNotifications(db, deps())).toEqual({ sent: 0 });
-  await counters({ sent: 1000, hardBounced: 40 });
+  await counters({ sent: 1000, hardBounced: 15 });
   expect(await sweepNotifications(db, deps())).toEqual({ sent: 1 });
   expect(sends).toHaveLength(2);
 });
@@ -335,10 +348,10 @@ it("one team's failing mail never stops the sweep for the others", async () => {
 });
 
 it("a warning that escalates to a pause notifies both once", async () => {
-  await counters({ sent: 1000, hardBounced: 45 });
+  await counters({ sent: 1000, hardBounced: 18 });
   await sweepNotifications(db, deps());
   expect(sends[0]?.subject).toContain("at risk");
-  await counters({ sent: 1000, hardBounced: 60 });
+  await counters({ sent: 1000, hardBounced: 21 });
   await sweepNotifications(db, deps());
   expect(sends.map((s) => s.subject)).toEqual([
     expect.stringContaining("at risk"),

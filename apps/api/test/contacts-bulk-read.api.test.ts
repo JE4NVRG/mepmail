@@ -5,6 +5,7 @@ import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 /**
  * Bulk reads (MepMail extension): `include=properties,topics` on the
@@ -36,6 +37,7 @@ async function call(key: string, method: string, path: string, body?: unknown) {
 
 async function seedTeam(slug: string): Promise<string> {
   const teamId = await createTeam(db, slug);
+  await approveCampaignFixture(db, teamId, "consent-fixture.example.test");
   const key = generateApiKey();
   await db.insert(schema.apiKeys).values({
     teamId,

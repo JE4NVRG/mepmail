@@ -12,6 +12,12 @@ import {
   getSignupSendingRestriction,
 } from "../src/signup-risk-enforcement.js";
 
+import {
+  approveCampaignFixture,
+  independentOperator,
+  verifiedDns,
+} from "./antiabuse-contract-fixture.js";
+
 let db: Db;
 let close: () => Promise<void>;
 
@@ -48,7 +54,13 @@ async function fixture(level: "sandbox" | "good" | "hold" = "sandbox", verified 
     .values({ teamId, principalUserId: userId, level, signals, reasons: ["synthetic_fixture"] });
   const [domain] = await db
     .insert(schema.domains)
-    .values({ teamId, name: `${userId}.example.test`, region: "us-east-1", status: "verified" })
+    .values({
+      teamId,
+      name: `${userId}.example.test`,
+      ...verifiedDns(`${userId}.example.test`),
+      region: "us-east-1",
+      status: "verified",
+    })
     .returning({ id: schema.domains.id, name: schema.domains.name });
   if (!domain) throw new Error("synthetic domain missing");
   const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
@@ -113,6 +125,7 @@ it.each(["cc", "bcc"] as const)(
   "one external %s refuses the whole email before encryption, quota or queue",
   async (field) => {
     const f = await fixture();
+    await approveCampaignFixture(db, f.teamId, f.userId, f.domain.name);
     const { keyring, wrap } = cryptoSpy();
     const enqueue = vi.fn(async (_id: string) => {});
     const result = await acceptEmail(
@@ -163,11 +176,13 @@ it.each(["missing", "unverified"] as const)(
   async (kind) => {
     const f = await fixture("sandbox", kind !== "unverified");
     if (kind === "missing") {
-      await clearTeamSignupRisk(db, {
-        teamId: f.teamId,
-        operatorId: f.userId,
-        reason: "Synthetic review before deleting this fixture principal",
-      });
+      await expect(
+        clearTeamSignupRisk(db, {
+          teamId: f.teamId,
+          operatorId: f.userId,
+          reason: "Synthetic self-review is not independent",
+        }),
+      ).rejects.toThrow("signup_review_independent_operator_required");
       await db.delete(schema.user).where(eq(schema.user.id, f.userId));
     } else {
       await expect(
@@ -209,6 +224,14 @@ it("payment alone and an active contract without verified DNS do not clear sandb
     .update(schema.domains)
     .set({ status: "verified", verifiedAt: new Date() })
     .where(eq(schema.domains.id, f.domain.id));
+  expect(await checkSignupSend(db, f.teamId, ["external@example.test"])).toEqual({
+    allowed: false,
+    reason: "signup_sandbox",
+  });
+  await db
+    .update(schema.teams)
+    .set({ sendReviewClearedAt: new Date() })
+    .where(eq(schema.teams.id, f.teamId));
   expect(await checkSignupSend(db, f.teamId, ["external@example.test"])).toEqual({ allowed: true });
 });
 
@@ -250,13 +273,10 @@ it("an audited human decision is per team, idempotent, and preserves holds and q
       latestStatus: "queued_quota",
     })
     .returning();
+  const operatorId = await independentOperator(db);
   const reason = "Synthetic operator reviewed the intended use";
-  expect(await clearTeamSignupRisk(db, { teamId: f.teamId, operatorId: f.userId, reason })).toBe(
-    true,
-  );
-  expect(await clearTeamSignupRisk(db, { teamId: f.teamId, operatorId: f.userId, reason })).toBe(
-    false,
-  );
+  expect(await clearTeamSignupRisk(db, { teamId: f.teamId, operatorId, reason })).toBe(true);
+  expect(await clearTeamSignupRisk(db, { teamId: f.teamId, operatorId, reason })).toBe(false);
   const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, f.teamId));
   expect(team).toMatchObject({
     sendReviewAt: holdAt,
@@ -281,7 +301,7 @@ it("an audited human decision is per team, idempotent, and preserves holds and q
     );
   expect(audit).toMatchObject([
     {
-      actorId: `user:${f.userId}`,
+      actorId: `user:${operatorId}`,
       target: `team:${f.teamId}`,
       data: { reason, existingHoldOrSuspensionUnchanged: true, noQueueAction: true },
     },
@@ -294,6 +314,7 @@ it("requires a review reason and rolls back clearance if mandatory audit cannot 
   await expect(
     clearTeamSignupRisk(db, { teamId: f.teamId, operatorId: f.userId, reason: "short" }),
   ).rejects.toThrow("signup_review_reason_required");
+  const operatorId = await independentOperator(db);
   // Deliberately fail only this synthetic team's audit in this synthetic DB.
   await db.execute(
     sql.raw(`CREATE FUNCTION reject_fixture_signup_audit() RETURNS trigger AS $$
@@ -308,7 +329,7 @@ it("requires a review reason and rolls back clearance if mandatory audit cannot 
   await expect(
     clearTeamSignupRisk(db, {
       teamId: f.teamId,
-      operatorId: f.userId,
+      operatorId,
       reason: "Synthetic mandatory audit failure fixture",
     }),
   ).rejects.toThrow();

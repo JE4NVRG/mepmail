@@ -14,6 +14,7 @@ import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/t
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 /**
  * The accept → queue seam: every accepted email must PRODUCE a send job
@@ -31,13 +32,19 @@ let enqueued: { emailId: string; startAfter?: Date }[];
 beforeAll(async () => {
   ({ db, close } = await createTestDb());
   teamId = await createTeam(db, "pipeline-team");
+  await approveCampaignFixture(db, teamId);
   await db.insert(schema.domains).values({
     teamId,
     name: "acme.dev",
     region: "us-east-1",
     status: "verified",
     verifiedAt: new Date(),
+    ...campaignDns("acme.dev"),
   });
+  await db
+    .update(schema.teams)
+    .set({ createdAt: new Date(Date.now() - 40 * DAY_MS), dailySendCeiling: 100000 })
+    .where(eq(schema.teams.id, teamId));
   const key = generateApiKey();
   token = key.token;
   await db.insert(schema.apiKeys).values({

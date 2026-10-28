@@ -6,6 +6,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 /**
  * POST /contacts/batch: strict vs permissive validation, the three
@@ -61,6 +62,7 @@ const batch = (
 
 async function seedTeam(slug: string): Promise<{ teamId: string; token: string }> {
   const teamId = await createTeam(db, slug);
+  await approveCampaignFixture(db, teamId, "consent-fixture.example.test");
   const key = generateApiKey();
   await db.insert(schema.apiKeys).values({
     teamId,

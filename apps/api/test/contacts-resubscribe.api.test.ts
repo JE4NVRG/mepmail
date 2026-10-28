@@ -6,6 +6,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -38,6 +39,7 @@ const suppressions = (email: string) =>
 beforeAll(async () => {
   ({ db, close } = await createTestDb());
   teamId = await createTeam(db, "resub");
+  await approveCampaignFixture(db, teamId, "consent-fixture.example.test");
   const key = generateApiKey();
   await db.insert(schema.apiKeys).values({
     teamId,

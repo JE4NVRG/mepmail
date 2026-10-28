@@ -8,6 +8,7 @@ import { sql } from "drizzle-orm";
 import { Resend } from "resend";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 /**
  * Wire-compat gate for the SDK's top-level /contacts surface: resend v6 hits
@@ -24,6 +25,7 @@ let resend: Resend;
 beforeAll(async () => {
   ({ db, close: closeDb } = await createTestDb());
   const teamId = await createTeam(db, "contacts-root");
+  await approveCampaignFixture(db, teamId, "consent-fixture.example.test");
   const key = generateApiKey();
   await db.insert(schema.apiKeys).values({
     teamId,
@@ -162,6 +164,7 @@ describe("official resend SDK: top-level /contacts", () => {
     expect(created.error).toBeNull();
 
     const otherTeam = await createTeam(db, "contacts-root-b");
+    await approveCampaignFixture(db, otherTeam, "consent-fixture.example.test");
     const otherKey = generateApiKey();
     await db.insert(schema.apiKeys).values({
       teamId: otherTeam,

@@ -5,6 +5,7 @@ import { EnvKeyring, generateApiKey } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
+import { approveImportFixture } from "./reviewed-import.js";
 
 export interface LiveApi {
   /** http://127.0.0.1:<ephemeral port> */
@@ -44,6 +45,7 @@ export async function startLiveApi(
     slug?: string;
     /** Team plan; unset keeps the schema default (free). */
     plan?: "free" | "starter" | "pro" | "scale";
+    reviewedImport?: boolean;
   } = {},
 ): Promise<LiveApi> {
   const { db, close } = await createTestDb();
@@ -52,6 +54,7 @@ export async function startLiveApi(
     await db.update(schema.teams).set({ plan: options.plan }).where(eq(schema.teams.id, teamId));
   }
   const apiKey = await createApiKey(db, teamId);
+  if (options.reviewedImport) await approveImportFixture(db, teamId);
   const app = createApi({
     db,
     keyring: EnvKeyring.fromBase64(randomBytes(32).toString("base64")),

@@ -9,6 +9,7 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { createClient } from "../../../packages/mcp/src/client.js";
 import { registerTools } from "../../../packages/mcp/src/tools.js";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -35,6 +36,7 @@ async function fixture(isCloud = true) {
   const userId = randomUUID();
   const email = `${userId}@example.test`;
   const teamId = await createTeam(db, `api-signup-${userId}`);
+  await approveCampaignFixture(db, teamId);
   await db
     .insert(schema.user)
     .values({ id: userId, name: "Synthetic API principal", email, emailVerified: true });
@@ -49,6 +51,7 @@ async function fixture(isCloud = true) {
     region: "us-east-1",
     status: "verified",
     verifiedAt: new Date(),
+    ...campaignDns(domain),
   });
   const key = generateApiKey();
   await db.insert(schema.apiKeys).values({

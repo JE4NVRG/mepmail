@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { sweepNotifications } from "../src/handlers/notify.js";
 import * as notificationTemplates from "../src/notifications/templates.js";
+import { rollingHistory } from "./fixtures/antiabuse.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -54,6 +55,8 @@ const deps = () => ({
 
 async function counters(values: Partial<typeof schema.usageCounters.$inferInsert>) {
   await db.insert(schema.usageCounters).values({ teamId, day: utcDay(), ...values });
+  if (values.sent)
+    await rollingHistory(db, teamId, { sent: values.sent, complained: values.complained ?? 0 });
 }
 
 async function deliveries() {

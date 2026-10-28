@@ -7,6 +7,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { Resend } from "resend";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 /**
  * THE wire-compat gate: the official `resend` npm SDK, pointed at a live
@@ -23,12 +24,14 @@ let teamId: string;
 beforeAll(async () => {
   ({ db, close: closeDb } = await createTestDb());
   teamId = await createTeam(db, "contract");
+  await approveCampaignFixture(db, teamId);
   await db.insert(schema.domains).values({
     teamId,
     name: "acme.dev",
     region: "us-east-1",
     status: "verified",
     verifiedAt: new Date(),
+    ...campaignDns("acme.dev"),
   });
   const key = generateApiKey();
   await db.insert(schema.apiKeys).values({

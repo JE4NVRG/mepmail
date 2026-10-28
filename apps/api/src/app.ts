@@ -2755,6 +2755,9 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
     // Same boundary as /emails: only a verified team domain may appear as
     // the sender.
     const domain = await verifySenderDomain(db, auth.teamId, broadcast.from);
+    if (!domain.ok) {
+      return fail(422, "validation_error", senderVerdictMessage(domain));
+    }
     const consent = await checkCampaignConsent(db, {
       teamId: auth.teamId,
       from: broadcast.from,
@@ -2762,9 +2765,6 @@ function registerBroadcastRoutes(app: OpenAPIHono<Env>, deps: ApiDeps): void {
       isCloud: deps.isCloud,
     });
     if (!consent.allowed) return fail(403, consent.reason, CAMPAIGN_CONSENT_MESSAGE);
-    if (!domain.ok) {
-      return fail(422, "validation_error", senderVerdictMessage(domain));
-    }
     // Same per-key domain confinement as /emails and SMTP: a domain-scoped
     // key must not send from a different team domain.
     if (keyForbidsSendingDomain(auth, domain.domainId)) {

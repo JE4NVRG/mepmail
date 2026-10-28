@@ -7,6 +7,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { Resend } from "resend";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 /**
  * Wire-compat gate for broadcasts: the official `resend` npm SDK against a
@@ -24,6 +25,7 @@ const enqueued: { broadcastId: string; startAfter?: Date | undefined }[] = [];
 beforeAll(async () => {
   ({ db, close: closeDb } = await createTestDb());
   const teamId = await createTeam(db, "bc-contract");
+  await approveCampaignFixture(db, teamId);
   const key = generateApiKey();
   await db.insert(schema.apiKeys).values({
     teamId,
@@ -38,6 +40,7 @@ beforeAll(async () => {
     region: "us-east-1",
     status: "verified",
     verifiedAt: new Date(),
+    ...campaignDns("acme.dev"),
   });
   const [segment] = await db
     .insert(schema.segments)

@@ -35,6 +35,7 @@ import {
   WEBHOOK_ENDPOINTS,
   WEBHOOK_SECRETS,
 } from "./helpers/realistic-account.js";
+import { approveImportFixture } from "./helpers/reviewed-import.js";
 
 /*
  * The built bundle as a real subprocess against a fake Resend and the real
@@ -171,10 +172,7 @@ beforeAll(async () => {
     name: "example.com",
     region: "us-east-1",
   });
-  await cloud.db
-    .update(schema.domains)
-    .set({ status: "verified" })
-    .where(eq(schema.domains.id, verified.id));
+  await approveImportFixture(cloud.db, cloud.teamId, verified.id);
   await post(cloud, "/domains", { name: "legacy.example.net", region: "us-east-1" });
   await post(cloud, "/topics", {
     name: "Newsletter",

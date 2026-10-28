@@ -21,6 +21,7 @@ import {
 } from "../src/plans.js";
 import { readPeriodUsage } from "../src/quota.js";
 import { DAY_MS, utcDay } from "../src/utc-day.js";
+import { approveCampaignFixture } from "./antiabuse-contract-fixture.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -134,6 +135,7 @@ const acceptedToday = async () => {
 
 describe("acceptEmail", () => {
   it("charges quota per distinct recipient across to/cc/bcc", async () => {
+    await approveCampaignFixture(db, teamId, "member-1", "acme.dev");
     const before = await acceptedToday();
     const result = await acceptEmail(deps(), auth(), {
       ...payload(),

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
@@ -274,11 +275,35 @@ describe("standings", () => {
     await db
       .insert(schema.usageCounters)
       .values({ teamId, day: utcDay(now), sent: 200, complained: 1 });
+    const confirmed = await db
+      .insert(schema.emails)
+      .values(
+        Array.from({ length: 200 }, (_, i) => ({
+          teamId: teamId,
+          from: "sender@example.test",
+          to: ["recipient@example.test"],
+          subject: "Synthetic accepted send",
+          createdAt: new Date(now.getTime() - 60_000),
+          sentAt: new Date(now.getTime() - 60_000),
+          sesMessageId: `fixture-${randomUUID()}-${i}`,
+          latestStatus: "sent" as const,
+        })),
+      )
+      .returning({ id: schema.emails.id });
+    await db.insert(schema.emailEvents).values(
+      confirmed.slice(0, 1).map((row) => ({
+        emailId: row.id,
+        type: "complained" as const,
+        occurredAt: new Date(now.getTime() - 60_000),
+        createdAt: new Date(now.getTime() - 60_000),
+        snsMessageId: randomUUID(),
+      })),
+    );
     const rows = await computeTeamStandings(db, now);
     expect(rows.filter((r) => r.teamId === teamId)).toMatchObject([
       {
         teamId,
-        guardrail: "ok",
+        guardrail: "paused",
         complaintRate7d: 0.005,
         hardBounceRate7d: 0,
         sent7d: 200,

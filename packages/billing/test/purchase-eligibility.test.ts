@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { holdOnContentVerdict } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
@@ -146,6 +147,33 @@ describe("review before a new payment", () => {
       sent: 1000,
       hardBounced: 100,
     });
+    const db = f.db;
+    const acceptedAt = new Date(Date.now() - 60_000);
+    const confirmed = await db
+      .insert(schema.emails)
+      .values(
+        Array.from({ length: 1000 }, (_, i) => ({
+          teamId: f.input.team.id,
+          from: "sender@example.test",
+          to: ["recipient@example.test"],
+          subject: "Synthetic accepted send",
+          createdAt: acceptedAt,
+          sentAt: acceptedAt,
+          sesMessageId: `fixture-${randomUUID()}-${i}`,
+          latestStatus: "sent" as const,
+        })),
+      )
+      .returning({ id: schema.emails.id });
+    await db.insert(schema.emailEvents).values(
+      confirmed.slice(0, 100).map((row) => ({
+        emailId: row.id,
+        type: "bounced" as const,
+        occurredAt: acceptedAt,
+        createdAt: acceptedAt,
+        snsMessageId: randomUUID(),
+        bounceType: "Permanent",
+      })),
+    );
     await expect(purchase("pix")).rejects.toMatchObject({ code: "guardrail_paused" });
     expect(f.posts).toEqual([]);
   });

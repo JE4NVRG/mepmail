@@ -7,6 +7,7 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { Resend } from "resend";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi } from "../src/app.js";
+import { approveCampaignFixture, campaignDns } from "./approved-campaign-fixture.js";
 
 /**
  * Wire-compat gate for contactProperties: the official `resend` npm SDK
@@ -22,6 +23,7 @@ let resend: Resend;
 beforeAll(async () => {
   ({ db, close: closeDb } = await createTestDb());
   const teamId = await createTeam(db, "contact-properties-contract");
+  await approveCampaignFixture(db, teamId, "consent-fixture.example.test");
   const key = generateApiKey();
   await db.insert(schema.apiKeys).values({
     teamId,

@@ -9,6 +9,8 @@ import * as signupRisk from "../src/signup-risk.js";
 import { checkSignupSend } from "../src/signup-risk-enforcement.js";
 import type { SignupRiskSignals } from "../src/signup-risk-policy.js";
 
+import { verifiedDns } from "./antiabuse-contract-fixture.js";
+
 let db: Db;
 let close: () => Promise<void>;
 const now = new Date("2026-10-17T15:00:00.000Z");
@@ -228,7 +230,7 @@ it("preserves an operator-cleared risk override, but an independent hold still r
   expect(await mint(f.teamId)).toEqual({ allowed: false, reason: "team_review_required" });
 });
 
-it("preserves the existing verified-contract plus verified-domain exception, never payment alone", async () => {
+it("requires operator clearance as well as the verified contract and complete DNS proof", async () => {
   const f = await fixture("sandbox");
   const periodStart = new Date(Date.now() - 86_400_000);
   const periodEnd = new Date(Date.now() + 30 * 86_400_000);
@@ -247,13 +249,19 @@ it("preserves the existing verified-contract plus verified-domain exception, nev
   await db.insert(schema.domains).values({
     teamId: f.teamId,
     name: `${f.userId}.test`,
+    ...verifiedDns(`${f.userId}.test`),
     status: "verified",
     region: "us-east-1",
   });
+  expect(await mint(f.teamId)).toEqual({ allowed: false, reason: "signup_api_key_restricted" });
+  await db
+    .update(schema.teams)
+    .set({ sendReviewClearedAt: now })
+    .where(eq(schema.teams.id, f.teamId));
   expect((await mint(f.teamId)).allowed).toBe(true);
   await db
     .update(schema.teams)
-    .set({ sendReviewAt: now, sendReviewReason: "new_sender" })
+    .set({ sendReviewAt: at, sendReviewReason: "new_sender" })
     .where(eq(schema.teams.id, f.teamId));
   expect(await mint(f.teamId)).toEqual({ allowed: false, reason: "team_review_required" });
 });
