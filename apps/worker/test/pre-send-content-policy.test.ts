@@ -86,10 +86,11 @@ it("worker holds original HTML before SES/SMTP, claim or body purge, including f
   expect(Buffer.from(row!.bodyCiphertext!)).toEqual(body.ciphertext);
   expect(row?.sesMessageId).toBeNull();
 });
-function mail(teamId: string, mailboxId = randomUUID(), html = phishing) {
+function mail(teamId: string, mailboxId: string = randomUUID(), html = phishing) {
   return {
     teamId,
     mailboxId,
+    idempotencyKey: randomUUID(),
     outboxId: randomUUID(),
     attemptId: randomUUID(),
     from: "news@mail-policy.example",

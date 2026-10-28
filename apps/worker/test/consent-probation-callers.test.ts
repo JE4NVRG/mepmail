@@ -110,6 +110,7 @@ function mail(f: Awaited<ReturnType<typeof setup>>, mailboxId: string, text = pr
   return {
     teamId: f.teamId,
     mailboxId,
+    idempotencyKey: randomUUID(),
     outboxId: randomUUID(),
     attemptId: randomUUID(),
     from: f.from,
