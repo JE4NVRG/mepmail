@@ -98,7 +98,7 @@ type Evidence = {
     reference: string;
     registeredAt: string;
     ipAvailable: boolean;
-    ipReference?: string;
+    ipReference?: string | undefined;
   }[];
 };
 type Dossier = {
