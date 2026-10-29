@@ -180,6 +180,7 @@ interface SendEligibility {
 async function checkSendEligibility(
   db: Db,
   email: typeof schema.emails.$inferSelect,
+  declaredCampaign = false,
 ): Promise<SendEligibility> {
   if (!email.contactId) {
     // Bounces and complaints recorded after accept (a scheduled or
@@ -187,7 +188,7 @@ async function checkSendEligibility(
     // strip the hit, refuse only when no primary recipient is left.
     const recipients = [...email.to, ...(email.cc ?? []), ...(email.bcc ?? [])];
     const suppressed = await findSuppressed(db, email.teamId, recipients, {
-      transactional: email.topicId === null,
+      transactional: !declaredCampaign && email.topicId === null,
     });
     if (suppressed.size === 0) return { eligible: true, topicId: null };
     if (email.to.every((r) => suppressed.has(r))) {
@@ -374,6 +375,37 @@ async function cancelQueuedEmail(db: Db, email: { id: string; teamId: string }):
 /** Header names are case-insensitive; the caller's map keeps whatever casing it sent. */
 const hasListUnsubscribe = (headers: Record<string, string> | null | undefined): boolean =>
   Object.keys(headers ?? {}).some((k) => k.toLowerCase() === "list-unsubscribe");
+
+/** Fail closed for declared API marketing even when no native contact/topic token exists. */
+export function hasOneClickUnsubscribe(headers: Record<string, string>): boolean {
+  const list = Object.entries(headers).filter(([k]) => k.toLowerCase() === "list-unsubscribe");
+  const post = Object.entries(headers).filter(([k]) => k.toLowerCase() === "list-unsubscribe-post");
+  if (list.length !== 1 || post.length !== 1) return false;
+  const value = list[0]?.[1] ?? "";
+  const postValue = post[0]?.[1] ?? "";
+  if (/[\r\n]/.test(value + postValue) || postValue.trim() !== "List-Unsubscribe=One-Click")
+    return false;
+  const links = [...value.matchAll(/<([^<>]+)>/g)];
+  if (!links.length || !/^\s*<[^<>]+>(?:\s*,\s*<[^<>]+>)*\s*$/.test(value)) return false;
+  let https = false;
+  for (const link of links) {
+    try {
+      const url = new URL(link[1] ?? "");
+      if (
+        url.protocol === "https:" &&
+        url.hostname &&
+        !url.username &&
+        !url.password &&
+        !url.hash
+      ) {
+        https = true;
+      } else if (url.protocol !== "mailto:") return false;
+    } catch {
+      return false;
+    }
+  }
+  return https;
+}
 
 /**
  * SES errors that no retry can fix: the message itself (MessageRejected,
@@ -586,7 +618,7 @@ export async function sendEmail(
     return "parked";
   }
 
-  let eligibility = await checkSendEligibility(db, email);
+  let eligibility = await checkSendEligibility(db, email, closedCampaign);
   if (!eligibility.eligible) return refuse(db, email, eligibility.reason);
   if (eligibility.strip) await stripRecipients(db, email, eligibility.strip);
 
@@ -821,11 +853,16 @@ export async function sendEmail(
       buildUnsubscribeHeaders(deps.unsubscribe.baseUrl, topicUnsubscribeToken),
     );
   }
+  if (closedCampaign && !hasOneClickUnsubscribe(headers)) {
+    await parkQueued(db, email, "campaign one-click unsubscribe required");
+    return "parked";
+  }
   // Bulk-mail class signals (RFC 2919 List-Id, RFC 3834 Auto-Submitted, and
   // Precedence) so mailbox providers file broadcasts as list mail. Only for
   // broadcast rows — transactional sends must not carry them.
-  if (email.broadcastId && email.contactId) {
-    if (domain?.name) headers["List-Id"] = `<${email.broadcastId}.${domain.name}>`;
+  if (closedCampaign || (email.broadcastId && email.contactId)) {
+    if (email.broadcastId && domain?.name)
+      headers["List-Id"] = `<${email.broadcastId}.${domain.name}>`;
     headers.Precedence = "bulk";
     headers["Auto-Submitted"] = "auto-generated";
   }
@@ -840,7 +877,7 @@ export async function sendEmail(
     finalHeaders: headers,
     hasAttachments: !!attachments?.length,
     replyTo: email.replyTo,
-    isBroadcast: !!(email.contactId || email.broadcastId),
+    isBroadcast: closedCampaign || !!(email.contactId || email.broadcastId),
     hasTopic: !!email.topicId,
     tracking: {
       clickEnabled: click,
@@ -900,7 +937,7 @@ export async function sendEmail(
   // broadcast fan-out first selected them. A recipient suppressed in the
   // meantime invalidates the MIME already built, so the row is stripped and
   // handed straight back to the queue.
-  eligibility = await checkSendEligibility(db, email);
+  eligibility = await checkSendEligibility(db, email, closedCampaign);
   if (!eligibility.eligible) return refuse(db, email, eligibility.reason);
   if (eligibility.strip) {
     await stripRecipients(db, email, eligibility.strip);

@@ -821,7 +821,7 @@ export const consoleTeamsRouter = router({
           message: "A suspended team cannot have its sending review released.",
         });
       }
-      if (team.sendReviewAt.toISOString() !== input.expectedHoldAt) {
+      if (team.sendReviewAt.getTime() !== Date.parse(input.expectedHoldAt)) {
         throw new TRPCError({
           code: "CONFLICT",
           message:
@@ -846,7 +846,9 @@ export const consoleTeamsRouter = router({
           sendReviewClearedAt: now,
           sendReviewClearedBy: ctx.operator.id,
         })
-        .where(and(eq(t.id, team.id), eq(t.sendReviewAt, team.sendReviewAt)))
+        .where(
+          and(eq(t.id, team.id), sql`${t.sendReviewAt} = ${input.expectedHoldAt}::timestamptz`),
+        )
         .returning({ id: t.id });
       // Concurrent console requests must not release or notify twice, nor
       // remove a newer hold using the state loaded before it was opened.

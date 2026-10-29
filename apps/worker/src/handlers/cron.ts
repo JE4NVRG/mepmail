@@ -53,6 +53,11 @@ import {
   type SQL,
   sql,
 } from "drizzle-orm";
+import {
+  type QueueAdmission,
+  queueAdmissionScope,
+  queueEmailAdmitted,
+} from "../queue-admission.js";
 import { exhaustOpenDeliveries } from "./deliver-webhook.js";
 
 /**
@@ -154,6 +159,7 @@ export async function reconcileStalledBroadcasts(
 }
 
 export interface DrainDeps {
+  queueAdmission?: QueueAdmission;
   isCloud: boolean;
   /** One call per page; startAfter defers emails scheduled beyond the drain time, priority keeps transactional rows ahead of broadcast ones. */
   enqueueSends: EnqueueEmailSends;
@@ -235,8 +241,8 @@ interface DrainRun {
  * rest — errors are collected and rethrown at the end so the cron retries.
  */
 export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainResult> {
-  await deps.sesQuota?.recount?.();
-  const regions = deps.sesQuota?.regions ?? [];
+  if (!deps.queueAdmission?.policy?.restoration) await deps.sesQuota?.recount?.();
+  const regions = deps.queueAdmission?.policy?.restoration ? [] : (deps.sesQuota?.regions ?? []);
   const held = regions.filter((region) => deps.sesQuota?.exhausted(region));
   const relayed = deps.customerRelay
     ? held.filter((region) => deps.sesQuota?.accountPaused?.(region) === true)
@@ -275,7 +281,7 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
     }
   }
   let budget = DRAIN_MAX_PER_RUN - drained;
-  if (budget > 0) {
+  if (budget > 0 && !deps.queueAdmission?.policy?.restoration) {
     const b = schema.broadcasts;
     const waiting = await db
       .select({ id: b.id, teamId: b.teamId })
@@ -397,10 +403,20 @@ async function releaseParkedRows(
         and(
           eq(schema.emails.latestStatus, "queued_quota"),
           opts.where,
+          queueAdmissionScope(deps.queueAdmission),
           // The operator's holds: a suspended team, or one held for review,
           // releases nothing; a paused team releases only its transactional rows.
           isNull(schema.teams.suspendedAt),
           isNull(schema.teams.sendReviewAt),
+          deps.queueAdmission?.policy?.restoration?.campaignCohort
+            ? or(
+                ne(
+                  schema.emails.teamId,
+                  deps.queueAdmission.policy.restoration.campaignCohort.teamId,
+                ),
+                isNull(schema.teams.broadcastsPausedByOperatorAt),
+              )
+            : undefined,
           or(isNull(schema.emails.broadcastId), isNull(schema.teams.broadcastsPausedByOperatorAt)),
           run.exhaustedTeams.size > 0
             ? notInArray(schema.emails.teamId, [...run.exhaustedTeams])
@@ -565,6 +581,23 @@ async function releaseParked(
     const outcome = await db
       .transaction(async (tx) => {
         const txDb = tx as unknown as Db;
+        if (deps.queueAdmission?.policy?.restoration) {
+          // Same ordering as claimAzureSend: global advisory fence, then row lock.
+          // A racing lifetime attempt cannot slip between admission and reservation.
+          await txDb.execute(sql`select pg_advisory_xact_lock(18475923, 1)`);
+          const [current] = await txDb
+            .select()
+            .from(schema.emails)
+            .where(
+              and(
+                eq(schema.emails.id, email.id),
+                eq(schema.emails.latestStatus, "queued_quota"),
+                queueAdmissionScope(deps.queueAdmission),
+              ),
+            )
+            .for("update");
+          if (!current || !queueEmailAdmitted(current, deps.queueAdmission)) return "held" as const;
+        }
         quota = await applySenderProbationQuota(txDb, email.teamId, quota, deps.isCloud);
         const reservation = await reserveQuota(txDb, { teamId: email.teamId, count: units, quota });
         if (!reservation.reserved) return "exhausted" as const;
@@ -589,7 +622,7 @@ async function releaseParked(
       run.exhaustedTeams.add(email.teamId);
       return null;
     }
-    if (outcome === "raced") return null;
+    if (outcome === "raced" || outcome === "held") return null;
     const { id, teamId, broadcastId, region } = email;
     return {
       id,
@@ -626,7 +659,7 @@ const RECONCILE_MAX_PER_RUN = 20_000;
  */
 export async function reconcileStalledSends(
   db: Db,
-  deps: { enqueueSends: EnqueueEmailSends; now?: Date },
+  deps: { enqueueSends: EnqueueEmailSends; now?: Date; queueAdmission?: QueueAdmission },
 ): Promise<number> {
   const now = deps.now ?? new Date();
   const staleBefore = new Date(now.getTime() - 15 * 60 * 1000);
@@ -636,6 +669,7 @@ export async function reconcileStalledSends(
     .where(
       and(
         eq(schema.emails.latestStatus, "queued"),
+        queueAdmissionScope(deps.queueAdmission),
         isNotNull(schema.emails.sentAt),
         isNull(schema.emails.sesMessageId),
         lt(schema.emails.sentAt, staleBefore),
@@ -656,6 +690,7 @@ export async function reconcileStalledSends(
   // A row scheduled for later is waiting by design, not lost; its job is due
   // with it and would only be re-enqueued every sweep until then.
   const stalled = and(
+    queueAdmissionScope(deps.queueAdmission),
     eq(e.latestStatus, "queued"),
     isNull(e.sentAt),
     lt(e.createdAt, staleBefore),

@@ -35,7 +35,6 @@ import {
   deriveTrackingKey,
   deriveUnsubscribeKey,
   eraseRecipient,
-  extractAddrSpec,
   failQueuedMailboxOutbox,
   getInstanceSettings,
   hashRecipient,
@@ -59,12 +58,7 @@ import {
   TimingWindow,
 } from "@millionsend/core";
 import { getDb, schema } from "@millionsend/db";
-import {
-  EMAIL_SEND_PRIORITY,
-  type EmailSendPriority,
-  type EnqueueEmailSends,
-  Queue,
-} from "@millionsend/queue";
+import { type EmailSendPriority, type EnqueueEmailSends, Queue } from "@millionsend/queue";
 import {
   createKeyringFromEnv,
   createSesAccountClient,
@@ -130,6 +124,7 @@ import {
   mailboxWorkerMime,
   parseMailboxSesConfigurationSets,
 } from "./mailbox-sender.js";
+import { createAdmittedEnqueue } from "./queue-admission.js";
 import { parseSesFailover } from "./ses-failover.js";
 import { createSesSender } from "./ses-sender.js";
 import { startSqsPoller } from "./sqs-poller.js";
@@ -314,40 +309,8 @@ const queue = await Queue.start(env.DATABASE_URL, { workers: true });
 // Everything the worker itself enqueues is bulk unless the caller says
 // otherwise: broadcast fan-out always, drained or reconciled rows by origin.
 // A page of sends is one statement; a single send is a page of one.
-const enqueueSends: EnqueueEmailSends = async (batch) => {
-  if (sendingProviderPolicy?.restoration) {
-    const admitted = [];
-    for (const request of batch) {
-      const [email] = await db
-        .select()
-        .from(schema.emails)
-        .where(eq(schema.emails.id, request.emailId));
-      if (!email || email.sentAt || email.sesMessageId) continue;
-      const cohort = sendingProviderPolicy.restoration.teams[email.teamId];
-      if (
-        !cohort ||
-        !sendingProviderPolicy.allowedTeamIds?.includes(email.teamId) ||
-        email.createdAt.getTime() < Date.parse(cohort.notBefore) ||
-        email.broadcastId ||
-        email.contactId ||
-        email.topicId ||
-        !cohort.senders.includes(extractAddrSpec(email.from).toLowerCase())
-      )
-        continue;
-      admitted.push(request);
-    }
-    batch = admitted;
-  }
-  await queue.sendMany(
-    "email.send",
-    batch.map(({ emailId, startAfter, priority }) => ({
-      payload: { emailId },
-      dedupeKey: emailId,
-      priority: priority ?? EMAIL_SEND_PRIORITY.bulk,
-      startAfter,
-    })),
-  );
-};
+const queueAdmission = { policy: sendingProviderPolicy, azureAvailable: relay?.name === "azure" };
+const enqueueSends: EnqueueEmailSends = createAdmittedEnqueue(db, queueAdmission, queue);
 const enqueueSend = (emailId: string, startAfter?: Date, priority?: EmailSendPriority) =>
   enqueueSends([{ emailId, startAfter, priority }]);
 
@@ -413,6 +376,7 @@ await queue.scheduleCrons(
     "quota.drain": async () => {
       const result = await drainQuotaParked(db, {
         isCloud: env.IS_CLOUD,
+        queueAdmission,
         enqueueSends,
         sesQuota: sendControls,
         customerRelay: relay !== undefined,
@@ -422,7 +386,7 @@ await queue.scheduleCrons(
       console.log(`quota.drain: drained=${result.drained} stillParked=${result.stillParked}`);
     },
     "sends.reconcile": async () => {
-      const requeued = await reconcileStalledSends(db, { enqueueSends });
+      const requeued = await reconcileStalledSends(db, { enqueueSends, queueAdmission });
       if (requeued > 0) console.log(`sends.reconcile: requeued=${requeued}`);
       if (mailboxTransportEnabled)
         await reconcileMailboxOutbox(db, {

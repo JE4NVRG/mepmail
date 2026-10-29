@@ -2,7 +2,7 @@ import { holdTeamForReview, type SystemMailMessage } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCaller } from "@/server/routers";
 
@@ -94,6 +94,37 @@ async function fixture(reason: "new_sender" | "payment_risk" = "new_sender") {
 }
 
 describe("send review release notices", () => {
+  it("releases an exactly observed six-fraction hold without rewriting its timestamp", async () => {
+    const id = await fixture();
+    await db.execute(
+      sql`update teams set send_review_at='2026-10-22T21:00:00.000123Z'::timestamptz where id=${id}`,
+    );
+    await operator().console.teams.releaseSendReview({
+      id,
+      expectedHoldAt: "2026-10-22T21:00:00.000123Z",
+    });
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
+    expect(team?.sendReviewAt).toBeNull();
+    expect(team?.sendReviewClearedBy).toBe("review-operator");
+    expect(h.sent).toHaveLength(1);
+    expect(h.runCronNow).toHaveBeenCalledWith("quota.drain");
+  });
+
+  it("never clears a newer hold one microsecond after the observed hold", async () => {
+    const id = await fixture();
+    await db.execute(
+      sql`update teams set send_review_at='2026-10-22T21:00:00.000124Z'::timestamptz where id=${id}`,
+    );
+    await operator().console.teams.releaseSendReview({
+      id,
+      expectedHoldAt: "2026-10-22T21:00:00.000123Z",
+    });
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
+    expect(team?.sendReviewAt).not.toBeNull();
+    expect(h.sent).toHaveLength(0);
+    expect(h.runCronNow).not.toHaveBeenCalled();
+  });
+
   it("rejects a stale operator snapshot without clearing a newer hold or draining", async () => {
     const id = await fixture();
     const newer = new Date(heldAt.getTime() + 1000);
