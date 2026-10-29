@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import type { schema } from "@millionsend/db";
 import { describe, expect, it } from "vitest";
 import { parseSendingProviderPolicy } from "../../../packages/core/src/sending-provider-policy.js";
 import { queueEmailAdmitted } from "../src/queue-admission.js";
@@ -40,7 +39,7 @@ const policy = parseSendingProviderPolicy(
   }),
 );
 const admission = { policy, azureAvailable: true };
-const row = {
+const row: Parameters<typeof queueEmailAdmitted>[0] = {
   id: emailId,
   teamId,
   createdAt: new Date(createdAt),
@@ -54,7 +53,7 @@ const row = {
   broadcastId: null,
   contactId: null,
   topicId: null,
-} as typeof schema.emails.$inferSelect;
+};
 
 describe("closed campaign queue admission", () => {
   it("admits the original parked row prospectively, without mutating it", () => {

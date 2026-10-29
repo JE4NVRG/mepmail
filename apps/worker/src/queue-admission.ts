@@ -48,7 +48,22 @@ export function queueAdmissionScope(admission?: QueueAdmission): SQL | undefined
   );
 }
 
-type QueueEmail = typeof schema.emails.$inferSelect;
+type QueueEmail = Pick<
+  typeof schema.emails.$inferSelect,
+  | "id"
+  | "teamId"
+  | "createdAt"
+  | "from"
+  | "to"
+  | "cc"
+  | "bcc"
+  | "sentAt"
+  | "sesMessageId"
+  | "latestStatus"
+  | "broadcastId"
+  | "contactId"
+  | "topicId"
+>;
 /** Prospective admission only; the send lane still rechecks every live guard. */
 export function queueEmailAdmitted(email: QueueEmail, admission?: QueueAdmission): boolean {
   const policy = admission?.policy;
