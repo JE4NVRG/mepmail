@@ -35,6 +35,7 @@ import {
   deriveTrackingKey,
   deriveUnsubscribeKey,
   eraseRecipient,
+  extractAddrSpec,
   failQueuedMailboxOutbox,
   getInstanceSettings,
   hashRecipient,
@@ -314,6 +315,29 @@ const queue = await Queue.start(env.DATABASE_URL, { workers: true });
 // otherwise: broadcast fan-out always, drained or reconciled rows by origin.
 // A page of sends is one statement; a single send is a page of one.
 const enqueueSends: EnqueueEmailSends = async (batch) => {
+  if (sendingProviderPolicy?.restoration) {
+    const admitted = [];
+    for (const request of batch) {
+      const [email] = await db
+        .select()
+        .from(schema.emails)
+        .where(eq(schema.emails.id, request.emailId));
+      if (!email || email.sentAt || email.sesMessageId) continue;
+      const cohort = sendingProviderPolicy.restoration.teams[email.teamId];
+      if (
+        !cohort ||
+        !sendingProviderPolicy.allowedTeamIds?.includes(email.teamId) ||
+        email.createdAt.getTime() < Date.parse(cohort.notBefore) ||
+        email.broadcastId ||
+        email.contactId ||
+        email.topicId ||
+        !cohort.senders.includes(extractAddrSpec(email.from).toLowerCase())
+      )
+        continue;
+      admitted.push(request);
+    }
+    batch = admitted;
+  }
   await queue.sendMany(
     "email.send",
     batch.map(({ emailId, startAfter, priority }) => ({

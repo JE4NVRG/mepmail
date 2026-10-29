@@ -6,7 +6,7 @@ export interface SmtpTransport {
   sendMail(mail: {
     envelope: { from: string; to: string[] };
     raw: Buffer;
-  }): Promise<{ messageId?: string }>;
+  }): Promise<{ messageId?: string; response?: string | undefined }>;
 }
 
 /**
@@ -59,7 +59,20 @@ function smtpSender(
         },
         raw: params.raw,
       });
+      if (idPrefix === "smtp-relay:azure:") {
+        const id = azureSmtpReceipt(info.response);
+        // SMTP has accepted DATA: absent receipt is ambiguous, never retry or use RFC Message-ID.
+        if (!id) throw new Error("azure_smtp_accepted_without_receipt");
+        return { messageId: `${idPrefix}${id}` };
+      }
       return { messageId: `${idPrefix}${info.messageId ?? params.emailId}` };
     },
   };
+}
+
+/** Accept exactly one ACS UUID from the successful SMTP DATA response, not MIME headers. */
+export function azureSmtpReceipt(response: string | undefined): string | null {
+  if (!response || !/^250[ -]/.test(response)) return null;
+  const ids = response.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi);
+  return ids?.length === 1 ? (ids[0]?.toLowerCase() ?? null) : null;
 }

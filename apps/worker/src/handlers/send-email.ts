@@ -46,6 +46,7 @@ import { schema } from "@millionsend/db";
 import { type EmailSendPriority, emailSendPriority } from "@millionsend/queue";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { createTransport } from "nodemailer";
+import { claimAzureSend } from "../../../../packages/core/src/azure-send-claim.js";
 import {
   campaignMessage,
   checkCampaignMessage,
@@ -518,6 +519,25 @@ export async function sendEmail(
           )
       )[0]
     : undefined;
+  const preliminaryRoute = resolveSendingProvider(deps.sendingProviderPolicy ?? null, {
+    teamId: email.teamId,
+    messageClass:
+      email.broadcastId || email.contactId || email.topicId ? "campaign" : "transactional",
+    createdAt: email.createdAt,
+    fromAddress: extractAddrSpec(email.from).toLowerCase(),
+    legacyProvider: "ses",
+    availableProviders: new Set([
+      "ses",
+      ...(deps.relay?.name === "azure" &&
+      deps.sendingProviderPolicy?.restoration &&
+      (domain?.relayEnabledAt || !email.domainId)
+        ? ["azure_smtp"]
+        : []),
+      ...(deps.relay && domain?.relayEnabledAt ? ["customer_smtp"] : []),
+    ]),
+  });
+  if (preliminaryRoute.kind === "held") return "parked";
+  const azureRoute = preliminaryRoute.provider === "azure_smtp";
   // SES at its 24-hour ceiling in this region: park before building anything,
   // the way an over-plan email parks at accept. The drain releases it as the
   // window frees. A bulk row parks earlier, at the broadcast share (or while
@@ -528,7 +548,7 @@ export async function sendEmail(
   }
   // A provider/account stop is not permission to replay through another account,
   // region or relay. Capacity-only exhaustion retains its existing quota path.
-  if (deps.sesQuota?.accountPaused?.(domain?.region) === true) {
+  if (!azureRoute && deps.sesQuota?.accountPaused?.(domain?.region) === true) {
     await parkQueued(db, email, "SES account paused");
     if (!bulk) deps.sesQuota.noteTransactionalParked?.(domain?.region);
     return "parked";
@@ -536,7 +556,7 @@ export async function sendEmail(
   // Account pauses never select another provider. Operator-configured customer
   // external-mailbox transports are a separate Correio adapter, not this lane.
   const region = domain?.region;
-  if (bulk) {
+  if (!azureRoute && bulk) {
     if (deps.sesQuota?.bulkExhausted?.(region) || deps.sesQuota?.paused?.(region)) {
       await parkQueued(
         db,
@@ -545,7 +565,7 @@ export async function sendEmail(
       );
       return "parked";
     }
-  } else if (deps.sesQuota?.exhausted(region)) {
+  } else if (!azureRoute && deps.sesQuota?.exhausted(region)) {
     await parkQueued(db, email, "SES 24h quota reached or account paused");
     deps.sesQuota.noteTransactionalParked?.(region);
     return "parked";
@@ -559,7 +579,8 @@ export async function sendEmail(
   // associated, so the tenant rides along only once the row is marked.
   // The shared onboarding sender is an identity of this instance's own SES
   // account: no team domain, the default region and configuration set.
-  const platformSend = !email.domainId && isOnboardingSender(email.from, deps.onboardingEmailFrom);
+  const platformSend =
+    !email.domainId && (isOnboardingSender(email.from, deps.onboardingEmailFrom) || azureRoute);
   if (!platformSend && domain?.status !== "verified") {
     // Terminal, not retried: a domain demoted or deleted after accept does
     // not come back on its own, and the row would otherwise ride the retry
@@ -820,16 +841,20 @@ export async function sendEmail(
   });
   const route = resolveSendingProvider(deps.sendingProviderPolicy ?? null, {
     teamId: email.teamId,
+    createdAt: email.createdAt,
+    fromAddress: extractAddrSpec(email.from).toLowerCase(),
     messageClass:
       routingInsights.marketing || campaignMessage(campaignInput) ? "campaign" : "transactional",
     legacyProvider: "ses",
     availableProviders: new Set([
       "ses",
+      ...(azureRoute ? ["azure_smtp"] : []),
       ...(deps.relay && domain?.relayEnabledAt ? ["customer_smtp"] : []),
     ]),
     blockedProviders: new Set(deps.sesQuota?.accountPaused?.(region) ? ["ses"] : []),
   });
   if (route.kind === "held") {
+    if (deps.sendingProviderPolicy?.restoration) return "parked";
     await parkQueued(db, email, `sending policy: ${route.reason}`);
     return "parked";
   }
@@ -849,7 +874,7 @@ export async function sendEmail(
 
   // The rate-limit wait comes before the final re-check so that check stays
   // immediately ahead of the claim.
-  await deps.throttle?.(region);
+  if (!azureRoute) await deps.throttle?.(region);
 
   // Re-check immediately before the atomic claim: quota delays and throttling
   // can leave a row queued long enough for a recipient to opt out after the
@@ -883,7 +908,7 @@ export async function sendEmail(
     }
   }
 
-  if (deps.sesQuota?.accountPaused?.(domain?.region) === true) {
+  if (!azureRoute && deps.sesQuota?.accountPaused?.(domain?.region) === true) {
     await parkQueued(db, email, "SES account paused");
     return "parked";
   }
@@ -898,18 +923,31 @@ export async function sendEmail(
   // double-send windows — a concurrent worker on the same job, and a retry
   // after SES accepted but the post-send bookkeeping failed. Claimed rows
   // are simply skipped on the next attempt.
-  const claimed = await db
-    .update(schema.emails)
-    .set({ sentAt: new Date() })
-    .where(
-      and(
-        eq(schema.emails.id, email.id),
-        eq(schema.emails.latestStatus, "queued"),
-        isNull(schema.emails.sentAt),
-      ),
-    )
-    .returning({ id: schema.emails.id });
-  if (claimed.length === 0) return "skipped";
+  if (azureRoute) {
+    const claim = await claimAzureSend(db, {
+      emailId: email.id,
+      teamId: email.teamId,
+      recipients: countDistinctRecipients(email.to, email.cc, email.bcc),
+    });
+    if (claim === "skipped") return "skipped";
+    if (claim === "quota") {
+      await deps.reschedule?.(email.id, new Date(Date.now() + 60_000), emailSendPriority(email));
+      return "deferred";
+    }
+  } else {
+    const claimed = await db
+      .update(schema.emails)
+      .set({ sentAt: new Date() })
+      .where(
+        and(
+          eq(schema.emails.id, email.id),
+          eq(schema.emails.latestStatus, "queued"),
+          isNull(schema.emails.sentAt),
+        ),
+      )
+      .returning({ id: schema.emails.id });
+    if (claimed.length === 0) return "skipped";
+  }
   // Claim acquisition also awaits the DB. A revoked approval is still a
   // proven non-send, so release this claim without purging the sealed payload.
   try {
@@ -929,7 +967,7 @@ export async function sendEmail(
     throw error;
   }
   // The claim itself awaits the DB; an account probe may close the gate then.
-  if (deps.sesQuota?.accountPaused?.(domain?.region) === true) {
+  if (!azureRoute && deps.sesQuota?.accountPaused?.(domain?.region) === true) {
     await db
       .update(schema.emails)
       .set({ sentAt: null })
@@ -938,7 +976,10 @@ export async function sendEmail(
     return "parked";
   }
 
-  const sender = route.provider === "customer_smtp" ? deps.relay?.sender : deps.ses;
+  const sender =
+    route.provider === "customer_smtp" || route.provider === "azure_smtp"
+      ? deps.relay?.sender
+      : deps.ses;
   if (!sender) throw new Error("selected_sending_provider_unavailable");
   let messageId: string;
   try {
@@ -964,7 +1005,7 @@ export async function sendEmail(
     // SES answers MessageRejected for every message while it has paused the
     // account; a fresh account read tells that apart from a refused message,
     // and the mail parks for the drain instead of failing for good.
-    if (await isSesEnforcementRefusal(err, deps.sesQuota, region)) {
+    if (!azureRoute && (await isSesEnforcementRefusal(err, deps.sesQuota, region))) {
       await db
         .update(schema.emails)
         .set({ sentAt: null })
@@ -973,7 +1014,7 @@ export async function sendEmail(
       if (!bulk) deps.sesQuota?.noteTransactionalParked?.(region);
       return "parked";
     }
-    if (TERMINAL_SES_ERRORS.has(name)) {
+    if (!azureRoute && TERMINAL_SES_ERRORS.has(name)) {
       await failQueuedEmail(db, email.id, `ses_${name}`);
       return "failed";
     }
@@ -990,7 +1031,7 @@ export async function sendEmail(
     // An unclassified error also has unknown acceptance. Only an explicit
     // quota/rate refusal below permits releasing this claim; never replay it
     // via another provider (SMTP included).
-    if (!isSesQuotaRefusal(err) && !isSesThrottle(err)) throw err;
+    if (azureRoute || (!isSesQuotaRefusal(err) && !isSesThrottle(err))) throw err;
     await db
       .update(schema.emails)
       .set({ sentAt: null })

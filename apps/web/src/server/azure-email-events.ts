@@ -77,8 +77,9 @@ const configuration = z.object({
     .max(64)
     .regex(/^[A-Za-z0-9_-]+$/),
   recipients: z.array(z.email().max(254)).min(1).max(20),
+  operational: z.boolean().default(false),
 });
-export type AzureEventConfig = z.infer<typeof configuration>;
+export type AzureEventConfig = z.input<typeof configuration>;
 export interface AzureDeliveryAudit {
   provider: "azure";
   messageId: string;
@@ -91,12 +92,14 @@ export interface AzureDeliveryAudit {
 export interface AzureEventStore {
   /** Must commit the entire batch atomically; conflicting existing IDs reject it. */
   append(teamId: string, events: AzureDeliveryAudit[]): Promise<void>;
+  apply?(events: AzureDeliveryAudit[]): Promise<void>;
 }
 export class AzureEventConflict extends Error {}
 
 /** Lazy, fail-closed: no new build-time or globally required env keys. */
 export function readAzureEventConfig(env: NodeJS.ProcessEnv): AzureEventConfig | null {
   const parsed = configuration.safeParse({
+    operational: env.AZURE_EMAIL_EVENT_OPERATIONAL === "1",
     token: env.AZURE_EMAIL_EVENT_TOKEN,
     topic: env.AZURE_EMAIL_EVENT_TOPIC,
     teamId: env.AZURE_EMAIL_EVENT_TEAM_ID,
@@ -224,7 +227,7 @@ export async function handleAzureEmailEvents(
     const data = delivery.safeParse(event.data);
     if (!data.success || !recent(data.data.deliveryAttemptTimeStamp, now)) return reply(400);
     const recipient = data.data.recipient.toLowerCase();
-    if (!config.recipients.includes(recipient)) return reply(403);
+    if (!config.operational && !config.recipients.includes(recipient)) return reply(403);
     audits.push({
       provider: "azure",
       messageId: data.data.messageId,
@@ -236,7 +239,11 @@ export async function handleAzureEmailEvents(
     });
   }
   try {
-    await dependencies.store().append(config.teamId, audits);
+    const store = dependencies.store();
+    if (config.operational) {
+      if (!store.apply) return reply(503);
+      await store.apply(audits);
+    } else await store.append(config.teamId, audits);
   } catch (error) {
     // Do not serialize DB errors: a failed bind can contain sensitive parameters.
     return reply(error instanceof AzureEventConflict ? 409 : 503);

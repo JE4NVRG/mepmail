@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
+import { hashRecipient } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
+import { schema } from "@millionsend/db";
 import { auditLog } from "@millionsend/db/schema";
 import { eq } from "drizzle-orm";
+import { processProviderEvent } from "../../../../packages/core/src/process-provider-event";
 import {
   AZURE_EMAIL_SOURCE,
   type AzureDeliveryAudit,
@@ -40,6 +43,85 @@ function metadata(event: AzureDeliveryAudit): Record<string, unknown> {
 /** Durable dedupe and append-only audit are the SAME atomic insert, not best-effort logging. */
 export function azureEmailEventStore(db: Db): AzureEventStore {
   return {
+    async apply(events) {
+      // Missing receipt is retryable: callback may beat the sender's durable receipt write.
+      // Preflight the whole batch before effects; a mismatch never mutates any tenant.
+      const matched = [];
+      for (const event of [...events].sort((a, b) => a.eventId.localeCompare(b.eventId))) {
+        if (
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(event.messageId)
+        )
+          throw new AzureEventConflict();
+        const receipt = `smtp-relay:azure:${event.messageId.toLowerCase()}`;
+        const [email] = await db
+          .select()
+          .from(schema.emails)
+          .where(eq(schema.emails.sesMessageId, receipt));
+        if (!email) throw new Error("azure_receipt_pending_or_unknown");
+        const recipient = [...email.to, ...(email.cc ?? []), ...(email.bcc ?? [])].find(
+          (r) => hashRecipient(r) === event.recipientHash,
+        );
+        if (!recipient || !email.sentAt) throw new AzureEventConflict();
+        matched.push({ event, receipt, recipient, teamId: email.teamId });
+      }
+      await db.transaction(async (transaction) => {
+        const tx = transaction as unknown as Db;
+        for (const { event, receipt, recipient, teamId } of matched) {
+          const id = azureEventAuditId(event.eventId);
+          const data = metadata(event);
+          const [inserted] = await tx
+            .insert(auditLog)
+            .values({
+              id,
+              teamId,
+              actorId: "system",
+              action: "sending.azure_delivery_report",
+              data,
+            })
+            .onConflictDoNothing({ target: auditLog.id })
+            .returning({ id: auditLog.id });
+          if (!inserted) {
+            const [existing] = await tx.select().from(auditLog).where(eq(auditLog.id, id));
+            if (
+              !existing ||
+              existing.teamId !== teamId ||
+              existing.actorId !== "system" ||
+              existing.action !== "sending.azure_delivery_report" ||
+              !existing.data ||
+              Object.keys(existing.data).length !== 7 ||
+              Object.entries(data).some(([key, value]) => existing.data?.[key] !== value)
+            )
+              throw new AzureEventConflict();
+            continue;
+          }
+          if (event.status === "expanded") continue;
+          const kind =
+            event.status === "delivered"
+              ? "Delivery"
+              : event.status === "hard_bounce"
+                ? "Bounce"
+                : "Reject";
+          await processProviderEvent(
+            tx,
+            {
+              eventType: kind,
+              sesMessageId: receipt,
+              occurredAt: event.deliveryAttemptTime,
+              data: metadata(event),
+              ...(kind === "Bounce"
+                ? { bounce: { bounceType: "Permanent", recipients: [recipient] } }
+                : {}),
+            },
+            {
+              snsMessageId: `azure:${event.eventId}`,
+              expectedRecipientHash: event.recipientHash,
+              // Persist the existing webhook outbox; existing reconcile sweep drains it.
+              enqueueWebhookDelivery: async () => {},
+            },
+          );
+        }
+      });
+    },
     async append(teamId, events) {
       await db.transaction(async (tx) => {
         // Stable order prevents opposite-order batches from deadlocking their PK inserts.
