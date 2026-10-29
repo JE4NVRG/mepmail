@@ -148,7 +148,15 @@ export async function handleAzureEmailEvents(
   if (!config) return reply(503);
   // Credentials belong only in the dedicated header, never URL/query parameters.
   if (new URL(request.url).search) return reply(400);
-  if (request.headers.get("aeg-subscription-name") !== config.subscription) return reply(403);
+  // Azure may vary the casing of this ASCII identifier; credentials stay case-sensitive.
+  const subscription = request.headers.get("aeg-subscription-name");
+  if (
+    !subscription ||
+    !/^[A-Za-z0-9_-]+$/.test(subscription) ||
+    subscription.toLowerCase() !== config.subscription.toLowerCase()
+  ) {
+    return reply(403);
+  }
   const kind = request.headers.get("aeg-event-type");
   if (kind !== "Notification" && kind !== "SubscriptionValidation") return reply(400);
   const token = request.headers.get("x-mepmail-azure-event-token");

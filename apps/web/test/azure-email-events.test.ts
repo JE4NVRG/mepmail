@@ -227,6 +227,98 @@ describe("own-pilot Azure Event Grid receiver", () => {
     fetchSpy.mockRestore();
   });
 
+  const subscriptionCases = [
+    "MEPMAIL-OWN-PILOT-FIXTURE",
+    "MePmAiL-OwN-PiLoT-FiXtUrE",
+    "mepmail-own-pilot-fixture",
+  ];
+  const callbackKinds = ["Notification", "SubscriptionValidation"] as const;
+  function callbackEvent(kind: (typeof callbackKinds)[number], id: string) {
+    return kind === "Notification"
+      ? event(id)
+      : {
+          ...event(id),
+          topic: "/control-plane/validation",
+          eventType: "Microsoft.EventGrid.SubscriptionValidationEvent",
+          dataVersion: "1",
+          data: {
+            validationCode: "synthetic-case-challenge",
+            validationUrl: "http://169.254.169.254/forbidden",
+          },
+        };
+  }
+
+  for (const kind of callbackKinds) {
+    it.each(subscriptionCases)(`accepts ${kind} subscription casing %s only`, async (name) => {
+      const id = `case-${kind}-${name}`;
+      const req = request([callbackEvent(kind, id)], {
+        "aeg-event-type": kind,
+        "aeg-subscription-name": name,
+      });
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("no network"));
+      try {
+        const response = await (kind === "Notification" ? accept(req) : reject(req));
+        expect(response.status).toBe(200);
+        if (kind === "SubscriptionValidation") {
+          expect(await response.json()).toEqual({ validationResponse: "synthetic-case-challenge" });
+        }
+        const rows = await fixture.db
+          .select()
+          .from(schema.auditLog)
+          .where(eq(schema.auditLog.id, azureEventAuditId(id)));
+        expect(rows).toHaveLength(kind === "Notification" ? 1 : 0);
+        if (kind === "Notification") {
+          expect(rows[0]?.teamId).toBe(env.AZURE_EMAIL_EVENT_TEAM_ID);
+          expect(rows[0]?.data?.eventId).toBe(id);
+        }
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(noStore).not.toHaveBeenCalled();
+        expect(env.AZURE_EMAIL_EVENT_SUBSCRIPTION).toBe("mepmail-own-pilot-fixture");
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it(`rejects missing or distinct ${kind} subscription names before persistence`, async () => {
+      for (const name of [
+        undefined,
+        "",
+        "other",
+        "prefix-MEPMAIL-OWN-PILOT-FIXTURE",
+        "MEPMAIL-OWN-PILOT-FIXTURE-suffix",
+        "MEPMAIL-OWN-PILOT-FIXTUR",
+        "MEPMAIL_OWN_PILOT_FIXTURE",
+        "MEPMAIL-OWN-PILOT-FIXTURE, other",
+      ]) {
+        const req = request([callbackEvent(kind, "rejected-name")], {
+          "aeg-event-type": kind,
+        });
+        if (name === undefined) req.headers.delete("aeg-subscription-name");
+        else req.headers.set("aeg-subscription-name", name);
+        expect((await reject(req)).status).toBe(403);
+      }
+      expect(noStore).not.toHaveBeenCalled();
+    });
+
+    it(`still requires exact ${kind} token with a case-varied subscription`, async () => {
+      for (const token of [
+        undefined,
+        "",
+        "incorrect-token",
+        env.AZURE_EMAIL_EVENT_TOKEN.toUpperCase(),
+      ]) {
+        const req = request([callbackEvent(kind, "rejected-token")], {
+          "aeg-event-type": kind,
+          "aeg-subscription-name": "MePmAiL-OwN-PiLoT-FiXtUrE",
+        });
+        if (token === undefined) req.headers.delete("x-mepmail-azure-event-token");
+        else req.headers.set("x-mepmail-azure-event-token", token);
+        expect((await reject(req)).status).toBe(401);
+      }
+      expect(noStore).not.toHaveBeenCalled();
+    });
+  }
+
   it("persists one audit across concurrent/restarted delivery, with exact metadata projection", async () => {
     const responses = await Promise.all(
       Array.from({ length: 8 }, () => accept(request([event("concurrent")]))),
