@@ -5,12 +5,15 @@ import {
   type SmtpTransport,
 } from "../src/handlers/smtp-fallback.js";
 
-function fakeTransport(messageId?: string) {
+function fakeTransport(messageId?: string, response?: string) {
   const mails: Parameters<SmtpTransport["sendMail"]>[0][] = [];
   const transport: SmtpTransport = {
     async sendMail(mail) {
       mails.push(mail);
-      return messageId === undefined ? {} : { messageId };
+      return {
+        ...(messageId === undefined ? {} : { messageId }),
+        ...(response ? { response } : {}),
+      };
     },
   };
   return { transport, mails };
@@ -19,7 +22,11 @@ function fakeTransport(messageId?: string) {
 const raw = Buffer.from("From: Acme <billing@acme.dev>\r\nSubject: hi\r\n\r\nhi\r\n");
 
 it("the customer relay sends the raw MIME from the message's own From, to every recipient", async () => {
-  const { transport, mails } = fakeTransport("<abc@relay.example>");
+  // RFC Message-ID is deliberately different: Azure correlation uses the DATA receipt.
+  const { transport, mails } = fakeTransport(
+    "<abc@relay.example>",
+    "250 2.0.0 OK 00000000-0000-4000-8000-000000000001",
+  );
   const relay = createCustomerSmtpRelay(
     "smtps://res.app.tenant:pw@smtp.example:465",
     "azure",
@@ -35,7 +42,7 @@ it("the customer relay sends the raw MIME from the message's own From, to every 
     region: "us-east-1",
     envelopeFrom: "billing@acme.dev",
   });
-  expect(sent.messageId).toBe("smtp-relay:azure:<abc@relay.example>");
+  expect(sent.messageId).toBe("smtp-relay:azure:00000000-0000-4000-8000-000000000001");
   expect(mails).toEqual([
     {
       envelope: {
