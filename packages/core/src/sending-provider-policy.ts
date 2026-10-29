@@ -138,13 +138,16 @@ export function resolveSendingProvider(
     const campaign = policy.restoration.campaignCohort;
     if (campaign?.teamId === input.teamId) {
       const message = campaign.messages.find((m) => m.emailId === input.emailId);
+      const recipient = input.to?.[0];
       if (
         !message ||
         input.messageClass !== "campaign" ||
         input.createdAt?.getTime() !== Date.parse(message.createdAt) ||
         input.fromAddress?.toLowerCase() !== campaign.from ||
         input.to?.length !== 1 ||
-        createHash("sha256").update(input.to[0].trim().toLowerCase()).digest("hex") !==
+        typeof recipient !== "string" ||
+        recipient.trim().length === 0 ||
+        createHash("sha256").update(recipient.trim().toLowerCase()).digest("hex") !==
           message.recipientHash ||
         (input.cc?.length ?? 0) !== 0 ||
         (input.bcc?.length ?? 0) !== 0 ||
