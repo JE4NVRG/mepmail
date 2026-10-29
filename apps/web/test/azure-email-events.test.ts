@@ -465,8 +465,9 @@ describe("own-pilot Azure Event Grid receiver", () => {
           eventTime: new Date(now).toISOString(),
           deliveryAttemptTime: new Date(value).toISOString(),
         });
+        expect(rows[0]?.data).not.toHaveProperty("deliveryAttemptTimestamp");
         expect(JSON.stringify(rows)).not.toMatch(
-          /DROP-ME|own-pilot@|untrusted-team|synthetic-only|deliveryAttemptTimestamp/,
+          /DROP-ME|own-pilot@|untrusted-team|synthetic-only/,
         );
       },
     );
