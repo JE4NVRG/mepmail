@@ -436,6 +436,191 @@ describe("own-pilot Azure Event Grid receiver", () => {
     expect(noStore).not.toHaveBeenCalled();
   });
 
+  const timestampAliases = ["deliveryAttemptTimeStamp", "deliveryAttemptTimestamp"] as const;
+  function timestampEvent(id: string, values: Record<string, unknown>) {
+    const base = event(id);
+    const { deliveryAttemptTimeStamp: _discard, ...data } = base.data;
+    return { ...base, data: { ...data, ...values } };
+  }
+  const deliveryTimes = ["2026-10-28T11:59:59.1234567Z", "2026-10-28T08:59:59.1234567-03:00"];
+  for (const alias of timestampAliases) {
+    it.each(deliveryTimes)(
+      `accepts documented ${alias} timestamp %s with exact private projection`,
+      async (value) => {
+        const id = `timestamp-${alias}-${deliveryTimes.indexOf(value)}`;
+        const response = await accept(request([timestampEvent(id, { [alias]: value })]));
+        expect(response.status).toBe(200);
+        const rows = await fixture.db
+          .select()
+          .from(schema.auditLog)
+          .where(eq(schema.auditLog.id, azureEventAuditId(id)));
+        expect(rows).toHaveLength(1);
+        expect(rows[0]?.teamId).toBe(env.AZURE_EMAIL_EVENT_TEAM_ID);
+        expect(rows[0]?.data).toEqual({
+          provider: "azure",
+          eventId: id,
+          messageId: "message-fixture-1",
+          status: "delivered",
+          recipientHash: createHash("sha256").update("own-pilot@example.invalid").digest("hex"),
+          eventTime: new Date(now).toISOString(),
+          deliveryAttemptTime: new Date(value).toISOString(),
+        });
+        expect(JSON.stringify(rows)).not.toMatch(
+          /DROP-ME|own-pilot@|untrusted-team|synthetic-only|deliveryAttemptTimestamp/,
+        );
+      },
+    );
+
+    it(`rejects invalid ${alias} timestamps before persistence even in a partial batch`, async () => {
+      for (const value of [
+        undefined,
+        null,
+        0,
+        true,
+        "",
+        "invalid",
+        "2026-10-28",
+        "2026-10-28T11:59:59",
+        "2026-10-28T11:59:59+0300",
+        "2026-02-30T11:59:59Z",
+        new Date(now - 26 * 3600000 - 1).toISOString(),
+        new Date(now + 300001).toISOString(),
+      ]) {
+        const beforeCalls = noStore.mock.calls.length;
+        expect(
+          (
+            await reject(
+              request([event("partial-valid"), timestampEvent("invalid-time", { [alias]: value })]),
+            )
+          ).status,
+        ).toBe(400);
+        expect(noStore.mock.calls.length).toBe(beforeCalls);
+      }
+      for (const value of [
+        new Date(now - 26 * 3600000).toISOString(),
+        new Date(now + 300000).toISOString(),
+      ]) {
+        const id = `boundary-${alias}-${value}`;
+        expect((await accept(request([timestampEvent(id, { [alias]: value })]))).status).toBe(200);
+      }
+      expect(noStore).not.toHaveBeenCalled();
+    });
+
+    it(`preserves auth, tenant, recipient and version guards with ${alias}`, async () => {
+      const base = timestampEvent(`scope-${alias}`, { [alias]: deliveryTimes[0] });
+      for (const [patch, status] of [
+        [{ topic: "/other/resource" }, 403],
+        [{ dataVersion: "2" }, 400],
+        [{ metadataVersion: "2" }, 400],
+        [{ data: { ...base.data, recipient: "customer@example.invalid" } }, 403],
+      ] as const)
+        expect((await reject(request([{ ...base, ...patch }]))).status).toBe(status);
+      expect((await reject(request([base], { "aeg-subscription-name": "other" }))).status).toBe(
+        403,
+      );
+      expect(
+        (
+          await reject(
+            request([base], {
+              "aeg-subscription-name": "MePmAiL-OwN-PiLoT-FiXtUrE",
+              "x-mepmail-azure-event-token": env.AZURE_EMAIL_EVENT_TOKEN.toUpperCase(),
+            }),
+          )
+        ).status,
+      ).toBe(401);
+      expect(noStore).not.toHaveBeenCalled();
+    });
+  }
+
+  it.each(deliveryTimes)("accepts identical explicit timestamp aliases %s", async (value) => {
+    expect(
+      (
+        await accept(
+          request([
+            timestampEvent(`identical-${deliveryTimes.indexOf(value)}`, {
+              deliveryAttemptTimeStamp: value,
+              deliveryAttemptTimestamp: value,
+            }),
+          ]),
+        )
+      ).status,
+    ).toBe(200);
+  });
+
+  it("rejects ambiguous, invalid, missing and arbitrary case timestamp keys before persistence", async () => {
+    for (const values of [
+      {},
+      { deliveryattempttimestamp: deliveryTimes[0] },
+      { DeliveryAttemptTimestamp: deliveryTimes[0] },
+      { deliveryAttemptTimeStamp: deliveryTimes[0], deliveryAttemptTimestamp: deliveryTimes[1] },
+      {
+        deliveryAttemptTimeStamp: deliveryTimes[0],
+        deliveryAttemptTimestamp: "2026-10-28T11:59:59.1234568Z",
+      },
+      {
+        deliveryAttemptTimeStamp: deliveryTimes[0],
+        deliveryAttemptTimestamp: "2026-10-28T11:59:59.123Z",
+      },
+      {
+        deliveryAttemptTimeStamp: deliveryTimes[0],
+        deliveryAttemptTimestamp: "2026-10-28T11:59:58.1234567Z",
+      },
+      ...timestampAliases.flatMap((alias) =>
+        [null, 0, "invalid"].map((value) => ({
+          deliveryAttemptTimeStamp: deliveryTimes[0],
+          deliveryAttemptTimestamp: deliveryTimes[0],
+          [alias]: value,
+        })),
+      ),
+    ])
+      expect(
+        (await reject(request([event("ambiguous-partial"), timestampEvent("ambiguous", values)])))
+          .status,
+      ).toBe(400);
+    expect(noStore).not.toHaveBeenCalled();
+    const fresh = "partial-never-persisted";
+    expect((await accept(request([event(fresh), timestampEvent("missing-time", {})]))).status).toBe(
+      400,
+    );
+    expect(
+      await fixture.db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, azureEventAuditId(fresh))),
+    ).toHaveLength(0);
+  });
+
+  it("deduplicates equivalent facts across aliases and rolls back shifted-fact conflicts", async () => {
+    const id = "cross-alias-dedupe";
+    const legacy = timestampEvent(id, { deliveryAttemptTimeStamp: deliveryTimes[0] });
+    const modern = timestampEvent(id, { deliveryAttemptTimestamp: deliveryTimes[0] });
+    expect((await accept(request([legacy, modern]))).status).toBe(200);
+    expect((await accept(request([modern]))).status).toBe(200);
+    const rows = await fixture.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.id, azureEventAuditId(id)));
+    expect(rows).toHaveLength(1);
+    expect(Object.keys(rows[0]?.data ?? {})).toHaveLength(7);
+    expect(JSON.stringify(rows)).not.toMatch(/DROP-ME|own-pilot@|untrusted-team|synthetic-only/);
+    const fresh = "cross-alias-conflict-new";
+    const shifted = timestampEvent(id, {
+      deliveryAttemptTimestamp: "2026-10-28T11:59:58.1234567Z",
+    });
+    expect((await accept(request([event(fresh), shifted]))).status).toBe(409);
+    expect(
+      await fixture.db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, azureEventAuditId(fresh))),
+    ).toHaveLength(0);
+    const [unchanged] = await fixture.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.id, azureEventAuditId(id)));
+    expect(unchanged?.data).toEqual(rows[0]?.data);
+  });
+
   it("persists one audit across concurrent/restarted delivery, with exact metadata projection", async () => {
     const responses = await Promise.all(
       Array.from({ length: 8 }, () => accept(request([event("concurrent")]))),

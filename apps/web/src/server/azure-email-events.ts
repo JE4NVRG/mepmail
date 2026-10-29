@@ -31,20 +31,38 @@ const statuses = {
   Expanded: "expanded",
   Failed: "failed",
 } as const;
-const delivery = z.object({
-  messageId: identifier,
-  recipient: z.email().max(254),
-  status: z.enum([
-    "Delivered",
-    "Bounced",
-    "Suppressed",
-    "Quarantined",
-    "FilteredSpam",
-    "Expanded",
-    "Failed",
-  ]),
-  deliveryAttemptTimeStamp: timestamp,
-});
+const delivery = z
+  .object({
+    messageId: identifier,
+    recipient: z.email().max(254),
+    status: z.enum([
+      "Delivered",
+      "Bounced",
+      "Suppressed",
+      "Quarantined",
+      "FilteredSpam",
+      "Expanded",
+      "Failed",
+    ]),
+    deliveryAttemptTimeStamp: timestamp.optional(),
+    deliveryAttemptTimestamp: timestamp.optional(),
+  })
+  .transform(({ deliveryAttemptTimestamp, ...data }, ctx) => {
+    // ACS documents exactly these two spellings. Never case-fold arbitrary JSON keys.
+    const value = data.deliveryAttemptTimeStamp ?? deliveryAttemptTimestamp;
+    if (
+      value === undefined ||
+      (data.deliveryAttemptTimeStamp !== undefined &&
+        deliveryAttemptTimestamp !== undefined &&
+        data.deliveryAttemptTimeStamp !== deliveryAttemptTimestamp)
+    ) {
+      // Compare original strings, not parsed instants: precision/offset differences conflict.
+      ctx.addIssue({ code: "custom", message: "Invalid delivery timestamp aliases" });
+      return z.NEVER;
+    }
+    // Keep the existing canonical projection; never retain the alternate key.
+    return { ...data, deliveryAttemptTimeStamp: value };
+  });
 const configuration = z.object({
   token: z
     .string()
