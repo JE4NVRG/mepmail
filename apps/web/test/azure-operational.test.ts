@@ -17,6 +17,7 @@ beforeAll(async () => {
 afterAll(async () => fixture?.close());
 const now = new Date();
 const env = {
+  NODE_ENV: "test" as const,
   AZURE_EMAIL_EVENT_TOKEN: "synthetic-public-fixture-never-a-live-credential",
   AZURE_EMAIL_EVENT_TOPIC: AZURE_EMAIL_SOURCE,
   AZURE_EMAIL_EVENT_TEAM_ID: "00000000-0000-4000-8000-000000000001",

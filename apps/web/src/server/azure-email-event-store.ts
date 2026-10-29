@@ -46,7 +46,12 @@ export function azureEmailEventStore(db: Db): AzureEventStore {
     async apply(events) {
       // Missing receipt is retryable: callback may beat the sender's durable receipt write.
       // Preflight the whole batch before effects; a mismatch never mutates any tenant.
-      const matched = [];
+      const matched: {
+        event: AzureDeliveryAudit;
+        receipt: string;
+        recipient: string;
+        teamId: string;
+      }[] = [];
       for (const event of [...events].sort((a, b) => a.eventId.localeCompare(b.eventId))) {
         if (
           !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(event.messageId)
