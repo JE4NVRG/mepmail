@@ -200,14 +200,22 @@ describe("own-pilot Azure Event Grid receiver", () => {
         )
       ).status,
     ).toBe(403);
+    // Real Azure provisioning metadata is not the delivery-report source.
+    // Auth and exact subscription remain mandatory; this cannot persist data.
+    const provisioned = await reject(
+      request([{ ...challenge, topic: "/control-plane/validation" }], {
+        "aeg-event-type": "SubscriptionValidation",
+      }),
+    );
+    expect(provisioned.status).toBe(200);
+    expect(await provisioned.json()).toEqual({ validationResponse: "synthetic-challenge" });
+    const unauthenticated = request([{ ...challenge, topic: "/control-plane/validation" }], {
+      "aeg-event-type": "SubscriptionValidation",
+    });
+    unauthenticated.headers.delete("x-mepmail-azure-event-token");
+    expect((await reject(unauthenticated)).status).toBe(401);
     expect(
-      (
-        await reject(
-          request([{ ...challenge, topic: "/other" }], {
-            "aeg-event-type": "SubscriptionValidation",
-          }),
-        )
-      ).status,
+      (await reject(request([{ ...event(), topic: "/control-plane/validation" }]))).status,
     ).toBe(403);
     expect(
       (await reject(request([challenge, event()], { "aeg-event-type": "SubscriptionValidation" })))

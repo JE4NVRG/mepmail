@@ -168,7 +168,13 @@ export async function handleAzureEmailEvents(
   if (!parsed.success) return reply(400);
   const now = dependencies.now?.() ?? Date.now();
   for (const event of parsed.data) {
-    if (event.topic.toLowerCase() !== config.topic.toLowerCase()) return reply(403);
+    // Delivery reports carry the ACS source. Provisioning metadata is NOT a
+    // delivery authorization boundary: its topic may differ in Azure's live
+    // handshake. Both still require the exclusive token + exact subscription;
+    // validation is singleton/code-only, performs no persistence or URL fetch.
+    if (kind === "Notification" && event.topic.toLowerCase() !== config.topic.toLowerCase()) {
+      return reply(403);
+    }
     if (!recent(event.eventTime, now)) return reply(400);
   }
   if (kind === "SubscriptionValidation") {
