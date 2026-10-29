@@ -19,6 +19,7 @@ vi.mock("@millionsend/db", async (original) => ({
 
 // Deliberately synthetic fixture, NEVER a credential for any live endpoint.
 const env = {
+  NODE_ENV: "test" as const,
   AZURE_EMAIL_EVENT_TOKEN: "synthetic-only-azure-event-token-not-a-real-secret",
   AZURE_EMAIL_EVENT_TOPIC: AZURE_EMAIL_SOURCE,
   AZURE_EMAIL_EVENT_TEAM_ID: "c2c23da1-544c-4c3b-8a84-f2e9bb3cfa4e",
@@ -87,7 +88,7 @@ describe("own-pilot Azure Event Grid receiver", () => {
     });
 
   it("fails closed for every missing config and malformed server config before persistence", async () => {
-    for (const key of Object.keys(env)) {
+    for (const key of Object.keys(env).filter((name) => name.startsWith("AZURE_EMAIL_EVENT_"))) {
       expect((await reject(request([event()]), { ...env, [key]: undefined })).status).toBe(503);
     }
     for (const patch of [
