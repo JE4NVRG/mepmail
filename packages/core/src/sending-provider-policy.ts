@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 
 /** Routing is operator-owned configuration, never a client-supplied send option. */
@@ -13,6 +14,25 @@ const policySchema = z
     allowedTeamIds: z.array(z.uuid()).max(10_000).optional(),
     restoration: z
       .object({
+        campaignCohort: z
+          .object({
+            teamId: z.uuid(),
+            from: z.email(),
+            messages: z
+              .array(
+                z
+                  .object({
+                    emailId: z.uuid(),
+                    createdAt: z.iso.datetime({ offset: true }),
+                    recipientHash: z.string().regex(/^[a-f0-9]{64}$/),
+                  })
+                  .strict(),
+              )
+              .min(1)
+              .max(5),
+          })
+          .strict()
+          .optional(),
         teams: z.record(
           z.uuid(),
           z
@@ -69,6 +89,18 @@ export function parseSendingProviderPolicy(raw: string | undefined): SendingProv
   ) {
     throw new Error("sending_provider_restoration_must_be_closed");
   }
+  const campaign = policy.restoration?.campaignCohort;
+  if (
+    campaign &&
+    (policy.restoration?.teams[campaign.teamId] !== undefined ||
+      !policy.allowedTeamIds?.includes(campaign.teamId) ||
+      policy.teams?.[campaign.teamId]?.transactional !== "disabled" ||
+      policy.teams?.[campaign.teamId]?.campaign !== "azure_smtp" ||
+      campaign.from !== campaign.from.toLowerCase() ||
+      new Set(campaign.messages.map((m) => m.emailId)).size !== campaign.messages.length ||
+      campaign.messages.some((m) => !/^[a-f0-9]{64}$/.test(m.recipientHash)))
+  )
+    throw new Error("sending_provider_campaign_must_be_closed");
   return policy;
 }
 
@@ -83,6 +115,13 @@ export function resolveSendingProvider(
   input: {
     teamId: string;
     messageClass: SendingMessageClass;
+    emailId?: string;
+    to?: readonly string[];
+    cc?: readonly string[] | null;
+    bcc?: readonly string[] | null;
+    sentAt?: Date | null;
+    sesMessageId?: string | null;
+    latestStatus?: string;
     createdAt?: Date;
     fromAddress?: string;
     legacyProvider: "ses" | "customer_smtp";
@@ -96,17 +135,37 @@ export function resolveSendingProvider(
     return { kind: "held", reason: "team_not_allowed" };
   }
   if (policy?.restoration) {
-    const cohort = policy.restoration.teams[input.teamId];
-    if (
-      !cohort ||
-      input.messageClass !== "transactional" ||
-      !input.createdAt ||
-      !Number.isFinite(input.createdAt.getTime()) ||
-      input.createdAt.getTime() < Date.parse(cohort.notBefore) ||
-      !input.fromAddress ||
-      !cohort.senders.includes(input.fromAddress.toLowerCase())
-    ) {
-      return { kind: "held", reason: "restoration_fenced" };
+    const campaign = policy.restoration.campaignCohort;
+    if (campaign?.teamId === input.teamId) {
+      const message = campaign.messages.find((m) => m.emailId === input.emailId);
+      if (
+        !message ||
+        input.messageClass !== "campaign" ||
+        input.createdAt?.getTime() !== Date.parse(message.createdAt) ||
+        input.fromAddress?.toLowerCase() !== campaign.from ||
+        input.to?.length !== 1 ||
+        createHash("sha256").update(input.to[0].trim().toLowerCase()).digest("hex") !==
+          message.recipientHash ||
+        (input.cc?.length ?? 0) !== 0 ||
+        (input.bcc?.length ?? 0) !== 0 ||
+        input.sentAt !== null ||
+        input.sesMessageId !== null ||
+        input.latestStatus !== "queued"
+      )
+        return { kind: "held", reason: "restoration_fenced" };
+    } else {
+      const cohort = policy.restoration.teams[input.teamId];
+      if (
+        !cohort ||
+        input.messageClass !== "transactional" ||
+        !input.createdAt ||
+        !Number.isFinite(input.createdAt.getTime()) ||
+        input.createdAt.getTime() < Date.parse(cohort.notBefore) ||
+        !input.fromAddress ||
+        !cohort.senders.includes(input.fromAddress.toLowerCase())
+      ) {
+        return { kind: "held", reason: "restoration_fenced" };
+      }
     }
   }
   const team = policy?.teams?.[input.teamId]?.[input.messageClass];

@@ -50,6 +50,8 @@ export const campaignConsentEvidenceSchema = z
   .strict();
 
 export type CampaignMessage = {
+  /** Internal operator policy declaration; true can only add restrictions. */
+  declaredCampaign?: boolean;
   broadcastId?: string | null | undefined;
   topicId?: string | null | undefined;
   to?: readonly string[] | undefined;
@@ -66,7 +68,7 @@ export type CampaignMessage = {
  * signup-risk, domain and content gates. Classification is defense-in-depth,
  * not a substitute for content screening. */
 export function campaignMessage(input: CampaignMessage): boolean {
-  if (input.broadcastId || input.topicId) return true;
+  if (input.declaredCampaign || input.broadcastId || input.topicId) return true;
   if ((input.to?.length ?? 0) + (input.cc?.length ?? 0) + (input.bcc?.length ?? 0) > 1) return true;
   if (Object.keys(input.headers ?? {}).some((h) => /^(list-unsubscribe|list-id)$/i.test(h)))
     return true;

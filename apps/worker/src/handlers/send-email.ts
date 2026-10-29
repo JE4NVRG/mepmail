@@ -519,10 +519,25 @@ export async function sendEmail(
           )
       )[0]
     : undefined;
+  // Operator declares these existing API rows as campaign, even without broadcast metadata.
+  const closedCampaign =
+    deps.sendingProviderPolicy?.restoration?.campaignCohort?.teamId === email.teamId;
+  const restorationMessage = {
+    emailId: email.id,
+    to: email.to,
+    cc: email.cc,
+    bcc: email.bcc,
+    sentAt: email.sentAt,
+    sesMessageId: email.sesMessageId,
+    latestStatus: email.latestStatus,
+  };
   const preliminaryRoute = resolveSendingProvider(deps.sendingProviderPolicy ?? null, {
+    ...restorationMessage,
     teamId: email.teamId,
     messageClass:
-      email.broadcastId || email.contactId || email.topicId ? "campaign" : "transactional",
+      closedCampaign || email.broadcastId || email.contactId || email.topicId
+        ? "campaign"
+        : "transactional",
     createdAt: email.createdAt,
     fromAddress: extractAddrSpec(email.from).toLowerCase(),
     legacyProvider: "ses",
@@ -646,6 +661,7 @@ export async function sendEmail(
   }
 
   const campaignInput = {
+    declaredCampaign: closedCampaign,
     teamId: email.teamId,
     isCloud: deps.isCloud ?? false,
     from: email.from,
@@ -840,11 +856,14 @@ export async function sendEmail(
     now: new Date(),
   });
   const route = resolveSendingProvider(deps.sendingProviderPolicy ?? null, {
+    ...restorationMessage,
     teamId: email.teamId,
     createdAt: email.createdAt,
     fromAddress: extractAddrSpec(email.from).toLowerCase(),
     messageClass:
-      routingInsights.marketing || campaignMessage(campaignInput) ? "campaign" : "transactional",
+      closedCampaign || routingInsights.marketing || campaignMessage(campaignInput)
+        ? "campaign"
+        : "transactional",
     legacyProvider: "ses",
     availableProviders: new Set([
       "ses",
@@ -928,6 +947,17 @@ export async function sendEmail(
       emailId: email.id,
       teamId: email.teamId,
       recipients: countDistinctRecipients(email.to, email.cc, email.bcc),
+      ...(closedCampaign
+        ? {
+            campaignSnapshot: {
+              createdAt: deps.sendingProviderPolicy!.restoration!.campaignCohort!.messages.find(
+                (message) => message.emailId === email.id,
+              )!.createdAt,
+              from: email.from,
+              to: email.to,
+            },
+          }
+        : {}),
     });
     if (claim === "skipped") return "skipped";
     if (claim === "quota") {
