@@ -187,7 +187,12 @@ export async function handleAzureEmailEvents(
   }
   if (kind === "SubscriptionValidation") {
     const event = parsed.data[0];
-    if (parsed.data.length !== 1 || event?.eventType !== VALIDATION || event.dataVersion !== "1") {
+    // Azure uses both versions for provisioning; delivery remains strictly 1.0 below.
+    if (
+      parsed.data.length !== 1 ||
+      event?.eventType !== VALIDATION ||
+      !["1", "2"].includes(event.dataVersion)
+    ) {
       return reply(400);
     }
     const challenge = z.object({ validationCode: identifier }).safeParse(event.data);

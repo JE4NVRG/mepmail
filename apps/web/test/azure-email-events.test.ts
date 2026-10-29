@@ -319,6 +319,123 @@ describe("own-pilot Azure Event Grid receiver", () => {
     });
   }
 
+  for (const version of ["1", "2"]) {
+    it(`accepts explicit validation version ${version} without persistence or URL fetch`, async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("no network"));
+      try {
+        for (const name of subscriptionCases) {
+          const id = `validation-${version}-${name}`;
+          const response = await reject(
+            request([{ ...callbackEvent("SubscriptionValidation", id), dataVersion: version }], {
+              "aeg-event-type": "SubscriptionValidation",
+              "aeg-subscription-name": name,
+            }),
+          );
+          expect(response.status).toBe(200);
+          expect(await response.json()).toEqual({ validationResponse: "synthetic-case-challenge" });
+          expect(
+            await fixture.db
+              .select()
+              .from(schema.auditLog)
+              .where(eq(schema.auditLog.id, azureEventAuditId(id))),
+          ).toHaveLength(0);
+        }
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(noStore).not.toHaveBeenCalled();
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it(`requires exact token for validation version ${version}`, async () => {
+      for (const token of [
+        undefined,
+        "",
+        "incorrect-token",
+        env.AZURE_EMAIL_EVENT_TOKEN.toUpperCase(),
+      ]) {
+        const req = request(
+          [{ ...callbackEvent("SubscriptionValidation", "v-token"), dataVersion: version }],
+          {
+            "aeg-event-type": "SubscriptionValidation",
+            "aeg-subscription-name": "MePmAiL-OwN-PiLoT-FiXtUrE",
+          },
+        );
+        if (token === undefined) req.headers.delete("x-mepmail-azure-event-token");
+        else req.headers.set("x-mepmail-azure-event-token", token);
+        expect((await reject(req)).status).toBe(401);
+      }
+      expect(noStore).not.toHaveBeenCalled();
+    });
+
+    it(`rejects missing or distinct names for validation version ${version}`, async () => {
+      for (const name of [
+        undefined,
+        "",
+        "other",
+        "prefix-mepmail-own-pilot-fixture",
+        "mepmail-own-pilot-fixture-suffix",
+      ]) {
+        const req = request(
+          [{ ...callbackEvent("SubscriptionValidation", "v-name"), dataVersion: version }],
+          {
+            "aeg-event-type": "SubscriptionValidation",
+          },
+        );
+        if (name === undefined) req.headers.delete("aeg-subscription-name");
+        else req.headers.set("aeg-subscription-name", name);
+        expect((await reject(req)).status).toBe(403);
+      }
+      expect(noStore).not.toHaveBeenCalled();
+    });
+
+    it(`keeps singleton, time, type and challenge guards for validation version ${version}`, async () => {
+      const challenge = {
+        ...callbackEvent("SubscriptionValidation", "v-guard"),
+        dataVersion: version,
+      };
+      for (const body of [
+        [challenge, challenge],
+        [challenge, event()],
+        [event(), challenge],
+        [{ ...challenge, eventTime: new Date(now - 27 * 3600000).toISOString() }],
+        [{ ...challenge, eventTime: new Date(now + 301000).toISOString() }],
+        [{ ...challenge, metadataVersion: "2" }],
+        [{ ...challenge, eventType: event().eventType }],
+        [{ ...challenge, data: { validationUrl: "http://169.254.169.254/forbidden" } }],
+        [{ ...challenge, data: { validationCode: "" } }],
+      ]) {
+        expect(
+          (await reject(request(body, { "aeg-event-type": "SubscriptionValidation" }))).status,
+        ).toBe(400);
+      }
+      expect(noStore).not.toHaveBeenCalled();
+    });
+  }
+
+  it("rejects every unsupported validation data version explicitly", async () => {
+    for (const dataVersion of [undefined, "", "0", "3", "1.0", "2.0", "01", "02", " 2", "2 ", 2]) {
+      const challenge = {
+        ...callbackEvent("SubscriptionValidation", "unsupported-version"),
+        dataVersion,
+      };
+      expect(
+        (await reject(request([challenge], { "aeg-event-type": "SubscriptionValidation" }))).status,
+      ).toBe(400);
+    }
+    expect(noStore).not.toHaveBeenCalled();
+  });
+
+  it("never accepts validation versions for notification delivery", async () => {
+    for (const dataVersion of ["1", "2", "2.0"]) {
+      expect((await reject(request([{ ...event(), dataVersion }]))).status).toBe(400);
+    }
+    expect(
+      (await reject(request([{ ...event(), topic: "/control-plane/validation" }]))).status,
+    ).toBe(403);
+    expect(noStore).not.toHaveBeenCalled();
+  });
+
   it("persists one audit across concurrent/restarted delivery, with exact metadata projection", async () => {
     const responses = await Promise.all(
       Array.from({ length: 8 }, () => accept(request([event("concurrent")]))),
