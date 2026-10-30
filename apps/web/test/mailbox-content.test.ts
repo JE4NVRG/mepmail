@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,6 +39,10 @@ import { mailboxSenderHmacKey } from "@/server/mailbox-sender-key";
 import { mailboxTransportMime } from "@/server/mailbox-transport";
 import { mailboxesRouter } from "@/server/routers/mailboxes";
 import { type Context, createCallerFactory, createContext, router } from "@/server/trpc";
+import {
+  prepareMailboxOptout,
+  validateMailboxOptout,
+} from "../../../packages/core/src/mailbox-optout";
 import { decideMailboxSender } from "../../../packages/core/src/mailbox-senders";
 import { seedMailboxTestService } from "./mailbox-service-fixture";
 
@@ -1903,6 +1907,237 @@ describe("ACS Parent normal Compose lifecycle", () => {
       }),
     );
   }
+
+  const optoutConfig = () => ({
+    baseUrl: "https://optout.example.invalid",
+    masterKey: Buffer.alloc(32, 73),
+  });
+  const readDraft = async (id: string) => {
+    const item = await readMailboxItem(db, keys, actor(), { mailboxId, id });
+    return {
+      item,
+      parsed: await simpleParser(item.raw, { skipTextToHtml: true, skipHtmlToText: true }),
+    };
+  };
+  it.each([false, true])(
+    "replaces only the authenticated old suffix A to B (rich=%s) through real saveDraft",
+    async (rich) => {
+      azureCompose();
+      const received = await imported();
+      const first = await as().saveDraft(
+        draft({
+          sourceItemId: received.id,
+          to: ["a@example.invalid"],
+          text: "Author body",
+          ...(rich ? { html: "<p>Author body</p>" } : {}),
+          retainedAttachments: [0],
+        }),
+      );
+      const before = await readDraft(first.id);
+      const old = await prepareMailboxOptout(db, teamId, ["a@example.invalid"], optoutConfig(), {
+        draftOnly: true,
+      });
+      const detail = await as().item({ mailboxId, id: first.id });
+      const update = draft({
+        id: first.id,
+        sourceItemId: first.id,
+        expectedRevision: first.revision,
+        to: ["b@example.invalid"],
+        text: detail.text,
+        ...(rich ? { html: detail.draftHtml! } : {}),
+        retainedAttachments: [0],
+      });
+      const saved = await as().saveDraft(update);
+      const { item, parsed } = await readDraft(saved.id);
+      const fresh = await prepareMailboxOptout(db, teamId, ["b@example.invalid"], optoutConfig(), {
+        draftOnly: true,
+      });
+      expect(saved.revision).toBe(first.revision + 1);
+      expect(parsed.text).not.toContain(old.url);
+      expect(parsed.html).not.toContain(old.url);
+      expect(parsed.text?.split(fresh.url)).toHaveLength(2);
+      expect(String(parsed.html).split(fresh.url)).toHaveLength(2);
+      expect(parsed.messageId).toBe(before.parsed.messageId);
+      expect(parsed.inReplyTo).toBe(before.parsed.inReplyTo);
+      expect(parsed.references).toEqual(before.parsed.references);
+      expect(parsed.attachments[0]!.content).toEqual(before.parsed.attachments[0]!.content);
+      expect(item.raw.equals(before.item.raw)).toBe(false);
+      expect((await as().item({ mailboxId, id: saved.id })).sendStatus).toBeNull();
+      const author = await validateMailboxOptout(
+        db,
+        teamId,
+        ["b@example.invalid"],
+        {
+          text: parsed.text!,
+          html: String(parsed.html),
+          headerLines: parsed.headerLines,
+        },
+        optoutConfig(),
+      );
+      expect(author.text.trim()).toBe("Author body");
+      await expect(as().saveDraft(update)).rejects.toMatchObject({ code: "CONFLICT" });
+      expect((await readDraft(saved.id)).item.raw).toEqual(item.raw);
+      await db
+        .update(schema.domains)
+        .set({ status: "verified" })
+        .where(eq(schema.domains.teamId, teamId));
+      const queued = await queueMailboxDraft(
+        db,
+        keys,
+        actor(),
+        { mailboxId, id: saved.id, expectedRevision: saved.revision },
+        mailboxTransportMime,
+      );
+      const [approval] = await db
+        .select()
+        .from(schema.mailboxOutbox)
+        .where(eq(schema.mailboxOutbox.id, queued.id));
+      expect(approval).toMatchObject({
+        draftRevision: saved.revision,
+        approvalKind: "human",
+        approvedBy: "owner",
+        rawSha256: createHash("sha256").update(item.raw).digest("hex"),
+      });
+      expect((await readDraft(saved.id)).item.raw).toEqual(item.raw);
+    },
+  );
+  it.each(["multi", "ses"])(
+    "removes A capability on transition to %s and remains editable",
+    async (target) => {
+      azureCompose();
+      const first = await as().saveDraft(
+        draft({ to: ["a@example.invalid"], text: "Author body", html: "<p>Author body</p>" }),
+      );
+      const detail = await as().item({ mailboxId, id: first.id });
+      if (target === "ses")
+        vi.stubEnv(
+          "SENDING_PROVIDER_POLICY_JSON",
+          JSON.stringify({ version: 1, defaults: { transactional: "ses", campaign: "ses" } }),
+        );
+      const saved = await as().saveDraft(
+        draft({
+          id: first.id,
+          sourceItemId: first.id,
+          expectedRevision: first.revision,
+          to:
+            target === "multi" ? ["a@example.invalid", "b@example.invalid"] : ["a@example.invalid"],
+          text: detail.text,
+          html: detail.draftHtml!,
+        }),
+      );
+      const { parsed } = await readDraft(saved.id);
+      expect(parsed.text?.trim()).toBe("Author body");
+      expect(parsed.html).not.toContain("/unsubscribe/recipient/");
+      expect(parsed.headerLines.filter((h) => h.key === "list-unsubscribe")).toHaveLength(0);
+      expect(saved.revision).toBe(first.revision + 1);
+      expect(
+        await as().saveDraft(
+          draft({
+            id: saved.id,
+            sourceItemId: saved.id,
+            expectedRevision: saved.revision,
+            to: [],
+            text: "Still editable",
+          }),
+        ),
+      ).toMatchObject({ kind: "draft" });
+    },
+  );
+  it.each(["foreign", "forged"])(
+    "does not remove a %s suffix authenticated against another identity",
+    async (kind) => {
+      azureCompose();
+      const control = await prepareMailboxOptout(
+        db,
+        kind === "foreign" ? otherTeam : teamId,
+        ["a@example.invalid"],
+        optoutConfig(),
+        { draftOnly: true },
+      );
+      const badUrl = kind === "forged" ? control.url + "x" : control.url;
+      const raw = Buffer.from(
+        `From: person@content.invalid\r\nTo: a@example.invalid\r\nSubject: Source controls\r\nList-Unsubscribe: <${badUrl}>\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=controls\r\n\r\n--controls\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nAuthor${control.text.replaceAll(control.url, badUrl)}\r\n--controls\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<p>Author</p>${control.html.replaceAll(control.url, badUrl)}\r\n--controls--\r\n`,
+      );
+      const first = await saveMailboxDraft(db, keys, actor(), {
+        mailboxId,
+        expectedRevision: 0,
+        raw,
+      });
+      const detail = await as().item({ mailboxId, id: first.id });
+      const saved = await as().saveDraft(
+        draft({
+          id: first.id,
+          sourceItemId: first.id,
+          expectedRevision: first.revision,
+          to: ["b@example.invalid"],
+          text: detail.text,
+        }),
+      );
+      const { parsed } = await readDraft(saved.id);
+      expect(parsed.text).toContain(badUrl);
+      const derived = await validateMailboxOptout(
+        db,
+        teamId,
+        ["b@example.invalid"],
+        { text: parsed.text!, html: String(parsed.html), headerLines: parsed.headerLines },
+        optoutConfig(),
+      );
+      expect(derived.text).toContain(badUrl);
+    },
+  );
+  it.each(["foreign", "forged", "quoted"])(
+    "preserves %s controls as author content rather than laundering them",
+    async (kind) => {
+      azureCompose();
+      const control = await prepareMailboxOptout(
+        db,
+        kind === "foreign" ? otherTeam : teamId,
+        ["a@example.invalid"],
+        optoutConfig(),
+        { draftOnly: true },
+      );
+      const url =
+        kind === "forged"
+          ? control.url.slice(0, -1) + (control.url.endsWith("a") ? "b" : "a")
+          : control.url;
+      const author = `Author citation: ${url}`;
+      const first = await as().saveDraft(draft({ to: ["a@example.invalid"], text: author }));
+      const detail = await as().item({ mailboxId, id: first.id });
+      const saved = await as().saveDraft(
+        draft({
+          id: first.id,
+          sourceItemId: first.id,
+          expectedRevision: first.revision,
+          to: ["b@example.invalid"],
+          text: detail.text,
+        }),
+      );
+      const { parsed } = await readDraft(saved.id);
+      const derived = await validateMailboxOptout(
+        db,
+        teamId,
+        ["b@example.invalid"],
+        { text: parsed.text!, html: String(parsed.html), headerLines: parsed.headerLines },
+        optoutConfig(),
+      );
+      expect(derived.text).toContain(author);
+      expect(parsed.text).toContain(author);
+      // A forged/foreign control is not accepted as B's mandatory system suffix.
+      await expect(
+        validateMailboxOptout(
+          db,
+          teamId,
+          ["b@example.invalid"],
+          {
+            text: control.text,
+            html: control.html,
+            headerLines: [{ key: "list-unsubscribe", line: `List-Unsubscribe: <${url}>` }],
+          },
+          optoutConfig(),
+        ),
+      ).rejects.toThrow();
+    },
+  );
   it("saves, reads and re-saves a normal Azure draft with exactly one approved footer", async () => {
     azureCompose();
     const first = await as().saveDraft(draft({ text: "A normal personal reply" }));

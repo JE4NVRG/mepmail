@@ -1250,14 +1250,57 @@ export async function saveMailboxContentDraft(
     buffer: true,
     newline: "windows",
   });
-  const composeText =
-    optout && text.trimEnd().endsWith(optout.text)
-      ? text.trimEnd().slice(0, -optout.text.length)
-      : text;
-  const composeHtml =
-    rich && optout && rich.trimEnd().endsWith(optout.html)
-      ? rich.trimEnd().slice(0, -optout.html.length)
-      : rich;
+  let composeText = text;
+  let composeHtml = rich;
+  // Only this exact, revision-checked draft can identify an earlier system
+  // suffix. Never infer controls from the new recipient, keywords or quoted URLs.
+  if (input.id && source?.kind === "draft") {
+    const previousRecipients = [
+      ...addresses(source.mime.to),
+      ...addresses(source.mime.cc),
+      ...addresses(source.mime.bcc),
+    ];
+    const previousHeaders = source.mime.headerLines.filter((h) => h.key === "list-unsubscribe");
+    if (previousHeaders.length === 1 && new Set(previousRecipients).size === 1) {
+      let previous: Awaited<ReturnType<typeof prepareMailboxOptout>> | null = null;
+      try {
+        // Deterministically recreate the signed team+OLD-recipient capability.
+        // draftOnly never re-enrolls a contact or changes sticky suppressions.
+        previous = await prepareMailboxOptout(
+          db,
+          actor.teamId,
+          previousRecipients,
+          {
+            baseUrl: unsubscribeBaseUrl() ?? "",
+            masterKey: Buffer.from(env.MASTER_ENCRYPTION_KEY ?? "", "base64"),
+          },
+          { draftOnly: true },
+        );
+      } catch {
+        // Unauthenticated/legacy content stays authored content, never deleted.
+      }
+      const header = previousHeaders[0]!.line;
+      const value = header
+        .slice(header.indexOf(":") + 1)
+        .replace(/\r?\n[ \t]+/g, " ")
+        .trim();
+      if (
+        previous &&
+        value === `<${previous.url}>` &&
+        source.mime.text?.replace(/\r\n/g, "\n").trimEnd().endsWith(previous.text) &&
+        typeof source.mime.html === "string" &&
+        source.mime.html.trimEnd().endsWith(previous.html)
+      ) {
+        const normalized = composeText.replace(/\r\n/g, "\n").trimEnd();
+        if (normalized.endsWith(previous.text))
+          composeText = normalized.slice(0, -previous.text.length);
+        // The editor reopens sanitized HTML, whose anchor has safe rel attributes.
+        const editorSuffix = sanitizeMailboxComposeHtml(previous.html);
+        if (composeHtml?.trimEnd().endsWith(editorSuffix))
+          composeHtml = composeHtml.trimEnd().slice(0, -editorSuffix.length);
+      }
+    }
+  }
   const result = await transport.sendMail({
     from: box.address,
     to: input.to,
