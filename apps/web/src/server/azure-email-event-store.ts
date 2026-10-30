@@ -4,6 +4,11 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { auditLog } from "@millionsend/db/schema";
 import { eq } from "drizzle-orm";
+import {
+  acceptMailboxOutbox,
+  MAILBOX_AZURE_RESOURCE,
+  mailboxRecipientHashFromPublicHash,
+} from "../../../../packages/core/src/mailbox-transport";
 import { processProviderEvent } from "../../../../packages/core/src/process-provider-event";
 import {
   AZURE_EMAIL_SOURCE,
@@ -51,6 +56,7 @@ export function azureEmailEventStore(db: Db): AzureEventStore {
         receipt: string;
         recipient: string;
         teamId: string;
+        mailbox?: { outboxId: string; attemptId: string; recipientHashes: string[] };
       }[] = [];
       for (const event of [...events].sort((a, b) => a.eventId.localeCompare(b.eventId))) {
         if (
@@ -62,7 +68,38 @@ export function azureEmailEventStore(db: Db): AzureEventStore {
           .select()
           .from(schema.emails)
           .where(eq(schema.emails.sesMessageId, receipt));
-        if (!email) throw new Error("azure_receipt_pending_or_unknown");
+        const boxes = await db
+          .select()
+          .from(schema.mailboxOutbox)
+          .where(eq(schema.mailboxOutbox.providerMessageId, receipt))
+          .limit(2);
+        if (email && boxes.length) throw new AzureEventConflict();
+        if (!email) {
+          const box = boxes[0];
+          if (boxes.length > 1) throw new AzureEventConflict();
+          if (!box) throw new Error("azure_receipt_pending_or_unknown");
+          if (
+            box.status !== "accepted" ||
+            !box.attemptId ||
+            !box.recipientHashes ||
+            !box.recipientHashes.includes(
+              mailboxRecipientHashFromPublicHash(box.teamId, event.recipientHash),
+            )
+          )
+            throw new AzureEventConflict();
+          matched.push({
+            event,
+            receipt,
+            recipient: "",
+            teamId: box.teamId,
+            mailbox: {
+              outboxId: box.id,
+              attemptId: box.attemptId,
+              recipientHashes: [...box.recipientHashes],
+            },
+          });
+          continue;
+        }
         const recipient = [...email.to, ...(email.cc ?? []), ...(email.bcc ?? [])].find(
           (r) => hashRecipient(r) === event.recipientHash,
         );
@@ -71,7 +108,7 @@ export function azureEmailEventStore(db: Db): AzureEventStore {
       }
       await db.transaction(async (transaction) => {
         const tx = transaction as unknown as Db;
-        for (const { event, receipt, recipient, teamId } of matched) {
+        for (const { event, receipt, recipient, teamId, mailbox } of matched) {
           const id = azureEventAuditId(event.eventId);
           const data = metadata(event);
           const [inserted] = await tx
@@ -100,6 +137,26 @@ export function azureEmailEventStore(db: Db): AzureEventStore {
             continue;
           }
           if (event.status === "expanded") continue;
+          if (mailbox) {
+            await acceptMailboxOutbox(tx, mailbox.outboxId, {
+              attemptId: mailbox.attemptId,
+              messageId: receipt,
+              outboundEvidence: {
+                azureResource: MAILBOX_AZURE_RESOURCE,
+                azureEventId: event.eventId,
+                outcome:
+                  event.status === "delivered"
+                    ? "delivered"
+                    : event.status === "hard_bounce"
+                      ? "hard_bounce"
+                      : "rejected",
+                recipientHashes: [mailboxRecipientHashFromPublicHash(teamId, event.recipientHash)],
+                approvedRecipientHashes: mailbox.recipientHashes,
+                occurredAt: new Date(event.deliveryAttemptTime),
+              },
+            });
+            continue;
+          }
           const kind =
             event.status === "delivered"
               ? "Delivery"

@@ -115,6 +115,7 @@ import {
 } from "./handlers/signup-risk-digest.js";
 import { createCustomerSmtpRelay, createSmtpFallback } from "./handlers/smtp-fallback.js";
 import { syncTenants, watchTenants } from "./handlers/tenants.js";
+import { createMailboxAzureSender } from "./mailbox-azure-sender.js";
 import { createMailboxExternalAwareSender } from "./mailbox-external-sender.js";
 import { createMailboxIngress, parseMailboxInboundConfiguration } from "./mailbox-ingress.js";
 import { readMailboxSearchDocument } from "./mailbox-search-document.js";
@@ -834,13 +835,18 @@ await queue.workDeadLetter("abuse.judge", async ({ sampleId }) => {
 
 // Sends from connected external accounts leave through the person's own SMTP, so the
 // worker runs with the Correio registry even where SES sending is off.
+const mailboxAzure =
+  mailboxTransportEnabled && relay?.name === "azure" && sendingProviderPolicy
+    ? createMailboxAzureSender(db, { policy: sendingProviderPolicy, relay, isCloud: env.IS_CLOUD })
+    : null;
 const mailboxSender =
-  mailboxSes || mailboxRegistryEnabled
+  mailboxSes || mailboxRegistryEnabled || mailboxAzure
     ? createMailboxContentPolicySender(
         db,
         createMailboxExternalAwareSender(db, keyring, mailboxSes ?? null),
         env.IS_CLOUD,
         sendingProviderPolicy,
+        mailboxAzure,
       )
     : null;
 if (mailboxSender) {

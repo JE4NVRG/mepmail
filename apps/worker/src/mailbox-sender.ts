@@ -25,6 +25,7 @@ import { releaseQuota, reserveQuota } from "../../../packages/core/src/quota.js"
 import { isSendReviewHeld } from "../../../packages/core/src/send-review.js";
 import { applySenderProbationQuota } from "../../../packages/core/src/sender-probation.js";
 import { utcDay } from "../../../packages/core/src/utc-day.js";
+import { mailboxOutbox } from "../../../packages/db/src/schema/mailbox-transport.js";
 import type { SesSender } from "./handlers/send-email.js";
 import { isSesEnforcementRefusal, type SesQuotaGate } from "./handlers/ses-quota.js";
 import type { SesFailover } from "./ses-failover.js";
@@ -95,7 +96,7 @@ async function checkMailboxContent(
 // Private identity marker, not a client-declared option. Outer router and SES
 // share one reservation using the existing Send day ledger, not a new counter.
 const probationReserved = new WeakSet<object>();
-function withMailboxProbation(
+export function withMailboxProbation(
   db: Db,
   sender: MailboxOutboxSender,
   isCloud: boolean,
@@ -148,6 +149,7 @@ export function createMailboxContentPolicySender(
   sender: MailboxOutboxSender,
   isCloud: boolean,
   policy: SendingProviderPolicy | null = null,
+  azure: MailboxOutboxSender | null = null,
 ): MailboxOutboxSender {
   return {
     async send(input) {
@@ -189,19 +191,53 @@ export function createMailboxContentPolicySender(
           now: new Date(),
         });
         const [box] = await db
-          .select({ origin: schema.mailboxes.origin })
+          .select({
+            origin: schema.mailboxes.origin,
+            domainStatus: schema.domains.status,
+            relayEnabledAt: schema.domains.relayEnabledAt,
+            address: schema.mailboxes.address,
+          })
           .from(schema.mailboxes)
+          .leftJoin(
+            schema.domains,
+            and(
+              eq(schema.domains.id, schema.mailboxes.domainId),
+              eq(schema.domains.teamId, schema.mailboxes.teamId),
+            ),
+          )
           .where(
             and(
               eq(schema.mailboxes.id, input.mailboxId),
               eq(schema.mailboxes.teamId, input.teamId),
             ),
           );
-        // Router only exposes its existing adapter. Policy cannot turn on a new
-        // relay or reroute SES mail via a connected external identity.
+        const [outbox] = await db
+          .select({ createdAt: mailboxOutbox.createdAt })
+          .from(mailboxOutbox)
+          .where(
+            and(
+              eq(mailboxOutbox.id, input.outboxId),
+              eq(mailboxOutbox.teamId, input.teamId),
+              eq(mailboxOutbox.mailboxId, input.mailboxId),
+              eq(mailboxOutbox.attemptId, input.attemptId),
+              eq(mailboxOutbox.status, "sending"),
+            ),
+          );
+        // Origin alone grants no Azure route. Only an explicit closed operator policy,
+        // verified same-team linked domain, relay attestation and live outbox can expose it.
+        const azureAllowed =
+          !!azure &&
+          !!policy.restoration?.teams[input.teamId] &&
+          !!outbox &&
+          box?.origin !== "external" &&
+          box?.domainStatus === "verified" &&
+          !!box.relayEnabledAt &&
+          box.address === input.from;
         const provider = box?.origin === "external" ? "customer_smtp" : "ses";
         const route = resolveSendingProvider(policy, {
           teamId: input.teamId,
+          createdAt: outbox?.createdAt,
+          fromAddress: input.from,
           messageClass:
             insight.marketing ||
             campaignMessage({
@@ -216,9 +252,12 @@ export function createMailboxContentPolicySender(
               ? "campaign"
               : "transactional",
           legacyProvider: provider,
-          availableProviders: new Set(box ? [provider] : []),
+          availableProviders: new Set(
+            box ? [provider, ...(azureAllowed ? ["azure_smtp"] : [])] : [],
+          ),
         });
         if (route.kind === "held") throw new MailboxSendDeferredError();
+        if (route.provider === "azure_smtp") return azure!.send(input);
       }
       return withMailboxProbation(db, sender, isCloud).send(input);
     },

@@ -56,6 +56,7 @@ import {
   assertMailboxTrialSending,
   lockMailboxService,
   MailboxServiceError,
+  mailboxServiceActive,
   mailboxSubscriptionUsagePeriod,
   requireMailboxSeat,
 } from "./mailbox-service.js";
@@ -130,14 +131,21 @@ export type { MailboxOutboundOutcome };
 /** Internal trusted SNS boundary, never a client/API payload. The worker must
  * authenticate the topic, tags, provider attempt and approved MIME recipients.
  */
-export interface MailboxOutboundEvidence {
-  topicArn: string;
-  snsMessageId: string;
+export const MAILBOX_AZURE_RESOURCE =
+  "/subscriptions/4881e023-287d-4b1e-90ce-e643ee354ba5/resourceGroups/mepmail-email/providers/Microsoft.Communication/communicationServices/mepmail-acs";
+
+export type MailboxOutboundEvidence = (
+  | { topicArn: string; snsMessageId: string }
+  | {
+      azureResource: string;
+      azureEventId: string;
+    }
+) & {
   outcome: MailboxOutboundOutcome;
   recipientHashes: readonly string[];
   approvedRecipientHashes: readonly string[];
   occurredAt: Date;
-}
+};
 
 export interface MailboxOutboundSummary {
   totalRecipients: number;
@@ -209,6 +217,16 @@ export function mailboxRecipientHash(teamId: string, address: string): string {
   );
 }
 
+/** Authenticated callback bridge. No raw recipient or MIME is needed/persisted. */
+export function mailboxRecipientHashFromPublicHash(teamId: string, publicHash: string): string {
+  if (
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(teamId) ||
+    !/^[a-f0-9]{64}$/.test(publicHash)
+  )
+    throw new MailboxContentError("invalid");
+  return hash(`mepmail-private-recipient-v1\0${teamId.toLowerCase()}\0${publicHash}`);
+}
+
 function checkedHashes(values: readonly string[]): string[] {
   if (
     !Array.isArray(values) ||
@@ -277,9 +295,16 @@ export async function checkMailboxRecipientBlocks(
 }
 
 function copyOutboundEvidence(value: MailboxOutboundEvidence): MailboxOutboundEvidence {
+  const sourceValid =
+    "azureResource" in value
+      ? value.azureResource.toLowerCase() === MAILBOX_AZURE_RESOURCE.toLowerCase() &&
+        /^[A-Za-z0-9._:@+-]{1,256}$/.test(value.azureEventId) &&
+        !("topicArn" in value) &&
+        !("snsMessageId" in value)
+      : /^arn:aws(?:-[a-z]+)?:sns:[a-z0-9-]+:\d{12}:[A-Za-z0-9_-]{1,256}$/.test(value.topicArn) &&
+        /^[\x21-\x7e]{1,128}$/.test(value.snsMessageId);
   if (
-    !/^arn:aws(?:-[a-z]+)?:sns:[a-z0-9-]+:\d{12}:[A-Za-z0-9_-]{1,256}$/.test(value.topicArn) ||
-    !/^[\x21-\x7e]{1,128}$/.test(value.snsMessageId) ||
+    !sourceValid ||
     !OUTCOMES.has(value.outcome) ||
     !(value.occurredAt instanceof Date) ||
     !Number.isFinite(value.occurredAt.getTime())
@@ -320,7 +345,14 @@ async function recordOutboundEvidence(
       .set({ recipientHashes: [...evidence.approvedRecipientHashes] })
       .where(eq(mailboxOutbox.id, row.id));
   }
-  const id = hash(`mepmail-private-sns-v1\0${evidence.topicArn}\0${evidence.snsMessageId}`);
+  if ("azureResource" in evidence && !/^smtp-relay:azure:[0-9a-f-]{36}$/.test(messageId))
+    throw new MailboxContentError("conflict");
+  const id =
+    "azureResource" in evidence
+      ? hash(
+          `mepmail-private-azure-v1\0${evidence.azureResource.toLowerCase()}\0${evidence.azureEventId}`,
+        )
+      : hash(`mepmail-private-sns-v1\0${evidence.topicArn}\0${evidence.snsMessageId}`);
   const fingerprint = hash(
     JSON.stringify([
       row.id,
@@ -1216,6 +1248,96 @@ export async function acceptMailboxOutbox(
       );
     return outboxDto(accepted!, false);
   });
+}
+
+/** Native adapter pre-SMTP revalidation, including after the global quota lock.
+ * Uses the original approval provenance and existing authorization/seat locks;
+ * it neither claims nor refunds counters, outbox state or provider receipts.
+ */
+export async function assertMailboxOutboxSendAccess(
+  db: Db,
+  input: Parameters<MailboxOutboxSender["send"]>[0],
+): Promise<void> {
+  const [known] = await db
+    .select()
+    .from(mailboxOutbox)
+    .where(
+      and(
+        eq(mailboxOutbox.id, input.outboxId),
+        eq(mailboxOutbox.teamId, input.teamId),
+        eq(mailboxOutbox.mailboxId, input.mailboxId),
+        eq(mailboxOutbox.attemptId, input.attemptId),
+        eq(mailboxOutbox.status, "sending"),
+      ),
+    );
+  if (!known) throw new MailboxContentError("forbidden");
+  const check = async (tx: Db, expiresAt?: Date | null) => {
+    const plan = await lockMailboxService(tx, input.teamId);
+    await requireMailboxSeat(tx, input.teamId, input.mailboxId, plan);
+    const [domain] = await tx
+      .select({
+        status: schema.domains.status,
+        relayEnabledAt: schema.domains.relayEnabledAt,
+        address: schema.mailboxes.address,
+        origin: schema.mailboxes.origin,
+      })
+      .from(schema.mailboxes)
+      .innerJoin(
+        schema.domains,
+        and(
+          eq(schema.domains.id, schema.mailboxes.domainId),
+          eq(schema.domains.teamId, schema.mailboxes.teamId),
+        ),
+      )
+      .where(
+        and(eq(schema.mailboxes.id, input.mailboxId), eq(schema.mailboxes.teamId, input.teamId)),
+      )
+      .for("share");
+    const [team] = await tx.select().from(schema.teams).where(eq(schema.teams.id, input.teamId));
+    const at = new Date();
+    const period = plan.unlimitedOutbound ? null : mailboxSubscriptionUsagePeriod(plan, at);
+    if (
+      !domain ||
+      domain.status !== "verified" ||
+      !domain.relayEnabledAt ||
+      domain.origin === "external" ||
+      domain.address !== input.from ||
+      !team ||
+      team.suspendedAt ||
+      (team.sendReviewAt &&
+        (!team.sendReviewClearedAt || team.sendReviewClearedAt < team.sendReviewAt)) ||
+      (expiresAt && expiresAt.getTime() <= at.getTime()) ||
+      (!plan.unlimitedOutbound &&
+        (!mailboxServiceActive(plan, at) ||
+          !period ||
+          period.start.getTime() !== known.periodStart.getTime() ||
+          period.end.getTime() !== known.periodEnd.getTime()))
+    )
+      throw new MailboxContentError("forbidden");
+  };
+  if (known.approvalKind === "agent" && known.agentKeyId) {
+    await withMailboxAgentQueuedSendAccess(
+      db,
+      {
+        keyId: known.agentKeyId,
+        teamId: known.teamId,
+        mailboxId: known.mailboxId,
+        approvedBy: known.approvedBy,
+        approvedMembershipId: known.approvedMembershipId,
+      },
+      ({ db: tx, expiresAt }) => check(tx, expiresAt),
+    );
+  } else if (known.approvalKind === "human" && known.agentKeyId === null) {
+    await withMailboxSendAccess(
+      db,
+      { teamId: known.teamId, userId: known.approvedBy },
+      known.mailboxId,
+      (tx, membershipId) => {
+        if (membershipId !== known.approvedMembershipId) throw new MailboxContentError("forbidden");
+        return check(tx);
+      },
+    );
+  } else throw new MailboxContentError("forbidden");
 }
 
 /** Internal worker. The durable claim precedes the external side effect. A job

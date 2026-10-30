@@ -51,6 +51,7 @@ import {
   campaignMessage,
   checkCampaignMessage,
 } from "../../../../packages/core/src/campaign-consent.js";
+import { campaignSendWindowOpen } from "../../../../packages/core/src/campaign-send-window.js";
 import { screenPreSendContent } from "../../../../packages/core/src/pre-send-content-policy.js";
 import {
   isSesEnforcementRefusal,
@@ -88,6 +89,7 @@ export interface SesSender {
 }
 
 export interface SendDeps {
+  now?: (() => Date) | undefined;
   sendingProviderPolicy?: SendingProviderPolicy | null;
   /** Optional fixture transport; deployment configuration is used when absent. */
   funnel?: FunnelEventTarget | undefined;
@@ -477,7 +479,13 @@ export async function sendEmail(
   // Only queued emails are sendable: quota-parked, already-sent, and failed
   // rows are skipped no matter how the job arrived.
   if (email?.latestStatus !== "queued" || email.sentAt !== null) return "skipped";
-  if (email.scheduledAt && email.scheduledAt.getTime() > Date.now()) {
+  const campaignWindow = deps.sendingProviderPolicy?.restoration?.campaignCohort;
+  const campaignWindowOpen = () =>
+    campaignWindow?.teamId !== email.teamId ||
+    campaignSendWindowOpen(campaignWindow.sendWindow, deps.now?.());
+  // Delayed/stale jobs stop before rescheduling, quota, decryption or transport.
+  if (!campaignWindowOpen()) return "parked";
+  if (email.scheduledAt && email.scheduledAt.getTime() > (deps.now?.() ?? new Date()).getTime()) {
     // Returning without re-enqueueing would ack the job and strand the
     // email forever; hand it back to the queue for its due time.
     await deps.reschedule?.(email.id, email.scheduledAt, emailSendPriority(email));
@@ -565,6 +573,7 @@ export async function sendEmail(
   };
   const preliminaryRoute = resolveSendingProvider(deps.sendingProviderPolicy ?? null, {
     ...restorationMessage,
+    now: deps.now?.(),
     teamId: email.teamId,
     messageClass:
       closedCampaign || email.broadcastId || email.contactId || email.topicId
@@ -894,6 +903,7 @@ export async function sendEmail(
   });
   const route = resolveSendingProvider(deps.sendingProviderPolicy ?? null, {
     ...restorationMessage,
+    now: deps.now?.(),
     teamId: email.teamId,
     createdAt: email.createdAt,
     fromAddress: extractAddrSpec(email.from).toLowerCase(),
@@ -975,6 +985,8 @@ export async function sendEmail(
     return "parked";
   }
 
+  if (!campaignWindowOpen()) return "parked";
+
   // Atomic claim (sentAt doubles as the claim marker): closes the
   // double-send windows — a concurrent worker on the same job, and a retry
   // after SES accepted but the post-send bookkeeping failed. Claimed rows
@@ -984,9 +996,11 @@ export async function sendEmail(
       emailId: email.id,
       teamId: email.teamId,
       recipients: countDistinctRecipients(email.to, email.cc, email.bcc),
+      now: deps.now,
       ...(closedCampaign
         ? {
             campaignSnapshot: {
+              sendWindow: deps.sendingProviderPolicy!.restoration!.campaignCohort!.sendWindow,
               createdAt: deps.sendingProviderPolicy!.restoration!.campaignCohort!.messages.find(
                 (message) => message.emailId === email.id,
               )!.createdAt,
@@ -998,6 +1012,7 @@ export async function sendEmail(
     });
     if (claim === "skipped") return "skipped";
     if (claim === "quota") {
+      if (!campaignWindowOpen()) return "parked";
       await deps.reschedule?.(email.id, new Date(Date.now() + 60_000), emailSendPriority(email));
       return "deferred";
     }
@@ -1015,6 +1030,7 @@ export async function sendEmail(
       .returning({ id: schema.emails.id });
     if (claimed.length === 0) return "skipped";
   }
+  if (!campaignWindowOpen()) return "parked";
   // Claim acquisition also awaits the DB. A revoked approval is still a
   // proven non-send, so release this claim without purging the sealed payload.
   try {
@@ -1048,6 +1064,9 @@ export async function sendEmail(
       ? deps.relay?.sender
       : deps.ses;
   if (!sender) throw new Error("selected_sending_provider_unavailable");
+  // Final fresh sample, after every awaited guard and immediately before SMTP.
+  // Expiry never resets a durable claim, quota reservation or lifetime audit.
+  if (!campaignWindowOpen()) return "parked";
   let messageId: string;
   try {
     ({ messageId } = await sender.sendRaw({

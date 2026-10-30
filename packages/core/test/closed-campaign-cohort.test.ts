@@ -55,6 +55,7 @@ function policy(emailId: string) {
       restoration: {
         teams: { [own]: { notBefore: cutoff, senders: ["system@example.invalid"] } },
         campaignCohort: {
+          sendWindow: { startsAt: "2000-01-01T00:00:00Z", endsAt: "2100-01-01T00:00:00Z" },
           teamId: client,
           from: "news@example.invalid",
           messages: [{ emailId, createdAt: originalAt, recipientHash }],
@@ -143,7 +144,12 @@ it("claims real jsonb recipients with the exact six-fraction timestamp and never
     emailId: row.id,
     teamId: client,
     recipients: 1,
-    campaignSnapshot: { createdAt: originalAt, from: row.from, to: [recipient] },
+    campaignSnapshot: {
+      sendWindow: { startsAt: "2000-01-01T00:00:00Z", endsAt: "2100-01-01T00:00:00Z" },
+      createdAt: originalAt,
+      from: row.from,
+      to: [recipient],
+    },
   };
   expect(await claimAzureSend(fixture.db, request)).toBe("claimed");
   await fixture.db.update(schema.emails).set({ sentAt: null }).where(eq(schema.emails.id, row.id));
@@ -168,7 +174,12 @@ it("refuses a one-microsecond mutation without taking a claim", async () => {
       emailId: row.id,
       teamId: client,
       recipients: 1,
-      campaignSnapshot: { createdAt: originalAt, from: row.from, to: [recipient] },
+      campaignSnapshot: {
+        sendWindow: { startsAt: "2000-01-01T00:00:00Z", endsAt: "2100-01-01T00:00:00Z" },
+        createdAt: originalAt,
+        from: row.from,
+        to: [recipient],
+      },
     }),
   ).toBe("skipped");
   const [stored] = await fixture.db

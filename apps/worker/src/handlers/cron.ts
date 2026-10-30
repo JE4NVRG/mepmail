@@ -53,6 +53,7 @@ import {
   type SQL,
   sql,
 } from "drizzle-orm";
+import { campaignSendWindowOpen } from "../../../../packages/core/src/campaign-send-window.js";
 import {
   type QueueAdmission,
   queueAdmissionScope,
@@ -205,6 +206,8 @@ export interface DrainResult {
 
 /** Sentinel: the row left queued_quota concurrently; roll the reservation back. */
 class DrainRaced extends Error {}
+/** Throw inside the transaction so a timed-out reservation is rolled back. */
+class DrainWindowClosed extends Error {}
 
 /** Parked rows loaded per page; the backlog is unbounded (see acceptEmail). */
 const DRAIN_PAGE = 500;
@@ -574,6 +577,11 @@ async function releaseParked(
   throttleAt: Date | null,
 ): Promise<MovedEmail | null> {
   if (run.exhaustedTeams.has(email.teamId)) return null;
+  const campaign = deps.queueAdmission?.policy?.restoration?.campaignCohort;
+  const windowOpen = () =>
+    campaign?.teamId !== email.teamId ||
+    campaignSendWindowOpen(campaign.sendWindow, deps.queueAdmission?.now?.());
+  if (!windowOpen()) return null;
   let quota = teamQuota({ ...email, id: email.teamId }, deps.isCloud);
   // Charged the way accept charged it: one unit per distinct mailbox.
   const units = countDistinctRecipients(email.to, email.cc, email.bcc);
@@ -599,23 +607,28 @@ async function releaseParked(
           if (!current || !queueEmailAdmitted(current, deps.queueAdmission)) return "held" as const;
         }
         quota = await applySenderProbationQuota(txDb, email.teamId, quota, deps.isCloud);
+        if (!windowOpen()) throw new DrainWindowClosed();
         const reservation = await reserveQuota(txDb, { teamId: email.teamId, count: units, quota });
+        if (!windowOpen()) throw new DrainWindowClosed();
         if (!reservation.reserved) return "exhausted" as const;
         const moved = await transitionQueueState(txDb, email.id, {
           from: "queued_quota",
           to: "queued",
         });
         if (!moved) throw new DrainRaced();
+        if (!windowOpen()) throw new DrainWindowClosed();
         if (throttleAt) {
           await txDb
             .update(schema.emails)
             .set({ scheduledAt: throttleAt })
             .where(eq(schema.emails.id, email.id));
         }
+        if (!windowOpen()) throw new DrainWindowClosed();
         return "moved" as const;
       })
       .catch((err) => {
         if (err instanceof DrainRaced) return "raced" as const;
+        if (err instanceof DrainWindowClosed) return "held" as const;
         throw err;
       });
     if (outcome === "exhausted") {

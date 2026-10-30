@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { campaignSendWindowOpen, campaignSendWindowSchema } from "./campaign-send-window.js";
 
 /** Routing is operator-owned configuration, never a client-supplied send option. */
 const providerId = z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/);
@@ -17,6 +18,7 @@ const policySchema = z
         campaignCohort: z
           .object({
             teamId: z.uuid(),
+            sendWindow: campaignSendWindowSchema,
             from: z.email(),
             messages: z
               .array(
@@ -113,6 +115,8 @@ export function parseSendingProviderPolicy(raw: string | undefined): SendingProv
 export function resolveSendingProvider(
   policy: SendingProviderPolicy | null,
   input: {
+    /** Fresh clock sample; never the email creation/scheduling timestamp. */
+    now?: Date | undefined;
     teamId: string;
     messageClass: SendingMessageClass;
     emailId?: string;
@@ -140,6 +144,7 @@ export function resolveSendingProvider(
       const message = campaign.messages.find((m) => m.emailId === input.emailId);
       const recipient = input.to?.[0];
       if (
+        !campaignSendWindowOpen(campaign.sendWindow, input.now) ||
         !message ||
         input.messageClass !== "campaign" ||
         input.createdAt?.getTime() !== Date.parse(message.createdAt) ||

@@ -7,12 +7,14 @@ import {
   type EnqueueEmailSends,
 } from "@millionsend/queue";
 import { and, eq, isNull, or, type SQL, sql } from "drizzle-orm";
+import { campaignSendWindowOpen } from "../../../packages/core/src/campaign-send-window.js";
 import {
   resolveSendingProvider,
   type SendingProviderPolicy,
 } from "../../../packages/core/src/sending-provider-policy.js";
 
 export interface QueueAdmission {
+  now?: (() => Date) | undefined;
   policy: SendingProviderPolicy | null;
   azureAvailable: boolean;
 }
@@ -29,10 +31,16 @@ export function queueAdmissionScope(admission?: QueueAdmission): SQL | undefined
     scopes.push(sql`${e.teamId} = ${teamId} and ${e.createdAt} >= ${own.notBefore}::timestamptz`);
   }
   const campaign = policy.restoration.campaignCohort;
-  if (campaign && policy.allowedTeamIds?.includes(campaign.teamId)) {
+  if (
+    campaign &&
+    policy.allowedTeamIds?.includes(campaign.teamId) &&
+    campaignSendWindowOpen(campaign.sendWindow, admission?.now?.())
+  ) {
     for (const message of campaign.messages) {
       scopes.push(sql`${e.teamId} = ${campaign.teamId} and ${e.id} = ${message.emailId}
         and ${e.createdAt} = ${message.createdAt}::timestamptz
+        and clock_timestamp() >= ${campaign.sendWindow.startsAt}::timestamptz
+        and clock_timestamp() < ${campaign.sendWindow.endsAt}::timestamptz
         and not exists (select 1 from ${schema.auditLog} a
           where a.team_id = ${campaign.teamId} and a.action = 'sending.restoration_campaign_claimed'
           and a.data->>'emailId' = ${message.emailId})`);
@@ -79,6 +87,7 @@ export function queueEmailAdmitted(email: QueueEmail, admission?: QueueAdmission
     return false;
   return (
     resolveSendingProvider(policy, {
+      now: admission?.now?.(),
       teamId: email.teamId,
       emailId: email.id,
       messageClass:
@@ -127,9 +136,25 @@ export function createAdmittedEnqueue(
           // Its caller compensates the entire failed page; no partial queue write.
           throw new Error("sending_queue_admission_held");
         }
+        const campaign = admission.policy.restoration.campaignCohort;
+        if (
+          campaign?.teamId === email.teamId &&
+          request.startAfter &&
+          !campaignSendWindowOpen(campaign.sendWindow, request.startAfter)
+        ) {
+          throw new Error("sending_queue_admission_held");
+        }
         admitted.push(request);
       }
       batch = admitted;
+    }
+    const campaign = admission.policy?.restoration?.campaignCohort;
+    if (
+      campaign &&
+      batch.some((r) => campaign.messages.some((m) => m.emailId === r.emailId)) &&
+      !campaignSendWindowOpen(campaign.sendWindow, admission.now?.())
+    ) {
+      throw new Error("sending_queue_admission_held");
     }
     if (batch.length === 0) return;
     await queue.sendMany(
