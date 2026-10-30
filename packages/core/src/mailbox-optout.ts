@@ -114,15 +114,38 @@ export async function validateMailboxOptout(
   // marketing content. Remove only the exact signed team+recipient footer in
   // this derived analysis; the approved wire MIME and Sent history never change.
   const canonicalLine = footer.text.trimStart();
-  const authorText = text
-    .slice(0, -footer.text.length)
-    .split("\n")
-    .filter((line) => line.replace(/^[\t >]*/, "").trimEnd() !== canonicalLine)
-    .join("\n");
+  const label = canonicalLine.slice(0, canonicalLine.length - url.href.length).trimEnd();
+  const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Require quote markers on EVERY folded line. Only whitespace/folding may
+  // differ; label and URL remain exact. Never strip author prose.
+  function stripQuoted(value: string, html: boolean): string {
+    const separator = html ? "<br\\s*/?>" : "\\n";
+    const marker = html ? "&gt;" : ">";
+    const prefix = `(?:[ \\t]*${marker})+[ \\t]*`;
+    const gap = `(?:[ \\t]+|[ \\t]*(?:${separator})${prefix})`;
+    const words = label.split(" ").map(escapeRegex).join(gap);
+    const literalUrl = escapeRegex(url.href);
+    const target = html ? `&lt;${literalUrl}&gt;` : `<${literalUrl}>`;
+    const control = `${words}${gap}(?:${literalUrl}|Unsubscribe${gap}${target})`;
+    const pattern = new RegExp(
+      `(^|${separator})(${prefix})${control}(?=[ \\t]*(?:${separator}|$|</p>))`,
+      "g",
+    );
+    return value.replace(pattern, "$1");
+  }
+  const authorText = stripQuoted(text.slice(0, -footer.text.length), false);
   const authorHtml =
     content.html === null
       ? null
-      : content.html.trimEnd().slice(0, -footer.html.length).split(footer.html).join("");
+      : content.html
+          .trimEnd()
+          .slice(0, -footer.html.length)
+          // Editor-serialized quoted controls only. Leave all other quote/HTML bytes.
+          .replace(
+            /(<blockquote\b[^<>]*>)([\s\S]*?)(<\/blockquote\s*>)/gi,
+            (_match, open: string, body: string, close: string) =>
+              open + stripQuoted(body.split(footer.html).join(""), true) + close,
+          );
   return {
     text: authorText,
     html: authorHtml,
