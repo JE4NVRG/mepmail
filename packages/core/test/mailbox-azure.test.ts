@@ -1,3 +1,28 @@
+import { createHmac } from "node:crypto";
+import * as dbExports from "@millionsend/db";
+import { simpleParser } from "mailparser";
+import {
+  GET as optoutGET,
+  POST as optoutPOST,
+} from "../../../apps/web/src/app/unsubscribe/recipient/[token]/route.js";
+import {
+  buildAzureRecipientOptoutUrl,
+  recordAzureRecipientOptout,
+  verifyAzureRecipientOptoutToken,
+} from "../src/azure-recipient-optout.js";
+import {
+  mailboxDraftNeedsAzureOptout,
+  mailboxOptoutFooter,
+  prepareMailboxOptout,
+  validateMailboxOptout,
+} from "../src/mailbox-optout.js";
+import { deriveUnsubscribeKey } from "../src/unsubscribe.js";
+
+const syntheticMaster = Buffer.alloc(32, 73);
+process.env.MASTER_ENCRYPTION_KEY = syntheticMaster.toString("base64");
+process.env.APP_BASE_URL = "https://optout.example.invalid";
+const optoutConfig = { baseUrl: "https://optout.example.invalid", masterKey: syntheticMaster };
+
 import type { SesSender } from "../../../apps/worker/src/handlers/send-email.js";
 import { createMailboxContentPolicySender } from "../../../apps/worker/src/mailbox-sender.js";
 import { createMailboxAgentKey } from "../src/mailbox-agent-access.js";
@@ -115,6 +140,7 @@ describe("NativeR2 cloud and blocking-boundary regressions", () => {
     "membership",
     "agent-revoked",
     "agent-expired",
+    "optout",
   ])(
     "rechecks %s after the global-budget await without refunding its durable claim",
     async (kind) => {
@@ -181,6 +207,11 @@ describe("NativeR2 cloud and blocking-boundary regressions", () => {
             .update(schema.mailboxAgentKeys)
             .set({ expiresAt: new Date(Date.now() - 1) })
             .where(eq(schema.mailboxAgentKeys.id, keyId!));
+        if (kind === "optout")
+          await recordAzureRecipientOptout(db, {
+            teamId: f.teamId,
+            recipientHash: hashRecipient(f.recipients[0]!),
+          });
         return result;
       });
       const sent = await cloud(f, outbox);
@@ -397,8 +428,9 @@ async function setup(multi = false) {
   const recipients = multi
     ? ["one@example.invalid", "two@example.invalid"]
     : ["one@example.invalid"];
+  const compliance = await prepareMailboxOptout(db, teamId, [recipients[0]!], optoutConfig);
   const raw = Buffer.from(
-    `From: ${from}\r\nTo: ${recipients.join(", ")}\r\n${multi ? "Bcc: hidden@example.invalid\r\n" : ""}Subject: A direct reply\r\nMessage-ID: <original@fixture.invalid>\r\nIn-Reply-To: <prior@fixture.invalid>\r\nReferences: <prior@fixture.invalid>\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=fixture\r\n\r\n--fixture\r\nContent-Type: text/plain\r\n\r\nPersonal reply\r\n--fixture\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=fixture.txt\r\nContent-Transfer-Encoding: base64\r\n\r\nZml4dHVyZQ==\r\n--fixture--\r\n`,
+    `From: ${from}\r\nTo: ${recipients.join(", ")}\r\n${multi ? "Bcc: hidden@example.invalid\r\n" : ""}${"List-Unsubscribe: " + compliance.headers["List-Unsubscribe"]}\r\nSubject: A direct reply\r\nMessage-ID: <original@fixture.invalid>\r\nIn-Reply-To: <prior@fixture.invalid>\r\nReferences: <prior@fixture.invalid>\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=fixture\r\n\r\n--fixture\r\nContent-Type: text/plain\r\n\r\nPersonal reply${compliance.text}\r\n--fixture\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=fixture.txt\r\nContent-Transfer-Encoding: base64\r\n\r\nZml4dHVyZQ==\r\n--fixture--\r\n`,
   );
   const actor = { teamId, userId };
   const draft = () =>
@@ -600,4 +632,249 @@ it("diagnoses multi-recipient/Bcc incompatibility without bypassing campaign pol
   const sent = await run(f);
   expect(sent.result.status).toBe("queued");
   expect(sent.sendRaw).not.toHaveBeenCalled();
+});
+
+describe("ACS recipient opt-out actual storage and MIME", () => {
+  it("canonical link POST storage blocks even transactional with no audience enrollment", async () => {
+    const f = await setup();
+    expect(await db.select().from(schema.contacts)).toHaveLength(0);
+    const mime = await simpleParser(f.raw, { skipTextToHtml: true });
+    const value = mime.headerLines.find((h) => h.key === "list-unsubscribe")!.line.trim();
+    const token = value.slice(value.lastIndexOf("/") + 1).replace(">", "");
+    const target = verifyAzureRecipientOptoutToken(token, deriveUnsubscribeKey(syntheticMaster));
+    expect(target).toEqual({ teamId: f.teamId, recipientHash: hashRecipient(f.recipients[0]!) });
+    vi.spyOn(dbExports, "getDb").mockReturnValue(db);
+    const ctx = { params: Promise.resolve({ token }) };
+    const get = await optoutGET(new Request(value.slice(value.indexOf("<") + 1, -1)), ctx);
+    expect(get.status).toBe(200);
+    expect(await get.text()).toContain("including service and transactional");
+    expect(await db.select().from(schema.suppressions)).toHaveLength(0);
+    expect(
+      (await optoutPOST(new Request("https://optout.example.invalid", { method: "POST" }), ctx))
+        .status,
+    ).toBe(200);
+    expect(
+      (await optoutPOST(new Request("https://optout.example.invalid", { method: "POST" }), ctx))
+        .status,
+    ).toBe(200);
+    expect(await db.select().from(schema.suppressions)).toHaveLength(1);
+    const sent = await cloud(f);
+    expect(sent.result.status).toBe("queued");
+    expect(sent.sendRaw).not.toHaveBeenCalled();
+    expect(await daily(f.teamId)).toBe(0);
+    expect(await receipts(f.teamId)).toHaveLength(0);
+    expect(await db.select().from(schema.contacts)).toHaveLength(0);
+  });
+  it.each(["absent", "tampered", "foreign-team", "foreign-recipient", "wrong-host", "header-only"])(
+    "rejects %s before probation/budget/SMTP",
+    async (kind) => {
+      const f = await setup();
+      const parsed = await simpleParser(f.raw, { skipTextToHtml: true, skipHtmlToText: true });
+      let text = parsed.text ?? "";
+      let headerLines = parsed.headerLines.map((h) => ({ ...h }));
+      if (kind === "absent") headerLines = headerLines.filter((h) => h.key !== "list-unsubscribe");
+      if (kind === "header-only") text = "Personal reply";
+      if (kind === "tampered")
+        headerLines = headerLines.map((h) =>
+          h.key === "list-unsubscribe" ? { ...h, line: h.line.replace(/.$/, "x") } : h,
+        );
+      if (kind === "wrong-host")
+        headerLines = headerLines.map((h) => ({
+          ...h,
+          line: h.line.replace("optout.example.invalid", "foreign.example.invalid"),
+        }));
+      if (kind === "foreign-team" || kind === "foreign-recipient") {
+        const url = buildAzureRecipientOptoutUrl({
+          teamId: kind === "foreign-team" ? randomUUID() : f.teamId,
+          recipient: kind === "foreign-recipient" ? "foreign@example.invalid" : f.recipients[0]!,
+          secretKey: deriveUnsubscribeKey(syntheticMaster),
+          baseUrl: optoutConfig.baseUrl,
+        });
+        headerLines = headerLines.map((h) =>
+          h.key === "list-unsubscribe" ? { ...h, line: `List-Unsubscribe: <${url}>` } : h,
+        );
+      }
+      await expect(
+        validateMailboxOptout(
+          db,
+          f.teamId,
+          f.recipients,
+          { text, html: null, headerLines },
+          optoutConfig,
+        ),
+      ).rejects.toThrow();
+      expect(await daily(f.teamId)).toBe(0);
+      expect(await receipts(f.teamId)).toHaveLength(0);
+    },
+  );
+  it.each(["hard_bounce", "complaint", "manual", "one_click_unsubscribe"] as const)(
+    "does not override sticky %s",
+    async (reason) => {
+      const f = await setup();
+      await db
+        .insert(schema.suppressions)
+        .values({ teamId: f.teamId, emailHash: hashRecipient(f.recipients[0]!), reason });
+      await recordAzureRecipientOptout(db, {
+        teamId: f.teamId,
+        recipientHash: hashRecipient(f.recipients[0]!),
+      });
+      expect((await db.select().from(schema.suppressions))[0]?.reason).toBe(reason);
+      const sent = await cloud(f);
+      expect(sent.result.status).toBe("queued");
+      expect(sent.sendRaw).not.toHaveBeenCalled();
+      expect(await daily(f.teamId)).toBe(0);
+    },
+  );
+  it("real campaign plus a valid compliance footer remains held without consent", async () => {
+    const f = await setup();
+    const raw = Buffer.from(f.raw.toString().replace("A direct reply", "Newsletter special offer"));
+    const item = await saveMailboxDraft(db, keys, f.actor, {
+      mailboxId: f.box.id,
+      expectedRevision: 0,
+      raw,
+    });
+    const outbox = await queueMailboxDraft(
+      db,
+      keys,
+      f.actor,
+      { mailboxId: f.box.id, id: item.id, expectedRevision: item.revision },
+      mime,
+    );
+    const sent = await cloud(f, outbox);
+    expect(sent.result.status).toBe("queued");
+    expect(sent.sendRaw).not.toHaveBeenCalled();
+    expect(await daily(f.teamId)).toBe(0);
+  });
+  it("rejects expired/extra-field tokens rather than silently ignoring an expiry declaration", () => {
+    const payload = Buffer.from(
+      JSON.stringify({
+        v: 1,
+        teamId: randomUUID(),
+        recipientHash: hashRecipient("one@example.invalid"),
+        expiresAt: 1,
+      }),
+    ).toString("base64url");
+    const signature = createHmac("sha256", deriveUnsubscribeKey(syntheticMaster))
+      .update(`mepmail:azure-recipient-optout:v1\0${payload}`)
+      .digest("base64url");
+    expect(
+      verifyAzureRecipientOptoutToken(
+        `${payload}.${signature}`,
+        deriveUnsubscribeKey(syntheticMaster),
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("ACS Parent composition and canonical reply regressions", () => {
+  it("prepares only the explicitly configured Azure sender, not other providers or multi drafts", async () => {
+    const f = await setup();
+    const rawPolicy = JSON.stringify(policy(f));
+    expect(
+      mailboxDraftNeedsAzureOptout(rawPolicy, f.teamId, f.box.address, "native", f.recipients),
+    ).toBe(true);
+    expect(
+      mailboxDraftNeedsAzureOptout(undefined, f.teamId, f.box.address, "native", f.recipients),
+    ).toBe(false);
+    expect(
+      mailboxDraftNeedsAzureOptout(rawPolicy, f.teamId, f.box.address, "external", f.recipients),
+    ).toBe(false);
+    expect(
+      mailboxDraftNeedsAzureOptout(rawPolicy, randomUUID(), f.box.address, "native", f.recipients),
+    ).toBe(false);
+    expect(
+      mailboxDraftNeedsAzureOptout(
+        rawPolicy,
+        f.teamId,
+        "other@example.invalid",
+        "native",
+        f.recipients,
+      ),
+    ).toBe(false);
+    expect(
+      mailboxDraftNeedsAzureOptout(rawPolicy, f.teamId, f.box.address, "native", [
+        ...f.recipients,
+        "second@example.invalid",
+      ]),
+    ).toBe(false);
+  });
+  it("keeps suppressed recipients editable as drafts without enabling delivery", async () => {
+    const f = await setup();
+    await db.insert(schema.suppressions).values({
+      teamId: f.teamId,
+      emailHash: hashRecipient(f.recipients[0]!),
+      reason: "one_click_unsubscribe",
+    });
+    await expect(
+      prepareMailboxOptout(db, f.teamId, f.recipients, optoutConfig, { draftOnly: true }),
+    ).resolves.toHaveProperty("url");
+    await expect(prepareMailboxOptout(db, f.teamId, f.recipients, optoutConfig)).rejects.toThrow(
+      "suppressed",
+    );
+    const sent = await cloud(f);
+    expect(sent.sendRaw).not.toHaveBeenCalled();
+    expect(await receipts(f.teamId)).toHaveLength(0);
+  });
+  it("ordinary reply quoting only an authenticated provider footer is still one-recipient correspondence", async () => {
+    const f = await setup();
+    const parsed = await simpleParser(f.raw, { skipTextToHtml: true, skipHtmlToText: true });
+    const control = await prepareMailboxOptout(db, f.teamId, f.recipients, optoutConfig);
+    const replyText =
+      "A direct reply\n\n> Previous message" + "\n> " + control.text.trimStart() + control.text;
+    const analyzed = await validateMailboxOptout(
+      db,
+      f.teamId,
+      f.recipients,
+      { text: replyText, html: null, headerLines: parsed.headerLines },
+      optoutConfig,
+    );
+    expect(analyzed.text).toContain("Previous message");
+    expect(analyzed.text).not.toContain(control.url);
+    const raw = Buffer.from(
+      f.raw
+        .toString()
+        .replace(
+          "Personal reply",
+          "Personal reply\r\n\r\n> Previous message\r\n> " + control.text.trimStart(),
+        ),
+    );
+    const item = await saveMailboxDraft(db, keys, f.actor, {
+      mailboxId: f.box.id,
+      expectedRevision: 0,
+      raw,
+    });
+    const outbox = await queueMailboxDraft(
+      db,
+      keys,
+      f.actor,
+      { mailboxId: f.box.id, id: item.id, expectedRevision: item.revision },
+      mime,
+    );
+    const sent = await cloud(f, outbox);
+    expect(sent.result.status).toBe("accepted");
+    expect(sent.sendRaw).toHaveBeenCalledTimes(1);
+  });
+  it("does not neutralize a foreign or merely similar opt-out quote", async () => {
+    const f = await setup();
+    const parsed = await simpleParser(f.raw, { skipTextToHtml: true, skipHtmlToText: true });
+    const own = await prepareMailboxOptout(db, f.teamId, f.recipients, optoutConfig);
+    const foreign = buildAzureRecipientOptoutUrl({
+      teamId: randomUUID(),
+      recipient: f.recipients[0]!,
+      secretKey: deriveUnsubscribeKey(syntheticMaster),
+      baseUrl: optoutConfig.baseUrl,
+    });
+    const analyzed = await validateMailboxOptout(
+      db,
+      f.teamId,
+      f.recipients,
+      {
+        text: "A direct reply\n> " + mailboxOptoutFooter(foreign).text.trimStart() + own.text,
+        html: null,
+        headerLines: parsed.headerLines,
+      },
+      optoutConfig,
+    );
+    expect(analyzed.text).toContain(foreign);
+  });
 });

@@ -28,6 +28,7 @@ import { utcDay } from "../../../packages/core/src/utc-day.js";
 import { mailboxOutbox } from "../../../packages/db/src/schema/mailbox-transport.js";
 import type { SesSender } from "./handlers/send-email.js";
 import { isSesEnforcementRefusal, type SesQuotaGate } from "./handlers/ses-quota.js";
+import { mailboxAzureCompliance } from "./mailbox-optout.js";
 import type { SesFailover } from "./ses-failover.js";
 
 export const mailboxWorkerMime: MailboxTransportMimeAdapter = {
@@ -76,6 +77,9 @@ async function checkMailboxContent(
   }
   try {
     const parsed = await simpleParser(input.raw, { skipImageLinks: true, skipTextToHtml: true });
+    const authored = parsed.headerLines.some((h) => h.key === "list-unsubscribe")
+      ? await mailboxAzureCompliance(db, input)
+      : null;
     const consent = await checkCampaignMessage(db, {
       teamId: input.teamId,
       from: parsed.from?.text ?? input.from,
@@ -83,9 +87,11 @@ async function checkMailboxContent(
       cc: input.cc,
       bcc: input.bcc,
       subject: parsed.subject ?? "",
-      html: typeof parsed.html === "string" ? parsed.html : null,
-      text: parsed.text ?? null,
-      headers: Object.fromEntries(parsed.headerLines.map((line) => [line.key, line.line])),
+      html: authored ? authored.html : typeof parsed.html === "string" ? parsed.html : null,
+      text: authored ? authored.text : (parsed.text ?? null),
+      headers: authored
+        ? authored.headers
+        : Object.fromEntries(parsed.headerLines.map((line) => [line.key, line.line])),
     });
     if (!consent.allowed) throw new MailboxSendDeferredError();
   } catch {
@@ -167,11 +173,18 @@ export function createMailboxContentPolicySender(
           skipTextToHtml: true,
         });
         const from = parsed.from?.text ?? input.from;
-        const html = typeof parsed.html === "string" ? parsed.html : null;
+        const authored = parsed.headerLines.some((h) => h.key === "list-unsubscribe")
+          ? await mailboxAzureCompliance(db, input)
+          : null;
+        const html = authored
+          ? authored.html
+          : typeof parsed.html === "string"
+            ? parsed.html
+            : null;
         const insight = evaluateEmailInsights({
           html,
           preTrackingHtml: html,
-          text: parsed.text ?? null,
+          text: authored ? authored.text : (parsed.text ?? null),
           from,
           senderDomain: parseSingleSender(from)?.domain ?? "",
           subject: parsed.subject ?? "",
@@ -246,8 +259,10 @@ export function createMailboxContentPolicySender(
               bcc: input.bcc,
               subject: parsed.subject,
               html,
-              text: parsed.text,
-              headers: Object.fromEntries(parsed.headerLines.map((line) => [line.key, line.line])),
+              text: authored ? authored.text : parsed.text,
+              headers: authored
+                ? authored.headers
+                : Object.fromEntries(parsed.headerLines.map((line) => [line.key, line.line])),
             })
               ? "campaign"
               : "transactional",

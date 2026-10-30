@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { env, unsubscribeBaseUrl } from "@millionsend/config";
 import {
   countMailboxSchedules,
   countMailboxViews,
@@ -29,6 +30,10 @@ import {
   mailboxMessageId,
   mailboxReplyIds,
 } from "../../../../packages/core/src/mailbox-message-id";
+import {
+  mailboxDraftNeedsAzureOptout,
+  prepareMailboxOptout,
+} from "../../../../packages/core/src/mailbox-optout.js";
 import { pilotImageMetadata } from "../../../../packages/core/src/mailbox-pilot-images";
 import {
   mailboxSenderDecisionsFor,
@@ -1221,12 +1226,38 @@ export async function saveMailboxContentDraft(
     // A submitted ID cannot thread a reply to SES's overwritten Sent header.
     if (!replyId) throw new MailboxContentError("conflict");
   }
+  const optout = mailboxDraftNeedsAzureOptout(
+    env.SENDING_PROVIDER_POLICY_JSON,
+    actor.teamId,
+    box.address,
+    box.origin,
+    [...input.to, ...cc, ...bcc],
+  )
+    ? await prepareMailboxOptout(
+        db,
+        actor.teamId,
+        [...input.to, ...cc, ...bcc],
+        {
+          baseUrl: unsubscribeBaseUrl() ?? "",
+          masterKey: Buffer.from(env.MASTER_ENCRYPTION_KEY ?? "", "base64"),
+        },
+        { draftOnly: true },
+      )
+    : null;
   // streamTransport buffers a MIME capture. It never connects to SMTP/SES.
   const transport = nodemailer.createTransport({
     streamTransport: true,
     buffer: true,
     newline: "windows",
   });
+  const composeText =
+    optout && text.trimEnd().endsWith(optout.text)
+      ? text.trimEnd().slice(0, -optout.text.length)
+      : text;
+  const composeHtml =
+    rich && optout && rich.trimEnd().endsWith(optout.html)
+      ? rich.trimEnd().slice(0, -optout.html.length)
+      : rich;
   const result = await transport.sendMail({
     from: box.address,
     to: input.to,
@@ -1234,11 +1265,11 @@ export async function saveMailboxContentDraft(
     // Bcc stays on the sealed draft (and Sent copy); the sender strips it from what leaves.
     ...(bcc.length ? { bcc, keepBcc: true } : {}),
     subject: input.subject,
-    text,
+    text: composeText + (optout?.text ?? ""),
     // The person's own formatting, sanitized; otherwise the same words as HTML, with
     // the mailbox's signature formatted where the composer placed it.
-    html: rich ?? mailboxDraftHtml(text, signature),
-    ...(rich ? { headers: { [MAILBOX_RICH_FORMAT_HEADER]: "rich" } } : {}),
+    html: (composeHtml ?? mailboxDraftHtml(composeText, signature)) + (optout?.html ?? ""),
+    headers: { ...(rich ? { [MAILBOX_RICH_FORMAT_HEADER]: "rich" } : {}), ...optout?.headers },
     messageId: input.id ? originalId : `<${randomUUID()}@${box.address.split("@")[1]}>`,
     inReplyTo:
       mode === "forward"

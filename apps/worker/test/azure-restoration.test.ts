@@ -1,14 +1,22 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import {
+  deriveUnsubscribeKey,
   EnvKeyring,
   encryptEmailBody,
+  hashRecipient,
   parseSendingProviderPolicy,
   SYSTEM_MAIL_TAG,
 } from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
+import { simpleParser } from "mailparser";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import {
+  recordAzureRecipientOptout,
+  verifyAzureRecipientOptoutToken,
+} from "../../../packages/core/src/azure-recipient-optout.js";
+import * as azureClaims from "../../../packages/core/src/azure-send-claim.js";
 import { type SendDeps, sendEmail } from "../src/handlers/send-email.js";
 import { createCustomerSmtpRelay } from "../src/handlers/smtp-fallback.js";
 
@@ -55,6 +63,10 @@ function deps(response: string) {
   }));
   const value: SendDeps = {
     keyring,
+    unsubscribe: {
+      secretKey: deriveUnsubscribeKey(Buffer.alloc(32, 73)),
+      baseUrl: "https://optout.example.invalid",
+    },
     ses: { sendRaw: ses },
     fallback: { sendRaw: ses },
     relay: {
@@ -109,6 +121,18 @@ it("trusted receipt preserves original From and MIME and never invokes SES", asy
   expect(d.smtp.mock.calls[0]?.[0].envelope.from).toBe("DoNotReply@example.invalid");
   expect(d.smtp.mock.calls[0]?.[0].raw.toString()).toContain("DoNotReply@example.invalid");
   expect(d.ses).not.toHaveBeenCalled();
+  const parsed = await simpleParser(d.smtp.mock.calls[0]![0].raw);
+  const link = (parsed.text ?? "")
+    .split(/\s+/)
+    .find((s) => s.startsWith("https://optout.example.invalid/unsubscribe/recipient/"));
+  expect(link).toBeDefined();
+  const token = new URL(link!).pathname.split("/").at(-1)!;
+  expect(verifyAzureRecipientOptoutToken(token, d.value.unsubscribe!.secretKey)).toEqual({
+    teamId: team,
+    recipientHash: hashRecipient(email.to[0]!),
+  });
+  expect(parsed.text).toContain("Stop all messages from this team");
+  expect(await fixture.db.select().from(schema.contacts)).toHaveLength(0);
 });
 it("system tag/null domain cannot admit another From or old backlog", async () => {
   for (const patch of [
@@ -127,4 +151,75 @@ it("system tag/null domain cannot admit another From or old backlog", async () =
     expect(stored?.sentAt).toBeNull();
     expect(stored?.latestStatus).toBe("queued");
   }
+});
+
+it("ACS API opt-out before claim parks transactional without sending or audience enrollment", async () => {
+  const address = `before-${randomUUID()}@example.invalid`;
+  const email = await seed({ to: [address] });
+  const d = deps(`250 ${randomUUID()}`);
+  await recordAzureRecipientOptout(fixture.db, {
+    teamId: team,
+    recipientHash: hashRecipient(address),
+  });
+  expect(await sendEmail(fixture.db, d.value, { emailId: email.id })).toBe("parked");
+  const [row] = await fixture.db.select().from(schema.emails).where(eq(schema.emails.id, email.id));
+  expect(row?.sentAt).toBeNull();
+  expect(d.smtp).not.toHaveBeenCalled();
+  expect(await fixture.db.select().from(schema.contacts)).toHaveLength(0);
+});
+it("ACS API post-budget opt-out preserves claim and prevents SMTP/retry", async () => {
+  const address = `after-${randomUUID()}@example.invalid`;
+  const email = await seed({ to: [address] });
+  const d = deps(`250 ${randomUUID()}`);
+  const original = azureClaims.claimAzureSend;
+  const spy = vi.spyOn(azureClaims, "claimAzureSend").mockImplementation(async (...args) => {
+    const result = await original(...args);
+    if (result === "claimed")
+      await recordAzureRecipientOptout(fixture.db, {
+        teamId: team,
+        recipientHash: hashRecipient(address),
+      });
+    return result;
+  });
+  try {
+    expect(await sendEmail(fixture.db, d.value, { emailId: email.id })).toBe("parked");
+    const [row] = await fixture.db
+      .select()
+      .from(schema.emails)
+      .where(eq(schema.emails.id, email.id));
+    expect(row?.sentAt).toBeInstanceOf(Date);
+    expect(row?.sesMessageId).toBeNull();
+    expect(d.smtp).not.toHaveBeenCalled();
+    expect(await sendEmail(fixture.db, d.value, { emailId: email.id })).toBe("skipped");
+    const audit = await fixture.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.teamId, team));
+    expect(
+      audit.some(
+        (a) => a.action === "sending.azure_optout_held_after_claim" && a.data?.emailId === email.id,
+      ),
+    ).toBe(true);
+  } finally {
+    spy.mockRestore();
+  }
+});
+it("ACS API no opt-out configuration keeps the sealed payload unclaimed", async () => {
+  const email = await seed();
+  const d = deps(`250 ${randomUUID()}`);
+  delete d.value.unsubscribe;
+  expect(await sendEmail(fixture.db, d.value, { emailId: email.id })).toBe("parked");
+  const [row] = await fixture.db.select().from(schema.emails).where(eq(schema.emails.id, email.id));
+  expect(row?.sentAt).toBeNull();
+  expect(row?.bodyCiphertext).toEqual(email.bodyCiphertext);
+  expect(d.smtp).not.toHaveBeenCalled();
+});
+it("ACS API shared multi-recipient MIME remains retained rather than leaking recipient capabilities", async () => {
+  const email = await seed({ to: ["one@example.invalid", "two@example.invalid"] });
+  const d = deps(`250 ${randomUUID()}`);
+  expect(await sendEmail(fixture.db, d.value, { emailId: email.id })).toBe("parked");
+  expect(d.smtp).not.toHaveBeenCalled();
+  const [row] = await fixture.db.select().from(schema.emails).where(eq(schema.emails.id, email.id));
+  expect(row?.sentAt).toBeNull();
+  expect(row?.bodyCiphertext).toEqual(email.bodyCiphertext);
 });

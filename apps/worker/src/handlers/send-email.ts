@@ -46,6 +46,7 @@ import { schema } from "@millionsend/db";
 import { type EmailSendPriority, emailSendPriority } from "@millionsend/queue";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { createTransport } from "nodemailer";
+import { buildAzureRecipientOptoutUrl } from "../../../../packages/core/src/azure-recipient-optout.js";
 import { claimAzureSend } from "../../../../packages/core/src/azure-send-claim.js";
 import {
   campaignMessage,
@@ -53,6 +54,7 @@ import {
 } from "../../../../packages/core/src/campaign-consent.js";
 import { campaignSendWindowOpen } from "../../../../packages/core/src/campaign-send-window.js";
 import { screenPreSendContent } from "../../../../packages/core/src/pre-send-content-policy.js";
+import { appendAzureApiOptoutBody } from "../azure-api-optout.js";
 import {
   isSesEnforcementRefusal,
   isSesQuotaRefusal,
@@ -594,6 +596,37 @@ export async function sendEmail(
   });
   if (preliminaryRoute.kind === "held") return "parked";
   const azureRoute = preliminaryRoute.provider === "azure_smtp";
+  // ACS requires a working opt-out for customer mail, including transactional.
+  // A recipient-scoped link never enrolls this address as a marketing contact.
+  let azureRecipientOptoutUrl: string | null = null;
+  if (azureRoute) {
+    const unsubscribe = deps.unsubscribe;
+    if (
+      !unsubscribe ||
+      email.to.length !== 1 ||
+      (email.cc?.length ?? 0) > 0 ||
+      (email.bcc?.length ?? 0) > 0
+    ) {
+      await parkQueued(db, email, "Azure recipient-scoped opt-out required");
+      return "parked";
+    }
+    if ((await findSuppressed(db, email.teamId, email.to)).size > 0) {
+      await parkQueued(db, email, "Azure recipient opted out");
+      return "parked";
+    }
+    try {
+      azureRecipientOptoutUrl = buildAzureRecipientOptoutUrl({
+        teamId: email.teamId,
+        recipient: email.to[0]!,
+        secretKey: unsubscribe.secretKey,
+        baseUrl: unsubscribe.baseUrl,
+      });
+    } catch {
+      await parkQueued(db, email, "Azure opt-out configuration invalid");
+      return "parked";
+    }
+  }
+
   // SES at its 24-hour ceiling in this region: park before building anything,
   // the way an over-plan email parks at accept. The drain releases it as the
   // window frees. A bulk row parks earlier, at the broadcast share (or while
@@ -733,6 +766,16 @@ export async function sendEmail(
   const open = (domain?.openTracking ?? false) && !systemMail;
   let html = body.html;
   let text = body.text;
+  if (azureRecipientOptoutUrl) {
+    const compliant = appendAzureApiOptoutBody({
+      from: extractAddrSpec(email.from),
+      html,
+      text,
+      url: azureRecipientOptoutUrl,
+    });
+    html = compliant.html;
+    text = compliant.text;
+  }
 
   // Transactional topic send (topicId without contactId): the unsubscribe
   // token signs a contactId, so it exists only when the primary recipient
@@ -813,7 +856,7 @@ export async function sendEmail(
       // wrapping the visible Unsubscribe link through /t/c would log a bogus
       // click.
       const skipHrefPrefix =
-        (email.contactId || email.topicId) && deps.unsubscribe
+        (azureRecipientOptoutUrl || email.contactId || email.topicId) && deps.unsubscribe
           ? buildUnsubscribeUrl(deps.unsubscribe.baseUrl, "")
           : undefined;
       html = rewriteForTracking(html, {
@@ -862,6 +905,10 @@ export async function sendEmail(
       buildUnsubscribeHeaders(deps.unsubscribe.baseUrl, topicUnsubscribeToken),
     );
   }
+  if (azureRecipientOptoutUrl && !hasListUnsubscribe(headers)) {
+    headers["List-Unsubscribe"] = `<${azureRecipientOptoutUrl}>`;
+    headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+  }
   if (closedCampaign && !hasOneClickUnsubscribe(headers)) {
     await parkQueued(db, email, "campaign one-click unsubscribe required");
     return "parked";
@@ -901,6 +948,31 @@ export async function sendEmail(
       : null,
     now: new Date(),
   });
+  const originalContentInsights = evaluateEmailInsights({
+    html: body.html,
+    preTrackingHtml: body.html,
+    text: body.text,
+    from: email.from,
+    senderDomain: parseSingleSender(email.from)?.domain ?? "",
+    subject: email.subject,
+    finalHeaders: headers,
+    hasAttachments: !!attachments?.length,
+    replyTo: email.replyTo,
+    isBroadcast: closedCampaign || !!(email.contactId || email.broadcastId),
+    hasTopic: !!email.topicId,
+    tracking: {
+      clickEnabled: click,
+      openEnabled: open,
+      brandedHostUsed,
+      sharedFallbackUsed,
+      shippedUntracked,
+      trackingPending,
+    },
+    domainSnapshot: domain
+      ? { dmarcPolicy: domain.dmarcPolicy, dmarcCheckedAt: domain.dmarcCheckedAt }
+      : null,
+    now: new Date(),
+  });
   const route = resolveSendingProvider(deps.sendingProviderPolicy ?? null, {
     ...restorationMessage,
     now: deps.now?.(),
@@ -908,7 +980,9 @@ export async function sendEmail(
     createdAt: email.createdAt,
     fromAddress: extractAddrSpec(email.from).toLowerCase(),
     messageClass:
-      closedCampaign || routingInsights.marketing || campaignMessage(campaignInput)
+      closedCampaign ||
+      (azureRecipientOptoutUrl ? originalContentInsights.marketing : routingInsights.marketing) ||
+      campaignMessage(campaignInput)
         ? "campaign"
         : "transactional",
     legacyProvider: "ses",
@@ -985,6 +1059,10 @@ export async function sendEmail(
     return "parked";
   }
 
+  if (azureRoute && (await findSuppressed(db, email.teamId, email.to)).size > 0) {
+    await parkQueued(db, email, "Azure recipient opted out");
+    return "parked";
+  }
   if (!campaignWindowOpen()) return "parked";
 
   // Atomic claim (sentAt doubles as the claim marker): closes the
@@ -1032,21 +1110,23 @@ export async function sendEmail(
   }
   if (!campaignWindowOpen()) return "parked";
   // Claim acquisition also awaits the DB. A revoked approval is still a
-  // proven non-send, so release this claim without purging the sealed payload.
+  // proven non-send; ACS lifetime receipts nevertheless remain durable.
   try {
     if (!(await checkCampaignMessage(db, campaignInput)).allowed) {
-      await db
-        .update(schema.emails)
-        .set({ sentAt: null })
-        .where(and(eq(schema.emails.id, email.id), eq(schema.emails.latestStatus, "queued")));
+      if (!azureRoute)
+        await db
+          .update(schema.emails)
+          .set({ sentAt: null })
+          .where(and(eq(schema.emails.id, email.id), eq(schema.emails.latestStatus, "queued")));
       await parkQueued(db, email, "campaign consent required");
       return "parked";
     }
   } catch (error) {
-    await db
-      .update(schema.emails)
-      .set({ sentAt: null })
-      .where(and(eq(schema.emails.id, email.id), eq(schema.emails.latestStatus, "queued")));
+    if (!azureRoute)
+      await db
+        .update(schema.emails)
+        .set({ sentAt: null })
+        .where(and(eq(schema.emails.id, email.id), eq(schema.emails.latestStatus, "queued")));
     throw error;
   }
   // The claim itself awaits the DB; an account probe may close the gate then.
@@ -1064,6 +1144,17 @@ export async function sendEmail(
       ? deps.relay?.sender
       : deps.ses;
   if (!sender) throw new Error("selected_sending_provider_unavailable");
+  // The global claim can await a lock. Honor even transactional opt-outs again.
+  // A durable Azure claim is never reset/refunded or made retryable here.
+  if (azureRoute && (await findSuppressed(db, email.teamId, email.to)).size > 0) {
+    await db.insert(schema.auditLog).values({
+      teamId: email.teamId,
+      actorId: "system",
+      action: "sending.azure_optout_held_after_claim",
+      data: { emailId: email.id, reason: "recipient_opted_out" },
+    });
+    return "parked";
+  }
   // Final fresh sample, after every awaited guard and immediately before SMTP.
   // Expiry never resets a durable claim, quota reservation or lifetime audit.
   if (!campaignWindowOpen()) return "parked";

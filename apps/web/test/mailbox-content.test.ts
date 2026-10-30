@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import {
@@ -55,8 +56,12 @@ let client: PGlite,
   mailboxId: string,
   agentId: string,
   keys: EnvKeyring;
-const folder = fileURLToPath(new URL("../../../packages/db/drizzle/", import.meta.url));
-const extension = fileURLToPath(new URL("../../../packages/db/mailbox-drizzle/", import.meta.url));
+const folder = process.env.MEPMAIL_AZURE_FIXTURE_DDL_ROOT
+  ? join(process.env.MEPMAIL_AZURE_FIXTURE_DDL_ROOT, "drizzle")
+  : fileURLToPath(new URL("../../../packages/db/drizzle/", import.meta.url));
+const extension = process.env.MEPMAIL_AZURE_FIXTURE_DDL_ROOT
+  ? join(process.env.MEPMAIL_AZURE_FIXTURE_DDL_ROOT, "mailbox-drizzle")
+  : fileURLToPath(new URL("../../../packages/db/mailbox-drizzle/", import.meta.url));
 const caller = createCallerFactory(router({ mailboxes: mailboxesRouter }));
 function ctx(userId = "owner", extra: Partial<Context> = {}): Context {
   return {
@@ -163,7 +168,7 @@ beforeEach(async () => {
     for (const name of readdirSync(folder)
       .filter((n) => n.endsWith(".sql"))
       .sort())
-      for (const sql of readFileSync(folder + name, "utf8")
+      for (const sql of readFileSync(join(folder, name), "utf8")
         .split("--> statement-breakpoint")
         .filter((s) => s.trim()))
         await tx.exec(sql);
@@ -1873,5 +1878,80 @@ describe("session-authenticated mailbox content", () => {
         id: a.id,
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe("ACS Parent normal Compose lifecycle", () => {
+  function azureCompose() {
+    vi.stubEnv("MASTER_ENCRYPTION_KEY", Buffer.alloc(32, 73).toString("base64"));
+    vi.stubEnv("APP_BASE_URL", "https://optout.example.invalid");
+    vi.stubEnv(
+      "SENDING_PROVIDER_POLICY_JSON",
+      JSON.stringify({
+        version: 1,
+        allowedTeamIds: [teamId],
+        defaults: { transactional: "disabled", campaign: "disabled" },
+        teams: { [teamId]: { transactional: "azure_smtp", campaign: "disabled" } },
+        restoration: {
+          teams: {
+            [teamId]: {
+              notBefore: "2020-01-01T00:00:00.000Z",
+              senders: ["person@content.invalid"],
+            },
+          },
+        },
+      }),
+    );
+  }
+  it("saves, reads and re-saves a normal Azure draft with exactly one approved footer", async () => {
+    azureCompose();
+    const first = await as().saveDraft(draft({ text: "A normal personal reply" }));
+    const a = await readMailboxItem(db, keys, actor(), { mailboxId, id: first.id });
+    const parsed = await simpleParser(a.raw, { skipTextToHtml: true, skipHtmlToText: true });
+    expect(parsed.text).toContain("Stop all Azure-delivered messages from this team");
+    expect(parsed.headerLines.filter((h) => h.key === "list-unsubscribe")).toHaveLength(1);
+    const again = await as().saveDraft(
+      draft({
+        id: first.id,
+        sourceItemId: first.id,
+        expectedRevision: first.revision,
+        text: parsed.text ?? "",
+      }),
+    );
+    const b = await readMailboxItem(db, keys, actor(), { mailboxId, id: again.id });
+    const p = await simpleParser(b.raw, { skipTextToHtml: true, skipHtmlToText: true });
+    expect((p.text ?? "").split("Stop all Azure-delivered messages from this team")).toHaveLength(
+      2,
+    );
+    expect(
+      (typeof p.html === "string" ? p.html : "").split(
+        "Stop all Azure-delivered messages from this team",
+      ),
+    ).toHaveLength(2);
+    expect(again.revision).toBe(first.revision + 1);
+  });
+  it("keeps multi-recipient drafts editable without leaking one recipient token", async () => {
+    azureCompose();
+    const saved = await as().saveDraft(
+      draft({ to: ["one@example.invalid", "two@example.invalid"] }),
+    );
+    const item = await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id });
+    const p = await simpleParser(item.raw);
+    expect(p.to).toBeTruthy();
+    expect(p.headerLines.filter((h) => h.key === "list-unsubscribe")).toHaveLength(0);
+    expect(p.text).not.toContain("/unsubscribe/recipient/");
+  });
+  it("does not impose Azure composition policy on an unconfigured SES mailbox", async () => {
+    vi.stubEnv(
+      "SENDING_PROVIDER_POLICY_JSON",
+      JSON.stringify({ version: 1, defaults: { transactional: "ses", campaign: "ses" } }),
+    );
+    const saved = await as().saveDraft(
+      draft({ to: ["one@example.invalid", "two@example.invalid"] }),
+    );
+    const item = await readMailboxItem(db, keys, actor(), { mailboxId, id: saved.id });
+    const p = await simpleParser(item.raw);
+    expect(p.text).not.toContain("/unsubscribe/recipient/");
+    expect(p.headerLines.filter((h) => h.key === "list-unsubscribe")).toHaveLength(0);
   });
 });

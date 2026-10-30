@@ -12,6 +12,7 @@ import type { Db } from "@millionsend/db";
 import { reserveMailboxAzureBudget } from "../../../packages/core/src/mailbox-azure-budget.js";
 import { assertMailboxOutboxSendAccess } from "../../../packages/core/src/mailbox-transport.js";
 import type { SesSender } from "./handlers/send-email.js";
+import { mailboxAzureCompliance } from "./mailbox-optout.js";
 import { createMailboxContentPolicySender, withMailboxProbation } from "./mailbox-sender.js";
 
 /** Native Correio only; caller must be sendMailboxOutbox, never a direct API route.
@@ -39,6 +40,7 @@ export function createMailboxAzureSender(
         ...new Set([...input.to, ...input.cc, ...input.bcc].map((r) => r.toLowerCase())),
       ];
       const authorize = async () => {
+        await mailboxAzureCompliance(db, input);
         if (
           !(await checkSignupSend(db, input.teamId, recipients)).allowed ||
           !(await checkMailboxRecipientBlocks(db, { teamId: input.teamId, recipients }))
@@ -108,11 +110,10 @@ export function createMailboxAzureSender(
   // before quota + SMTP, including when this adapter is accidentally invoked alone.
   // Only the final adapter reserves probation. Routers may clone the input, so
   // relying on an outer WeakSet identity across those clones would double charge.
-  return createMailboxContentPolicySender(
-    db,
-    unavailable,
-    options.isCloud,
-    options.policy,
-    withMailboxProbation(db, attempt, options.isCloud),
-  );
+  return createMailboxContentPolicySender(db, unavailable, options.isCloud, options.policy, {
+    async send(input) {
+      await mailboxAzureCompliance(db, input);
+      return withMailboxProbation(db, attempt, options.isCloud).send(input);
+    },
+  });
 }
