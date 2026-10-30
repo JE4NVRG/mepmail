@@ -67,7 +67,11 @@ export async function validateMailboxOptout(
   db: Db,
   teamId: string,
   recipients: readonly string[],
-  content: { text: string; html: string | null; headerLines: { key: string; line: string }[] },
+  content: {
+    text: string;
+    html: string | null;
+    headerLines: readonly { key: string; line: string }[];
+  },
   config: MailboxOptoutConfig,
 ) {
   const key = checked(config);

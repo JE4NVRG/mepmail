@@ -1,6 +1,9 @@
 import { env, unsubscribeBaseUrl } from "@millionsend/config";
 import type { Db } from "@millionsend/db";
 import { simpleParser } from "mailparser";
+
+export { simpleParser as parseMailboxComplianceMime } from "mailparser";
+
 import { validateMailboxOptout } from "../../../packages/core/src/mailbox-optout.js";
 import {
   type MailboxOutboxSender,

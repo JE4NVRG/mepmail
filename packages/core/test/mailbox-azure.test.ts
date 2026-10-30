@@ -1,10 +1,10 @@
 import { createHmac } from "node:crypto";
 import * as dbExports from "@millionsend/db";
-import { simpleParser } from "mailparser";
 import {
   GET as optoutGET,
   POST as optoutPOST,
 } from "../../../apps/web/src/app/unsubscribe/recipient/[token]/route.js";
+import { parseMailboxComplianceMime as simpleParser } from "../../../apps/worker/src/mailbox-optout.js";
 import {
   buildAzureRecipientOptoutUrl,
   recordAzureRecipientOptout,

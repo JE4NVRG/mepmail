@@ -20,7 +20,10 @@ const headers = {
   "Content-Type": "text/html; charset=utf-8",
 };
 /** Scanner-safe: GET never writes. No session/login/recipient disclosure required. */
-export async function GET(_request: Request, ctx: { params: Promise<{ token: string }> }) {
+export async function GET(
+  _request: Request,
+  ctx: { params: Promise<{ token: string }> },
+): Promise<Response> {
   const parsed = target((await ctx.params).token);
   if (!parsed) return new Response("Invalid opt-out link", { status: 404, headers });
   return new Response(
@@ -28,7 +31,10 @@ export async function GET(_request: Request, ctx: { params: Promise<{ token: str
     { headers },
   );
 }
-export async function POST(_request: Request, ctx: { params: Promise<{ token: string }> }) {
+export async function POST(
+  _request: Request,
+  ctx: { params: Promise<{ token: string }> },
+): Promise<Response> {
   const parsed = target((await ctx.params).token);
   if (!parsed) return new Response("Invalid opt-out link", { status: 404, headers });
   await recordAzureRecipientOptout(getDb(), parsed);
