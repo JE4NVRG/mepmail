@@ -8,14 +8,14 @@ import {
   acceptMailboxOutbox,
   MAILBOX_AZURE_RESOURCE,
   mailboxRecipientHashFromPublicHash,
-} from "../../../../packages/core/src/mailbox-transport";
-import { processProviderEvent } from "../../../../packages/core/src/process-provider-event";
+} from "../../../../packages/core/src/mailbox-transport.js";
+import { processProviderEvent } from "../../../../packages/core/src/process-provider-event.js";
 import {
   AZURE_EMAIL_SOURCE,
   type AzureDeliveryAudit,
   AzureEventConflict,
   type AzureEventStore,
-} from "./azure-email-events";
+} from "./azure-email-events.js";
 
 export const AZURE_EVENT_AUDIT_ACTION = "pilot.azure_email_delivery_report";
 

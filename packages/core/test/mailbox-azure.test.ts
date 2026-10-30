@@ -266,8 +266,8 @@ describe("NativeR2 cloud and blocking-boundary regressions", () => {
         const rows = (
           Array.isArray(result) ? result : (result as unknown as { rows: unknown[] }).rows
         ) as { n: number; wall: boolean }[];
-        expect(rows[0].n).toBe(kind.startsWith("api") ? 1 : 2);
-        expect(rows[0].wall).toBe(true);
+        expect(rows[0]?.n).toBe(kind.startsWith("api") ? 1 : 2);
+        expect(rows[0]?.wall).toBe(true);
       });
     },
   );

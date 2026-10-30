@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { hashRecipient } from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb, createWebhookEndpoint } from "@millionsend/test-utils";
@@ -11,6 +13,20 @@ let fixture: Awaited<ReturnType<typeof createTestDb>>;
 let team: string;
 beforeAll(async () => {
   fixture = await createTestDb();
+  // Receipt collision fencing checks BOTH lanes. This fixture must contain
+  // the existing Correio schema too; never remove that production guard.
+  const root = process.env.MEPMAIL_AZURE_FIXTURE_DDL_ROOT
+    ? `${process.env.MEPMAIL_AZURE_FIXTURE_DDL_ROOT}/mailbox-drizzle/`
+    : fileURLToPath(new URL("../../../packages/db/mailbox-drizzle/", import.meta.url));
+  for (const name of readdirSync(root)
+    .filter((n) => n.endsWith(".sql"))
+    .sort()) {
+    await fixture.db.transaction(async (tx) => {
+      for (const statement of readFileSync(root + name, "utf8").split("--> statement-breakpoint")) {
+        if (statement.trim()) await tx.execute(sql.raw(statement));
+      }
+    });
+  }
   team = await createTeam(fixture.db, "azure-operational");
   await createWebhookEndpoint(fixture.db, team, null);
 });

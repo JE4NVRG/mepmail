@@ -236,7 +236,7 @@ export function createMailboxContentPolicySender(
         const provider = box?.origin === "external" ? "customer_smtp" : "ses";
         const route = resolveSendingProvider(policy, {
           teamId: input.teamId,
-          createdAt: outbox?.createdAt,
+          ...(outbox ? { createdAt: outbox.createdAt } : {}),
           fromAddress: input.from,
           messageClass:
             insight.marketing ||
