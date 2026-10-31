@@ -109,22 +109,6 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
     );
   const accountTerms =
     /\b(account|conta|cuenta|compte|password|senha|login|sign in|payment|pagamento|pagamento|billing|fatura|cartao|card|subscription|assinatura|apple id)\b/;
-  // A bounded informational title can use "update" as a noun, not an imperative.
-  // Sensitive titles and pressure retain the original signal. Only the final
-  // nominal token changes; sender/body actions and brand checks stay untouched.
-  const nominalUpdateSubject =
-    !pressure &&
-    !accountTerms.test(subjectWords) &&
-    /^(?:[a-z0-9]{1,40} ){0,6}(?:migration|status|progress) updates?$/.test(subjectWords);
-  const actionSubject =
-    receiptSubject && !pressure
-      ? subjectWords.replace(/\bconfirmation\b/g, " ")
-      : nominalUpdateSubject
-        ? subjectWords.replace(/\bupdates?$/, " ")
-        : input.subject;
-  const rawActionWords = foldText(
-    `${senderName(input.from)} ${actionSubject} ${visible} ${input.text ?? ""}`,
-  );
   // Keep the original payment-action signal by default. Only an explicitly
   // completed refund is informational, never a payment request/needed/due lure.
   // A claim about a third-party brand's account stays protected even if it
@@ -154,6 +138,32 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
       );
     }),
   );
+  // Credential/payment evidence is conservative even without a known CTA verb.
+  // Account alone is deliberately excluded: bounded brand-qualified ownership
+  // above distinguishes a protected account from an unrelated service account.
+  const sensitiveBody =
+    /\b(password|senha|credentials?|credenciais|passcode|otp|one time (?:password|code)|verification code|security code|login|log in|sign in|signin|payment|pagamento|billing|fatura|cartao|card)\b/.test(
+      foldText(`${visible} ${input.text ?? ""}`),
+    );
+  // A bounded informational title can use "update" as a noun, not an imperative.
+  // Suppress only without sensitive body evidence or a protected account claim.
+  // This guard does not need to enumerate request verbs (enter/provide/type/etc.).
+  // An unrelated service account alone is not a protected brand account claim.
+  const nominalUpdateSubject =
+    !pressure &&
+    !sensitiveBody &&
+    !brandedAccountClaim &&
+    !accountTerms.test(subjectWords) &&
+    /^(?:[a-z0-9]{1,40} ){0,6}(?:migration|status|progress) updates?$/.test(subjectWords);
+  const actionSubject =
+    receiptSubject && !pressure
+      ? subjectWords.replace(/\bconfirmation\b/g, " ")
+      : nominalUpdateSubject
+        ? subjectWords.replace(/\bupdates?$/, " ")
+        : input.subject;
+  const rawActionWords = foldText(
+    `${senderName(input.from)} ${actionSubject} ${visible} ${input.text ?? ""}`,
+  );
   const actionWords = brandedAccountClaim
     ? rawActionWords
     : rawActionWords.replace(
@@ -161,7 +171,7 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
         "refund completed",
       );
   const action =
-    accountTerms.test(words) &&
+    (accountTerms.test(words) || sensitiveBody) &&
     /\b(verify|verifique|verificar|confirm|confirme|confirmar|update|atualize|atualizar|reset|redefin|recover|recuper|suspend|suspens|suspended|suspensa|bloquead|locked|failed|falhou|declined|recusad|expir|renew|renov|pagar|pay|regulariz|validate|validar|reativ|reactivat)\w*/.test(
       actionWords,
     );

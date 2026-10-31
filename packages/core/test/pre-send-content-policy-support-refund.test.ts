@@ -844,10 +844,19 @@ test("nominal migration title preserves visible HTML and multiline supplier cont
 const mixedNoticeActions = [
   ["generic password request", "Verify your password: https://security-review.invalid/login"],
   ["generic card request", "Update your card: https://billing-review.invalid/pay"],
-  ["qualified account", "Update your Microsoft 365 Business Premium account: https://security-review.invalid/login"],
-  ["qualified newline account", "Update your Google\nWorkspace for Education account: https://security-review.invalid/login"],
+  [
+    "qualified account",
+    "Update your Microsoft 365 Business Premium account: https://security-review.invalid/login",
+  ],
+  [
+    "qualified newline account",
+    "Update your Google\nWorkspace for Education account: https://security-review.invalid/login",
+  ],
   ["payment demand", "Your Microsoft account: payment is due. https://billing-review.invalid/pay"],
-  ["false qualified refund", "Your Microsoft Dynamics 365 Finance and Operations account payment has been refunded: https://statement-review.invalid/login"],
+  [
+    "false qualified refund",
+    "Your Microsoft Dynamics 365 Finance and Operations account payment has been refunded: https://statement-review.invalid/login",
+  ],
 ] as const;
 for (const [name, request] of mixedNoticeActions) {
   for (const html of [false, true]) {
@@ -911,3 +920,186 @@ test("nominal-title matching stays bounded on a near-limit mixed notice", () => 
     }).action,
   ).toBe("hold");
 });
+
+// Independent P1 inputs are embedded unchanged, including nulls and HTML bytes.
+const nominalP1Cases = [
+  {
+    id: "A1",
+    input: {
+      from: "MepMail Support <support@mepmail.invalid>",
+      subject: "Supplier migration update",
+      html: null,
+      text: "We use Microsoft and Google as delivery suppliers. No changes to your MepMail account. Documentation: https://mepmail.invalid/docs\nEnter your Microsoft password at https://security-review.invalid/login",
+    },
+    expected: "hold",
+  },
+  {
+    id: "A2",
+    input: {
+      from: "Customer Support <support@service-notice.invalid>",
+      subject: "Microsoft security status update",
+      html: null,
+      text: "Your Microsoft account has moved to our new portal. Enter your password at https://security-review.invalid/login",
+    },
+    expected: "hold",
+  },
+  {
+    id: "A3",
+    input: {
+      from: "Customer Support <support@service-notice.invalid>",
+      subject: "Google migration update",
+      html: '<p>Your Google Workspace account has moved to our new portal.</p><p>Enter your password here:</p><a href="https://security-review.invalid/login">Sign in</a>',
+      text: null,
+    },
+    expected: "hold",
+  },
+  {
+    id: "A4",
+    input: {
+      from: "MepMail Support <support@mepmail.invalid>",
+      subject: "Supplier migration update",
+      html: '<p>We use Microsoft and Google as delivery suppliers. No changes to your MepMail account. Documentation: https://mepmail.invalid/docs</p><p>Enter your Microsoft password at <a href="https://security-review.invalid/login">the migration portal</a>.</p>',
+      text: null,
+    },
+    expected: "hold",
+  },
+  {
+    id: "L07",
+    input: {
+      from: "MepMail Support <support@mepmail.invalid>",
+      subject: "Supplier migration update",
+      html: null,
+      text: "We use Microsoft and Google as delivery suppliers. No changes to your MepMail account. Documentation: https://mepmail.invalid/docs",
+    },
+    expected: "allow",
+  },
+  {
+    id: "C1",
+    input: {
+      from: "MepMail Support <support@mepmail.invalid>",
+      subject: "Supplier migration update",
+      html: null,
+      text: "We use Microsoft and Google as delivery suppliers. No changes to your MepMail account. Documentation: https://mepmail.invalid/docs\nVerify your Microsoft password at https://security-review.invalid/login",
+    },
+    expected: "hold",
+  },
+] as const;
+for (const { id, input, expected } of nominalP1Cases) {
+  test(`P1 unchanged independent input: ${id}`, () => {
+    expect(evaluatePreSendContent(input).action).toBe(expected);
+  });
+}
+
+// Different verbs (including an unrecognized arbitrary verb), subjects, formats,
+// brands and senders must not neutralize credential/payment body evidence.
+const nominalSensitiveBodies = [
+  "Provide your Microsoft password at https://security-review.invalid/login",
+  "Type your password at https://security-review.invalid/login",
+  "Use your credentials at https://security-review.invalid/session",
+  "Sign in at https://security-review.invalid/session",
+  "Submit your card details at https://security-review.invalid/pay",
+  "Supply your OTP at https://security-review.invalid/session",
+  "Present your one-time code at https://security-review.invalid/session",
+  "Send your verification code to https://security-review.invalid/session",
+  "Supply your Google Workspace for Education credentials at https://security-review.invalid/session",
+  "Present your Microsoft 365 Apps for Business account at https://security-review.invalid/portal",
+  "Your Google Next Generation Enterprise account has moved to https://security-review.invalid/portal",
+  "Your account with Microsoft has moved to https://security-review.invalid/portal",
+  "Your Microsoft 365 Business Premium account has moved to https://security-review.invalid/portal",
+  "Your Microsoft Dynamics 365 Finance and Operations account has moved to https://security-review.invalid/portal",
+  "Use your senha at https://security-review.invalid/session",
+] as const;
+for (const body of nominalSensitiveBodies) {
+  for (const html of [false, true]) {
+    for (const from of [
+      "Administrator <admin@mepmail.invalid>",
+      "Operations <operations@other-service.invalid>",
+    ]) {
+      test(`P1 sensitive evidence: html=${html}: ${from}: ${body}`, () => {
+        const prefix =
+          "We use Microsoft and Google as delivery suppliers. No changes to your OtherService account.";
+        expect(
+          evaluatePreSendContent({
+            from,
+            subject: "Infrastructure status update",
+            ...(html ? { html: `<p>${prefix}</p><p>${body}</p>` } : { text: `${prefix}\n${body}` }),
+          }).action,
+        ).toBe("hold");
+      });
+    }
+  }
+}
+for (const body of [
+  "Your Google\nWorkspace for Education account has moved to https://security-review.invalid/portal",
+  'Your Micro<span>soft</span> 365 account has moved to the new portal. <a href="https://security-review.invalid/portal">Portal</a>',
+  'Provide your pass<span>word</span> at <a href="https://security-review.invalid/session">Portal</a>',
+  '<a href="https://security-review.invalid/session">Sign&#32;in</a>',
+]) {
+  test(`P1 HTML folding and qualified context: ${body}`, () => {
+    expect(
+      evaluatePreSendContent({
+        from: "Support <support@unrelated.invalid>",
+        subject: "Google migration update",
+        html: body,
+      }).action,
+    ).toBe("hold");
+  });
+}
+for (const body of [
+  "We use Microsoft and Google as suppliers. Your OtherService account remains intact. https://docs.unrelated.invalid/migration",
+  "We use Google Workspace as a supplier. Your OtherService account remains intact. https://docs.unrelated.invalid/migration",
+  "We use Microsoft 365 Business Premium as a supplier. Your MepMail account remains intact. https://docs.unrelated.invalid/migration",
+  "We use Google Workspace as a supplier; your OtherService account remains intact. https://docs.unrelated.invalid/migration",
+]) {
+  test(`P1 supplier clause cannot capture unrelated account: ${body}`, () => {
+    expect(
+      evaluatePreSendContent({
+        from: "Administrator <admin@unrelated.invalid>",
+        subject: "Project progress updates",
+        text: body,
+      }).action,
+    ).toBe("allow");
+  });
+}
+// These have no unrelated account preface and no original account-term token;
+// credentials/OTP evidence must itself preserve the nominal update signal.
+for (const text of [
+  "Use your credentials at https://security-review.invalid/session",
+  "Supply your OTP at https://security-review.invalid/session",
+  "Present your one-time code at https://security-review.invalid/session",
+  "Credentials: https://security-review.invalid/session",
+  "OTP: https://security-review.invalid/session",
+  "Log in at https://security-review.invalid/session",
+]) {
+  test(`P1 sensitive evidence needs no account preface or known verb: ${text}`, () => {
+    expect(
+      evaluatePreSendContent({
+        from: "Administrator <admin@unrelated.invalid>",
+        subject: "Microsoft status update",
+        text,
+      }).action,
+    ).toBe("hold");
+  });
+}
+// All original alignment and no-brand/no-destination requirements remain intact.
+for (const [from, text] of [
+  [
+    "Microsoft <notice@microsoft.com>",
+    "Provide your Microsoft password at https://security-review.invalid/login",
+  ],
+  [
+    "Support <support@unrelated.invalid>",
+    "Provide your Microsoft password at https://microsoft.com/login",
+  ],
+  [
+    "Support <support@unrelated.invalid>",
+    "Provide your OtherService credentials at https://security-review.invalid/session",
+  ],
+  ["Support <support@unrelated.invalid>", "Provide your Microsoft password offline"],
+]) {
+  test(`P1 preserves remaining signals: ${from}: ${text}`, () => {
+    expect(
+      evaluatePreSendContent({ from, subject: "Supplier migration update", text }).action,
+    ).toBe("allow");
+  });
+}
