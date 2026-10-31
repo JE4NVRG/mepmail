@@ -675,3 +675,33 @@ for (const [name, subject, body, expected] of cases) {
     if (verdict.action === "hold") expect(verdict.code).toBe("brand_account_link_mismatch");
   });
 }
+
+const retainedPaymentSignals = [
+  [
+    "payment needed",
+    "Microsoft payment needed",
+    "Your Microsoft account: payment needed. https://outside.example/billing",
+  ],
+  [
+    "payment request",
+    "Microsoft payment request",
+    "Payment request for your Microsoft account: https://outside.example/billing",
+  ],
+  [
+    "branded account false refund",
+    "Refund confirmation",
+    "Your Microsoft account payment has been refunded: https://outside.example/login",
+  ],
+  [
+    "benign preface cannot clear branded account false refund",
+    "Refund confirmation",
+    "We use Microsoft as a supplier. Your Microsoft account payment has been refunded: https://outside.example/login",
+  ],
+] as const;
+for (const [name, subject, text] of retainedPaymentSignals) {
+  test(name, () => {
+    expect(
+      evaluatePreSendContent({ from: "Support <support@outside.example>", subject, text }).action,
+    ).toBe("hold");
+  });
+}

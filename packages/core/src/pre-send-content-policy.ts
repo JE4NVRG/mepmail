@@ -109,14 +109,34 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
     );
   const actionSubject =
     receiptSubject && !pressure ? subjectWords.replace(/\bconfirmation\b/g, " ") : input.subject;
-  const actionWords = foldText(
+  const rawActionWords = foldText(
     `${senderName(input.from)} ${actionSubject} ${visible} ${input.text ?? ""}`,
   );
+  // Keep the original payment-action signal by default. Only an explicitly
+  // completed refund is informational, never a payment request/needed/due lure.
+  // A claim about a third-party brand's account stays protected even if it
+  // pretends to be a completed refund; a benign supplier preface cannot clear it.
+  const brandedAccountClaim = BRANDS.some((brand) =>
+    brand.terms.some((term) => {
+      const escaped = Array.from(term, (c) => (/^[a-z0-9 ]$/.test(c) ? c : "\\" + c)).join("");
+      const account =
+        "(?:account|conta|cuenta|compte|password|senha|login|subscription|assinatura|billing|fatura|id)";
+      return new RegExp(
+        String.raw`\b${escaped}\s+(?:your\s+|s\s+)?${account}\b|\b${account}\s+(?:at|with|for)\s+${escaped}\b`,
+      ).test(words);
+    }),
+  );
+  const actionWords = brandedAccountClaim
+    ? rawActionWords
+    : rawActionWords.replace(
+        /\bpayments?\s+(?:(?:has|have|had)\s+been\s+|(?:is|are|was|were)\s+)?(?:fully\s+)?refunded\b/g,
+        "refund completed",
+      );
   const action =
     /\b(account|conta|cuenta|compte|password|senha|login|sign in|payment|pagamento|pagamento|billing|fatura|cartao|card|subscription|assinatura|apple id)\b/.test(
       words,
     ) &&
-    /\b(verify|verifique|verificar|confirm|confirme|confirmar|update|atualize|atualizar|reset|redefin|recover|recuper|suspend|suspens|suspended|suspensa|bloquead|locked|failed|falhou|declined|recusad|expir|renew|renov|pagar|pay(?!ments?\b)|payment(?:s)?\s+(?:(?:is|are|was|were)\s+)?(?:required|due|overdue)\b|requires?\s+(?:an?\s+)?payment\b|regulariz|validate|validar|reativ|reactivat)\w*/.test(
+    /\b(verify|verifique|verificar|confirm|confirme|confirmar|update|atualize|atualizar|reset|redefin|recover|recuper|suspend|suspens|suspended|suspensa|bloquead|locked|failed|falhou|declined|recusad|expir|renew|renov|pagar|pay|regulariz|validate|validar|reativ|reactivat)\w*/.test(
       actionWords,
     );
   if (!action) return { action: "allow" };
