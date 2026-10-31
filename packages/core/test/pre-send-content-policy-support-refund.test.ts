@@ -1096,7 +1096,7 @@ for (const [from, text] of [
     "Provide your OtherService credentials at https://security-review.invalid/session",
   ],
   ["Support <support@unrelated.invalid>", "Provide your Microsoft password offline"],
-]) {
+] as const) {
   test(`P1 preserves remaining signals: ${from}: ${text}`, () => {
     expect(
       evaluatePreSendContent({ from, subject: "Supplier migration update", text }).action,
