@@ -52,12 +52,13 @@
     "hintOpen": "open",
     "hintClose": "close"
   },
+  "deliveryDisclosure": "Inbox placement and reading are not confirmed.",
   "status": {
     "queued": "Queued",
     "queued_quota": "Waiting",
     "sent": "Sent",
     "delivery_delayed": "Delivery delayed",
-    "delivered": "Delivered",
+    "delivered": "Received by recipient server",
     "opened": "Opened",
     "clicked": "Clicked",
     "bounced": "Bounced",

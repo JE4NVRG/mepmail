@@ -107,8 +107,21 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
     /\b(requires?|required|due|overdue|urgent|urgently|immediate|immediately|action needed|continue|click|tap)\b/.test(
       words,
     );
+  const accountTerms =
+    /\b(account|conta|cuenta|compte|password|senha|login|sign in|payment|pagamento|pagamento|billing|fatura|cartao|card|subscription|assinatura|apple id)\b/;
+  // A bounded informational title can use "update" as a noun, not an imperative.
+  // Sensitive titles and pressure retain the original signal. Only the final
+  // nominal token changes; sender/body actions and brand checks stay untouched.
+  const nominalUpdateSubject =
+    !pressure &&
+    !accountTerms.test(subjectWords) &&
+    /^(?:[a-z0-9]{1,40} ){0,6}(?:migration|status|progress) updates?$/.test(subjectWords);
   const actionSubject =
-    receiptSubject && !pressure ? subjectWords.replace(/\bconfirmation\b/g, " ") : input.subject;
+    receiptSubject && !pressure
+      ? subjectWords.replace(/\bconfirmation\b/g, " ")
+      : nominalUpdateSubject
+        ? subjectWords.replace(/\bupdates?$/, " ")
+        : input.subject;
   const rawActionWords = foldText(
     `${senderName(input.from)} ${actionSubject} ${visible} ${input.text ?? ""}`,
   );
@@ -148,9 +161,7 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
         "refund completed",
       );
   const action =
-    /\b(account|conta|cuenta|compte|password|senha|login|sign in|payment|pagamento|pagamento|billing|fatura|cartao|card|subscription|assinatura|apple id)\b/.test(
-      words,
-    ) &&
+    accountTerms.test(words) &&
     /\b(verify|verifique|verificar|confirm|confirme|confirmar|update|atualize|atualizar|reset|redefin|recover|recuper|suspend|suspens|suspended|suspensa|bloquead|locked|failed|falhou|declined|recusad|expir|renew|renov|pagar|pay|regulariz|validate|validar|reativ|reactivat)\w*/.test(
       actionWords,
     );

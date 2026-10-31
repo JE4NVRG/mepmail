@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 // warns, delayed stays neutral, and suppressed is a danger — future sends are
 // blocked.
 const VARIANTS = {
-  delivered: "success",
+  delivered: "neutral",
   verified: "success",
   sent: "neutral",
   opened: "info",
@@ -28,7 +28,7 @@ export type BadgeTone = (typeof VARIANTS)[BadgeStatus];
 // dot token borrow the family they read as: verified is a delivered-green,
 // pending an in-flight gray.
 const DOT_COLORS: Record<BadgeStatus, string> = {
-  delivered: "var(--ms-dot-delivered)",
+  delivered: "var(--ms-neutral)",
   verified: "var(--ms-dot-delivered)",
   sent: "var(--ms-dot-sent)",
   opened: "var(--ms-dot-opened)",
@@ -59,5 +59,17 @@ export function StatusDot({ status, color }: { status?: BadgeStatus; color?: str
 /** Labels come from common.status.* — semantic colors always carry text. */
 export function StatusBadge({ status }: { status: BadgeStatus }) {
   const t = useTranslations("common");
-  return <span className={`ms-badge ms-badge-${VARIANTS[status]}`}>{t(`status.${status}`)}</span>;
+  return (
+    <span
+      className={`ms-badge ms-badge-${VARIANTS[status]}`}
+      title={status === "delivered" ? t("deliveryDisclosure") : undefined}
+      style={
+        status === "delivered"
+          ? { minWidth: 140, maxWidth: 180, whiteSpace: "normal", overflowWrap: "anywhere" }
+          : undefined
+      }
+    >
+      {t(`status.${status}`)}
+    </span>
+  );
 }

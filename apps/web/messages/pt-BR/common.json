@@ -52,12 +52,13 @@
     "hintOpen": "abrir",
     "hintClose": "fechar"
   },
+  "deliveryDisclosure": "Caixa de Entrada e leitura não confirmadas.",
   "status": {
     "queued": "Na fila",
     "queued_quota": "Aguardando",
     "sent": "Enviado",
     "delivery_delayed": "Entrega atrasada",
-    "delivered": "Entregue",
+    "delivered": "Recebido pelo servidor destinatário",
     "opened": "Aberto",
     "clicked": "Clicado",
     "bounced": "Devolvido",

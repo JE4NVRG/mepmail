@@ -793,3 +793,121 @@ test("bounded qualifier matching handles a near-limit repeated-brand payload", (
     }).action,
   ).toBe("hold");
 });
+
+const supplierNotice =
+  "We use Microsoft and Google as delivery suppliers. No changes to your MepMail account. Documentation: https://mepmail.invalid/docs";
+test("L07 exact informational supplier migration update", () => {
+  expect(
+    evaluatePreSendContent({
+      from: "MepMail Support <support@mepmail.invalid>",
+      subject: "Supplier migration update",
+      html: null,
+      text: supplierNotice,
+    }).action,
+  ).toBe("allow");
+});
+
+// The distinction is lexical/contextual, independent of sender, service and URL.
+for (const from of [
+  "MepMail Support <support@mepmail.invalid>",
+  "Administrator <admin@unrelated.invalid>",
+  "Operations <operations@other-service.invalid>",
+]) {
+  for (const subject of [
+    "Supplier migration update",
+    "Infrastructure status update",
+    "Project progress updates",
+    "Supplier\nmigration\tupdate",
+  ]) {
+    test(`nominal title has no account-action signal: ${from}: ${JSON.stringify(subject)}`, () => {
+      expect(
+        evaluatePreSendContent({
+          from,
+          subject,
+          text: "We use Microsoft 365 and Google Workspace as delivery suppliers. Your OtherService account remains intact. Documentation: https://docs.other-service.invalid/migration",
+        }).action,
+      ).toBe("allow");
+    });
+  }
+}
+test("nominal migration title preserves visible HTML and multiline supplier context", () => {
+  expect(
+    evaluatePreSendContent({
+      from: "Operations <operations@other-service.invalid>",
+      subject: "Supplier migration update",
+      html: '<p>We use Micro<span>soft</span> 365 and Google\nWorkspace as delivery suppliers.</p><p>Your OtherService account remains intact.</p><a href="https://docs.other-service.invalid/migration">Documentation</a>',
+      text: null,
+    }).action,
+  ).toBe("allow");
+});
+
+const mixedNoticeActions = [
+  ["generic password request", "Verify your password: https://security-review.invalid/login"],
+  ["generic card request", "Update your card: https://billing-review.invalid/pay"],
+  ["qualified account", "Update your Microsoft 365 Business Premium account: https://security-review.invalid/login"],
+  ["qualified newline account", "Update your Google\nWorkspace for Education account: https://security-review.invalid/login"],
+  ["payment demand", "Your Microsoft account: payment is due. https://billing-review.invalid/pay"],
+  ["false qualified refund", "Your Microsoft Dynamics 365 Finance and Operations account payment has been refunded: https://statement-review.invalid/login"],
+] as const;
+for (const [name, request] of mixedNoticeActions) {
+  for (const html of [false, true]) {
+    test(`informational preface cannot clear ${name}: html=${html}`, () => {
+      const body = `${supplierNotice}\n${request}`;
+      expect(
+        evaluatePreSendContent({
+          from: "MepMail Support <support@mepmail.invalid>",
+          subject: "Supplier migration update",
+          ...(html ? { html: `<p>${supplierNotice}</p><p>${request}</p>` } : { text: body }),
+        }).action,
+      ).toBe("hold");
+    });
+  }
+}
+for (const subject of [
+  "Update your account",
+  "Account update",
+  "Microsoft 365 account migration update",
+  "Please update supplier migration update",
+  "Urgent supplier migration update",
+  "Supplier migration update required",
+  "Supplier migration update: verify password",
+]) {
+  test(`actionable title retains original signal: ${subject}`, () => {
+    expect(
+      evaluatePreSendContent({
+        from: "Administrator <admin@mepmail.invalid>",
+        subject,
+        text: supplierNotice,
+      }).action,
+    ).toBe("hold");
+  });
+}
+test("sender action is not cleared by an informational subject", () => {
+  expect(
+    evaluatePreSendContent({
+      from: "Verify account <admin@mepmail.invalid>",
+      subject: "Supplier migration update",
+      text: supplierNotice,
+    }).action,
+  ).toBe("hold");
+});
+test("nominal title does not remove a body update action", () => {
+  expect(
+    evaluatePreSendContent({
+      from: "Support <support@unrelated.invalid>",
+      subject: "Supplier migration update",
+      text: `${supplierNotice}\nUpdate: https://security-review.invalid/login`,
+    }).action,
+  ).toBe("hold");
+});
+test("nominal-title matching stays bounded on a near-limit mixed notice", () => {
+  const text = `${supplierNotice}\n${"Microsoft ".repeat(190000)}365 account: update your password https://security-review.invalid/login`;
+  expect(text.length).toBeLessThanOrEqual(2000000);
+  expect(
+    evaluatePreSendContent({
+      from: "Support <support@unrelated.invalid>",
+      subject: "Supplier migration update",
+      text,
+    }).action,
+  ).toBe("hold");
+});

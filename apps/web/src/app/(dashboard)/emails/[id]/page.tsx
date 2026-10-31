@@ -47,7 +47,7 @@ type EventType =
 
 /**
  * Ledger word color per the canvas: sent stays muted (it's the baseline,
- * not an outcome), delivered succeeds, opens/clicks inform, bounce and
+ * not an outcome), delivered confirms server receipt, opens/clicks inform, bounce and
  * suppression are dangers, complaints warn.
  */
 const EVENT_COLOR: Record<EventType, string> = {
@@ -55,7 +55,7 @@ const EVENT_COLOR: Record<EventType, string> = {
   queued_quota: "var(--ms-muted)",
   sent: "var(--ms-muted)",
   delivery_delayed: "var(--ms-neutral)",
-  delivered: "var(--ms-success)",
+  delivered: "var(--ms-neutral)",
   opened: "var(--ms-info)",
   clicked: "var(--ms-info)",
   bounced: "var(--ms-danger)",
@@ -633,6 +633,14 @@ export default function EmailDetailPage() {
         actions={<ApiDocsButton />}
       />
 
+      {email.latestStatus === "delivered" || events.some((event) => event.type === "delivered") ? (
+        <p style={{ color: "var(--ms-muted)", fontSize: 13, lineHeight: 1.6 }}>
+          <strong>{common("status.delivered")}</strong>
+          <br />
+          {common("deliveryDisclosure")}
+        </p>
+      ) : null}
+
       {hardBounced ? (
         <div
           className="ms-wrap-row"
@@ -811,7 +819,9 @@ export default function EmailDetailPage() {
                       fontSize: 12,
                       fontWeight: 600,
                       color: EVENT_COLOR[type],
-                      whiteSpace: "nowrap",
+                      maxWidth: type === "delivered" ? 180 : undefined,
+                      whiteSpace: type === "delivered" ? "normal" : "nowrap",
+                      overflowWrap: type === "delivered" ? "anywhere" : undefined,
                     }}
                   >
                     {eventLabel(type)}

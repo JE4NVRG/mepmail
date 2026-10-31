@@ -9,7 +9,8 @@ import { StatusTile } from "./status-tile";
 export function emailStatusColor(status: string): string {
   switch (status) {
     case "delivered":
-      return "var(--ms-success)";
+      // SMTP receipt is not Inbox placement or evidence of reading.
+      return "var(--ms-neutral)";
     case "opened":
     case "clicked":
       return "var(--ms-info)";
