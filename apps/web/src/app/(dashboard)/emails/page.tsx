@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useDeferredValue, useMemo, useState } from "react";
+import { ApiSendsScope } from "@/components/api-sends-scope";
 import { ApiDocsButton } from "@/components/api-sheet";
 import { EmailsTable } from "@/components/emails-table";
 import { EmptyState } from "@/components/empty-state";
@@ -17,6 +18,7 @@ import { codeRichTags } from "@/lib/code-rich-tags";
 import { formatDay, formatHoursMinutes } from "@/lib/format";
 import { manyOf } from "@/lib/list-param";
 import { type RangeKey, rangeSince } from "@/lib/list-range";
+import { sendingClarityMessage } from "@/lib/sending-clarity";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { oneOf, useUrlState } from "@/lib/url-state";
@@ -150,7 +152,7 @@ export default function EmailsPage() {
   return (
     <>
       <PageHeader
-        title={t("list.title")}
+        title={sendingClarityMessage(common, "apiSends.title")}
         actions={
           <>
             <Link className="ms-btn ms-btn-secondary" href="/onboarding#first-email">
@@ -168,6 +170,8 @@ export default function EmailsPage() {
           </>
         }
       />
+
+      <ApiSendsScope />
 
       {capReached && cap ? (
         <div

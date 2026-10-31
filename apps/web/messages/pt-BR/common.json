@@ -103,7 +103,9 @@
     "back": "Voltar para {to}"
   },
   "sendingPaused": {
-    "text": "Envios em fila: nosso provedor de e-mail pausou a entrega temporariamente. Nada se perde — seus e-mails são aceitos e saem sozinhos assim que a entrega voltar."
+    "text": "Os envios desta equipe estão temporariamente indisponíveis. Mensagens pendentes não são confirmação de entrega; confira o status e as condições de liberação.",
+    "scopeText": "Os envios desta equipe estão temporariamente indisponíveis. Mensagens pendentes não são confirmação de entrega; confira o status e as condições de liberação.",
+    "limitedText": "O envio está limitado às rotas e aos remetentes habilitados desta equipe. Confira a confirmação de entrega em cada mensagem."
   },
   "subscriptionsPaused": {
     "public": "Novas assinaturas estão temporariamente indisponíveis. Clientes atuais continuam podendo gerenciar suas assinaturas. Consulte a página de status para atualizações."
@@ -140,5 +142,10 @@
     "text": "Saiu uma nova versão do MepMail.",
     "reload": "Recarregar",
     "dismiss": "Dispensar"
+  },
+  "apiSends": {
+    "title": "Envios da API",
+    "description": "Mensagens enviadas pela API de e-mails ou pelo SMTP da API. Os envios do Correio ficam separados em Correio → Enviados, não nesta lista.",
+    "mailLink": "Abrir Correio"
   }
 }

@@ -27,6 +27,7 @@ import {
   mailboxSignature,
   replaceMailboxSignature,
 } from "@/lib/mailbox-compose-signature";
+import { mailboxDeliveryLabel } from "@/lib/mailbox-delivery-status";
 import {
   createMailboxListDateFormatter,
   type MailboxFolder,
@@ -215,7 +216,7 @@ function SendResults({
   return (
     <section className={styles.sendResults} aria-labelledby="mailbox-send-results-title">
       <h3 id="mailbox-send-results-title">{t("results.title")}</h3>
-      {accepted ? <p>{t("results.accepted")}</p> : null}
+      {accepted && !result?.hasConfirmed ? <p>{t("results.accepted")}</p> : null}
       {result ? (
         <>
           <dl className={styles.resultCounts}>
@@ -4005,8 +4006,11 @@ export function MailboxContentView({
                                       {t("approval.requested")}
                                     </span>
                                   ) : null}
-                                  {!blocked && row.sendStatus ? (
-                                    <span>{t(`deliveryStatus.${row.sendStatus}`)}</span>
+                                  {!blocked &&
+                                  mailboxDeliveryLabel(t, row.sendStatus, row.outboundSummary) ? (
+                                    <span>
+                                      {mailboxDeliveryLabel(t, row.sendStatus, row.outboundSummary)}
+                                    </span>
                                   ) : null}
                                   {!blocked && row.snoozedUntil ? (
                                     <span>
@@ -4638,8 +4642,9 @@ export function MailboxContentView({
                   </header>
                   <div className={styles.messageBadges}>
                     {approval ? <span>{approvalText(approval)}</span> : null}
-                    {item.kind === "sent" && selectedRow?.sendStatus ? (
-                      <span>{t(`deliveryStatus.${selectedRow.sendStatus}`)}</span>
+                    {item.kind === "sent" &&
+                    mailboxDeliveryLabel(t, item.sendStatus, item.outboundSummary) ? (
+                      <span>{mailboxDeliveryLabel(t, item.sendStatus, item.outboundSummary)}</span>
                     ) : null}
                   </div>
                   {item.kind === "draft" &&

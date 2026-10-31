@@ -103,7 +103,9 @@
     "back": "Back to {to}"
   },
   "sendingPaused": {
-    "text": "Sending is queued: our email provider has temporarily paused delivery. Nothing is lost — your emails are accepted and go out on their own as soon as it resumes."
+    "text": "Sending for this team is temporarily unavailable. Pending messages are not confirmation of delivery; check their status and any release requirements.",
+    "scopeText": "Sending for this team is temporarily unavailable. Pending messages are not confirmation of delivery; check their status and any release requirements.",
+    "limitedText": "Sending is limited to this team’s enabled routes and senders. Check each message for delivery confirmation."
   },
   "subscriptionsPaused": {
     "public": "New subscriptions are temporarily unavailable. Existing customers can still manage their subscriptions. Please check the status page for updates."
@@ -140,5 +142,10 @@
     "text": "A new version of MepMail is available.",
     "reload": "Reload",
     "dismiss": "Dismiss"
+  },
+  "apiSends": {
+    "title": "API sends",
+    "description": "Messages submitted through the email API or API SMTP. Mailbox messages are listed separately under Mailbox → Sent, not in this list.",
+    "mailLink": "Open mailbox"
   }
 }

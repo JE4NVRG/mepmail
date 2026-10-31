@@ -1,5 +1,6 @@
 import {
   AWS_REGION_DEFAULT,
+  customerSmtpRelay,
   EMAIL_RETENTION_DAYS_DEFAULT,
   env,
   isCloudDeployment,
@@ -28,6 +29,7 @@ import { isAwsCredentialError } from "@/lib/aws-errors";
 import { recordAudit } from "../audit";
 import { isInstanceOperator } from "../instance-operator";
 import type { SessionRole } from "../membership";
+import { sendingAvailability } from "../sending-availability";
 import { cloudSendingPaused, createSesPauseProbe } from "../ses-pause";
 import { awsCredentialsConfigured, passwordRecoveryEnabled } from "../system-mail";
 import { router, teamProcedure } from "../trpc";
@@ -131,6 +133,16 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
      * operator reads it on the SES settings page).
      */
     sendingPaused: teamProcedure.query(() => cloudSendingPaused(sesPaused)),
+
+    /** Team-scoped presentation only; sending/consent/standing guards stay server-side. */
+    sendingAvailability: teamProcedure.query(async ({ ctx }) =>
+      sendingAvailability({
+        teamId: ctx.teamId,
+        sesPaused: await cloudSendingPaused(sesPaused),
+        policyRaw: env.SENDING_PROVIDER_POLICY_JSON,
+        relayConfigured: !!customerSmtpRelay(),
+      }),
+    ),
 
     /**
      * Env-level deployment readiness, behind team auth like everything else.

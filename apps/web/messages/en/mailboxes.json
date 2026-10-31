@@ -229,9 +229,10 @@
   "deliveryStatus": {
     "queued": "Queued for sending",
     "sending": "Processing",
-    "accepted": "Accepted by the service",
+    "accepted": "Accepted; awaiting delivery confirmation",
     "unknown": "Send unconfirmed",
-    "failed": "Send refused"
+    "failed": "Send refused",
+    "partial": "Mixed recipient outcomes"
   },
   "safety": {
     "spamTitle": "Message in Spam",

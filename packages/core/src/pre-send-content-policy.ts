@@ -97,12 +97,27 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
   const words = foldText(
     `${senderName(input.from)} ${input.subject} ${visible} ${input.text ?? ""}`,
   );
+  // Only bare transaction-receipt titles lose the nominal confirmation signal.
+  // Brands/account terms or any extra urgency/CTA wording do not fit this title.
+  // Pressure anywhere in the message restores the original confirmation signal.
+  // This is an action-token distinction, not a brand/domain/sender exemption.
+  const subjectWords = foldText(input.subject);
+  const receiptSubject = /^(refund|order|receipt) confirmation$/.test(subjectWords);
+  const pressure =
+    /\b(requires?|required|due|overdue|urgent|urgently|immediate|immediately|action needed|continue|click|tap)\b/.test(
+      words,
+    );
+  const actionSubject =
+    receiptSubject && !pressure ? subjectWords.replace(/\bconfirmation\b/g, " ") : input.subject;
+  const actionWords = foldText(
+    `${senderName(input.from)} ${actionSubject} ${visible} ${input.text ?? ""}`,
+  );
   const action =
     /\b(account|conta|cuenta|compte|password|senha|login|sign in|payment|pagamento|pagamento|billing|fatura|cartao|card|subscription|assinatura|apple id)\b/.test(
       words,
     ) &&
-    /\b(verify|verifique|verificar|confirm|confirme|confirmar|update|atualize|atualizar|reset|redefin|recover|recuper|suspend|suspens|suspended|suspensa|bloquead|locked|failed|falhou|declined|recusad|expir|renew|renov|pagar|pay|regulariz|validate|validar|reativ|reactivat)\w*/.test(
-      words,
+    /\b(verify|verifique|verificar|confirm|confirme|confirmar|update|atualize|atualizar|reset|redefin|recover|recuper|suspend|suspens|suspended|suspensa|bloquead|locked|failed|falhou|declined|recusad|expir|renew|renov|pagar|pay(?!ments?\b)|payment(?:s)?\s+(?:(?:is|are|was|were)\s+)?(?:required|due|overdue)\b|requires?\s+(?:an?\s+)?payment\b|regulariz|validate|validar|reativ|reactivat)\w*/.test(
+      actionWords,
     );
   if (!action) return { action: "allow" };
   const links = [...html.matchAll(/\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)].map((m) =>

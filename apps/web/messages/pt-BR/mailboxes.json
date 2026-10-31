@@ -229,9 +229,10 @@
   "deliveryStatus": {
     "queued": "Na fila de envio",
     "sending": "Em processamento",
-    "accepted": "Aceito pelo serviço",
+    "accepted": "Aceito; aguardando confirmação de entrega",
     "unknown": "Envio não confirmado",
-    "failed": "Envio recusado"
+    "failed": "Envio recusado",
+    "partial": "Resultados diferentes por destinatário"
   },
   "safety": {
     "spamTitle": "Mensagem em Spam",
