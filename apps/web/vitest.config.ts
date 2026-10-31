@@ -18,7 +18,7 @@ export default defineConfig({
     // green 1h later. apps/db, packages/core and packages/cli already pin testTimeout: 60_000
     // for the same reason (packages/db says it outright: migrations run inside the test body).
     testTimeout: 60_000,
-    include: ["test/**/*.test.ts", "src/**/*.test.ts"],
+    include: ["test/**/*.test.ts", "test/**/*.test.tsx", "src/**/*.test.ts", "src/**/*.test.tsx"],
     // SKIP_ENV_VALIDATION: tests stub the variables they need, so the schema
     // must not demand a full production environment.
     //

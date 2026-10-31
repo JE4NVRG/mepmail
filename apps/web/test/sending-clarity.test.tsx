@@ -19,17 +19,12 @@ vi.mock("next/link", () => ({
 }));
 function render(locale: string, messages: unknown, node: ReactNode) {
   return renderToStaticMarkup(
-    createElement(
-      NextIntlClientProvider,
-      {
-        locale,
-        messages: { common: messages } as never,
-        timeZone: "UTC",
-      } as Parameters<typeof NextIntlClientProvider>[0],
-      node,
-    ),
+    <NextIntlClientProvider locale={locale} messages={{ common: messages } as never} timeZone="UTC">
+      {node}
+    </NextIntlClientProvider>,
   );
 }
+
 for (const [locale, messages] of [
   ["en", en],
   ["pt-BR", pt],
