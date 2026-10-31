@@ -705,3 +705,91 @@ for (const [name, subject, text] of retainedPaymentSignals) {
     ).toBe("hold");
   });
 }
+
+// Product names are qualifiers, not an enumerated exemption or SKU allowlist.
+const qualifiedProducts = [
+  "Microsoft 365",
+  "Google Workspace",
+  "Microsoft 365 Business Premium",
+  "Google Cloud Platform",
+  "Microsoft Dynamics 365 Business Central",
+  "Microsoft Future Service Edition",
+  "Google Next Generation Enterprise",
+] as const;
+for (const product of qualifiedProducts) {
+  for (const preface of ["", "We use Microsoft and Google as suppliers. "]) {
+    test(`qualified product account refund: ${preface}${product}`, () => {
+      expect(
+        evaluatePreSendContent({
+          from: "Support <support@outside.example>",
+          subject: "Refund confirmation",
+          text: `${preface}Your ${product} account payment has been refunded: https://outside.example/login`,
+        }).action,
+      ).toBe("hold");
+    });
+  }
+}
+for (const supplier of ["Microsoft", "Google Workspace", "Microsoft 365 Business Premium"]) {
+  test(`supplier clause does not own MepMail account: ${supplier}`, () => {
+    expect(
+      evaluatePreSendContent({
+        from: "Support <support@outside.example>",
+        subject: "Refund confirmation",
+        text: `We use ${supplier} as a supplier. Your MepMail account remains intact. Your payment has been refunded. https://mepmail.dev`,
+      }).action,
+    ).toBe("allow");
+  });
+}
+
+// Common product connectors are not evidence that the account belongs elsewhere.
+for (const product of [
+  "Microsoft 365 Apps for Business",
+  "Google Workspace for Education",
+  "Microsoft Dynamics 365 Finance and Operations",
+  "Microsoft To Do",
+  "Microsoft Teams for Work or School",
+  "Microsoft Word for the Web",
+]) {
+  test(`qualified product connectors retain account protection: ${product}`, () => {
+    expect(
+      evaluatePreSendContent({
+        from: "Support <support@outside.example>",
+        subject: "Refund confirmation",
+        text: `Your ${product} account payment has been refunded: https://outside.example/login`,
+      }).action,
+    ).toBe("hold");
+  });
+}
+for (const product of ["Microsoft\n365", "Google\tWorkspace"]) {
+  test(`qualified multiline product account: ${JSON.stringify(product)}`, () => {
+    expect(
+      evaluatePreSendContent({
+        from: "Support <support@outside.example>",
+        subject: "Refund confirmation",
+        text: `Your ${product} account payment has been refunded: https://outside.example/login`,
+      }).action,
+    ).toBe("hold");
+  });
+}
+test("qualified product account in visible HTML stays protected", () => {
+  expect(
+    evaluatePreSendContent({
+      from: "Support <support@outside.example>",
+      subject: "Refund confirmation",
+      html: '<p>Your Microsoft <strong>365</strong> account payment has been refunded.</p><a href="https://outside.example/login">Statement</a>',
+    }).action,
+  ).toBe("hold");
+});
+test("bounded qualifier matching handles a near-limit repeated-brand payload", () => {
+  const text =
+    "Microsoft ".repeat(190000) +
+    "365 account payment has been refunded: https://outside.example/login";
+  expect(text.length).toBeLessThanOrEqual(2000000);
+  expect(
+    evaluatePreSendContent({
+      from: "Support <support@outside.example>",
+      subject: "Refund confirmation",
+      text,
+    }).action,
+  ).toBe("hold");
+});

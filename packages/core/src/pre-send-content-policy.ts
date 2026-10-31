@@ -116,14 +116,29 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
   // completed refund is informational, never a payment request/needed/due lure.
   // A claim about a third-party brand's account stays protected even if it
   // pretends to be a completed refund; a benign supplier preface cannot clear it.
+  // Preserve clause boundaries before folding punctuation away. Product/service
+  // qualifiers are generic, bounded tokens, not a SKU allowlist. Supplier constructions
+  // cannot bridge into another product's account clause; product connectors
+  // such as for/and/to are not excluded from product names.
+  const claimClauses =
+    `${senderName(input.from)}. ${input.subject}. ${visible}. ${input.text ?? ""}`
+      .split(/[.!?;:]+/)
+      .map((clause) => foldText(clause))
+      .join("\n");
+  const productQualifier = "(?!(?:as|como|comme)\\b)[a-z0-9]{1,40} ";
   const brandedAccountClaim = BRANDS.some((brand) =>
     brand.terms.some((term) => {
       const escaped = Array.from(term, (c) => (/^[a-z0-9 ]$/.test(c) ? c : "\\" + c)).join("");
       const account =
         "(?:account|conta|cuenta|compte|password|senha|login|subscription|assinatura|billing|fatura|id)";
-      return new RegExp(
-        String.raw`\b${escaped}\s+(?:your\s+|s\s+)?${account}\b|\b${account}\s+(?:at|with|for)\s+${escaped}\b`,
-      ).test(words);
+      return (
+        new RegExp(
+          String.raw`\b${escaped}\s+(?:your\s+|s\s+)?${account}\b|\b${account}\s+(?:at|with|for)\s+${escaped}\b`,
+        ).test(words) ||
+        new RegExp(String.raw`\b${escaped} (?:${productQualifier}){1,6}${account}\b`).test(
+          claimClauses,
+        )
+      );
     }),
   );
   const actionWords = brandedAccountClaim
