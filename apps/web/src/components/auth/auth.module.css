@@ -381,6 +381,11 @@
 .column a:hover {
   text-decoration-thickness: 2px;
 }
+/* SignupClosed only: keep primary-button ink above the generic auth link rule. */
+.column a.closedLogin {
+  color: var(--ms-ground);
+  text-decoration: none;
+}
 .legal {
   margin: 4px 0 0;
   color: var(--auth-muted);

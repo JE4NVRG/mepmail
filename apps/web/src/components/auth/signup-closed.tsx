@@ -34,7 +34,10 @@ export async function SignupClosed({
             {availability === "full" ? copy.fullBody : copy.pausedBody}
           </p>
           <nav className={styles.form} aria-label={copy.links}>
-            <a className={`ms-btn ms-btn-primary ${styles.button}`} href="/login">
+            <a
+              className={`ms-btn ms-btn-primary ${styles.button} ${styles.closedLogin}`}
+              href="/login"
+            >
               {copy.login}
             </a>
             <a className={styles.back} href="/status">

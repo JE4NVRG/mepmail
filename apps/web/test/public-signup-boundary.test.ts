@@ -347,6 +347,26 @@ afterAll(() => {
 });
 beforeEach(() => reset());
 describe("public signup server-boundary regression", () => {
+  it("scopes the closed login CTA above generic auth links without altering its route", async () => {
+    const css = source("apps/web/src/components/auth/auth.module.css");
+    const rule = css.match(/\.column\s+a\.closedLogin\s*\{([^}]*)\}/)?.[1];
+    assert.ok(rule, "a scoped auth-link override must remain present");
+    assert.match(rule, /color:\s*var\(--ms-ground\)/);
+    assert.match(rule, /text-decoration:\s*none/);
+    for (const locale of ["en", "pt-BR"]) {
+      reset({ locale });
+      for (const availability of ["paused", "full"]) {
+        const markup = await html(
+          await load("apps/web/src/components/auth/signup-closed.tsx").SignupClosed({
+            availability,
+          }),
+        );
+        const links = [...markup.matchAll(/<a\b(?=[^>]*href="\/login")[^>]*>/g)];
+        assert.equal(links.length, 1);
+        assert.match(links[0][0], /class="[^"]*\bclosedLogin\b[^"]*"/);
+      }
+    }
+  });
   it.each([
     { name: "paused", expected: "paused" },
     { name: "bootstrap", count: 0, expected: "open" },
