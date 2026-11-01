@@ -1,11 +1,15 @@
+import { getLocale } from "next-intl/server";
 import type { ReactNode } from "react";
 import { DESKTOP_DOWNLOAD_URL } from "@/lib/desktop-download";
+import { publicSignupCopy } from "@/lib/public-signup-copy";
 import { newSubscriptionsPaused } from "@/server/new-subscriptions";
+import { publicSignupAvailability } from "@/server/public-signup";
 import { AdvertisingSettingsButton } from "./advertising-consent";
 import { LandingLangSwitch } from "./landing-lang-switch";
 import { LandingNav } from "./landing-nav";
 import { PublicAccount } from "./public-account";
 import { DocsLink, GithubLink } from "./public-events";
+import { SignupAvailability } from "./signup-availability";
 import { SignupCta } from "./signup-cta";
 import { SubscriptionsPausedNotice } from "./subscriptions-paused-notice";
 
@@ -140,7 +144,20 @@ export function SignupLink({
   );
 }
 
-export function PublicHeader({
+/** Status must remain independent of signup storage, even during an incident. */
+async function publicChromeClosedLabel(page: PublicPage): Promise<string | null> {
+  if (page !== "status") {
+    try {
+      if ((await publicSignupAvailability()) === "open") return null;
+    } catch {
+      // An unavailable hint is not an authoritative denial or permission to sign up.
+    }
+  }
+  // Keep locale/catalog failures visible; only the optional availability hint degrades.
+  return publicSignupCopy(await getLocale()).check;
+}
+
+export async function PublicHeader({
   labels,
   page,
   banner,
@@ -149,9 +166,10 @@ export function PublicHeader({
   page: PublicPage;
   /** Optional strip rendered between the skip link and the header (the landing's announcement). */
   banner?: ReactNode;
-}): ReactNode {
+}): Promise<ReactNode> {
+  const closedLabel = await publicChromeClosedLabel(page);
   return (
-    <>
+    <SignupAvailability closedLabel={closedLabel}>
       <a className="gtm-skip" href="#conteudo">
         {labels.skip}
       </a>
@@ -239,11 +257,11 @@ export function PublicHeader({
           </div>
         </div>
       </header>
-    </>
+    </SignupAvailability>
   );
 }
 
-export function PublicFooter({
+export async function PublicFooter({
   labels,
   page,
   contact,
@@ -253,105 +271,112 @@ export function PublicFooter({
   page: PublicPage;
   contact: string;
   legal: { terms: string; privacy: string; refund: string };
-}): ReactNode {
+}): Promise<ReactNode> {
+  const closedLabel = await publicChromeClosedLabel(page);
   return (
-    <footer className="gtm-footer">
-      <div className="gtm-container gtm-footer-grid">
-        <div className="gtm-footer-brand">
-          <a className="gtm-brand" href="/" aria-label={labels.brandAria}>
-            <Wordmark />
-          </a>
-          <p>{labels.footer.tagline}</p>
-          {/*
+    <SignupAvailability closedLabel={closedLabel}>
+      <footer className="gtm-footer">
+        <div className="gtm-container gtm-footer-grid">
+          <div className="gtm-footer-brand">
+            <a className="gtm-brand" href="/" aria-label={labels.brandAria}>
+              <Wordmark />
+            </a>
+            <p>{labels.footer.tagline}</p>
+            {/*
             TODO(claim AWS): a nota de rodapé só volta a citar o número do SES
             ("up to 500k emails/day") depois da aprovação do production access —
             a cota em produção ainda não está aprovada. Restaurar em
             messages/{en,pt-BR}/landing.json → footer.points[0] quando sair.
           */}
-          <ul className="gtm-footer-points">
-            {labels.footer.points.map((point) => (
-              <li key={point}>{point}</li>
-            ))}
-          </ul>
-          <SignupLink label={labels.footer.cta} />
+            <ul className="gtm-footer-points">
+              {labels.footer.points.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+            <SignupLink label={labels.footer.cta} />
+          </div>
+          <nav className="gtm-footer-col" aria-label={labels.footer.colProduct}>
+            <h3>{labels.footer.colProduct}</h3>
+            <a href="/envio" aria-current={page === "envio" ? "page" : undefined}>
+              {labels.nav.product}
+            </a>
+            <a href="/correio#como-funciona">{labels.nav.how}</a>
+            <a data-purchase="" href={anchorHref(page, "#planos")}>
+              {labels.nav.plans}
+            </a>
+            {labels.nav.correio ? <a href="/correio">{labels.nav.correio}</a> : null}
+            {labels.footer.apps ? (
+              <a
+                href={DESKTOP_DOWNLOAD_URL}
+                aria-current={page === "download" ? "page" : undefined}
+              >
+                {labels.footer.apps}
+              </a>
+            ) : null}
+            <a href="/integrations">{labels.nav.integrations}</a>
+            <a href="/envio#mcp">{labels.nav.mcp}</a>
+            <a href="/changelog" aria-current={page === "changelog" ? "page" : undefined}>
+              {labels.nav.changelog}
+            </a>
+            <DocsLink className="gtm-ext" href={DOCS_URL}>
+              {labels.nav.docs}
+              <span className="gtm-ext-mark" aria-hidden="true">
+                ↗
+              </span>
+            </DocsLink>
+          </nav>
+          <nav className="gtm-footer-col" aria-label={labels.footer.colCompare}>
+            <h3>{labels.footer.colCompare}</h3>
+            <a data-purchase="" href="/pricing">
+              {labels.footer.pricing}
+            </a>
+            <a data-purchase="" href="/pricing#cenarios">
+              {labels.nav.compare}
+            </a>
+            <a href="/alternatives/resend">{labels.footer.alternatives}</a>
+            {labels.footer.guides ? (
+              <a href="/guides" aria-current={page === "guides" ? "page" : undefined}>
+                {labels.footer.guides}
+              </a>
+            ) : null}
+          </nav>
+          <nav className="gtm-footer-col" aria-label={labels.footer.colAccount}>
+            <h3>{labels.footer.colAccount}</h3>
+            <SignupLink label={labels.nav.signup} />
+            <a href="/login">{labels.footer.login}</a>
+            <a href="/support">{labels.nav.support}</a>
+            <a href={contact}>{labels.footer.contact}</a>
+            <a href="/status">Status</a>
+          </nav>
+          <nav className="gtm-footer-col" aria-label={labels.footer.colLegal}>
+            <h3>{labels.footer.colLegal}</h3>
+            <a href={legal.terms}>{labels.footer.terms}</a>
+            <a href={legal.privacy}>{labels.footer.privacy}</a>
+            <AdvertisingSettingsButton />
+            <a href={legal.refund}>{labels.footer.refund}</a>
+            <a href="/security">{labels.nav.security}</a>
+            <GithubLink href="https://github.com/JE4NVRG/mepmail">
+              {labels.footer.sourceCode}
+            </GithubLink>
+            <a href="/source" title={labels.footer.sourceDownload}>
+              {labels.footer.sourceArchive ?? labels.footer.sourceDownload}
+            </a>
+          </nav>
         </div>
-        <nav className="gtm-footer-col" aria-label={labels.footer.colProduct}>
-          <h3>{labels.footer.colProduct}</h3>
-          <a href="/envio" aria-current={page === "envio" ? "page" : undefined}>
-            {labels.nav.product}
-          </a>
-          <a href="/correio#como-funciona">{labels.nav.how}</a>
-          <a data-purchase="" href={anchorHref(page, "#planos")}>
-            {labels.nav.plans}
-          </a>
-          {labels.nav.correio ? <a href="/correio">{labels.nav.correio}</a> : null}
-          {labels.footer.apps ? (
-            <a href={DESKTOP_DOWNLOAD_URL} aria-current={page === "download" ? "page" : undefined}>
-              {labels.footer.apps}
-            </a>
-          ) : null}
-          <a href="/integrations">{labels.nav.integrations}</a>
-          <a href="/envio#mcp">{labels.nav.mcp}</a>
-          <a href="/changelog" aria-current={page === "changelog" ? "page" : undefined}>
-            {labels.nav.changelog}
-          </a>
-          <DocsLink className="gtm-ext" href={DOCS_URL}>
-            {labels.nav.docs}
-            <span className="gtm-ext-mark" aria-hidden="true">
-              ↗
-            </span>
-          </DocsLink>
-        </nav>
-        <nav className="gtm-footer-col" aria-label={labels.footer.colCompare}>
-          <h3>{labels.footer.colCompare}</h3>
-          <a data-purchase="" href="/pricing">
-            {labels.footer.pricing}
-          </a>
-          <a data-purchase="" href="/pricing#cenarios">
-            {labels.nav.compare}
-          </a>
-          <a href="/alternatives/resend">{labels.footer.alternatives}</a>
-          {labels.footer.guides ? (
-            <a href="/guides" aria-current={page === "guides" ? "page" : undefined}>
-              {labels.footer.guides}
-            </a>
-          ) : null}
-        </nav>
-        <nav className="gtm-footer-col" aria-label={labels.footer.colAccount}>
-          <h3>{labels.footer.colAccount}</h3>
-          <SignupCta label={labels.nav.signup} />
-          <a href="/login">{labels.footer.login}</a>
-          <a href="/support">{labels.nav.support}</a>
-          <a href={contact}>{labels.footer.contact}</a>
-          <a href="/status">Status</a>
-        </nav>
-        <nav className="gtm-footer-col" aria-label={labels.footer.colLegal}>
-          <h3>{labels.footer.colLegal}</h3>
-          <a href={legal.terms}>{labels.footer.terms}</a>
-          <a href={legal.privacy}>{labels.footer.privacy}</a>
-          <AdvertisingSettingsButton />
-          <a href={legal.refund}>{labels.footer.refund}</a>
-          <a href="/security">{labels.nav.security}</a>
-          <GithubLink href="https://github.com/JE4NVRG/mepmail">
-            {labels.footer.sourceCode}
+        <div className="gtm-container gtm-footer-base">
+          <p>{labels.footer.rights}</p>
+          <GithubLink className="gtm-footer-gh" href="https://github.com/je4ndev">
+            <span className="gtm-sr-only">{labels.footer.ghAria}</span>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.31 9.31 0 0 1 12 6.98c.85 0 1.7.12 2.5.35 1.9-1.33 2.74-1.05 2.74-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.81-4.57 5.07.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.82 0 .27.18.59.69.49A10.13 10.13 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z" />
+            </svg>
           </GithubLink>
-          <a href="/source" title={labels.footer.sourceDownload}>
-            {labels.footer.sourceArchive ?? labels.footer.sourceDownload}
-          </a>
-        </nav>
-      </div>
-      <div className="gtm-container gtm-footer-base">
-        <p>{labels.footer.rights}</p>
-        <GithubLink className="gtm-footer-gh" href="https://github.com/je4ndev">
-          <span className="gtm-sr-only">{labels.footer.ghAria}</span>
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.31 9.31 0 0 1 12 6.98c.85 0 1.7.12 2.5.35 1.9-1.33 2.74-1.05 2.74-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.81-4.57 5.07.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.82 0 .27.18.59.69.49A10.13 10.13 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z" />
-          </svg>
-        </GithubLink>
-        <p className="gtm-footer-credit">
-          {labels.footer.credit} <GithubLink href="https://github.com/je4ndev">Je4nDev</GithubLink>
-        </p>
-      </div>
-    </footer>
+          <p className="gtm-footer-credit">
+            {labels.footer.credit}{" "}
+            <GithubLink href="https://github.com/je4ndev">Je4nDev</GithubLink>
+          </p>
+        </div>
+      </footer>
+    </SignupAvailability>
   );
 }

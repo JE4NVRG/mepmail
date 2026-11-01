@@ -6,6 +6,7 @@ import { clickContext, funnelClickProps } from "@/lib/funnel-tracking";
 import type { MailboxPlanCode } from "@/lib/mailbox-plans";
 import { visitSource } from "@/lib/public-funnel";
 import { signupHref, signupMailboxHref } from "@/lib/public-intent";
+import { useClosedSignupLabel } from "./signup-availability";
 
 /**
  * CTA de criação de conta. Dispara `signup_start` no Umami no clique e deixa a
@@ -37,6 +38,7 @@ export function SignupCta({
   mailboxPlan?: MailboxPlanCode | "choose";
 }) {
   const pathname = usePathname();
+  const closedLabel = useClosedSignupLabel();
   const href = mailboxPlan
     ? signupMailboxHref(mailboxPlan === "choose" ? null : mailboxPlan)
     : signupHref(rung);
@@ -55,6 +57,13 @@ export function SignupCta({
       ...(source ? { source } : {}),
     });
     if (plan) trackEvent("cta_pricing_click", { ...funnelClickProps(context) });
+  }
+  if (closedLabel) {
+    return (
+      <a className={className} href="/signup">
+        {closedLabel}
+      </a>
+    );
   }
   return (
     <a

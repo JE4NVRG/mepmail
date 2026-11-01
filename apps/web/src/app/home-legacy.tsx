@@ -31,9 +31,11 @@ import {
 } from "@/lib/landing-pricing";
 import { CORREIO_FROM_BRL_CENTS, CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
+import { publicSignupCopy } from "@/lib/public-signup-copy";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
 import { faqJsonLd, organizationJsonLd, siteBaseUrl, websiteJsonLd } from "@/lib/structured-data";
 import { titlePhrases } from "@/lib/title-phrases";
+import { publicSignupAvailability } from "@/server/public-signup";
 import { AgentDemo, type AgentDemoLabels } from "./correio/agent-demo";
 import "./landing-calc.css";
 import "./landing.css";
@@ -92,6 +94,9 @@ export async function LegacyHome() {
   const standaloneOpen = standaloneMailOpen();
   // Portuguese readers are Brazil's audience: they see the reais price list (Pix or card).
   const brazil = locale === "pt-BR";
+  const availability = await publicSignupAvailability();
+  const closed = availability !== "open";
+  const signupCopy = publicSignupCopy(locale);
   const mailFrom =
     brazil && standaloneOpen
       ? formatBrlPrice(CORREIO_FROM_BRL_CENTS, locale)
@@ -125,7 +130,7 @@ export async function LegacyHome() {
     overageLabel: t("plans.overageLabel"),
     attachmentLabel: t("plans.attachmentLabel"),
     cta: t("plans.cta"),
-    ctaNote: t("plans.ctaNote"),
+    ctaNote: closed ? signupCopy[availability] : t("plans.ctaNote"),
     featuredBadge: t("plans.featuredBadge"),
   } satisfies PlanCardLabels;
   const allPlans = plansWithCopy(
@@ -222,7 +227,9 @@ export async function LegacyHome() {
                       {t("domainHero.secondary")}
                     </a>
                   </div>
-                  <p className="gtm-note">{t("domainHero.note", { price: mailFrom })}</p>
+                  <p className="gtm-note">
+                    {closed ? signupCopy[availability] : t("domainHero.note", { price: mailFrom })}
+                  </p>
                   <p className="cro-domain-send">
                     <a href="#envio">
                       {t("domainHero.sendLink")} <span aria-hidden="true">↓</span>
@@ -329,7 +336,7 @@ export async function LegacyHome() {
                     {t("hero.ctaPlans")}
                   </a>
                 </div>
-                <p className="gtm-note">{t("hero.note")}</p>
+                <p className="gtm-note">{closed ? signupCopy[availability] : t("hero.note")}</p>
                 {sendOffer}
               </div>
             </section>
@@ -347,7 +354,7 @@ export async function LegacyHome() {
                     {t("hero.ctaPlans")}
                   </a>
                 </div>
-                <p className="gtm-note">{t("hero.note")}</p>
+                <p className="gtm-note">{closed ? signupCopy[availability] : t("hero.note")}</p>
                 {sendOffer}
               </div>
               <figure className="cro-hero-proof">
@@ -399,7 +406,7 @@ export async function LegacyHome() {
                 className="ms-btn ms-btn-primary gtm-action"
                 href="/signup?next=%2Ftemplates%2Fnew"
               >
-                {t("productProof.viewAll")}
+                {closed ? signupCopy.check : t("productProof.viewAll")}
               </a>
             </p>
           </div>
@@ -609,7 +616,7 @@ export async function LegacyHome() {
                 <li key={step}>{step}</li>
               ))}
             </ol>
-            <p className="gtm-note">{t("how.note")}</p>
+            <p className="gtm-note">{closed ? signupCopy[availability] : t("how.note")}</p>
             <SignupLink label={t("hero.ctaSignup")} />
           </div>
         </section>
@@ -629,8 +636,8 @@ export async function LegacyHome() {
         </section>
         <section className="gtm-section gtm-alt gtm-close">
           <div className="gtm-container">
-            <h2>{t("close.title")}</h2>
-            <p>{t("close.body")}</p>
+            <h2>{closed ? signupCopy[availability] : t("close.title")}</h2>
+            <p>{closed ? signupCopy[availability] : t("close.body")}</p>
             <SignupLink label={t("close.cta")} />
           </div>
         </section>

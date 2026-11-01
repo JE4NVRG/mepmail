@@ -24,8 +24,10 @@ import {
 } from "@/lib/landing-pricing";
 import { CORREIO_FROM_BRL_CENTS, CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
+import { publicSignupCopy } from "@/lib/public-signup-copy";
 import { faqJsonLd, organizationJsonLd, siteBaseUrl, websiteJsonLd } from "@/lib/structured-data";
 import { titlePhrases } from "@/lib/title-phrases";
+import { publicSignupAvailability } from "@/server/public-signup";
 import "./landing.css";
 import "./landing-cro.css";
 import "./site-v2.css";
@@ -78,6 +80,9 @@ export async function HomeV2() {
     getLocale(),
   ]);
   const brazil = locale === "pt-BR";
+  const availability = await publicSignupAvailability();
+  const closed = availability !== "open";
+  const signupCopy = publicSignupCopy(locale);
   const launchOfferEnabled = process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
   const site = {
     skip: l("skip"),
@@ -157,11 +162,13 @@ export async function HomeV2() {
               </a>
             </div>
             <p className="v2-note">
-              {t.rich("growth.note", {
-                free: freeVolume,
-                starter: money(starter.brlPriceCents, starter.priceCents),
-                b,
-              })}
+              {closed
+                ? signupCopy[availability]
+                : t.rich("growth.note", {
+                    free: freeVolume,
+                    starter: money(starter.brlPriceCents, starter.priceCents),
+                    b,
+                  })}
             </p>
             <figure>
               <div className="v2-code">
@@ -221,7 +228,8 @@ export async function HomeV2() {
             </figure>
             <p>
               <a className="v2-link-accent" href="/signup?next=/mail">
-                {t("correio.noDomain")} <span aria-hidden="true">→</span>
+                {closed ? signupCopy.check : t("correio.noDomain")}{" "}
+                <span aria-hidden="true">→</span>
               </a>
             </p>
           </div>
@@ -543,9 +551,9 @@ export async function HomeV2() {
         <section className="v2-violet v2-sec v2-center" aria-labelledby="home-close-title">
           <div className="v2-wrap v2-stack">
             <h2 id="home-close-title" className="v2-h2 v2-close-title">
-              {t("close.title")}
+              {closed ? signupCopy[availability] : t("close.title")}
             </h2>
-            <p className="v2-lead">{t("close.body")}</p>
+            <p className="v2-lead">{closed ? signupCopy[availability] : t("close.body")}</p>
             <div className="v2-actions">
               <SignupLink
                 label={l("domainHero.cta")}
@@ -553,7 +561,7 @@ export async function HomeV2() {
                 mailboxPlan="choose"
               />
               <a className="v2-btn v2-btn-line" href="/envio">
-                {t("close.envio")}
+                {closed ? signupCopy.check : t("close.envio")}
               </a>
             </div>
           </div>

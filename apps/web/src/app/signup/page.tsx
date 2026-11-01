@@ -3,9 +3,11 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { AuthForm } from "@/components/auth/auth-form";
+import { SignupClosed } from "@/components/auth/signup-closed";
 import { postAuthNext } from "@/lib/nav";
 import { enabledSocialProviders, hasSession } from "@/server/auth";
 import { publicPageUrls } from "@/server/public-seo";
+import { publicSignupAvailability } from "@/server/public-signup";
 import { accountMailDelayed } from "@/server/ses-pause";
 
 // Server component so the env-derived social-provider flags reach the client
@@ -18,6 +20,8 @@ export default async function SignupPage({
 }) {
   // An authenticated visitor has no business on the auth screens.
   if (await hasSession()) redirect(postAuthNext((await searchParams).next, "/"));
+  const availability = await publicSignupAvailability();
+  if (availability !== "open") return <SignupClosed availability={availability} />;
   return (
     <AuthForm
       mode="signup"
