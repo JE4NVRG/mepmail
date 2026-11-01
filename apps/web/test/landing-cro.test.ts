@@ -42,7 +42,16 @@ describe("landing CRO contract", () => {
     expect(v2).toContain("<PublicStarterGallery");
     expect(v2).not.toContain("200 OK");
     const entry = source("../src/app/page.tsx");
-    expect(entry).toContain("standaloneMailOpen() ? HomeV2() : LegacyHome()");
+    expect(entry).toMatch(
+      /standaloneMailOpen\(\)\s*\?\s*await HomeV2\(\)\s*:\s*await LegacyHome\(\)/,
+    );
+    expect(entry).toContain("await publicSignupAvailability()");
+    expect(entry).toContain(
+      'availability === "open" ? null : publicSignupCopy(await getLocale()).check',
+    );
+    expect(entry).toContain(
+      "<SignupAvailability closedLabel={closedLabel}>{home}</SignupAvailability>",
+    );
   });
 
   it("never loads production analytics in explicit local preview", () => {

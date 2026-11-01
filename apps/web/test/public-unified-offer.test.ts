@@ -35,6 +35,10 @@ const messages = (locale: Locale) =>
         changelog: ptChangelog,
       };
 
+// Presentation fixtures own the optional server availability boundary.
+vi.mock("@/server/public-signup", () => ({
+  publicSignupAvailability: vi.fn(async () => "open" as const),
+}));
 vi.mock("@millionsend/core", async () => ({
   PLAN_RUNGS: (await import("../../../packages/core/src/plans")).PLAN_RUNGS,
   // The v2 home counts the real deliverability checks it advertises.

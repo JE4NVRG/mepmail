@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
+// Presentation fixtures own the optional server availability boundary.
+vi.mock("@/server/public-signup", () => ({
+  publicSignupAvailability: vi.fn(async () => "open" as const),
+}));
 vi.mock("@millionsend/config", () => ({ env: {}, signupOpen: () => true }));
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
