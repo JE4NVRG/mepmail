@@ -90,32 +90,32 @@ describe.each(["en", "pt-BR"] as const)("OAuth consent mailboxes (%s)", (locale)
     expect(html).not.toContain(consent.summary.sendOn);
     expect(html).toContain(consent.summary.declined.replace("{list}", sendLabel));
   });
-  it("offers at most 20 mailboxes per app, the limit the grant takes", () => {
-    const many = Array.from({ length: 22 }, (_, i) => ({
+  it("offers at most 50 mailboxes per app, the limit the grant takes", () => {
+    const many = Array.from({ length: 52 }, (_, i) => ({
       id: `box-${i}`,
       address: `box${i}@example.test`,
       label: `Box ${i}`,
     }));
     const html = render(locale, many);
-    expect(html).toContain(consent.mailboxesLimit.replace("{max}", "20"));
-    expect(html).toContain(consent.mailboxesFirst.replace("{max}", "20"));
+    expect(html).toContain(consent.mailboxesLimit.replace("{max}", "50"));
+    expect(html).toContain(consent.mailboxesFirst.replace("{max}", "50"));
     expect(html).not.toContain(`>${consent.mailboxesAll}<`);
     // Up to two mailboxes: no limit note, the usual "Select all".
-    expect(render(locale)).not.toContain(consent.mailboxesLimit.replace("{max}", "20"));
+    expect(render(locale)).not.toContain(consent.mailboxesLimit.replace("{max}", "50"));
   });
 });
 
 describe("toggleMailbox", () => {
   it("ticks up to the limit, ignores a tick past it and always unticks", () => {
-    expect(MAIL_GRANT_MAX_MAILBOXES).toBe(20);
+    expect(MAIL_GRANT_MAX_MAILBOXES).toBe(50);
     let chosen = new Set<string>();
-    for (let i = 0; i < 22; i++) chosen = toggleMailbox(chosen, `box-${i}`);
-    expect(chosen.size).toBe(20);
-    expect(chosen.has("box-20")).toBe(false);
+    for (let i = 0; i < 52; i++) chosen = toggleMailbox(chosen, `box-${i}`);
+    expect(chosen.size).toBe(50);
+    expect(chosen.has("box-50")).toBe(false);
     chosen = toggleMailbox(chosen, "box-3");
-    expect(chosen.size).toBe(19);
-    chosen = toggleMailbox(chosen, "box-21");
-    expect(chosen.has("box-21")).toBe(true);
-    expect(chosen.size).toBe(20);
+    expect(chosen.size).toBe(49);
+    chosen = toggleMailbox(chosen, "box-51");
+    expect(chosen.has("box-51")).toBe(true);
+    expect(chosen.size).toBe(50);
   });
 });

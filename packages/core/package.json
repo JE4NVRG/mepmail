@@ -52,6 +52,10 @@
       "types": "./src/mail-preferences.ts",
       "default": "./src/mail-preferences.ts"
     },
+    "./mailbox-agent-limits": {
+      "types": "./src/mailbox-agent-limits.ts",
+      "default": "./src/mailbox-agent-limits.ts"
+    },
     "./oauth-scopes": {
       "types": "./src/oauth-scopes.ts",
       "default": "./src/oauth-scopes.ts"

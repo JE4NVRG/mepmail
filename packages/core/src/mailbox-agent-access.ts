@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
 import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { hashApiKey, verifyApiKey } from "./api-keys.js";
+import { MAX_TEAM_MAILBOXES } from "./mailbox-agent-limits.js";
 import type { MailboxRegistryActor } from "./mailbox-registry.js";
 import {
   mailboxServiceEntitlement,
@@ -45,7 +46,6 @@ function commonScopes(rows: readonly { scopes: readonly string[] }[]): MailboxAg
     : [];
 }
 const MAX_ACTIVE_KEYS_PER_MAILBOX = 25;
-const MAX_TEAM_MAILBOXES = 20;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const TOKEN =
   /^mmb_([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\.[A-Za-z0-9_-]{43}$/;

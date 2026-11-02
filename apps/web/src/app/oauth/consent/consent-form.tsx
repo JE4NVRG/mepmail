@@ -1,5 +1,6 @@
 "use client";
 
+import { MAX_TEAM_MAILBOXES } from "@millionsend/core/mailbox-agent-limits";
 import { ADMIN_MCP_SCOPES } from "@millionsend/core/oauth-scopes";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
@@ -32,7 +33,7 @@ const ADMIN_ONLY_SCOPES: ReadonlySet<string> = new Set(ADMIN_MCP_SCOPES);
 const MAIL_SCOPES = ["mail:read", "mail:draft", "mail:send"];
 const MAIL_SEND = "mail:send";
 /** The most mailboxes one app's credential takes (mailboxes.grantOAuthClient refuses more). */
-export const MAIL_GRANT_MAX_MAILBOXES = 20;
+export const MAIL_GRANT_MAX_MAILBOXES = MAX_TEAM_MAILBOXES;
 
 /** Ticks or unticks one mailbox; a tick past the limit is ignored, never sent to be refused. */
 export function toggleMailbox(

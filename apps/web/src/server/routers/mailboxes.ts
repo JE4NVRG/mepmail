@@ -57,6 +57,7 @@ import {
   updateMailboxTeamAgentKey,
   withMailboxRegistryAdmin,
 } from "@millionsend/core";
+import { MAX_TEAM_MAILBOXES } from "@millionsend/core/mailbox-agent-limits";
 import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
@@ -626,7 +627,7 @@ export const mailboxesRouter = router({
     .input(
       z.object({
         label: z.string().min(1).max(80),
-        mailboxIds: z.array(z.uuid()).min(1).max(20),
+        mailboxIds: z.array(z.uuid()).min(1).max(MAX_TEAM_MAILBOXES),
         scopes: z
           .array(z.enum(["read", "draft", "send"]))
           .min(1)
@@ -654,7 +655,7 @@ export const mailboxesRouter = router({
         .object({
           teamId: z.uuid(),
           clientId: z.string().min(1).max(200),
-          mailboxIds: z.array(z.uuid()).min(1).max(20),
+          mailboxIds: z.array(z.uuid()).min(1).max(MAX_TEAM_MAILBOXES),
           send: z.boolean().default(false),
         })
         .strict(),
@@ -708,7 +709,7 @@ export const mailboxesRouter = router({
           id: z.uuid(),
           expectedVersion: z.string().regex(/^[a-f0-9]{16}$/),
           label: z.string().min(1).max(80).optional(),
-          mailboxIds: z.array(z.uuid()).min(1).max(20).optional(),
+          mailboxIds: z.array(z.uuid()).min(1).max(MAX_TEAM_MAILBOXES).optional(),
           scopes: z
             .array(z.enum(["read", "draft", "send"]))
             .min(1)
@@ -727,7 +728,7 @@ export const mailboxesRouter = router({
                 .strict(),
             )
             .min(1)
-            .max(20)
+            .max(MAX_TEAM_MAILBOXES)
             .optional(),
           defaultMailboxId: z.uuid().nullable().optional(),
           expiresAt: z.date().nullable().optional(),
