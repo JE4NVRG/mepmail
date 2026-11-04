@@ -140,7 +140,7 @@ describe("restoration sender fence in the send lane", () => {
     // Operator lists the sender: the drain releases it (and only it; the other
     // unlisted sender's parked row stays parked) to the send lane.
     const admitted = policy([listed, later]);
-    const enqueue = vi.fn(async (_rows: { emailId: string }[]) => {});
+    const enqueue = vi.fn(async (_rows: readonly { emailId: string }[]) => {});
     await drainQuotaParked(fixture.db, {
       isCloud: false,
       enqueueSends: enqueue,
