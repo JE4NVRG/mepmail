@@ -31,6 +31,7 @@ import {
   emitSuppressionEvents,
   eraseRecipient,
   estimateAttachmentBytes,
+  extractAddrSpec,
   extractTokenPrefix,
   type FunnelEventTarget,
   fetchAccountScore,
@@ -62,8 +63,10 @@ import {
   regionPause,
   releaseIdempotent,
   reserveQuota,
+  restorationSenderAllowed,
   roundUpToSlot,
   SCHEDULED_AT_FORMS,
+  type SendingProviderPolicy,
   scoreBand,
   segmentContactsWhere,
   segmentFilterSchema,
@@ -199,6 +202,11 @@ export interface ApiDeps {
   onboardingEmailFrom?: string | undefined;
   /** Whether the shared sender reaches only members who verified their address (the instance verifies). */
   requireVerifiedMembers?: boolean | undefined;
+  /**
+   * SENDING_PROVIDER_POLICY_JSON, parsed. Only its restoration sender fence is
+   * read here, to refuse at accept what the send lane would never send.
+   */
+  sendingProviderPolicy?: SendingProviderPolicy | null | undefined;
   /**
    * Hands an accepted email to the send queue. REQUIRED: accepting mail
    * without a producer would strand it in "queued" forever.
@@ -448,6 +456,22 @@ async function sendingPausedError(
     "sending_paused",
     `Sending is paused: your ${metric} rate of ${pct(paused.rate)} over the last ${paused.windowDays} days is at or above the ${pct(limit)} limit. Lower it before sending again.`,
   );
+}
+
+const SENDER_NOT_ALLOWED_MESSAGE =
+  "This sender address is not enabled for this team while its sending is being restored; send from one of the team's enabled sender addresses";
+
+/**
+ * A team in a restoration cohort sends only from its listed senders (core
+ * restorationSenderAllowed, the rule the send lane applies). Refused here so
+ * the caller learns it at once instead of the row parking at send time.
+ */
+function senderNotAllowed(
+  deps: Pick<ApiDeps, "sendingProviderPolicy">,
+  teamId: string,
+  from: string,
+) {
+  return !restorationSenderAllowed(deps.sendingProviderPolicy, teamId, extractAddrSpec(from));
 }
 
 /** Refusal from acceptEmail inside a caller-owned batch transaction. */
@@ -3666,6 +3690,9 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
     ) {
       return c.json(errorBody(403, "restricted_api_key", RESTRICTED_DOMAIN_MESSAGE), 403);
     }
+    if (senderNotAllowed(deps, auth.teamId, from)) {
+      return c.json(errorBody(403, "sender_not_allowed", SENDER_NOT_ALLOWED_MESSAGE), 403);
+    }
 
     // Idempotency FIRST: a replay must return the stored response even if
     // recipients were suppressed after the original send.
@@ -3818,6 +3845,9 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
     }
     if (keyForbidsSendingDomain(auth, domain.domainId)) {
       return { status: 403, name: "restricted_api_key", message: RESTRICTED_DOMAIN_MESSAGE };
+    }
+    if (senderNotAllowed(deps, auth.teamId, body.from)) {
+      return { status: 403, name: "sender_not_allowed", message: SENDER_NOT_ALLOWED_MESSAGE };
     }
     // The accept pipeline refuses a disguised sender too; checked here so the
     // item fails at validation instead of aborting the batch transaction.

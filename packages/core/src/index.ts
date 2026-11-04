@@ -876,6 +876,7 @@ export { applySenderProbationQuota, probationCeiling } from "./sender-probation.
 export {
   parseSendingProviderPolicy,
   resolveSendingProvider,
+  restorationSenderAllowed,
   type SendingMessageClass,
   type SendingProviderDecision,
   type SendingProviderPolicy,

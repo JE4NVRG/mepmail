@@ -16,6 +16,8 @@ import {
   getInstanceSettings,
   hashRecipient,
   pacingHorizonDays,
+  parseSendingProviderPolicy,
+  type SendingProviderPolicy,
 } from "@millionsend/core";
 import { getDb } from "@millionsend/db";
 import { EMAIL_SEND_PRIORITY, Queue } from "@millionsend/queue";
@@ -36,6 +38,16 @@ const keyring = createKeyringFromEnv(env);
 
 // The API is the email.send producer, so the queue is unconditional.
 const queue = await Queue.start(env.DATABASE_URL);
+
+// Read for the accept-time restoration sender fence only. The worker owns
+// routing and refuses to boot on a malformed policy, so a parse failure here
+// is logged and leaves the send lane as the authority instead of downing accept.
+let sendingProviderPolicy: SendingProviderPolicy | null = null;
+try {
+  sendingProviderPolicy = parseSendingProviderPolicy(process.env.SENDING_PROVIDER_POLICY_JSON);
+} catch {
+  console.error("api: SENDING_PROVIDER_POLICY_JSON is invalid; accept-time sender fence disabled");
+}
 
 // SES event ingestion exists only when a topic allowlist is configured —
 // signature checks without one would accept any AWS account's topic.
@@ -93,6 +105,7 @@ const app = createApi({
   funnel: { ...umamiFunnel(), hostname: appHostname() },
   onboardingEmailFrom: env.ONBOARDING_EMAIL_FROM,
   requireVerifiedMembers: accountMailDeliverable(),
+  sendingProviderPolicy,
   rateLimitPerMinute: env.API_RATE_LIMIT_PER_MINUTE,
   revision: deploymentRevision(),
   appBaseUrl: env.APP_BASE_URL,

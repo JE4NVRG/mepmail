@@ -64,14 +64,38 @@ export const identityArn = (region: string, accountId: string, identity: string)
 export const configurationSetArn = (region: string, accountId: string, name: string): string =>
   `arn:aws:ses:${region}:${accountId}:configuration-set/${name}`;
 
-/** Creates the tenant, or adopts the existing one; either way returns the account id. */
+/**
+ * Suppression settings every NEW tenant is created with. SES's account-level
+ * suppression list is shared by every team on the instance, so one team's
+ * hard bounce (or an old one) would block the same address for all teams. With
+ * TENANT scope a send that names the team's tenant is checked only against
+ * that team's own SES list; MepMail's per-team suppression stays the guard.
+ * Sends without a tenant name keep the account list. Complaints stay out, as
+ * at account level: MepMail suppresses them per team itself.
+ */
+export const TENANT_SUPPRESSION_ATTRIBUTES = {
+  SuppressionScope: "TENANT",
+  SuppressedReasons: ["BOUNCE"],
+} as const;
+
+/**
+ * Creates the tenant, or adopts the existing one; either way returns the
+ * account id. Adoption never rewrites an existing tenant's suppression scope:
+ * that is the owner's audited backfill (PutTenantSuppressionAttributes).
+ */
 export async function ensureTenant(
   client: SesTenantClient,
   params: { tenantName: string },
 ): Promise<{ accountId: string }> {
   try {
     const out = (await client.send(
-      new CreateTenantCommand({ TenantName: params.tenantName }),
+      new CreateTenantCommand({
+        TenantName: params.tenantName,
+        SuppressionAttributes: {
+          SuppressionScope: TENANT_SUPPRESSION_ATTRIBUTES.SuppressionScope,
+          SuppressedReasons: [...TENANT_SUPPRESSION_ATTRIBUTES.SuppressedReasons],
+        },
+      }),
     )) as CreateTenantCommandOutput;
     return { accountId: accountIdFromArn(out.TenantArn) };
   } catch (error) {

@@ -149,7 +149,8 @@ it("system tag/null domain cannot admit another From or old backlog", async () =
       .from(schema.emails)
       .where(eq(schema.emails.id, email.id));
     expect(stored?.sentAt).toBeNull();
-    expect(stored?.latestStatus).toBe("queued");
+    // Visibly parked, never left "queued" behind an acked job.
+    expect(stored?.latestStatus).toBe("queued_quota");
   }
 });
 

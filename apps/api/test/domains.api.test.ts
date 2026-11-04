@@ -284,7 +284,10 @@ describe("POST /domains", () => {
       "CreateTenantResourceAssociationCommand",
       "CreateTenantResourceAssociationCommand",
     ]);
-    expect(calls[2]?.input).toEqual({ TenantName: t.id });
+    expect(calls[2]?.input).toEqual({
+      TenantName: t.id,
+      SuppressionAttributes: { SuppressionScope: "TENANT", SuppressedReasons: ["BOUNCE"] },
+    });
     expect(calls.slice(3).map((c) => c.input.ResourceArn)).toEqual([
       "arn:aws:ses:sa-east-1:123456789012:identity/tenant.example.com",
       "arn:aws:ses:sa-east-1:123456789012:configuration-set/mepmail",

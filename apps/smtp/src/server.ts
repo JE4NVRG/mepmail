@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { appHostname, env, umamiFunnel } from "@millionsend/config";
+import { parseSendingProviderPolicy, type SendingProviderPolicy } from "@millionsend/core";
 import { getDb } from "@millionsend/db";
 import { EMAIL_SEND_PRIORITY, Queue } from "@millionsend/queue";
 import { createKeyringFromEnv } from "@millionsend/ses";
@@ -17,6 +18,15 @@ const keyring = createKeyringFromEnv(env);
 
 // The relay and the Correio's submission both produce sends, so the queue is unconditional.
 const queue = await Queue.start(env.DATABASE_URL);
+
+// Accept-time restoration sender fence only; the worker owns routing and its
+// boot refuses a malformed policy, so a parse failure here leaves it in charge.
+let sendingProviderPolicy: SendingProviderPolicy | null = null;
+try {
+  sendingProviderPolicy = parseSendingProviderPolicy(process.env.SENDING_PROVIDER_POLICY_JSON);
+} catch {
+  console.error("smtp: SENDING_PROVIDER_POLICY_JSON is invalid; accept-time sender fence disabled");
+}
 
 // The customers' SMTP relay (SMTP_PORT, 2587 in production). SMTP_RELAY_ENABLED="0" leaves
 // it to another service: in production the Correio's mail-app servers (submission and
@@ -54,6 +64,7 @@ if (process.env.SMTP_RELAY_ENABLED !== "0") {
       ? { tls: { cert: readFileSync(certPath), key: readFileSync(keyPath) } }
       : {}),
     allowInsecureAuth: env.SMTP_ALLOW_INSECURE_AUTH,
+    sendingProviderPolicy,
   });
 
   server.on("error", (err) => {

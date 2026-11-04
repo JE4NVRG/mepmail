@@ -33,7 +33,12 @@ describe("ensureTenant", () => {
       accountId: "123456789012",
     });
     expect(calls.map((c) => c.name)).toEqual(["CreateTenantCommand"]);
-    expect(calls[0]?.input).toEqual({ TenantName: "team-1" });
+    // New tenants use their own SES suppression list: one team's hard bounce
+    // never blocks the same address for another team (account list is shared).
+    expect(calls[0]?.input).toEqual({
+      TenantName: "team-1",
+      SuppressionAttributes: { SuppressionScope: "TENANT", SuppressedReasons: ["BOUNCE"] },
+    });
   });
 
   it("adopts an existing tenant instead of failing", async () => {
@@ -45,6 +50,9 @@ describe("ensureTenant", () => {
       accountId: "123456789012",
     });
     expect(calls.map((c) => c.name)).toEqual(["CreateTenantCommand", "GetTenantCommand"]);
+    // Adoption is read-only: an existing tenant's suppression scope is changed
+    // only by the audited owner backfill, never implicitly here.
+    expect(calls[1]?.input).toEqual({ TenantName: "team-1" });
   });
 
   it("propagates other errors and refuses a response without an ARN", async () => {

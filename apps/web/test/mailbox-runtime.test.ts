@@ -375,7 +375,10 @@ describe("private Mail runtime adapters", () => {
     await sender.send(input);
     await sender.send(input);
     expect(provider.inputs).toEqual([
-      { TenantName: "tenant_fixture" },
+      {
+        TenantName: "tenant_fixture",
+        SuppressionAttributes: { SuppressionScope: "TENANT", SuppressedReasons: ["BOUNCE"] },
+      },
       {
         TenantName: "tenant_fixture",
         ResourceArn: "arn:aws:ses:us-east-1:123456789012:identity/example.invalid",

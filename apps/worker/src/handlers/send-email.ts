@@ -351,6 +351,49 @@ async function parkQueued(
 }
 
 /**
+ * Terminal refusal for a row admitted as transactional whose content the final
+ * route classifies otherwise, so the restoration policy holds it. The drain
+ * re-applies the same admission and would never release it, so instead of
+ * stranding it "queued" behind an acked job it fails visibly, with the hold
+ * reason, and hands its reservation back as parkQueued does. A row that
+ * already left "queued" is left alone.
+ */
+async function failHeldAfterAdmission(
+  db: Db,
+  email: { id: string; teamId: string },
+  detail: string,
+): Promise<void> {
+  const failed = await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Db;
+    const [row] = await txDb
+      .update(schema.emails)
+      .set({ latestStatus: "failed", sentAt: null })
+      .where(
+        and(
+          eq(schema.emails.id, email.id),
+          eq(schema.emails.latestStatus, "queued"),
+          isNull(schema.emails.sentAt),
+        ),
+      )
+      .returning({ to: schema.emails.to, cc: schema.emails.cc, bcc: schema.emails.bcc });
+    if (!row) return false;
+    await txDb.insert(schema.emailEvents).values({
+      emailId: email.id,
+      type: "failed",
+      occurredAt: new Date(),
+      data: { source: "worker", reason: "sending_policy_held_after_admission", detail },
+    });
+    const quota = await fetchTeamQuota(txDb, email.teamId, true);
+    if (quota) {
+      const count = countDistinctRecipients(row.to, row.cc, row.bcc);
+      await releaseQuota(txDb, { teamId: email.teamId, count, quota });
+    }
+    return true;
+  });
+  if (failed) console.warn(`email.send: sending policy held after admission, failed ${email.id}`);
+}
+
+/**
  * A queued row of a broadcast that was stopped: canceled like the rows the
  * stop swept, with its reservation handed back. A row that already left
  * "queued" is left alone.
@@ -594,7 +637,17 @@ export async function sendEmail(
       ...(deps.relay && domain?.relayEnabledAt ? ["customer_smtp"] : []),
     ]),
   });
-  if (preliminaryRoute.kind === "held") return "parked";
+  if (preliminaryRoute.kind === "held") {
+    // Without restoration the reconcile sweep re-enqueues a queued row every
+    // run, so leaving it queued is the retry (e.g. provider unavailable).
+    // Under restoration that sweep is admission-scoped and never re-enqueues a
+    // fenced row: left queued behind the acked job it was stranded. Parked as
+    // queued_quota, the drain releases it once the policy admits it.
+    if (deps.sendingProviderPolicy?.restoration) {
+      await parkQueued(db, email, `sending policy: ${preliminaryRoute.reason}`);
+    }
+    return "parked";
+  }
   const azureRoute = preliminaryRoute.provider === "azure_smtp";
   // ACS requires a working opt-out for customer mail, including transactional.
   // A recipient-scoped link never enrolls this address as a marketing contact.
@@ -994,7 +1047,12 @@ export async function sendEmail(
     blockedProviders: new Set(deps.sesQuota?.accountPaused?.(region) ? ["ses"] : []),
   });
   if (route.kind === "held") {
-    if (deps.sendingProviderPolicy?.restoration) return "parked";
+    if (deps.sendingProviderPolicy?.restoration) {
+      // Admitted as transactional, classified otherwise by content: refused,
+      // never silently left "queued" behind the acked job.
+      await failHeldAfterAdmission(db, email, route.reason);
+      return "failed";
+    }
     await parkQueued(db, email, `sending policy: ${route.reason}`);
     return "parked";
   }

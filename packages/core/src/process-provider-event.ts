@@ -70,6 +70,24 @@ const EVENT_TYPE_BY_EVENT: Record<
   "Rendering Failure": "rendering_failure",
 };
 
+/**
+ * A Permanent bounce whose subtype is OnAccountSuppressionList was never
+ * attempted: SES dropped it because the address sits on the ACCOUNT-level
+ * suppression list, which every team on this instance shares (often from
+ * another team's bounce, or an old one). It is no evidence against this team's
+ * recipient, so it must not become this team's suppression nor count as its
+ * hard bounce (SES itself leaves it out of Reputation.BounceRate). The event,
+ * status and webhook still record it. OnTenantSuppressionList is the team's
+ * own SES list and keeps suppressing normally.
+ */
+function isAccountListDrop(event: SerializedSesEvent): boolean {
+  return (
+    event.eventType === "Bounce" &&
+    event.bounce?.bounceType === "Permanent" &&
+    event.bounce.bounceSubType === "OnAccountSuppressionList"
+  );
+}
+
 /** Event-specific payload fields, mirroring Resend's webhook data shapes. */
 function webhookExtras(event: SerializedSesEvent): Record<string, unknown> {
   if (event.bounce) {
@@ -226,7 +244,9 @@ export async function processProviderEvent(
       // the deliverability score's bounce-rate input (transient greylisting
       // must not read as a hard-bounce crisis).
       const cols =
-        counter === "bounced" && event.bounce?.bounceType === "Permanent"
+        counter === "bounced" &&
+        event.bounce?.bounceType === "Permanent" &&
+        !isAccountListDrop(event)
           ? [counter, "hard_bounced"]
           : [counter];
       await txDb.execute(sql`
@@ -247,12 +267,15 @@ export async function processProviderEvent(
 
     // Auto-suppression: permanent bounces and complaints, scoped to the
     // owning team only and to addresses the email was actually sent to —
-    // the event payload never gets to name who is suppressed.
+    // the event payload never gets to name who is suppressed. An account-list
+    // drop (see isAccountListDrop) is not a bounce of this team's recipient.
     const ownRecipients = new Set(
       [...email.to, ...(email.cc ?? []), ...(email.bcc ?? [])].map(hashRecipient),
     );
     const toSuppress = (
-      event.eventType === "Bounce" && event.bounce?.bounceType === "Permanent"
+      event.eventType === "Bounce" &&
+      event.bounce?.bounceType === "Permanent" &&
+      !isAccountListDrop(event)
         ? event.bounce.recipients.map((r) => ({ email: r, reason: "hard_bounce" as const }))
         : event.eventType === "Complaint"
           ? (event.complaint?.recipients ?? []).map((r) => ({

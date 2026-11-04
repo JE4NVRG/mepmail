@@ -5,10 +5,13 @@ import {
   authenticateApiKey,
   CAMPAIGN_CONSENT_MESSAGE,
   disguiseMessage,
+  extractAddrSpec,
   formatMailbox,
   isTeamSuspended,
   OVERAGE_HARD_CAP,
   parseMailbox,
+  restorationSenderAllowed,
+  type SendingProviderPolicy,
   senderVerdictMessage,
   signupSendMessage,
   verifySenderDomain,
@@ -36,6 +39,8 @@ export interface SmtpDeps extends AcceptEmailDeps {
   allowInsecureAuth?: boolean | undefined;
   /** Defaults to MAX_MESSAGE_BYTES; lowered only by tests. */
   maxMessageBytes?: number | undefined;
+  /** SENDING_PROVIDER_POLICY_JSON, parsed: only its restoration sender fence is read. */
+  sendingProviderPolicy?: SendingProviderPolicy | null | undefined;
 }
 
 function smtpError(responseCode: number, message: string): Error {
@@ -139,6 +144,13 @@ async function handleMessage(
   // scope the HTTP send surface enforces, applied here so SMTP is no bypass.
   if (auth.domainId !== null && auth.domainId !== domain.domainId) {
     throw smtpError(550, "This API key can only send from its assigned domain");
+  }
+  // Same restoration sender fence as POST /emails: refused now, not parked at send.
+  if (!restorationSenderAllowed(deps.sendingProviderPolicy, auth.teamId, extractAddrSpec(from))) {
+    throw smtpError(
+      550,
+      "This sender address is not enabled for this team while its sending is being restored",
+    );
   }
 
   const result = await acceptEmail(deps, auth, {

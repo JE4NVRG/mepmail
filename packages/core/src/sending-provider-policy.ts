@@ -107,6 +107,24 @@ export function parseSendingProviderPolicy(raw: string | undefined): SendingProv
 }
 
 /**
+ * Sender fence of a team's restoration cohort: false only while the team is in
+ * `restoration.teams` and the addr-spec is not one of its listed senders. Any
+ * other team, or no restoration at all, is not fenced here. Accept surfaces
+ * refuse early with it; the send lane applies the same rule in
+ * resolveSendingProvider, so an accepted row can never be stranded by it.
+ */
+export function restorationSenderAllowed(
+  policy: SendingProviderPolicy | null | undefined,
+  teamId: string,
+  fromAddress: string | null | undefined,
+): boolean {
+  const cohort = policy?.restoration?.teams[teamId];
+  if (!cohort) return true;
+  const address = fromAddress?.trim().toLowerCase();
+  return !!address && cohort.senders.includes(address);
+}
+
+/**
  * Select exactly one configured transport AFTER the shared tenant/content/consent
  * guards. Selecting a provider never authorizes a send or relaxes those guards.
  * There is no retry/fallback output: a paused/refused/ambiguous transport must not
@@ -169,8 +187,7 @@ export function resolveSendingProvider(
         !input.createdAt ||
         !Number.isFinite(input.createdAt.getTime()) ||
         input.createdAt.getTime() < Date.parse(cohort.notBefore) ||
-        !input.fromAddress ||
-        !cohort.senders.includes(input.fromAddress.toLowerCase())
+        !restorationSenderAllowed(policy, input.teamId, input.fromAddress)
       ) {
         return { kind: "held", reason: "restoration_fenced" };
       }

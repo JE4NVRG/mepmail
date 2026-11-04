@@ -136,6 +136,81 @@ it("Transient bounce: status moves but nothing is suppressed", async () => {
   expect(counter?.hardBounced).toBe(before?.hardBounced ?? 0);
 });
 
+it("Permanent/OnAccountSuppressionList: never becomes a team suppression nor a team hard bounce", async () => {
+  // SES never attempted delivery: the address sits on the ACCOUNT-level list
+  // shared by every team (often from another team's old bounce). Turning that
+  // into this team's suppression would block a valid address forever.
+  const emailId = await insertSentEmail("mid-account-list", ["shared-list@example.com"]);
+  const [before] = await db
+    .select()
+    .from(schema.usageCounters)
+    .where(eq(schema.usageCounters.teamId, teamId));
+  await processSesEvent(
+    db,
+    makeEvent({
+      eventType: "Bounce",
+      sesMessageId: "mid-account-list",
+      bounce: {
+        bounceType: "Permanent",
+        bounceSubType: "OnAccountSuppressionList",
+        recipients: ["shared-list@example.com"],
+        diagnosticCode:
+          "Amazon SES did not send the message to this address because it is on the suppression list for your account.",
+      },
+      data: {
+        eventType: "Bounce",
+        bounce: { bounceType: "Permanent", bounceSubType: "OnAccountSuppressionList" },
+      },
+    }),
+  );
+
+  // The outcome stays visible: status, event row (with the SES subtype) and bounced counter.
+  expect(await statusOf(emailId)).toBe("bounced");
+  const events = await db
+    .select()
+    .from(schema.emailEvents)
+    .where(eq(schema.emailEvents.emailId, emailId));
+  expect(events).toHaveLength(1);
+  expect(events[0]?.bounceType).toBe("Permanent");
+  const data = events[0]?.data as { bounce?: { bounceSubType?: string } } | undefined;
+  expect(data?.bounce?.bounceSubType).toBe("OnAccountSuppressionList");
+  const supp = await db
+    .select()
+    .from(schema.suppressions)
+    .where(eq(schema.suppressions.emailHash, hashRecipient("shared-list@example.com")));
+  expect(supp).toHaveLength(0);
+  expect(await findSuppressed(db, teamId, ["shared-list@example.com"])).toEqual(new Set());
+  // SES itself leaves these out of Reputation.BounceRate; the team score must too.
+  const [counter] = await db
+    .select()
+    .from(schema.usageCounters)
+    .where(eq(schema.usageCounters.teamId, teamId));
+  expect(counter?.bounced).toBe((before?.bounced ?? 0) + 1);
+  expect(counter?.hardBounced).toBe(before?.hardBounced ?? 0);
+});
+
+it("Permanent/OnTenantSuppressionList: the team's own SES list still suppresses for that team", async () => {
+  await insertSentEmail("mid-tenant-list", ["own-bounce@example.com"]);
+  await processSesEvent(
+    db,
+    makeEvent({
+      eventType: "Bounce",
+      sesMessageId: "mid-tenant-list",
+      bounce: {
+        bounceType: "Permanent",
+        bounceSubType: "OnTenantSuppressionList",
+        recipients: ["own-bounce@example.com"],
+      },
+    }),
+  );
+  const [supp] = await db
+    .select()
+    .from(schema.suppressions)
+    .where(eq(schema.suppressions.emailHash, hashRecipient("own-bounce@example.com")));
+  expect(supp?.teamId).toBe(teamId);
+  expect(supp?.reason).toBe("hard_bounce");
+});
+
 it("Complaint: suppression with reason complaint", async () => {
   await insertSentEmail("mid-complaint", ["angry@example.com"]);
   await processSesEvent(
