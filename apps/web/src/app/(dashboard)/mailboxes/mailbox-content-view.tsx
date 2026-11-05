@@ -61,6 +61,11 @@ import { formatMailboxBytes, openMailboxLicense } from "@/lib/mailbox-plans";
 import { useCorreioPrefs } from "@/lib/mailbox-preferences";
 import { withQuickReply } from "@/lib/mailbox-quick-replies";
 import {
+  MAILBOX_READ_QUERY_OPTIONS,
+  mailboxReadAccessRefused,
+  mailboxReaderHasUsableData,
+} from "@/lib/mailbox-read-retry";
+import {
   isRecipientAddress,
   mailboxContacts,
   readRecentRecipients,
@@ -415,13 +420,13 @@ function DraftDialog({
   const sentList = useQuery(
     trpc.mailboxes.items.queryOptions(
       { mailboxId: null, folder: "sent" },
-      { retry: false, staleTime: 300_000 },
+      { ...MAILBOX_READ_QUERY_OPTIONS, staleTime: 300_000 },
     ),
   );
   const inboxList = useQuery(
     trpc.mailboxes.items.queryOptions(
       { mailboxId: null, folder: "inbox" },
-      { retry: false, staleTime: 300_000 },
+      { ...MAILBOX_READ_QUERY_OPTIONS, staleTime: 300_000 },
     ),
   );
   const [recent] = useState(readRecentRecipients);
@@ -1228,7 +1233,10 @@ function ConversationHistory({
   const locale = useLocale();
   const trpc = useTRPC();
   const thread = useQuery(
-    trpc.mailboxes.thread.queryOptions({ mailboxId, id }, { enabled: count > 1, retry: false }),
+    trpc.mailboxes.thread.queryOptions(
+      { mailboxId, id },
+      { enabled: count > 1, ...MAILBOX_READ_QUERY_OPTIONS },
+    ),
   );
   const others = thread.data?.entries.filter((entry) => !entry.current) ?? [];
   if (count <= 1 || !others.length) return null;
@@ -1468,7 +1476,7 @@ export function MailboxContentView({
   const sentForPeople = useQuery(
     trpc.mailboxes.items.queryOptions(
       { mailboxId: null, folder: "sent" },
-      { enabled: folder === "inbox", retry: false, staleTime: 300_000 },
+      { enabled: folder === "inbox", ...MAILBOX_READ_QUERY_OPTIONS, staleTime: 300_000 },
     ),
   );
   const knownPeople = useMemo(
@@ -1565,7 +1573,7 @@ export function MailboxContentView({
   const listing = useInfiniteQuery(
     trpc.mailboxes.items.infiniteQueryOptions(listInput, {
       getNextPageParam: (page) => page.nextCursor,
-      retry: false,
+      ...MAILBOX_READ_QUERY_OPTIONS,
       // Coming back to a folder shows what it had at once and refreshes behind it.
       gcTime: 10 * 60_000,
       staleTime: 15_000,
@@ -1641,7 +1649,7 @@ export function MailboxContentView({
         folder: "pinned",
         ...(mailboxKind ? { mailboxKind } : {}),
       },
-      { enabled: folder === "inbox", retry: false, refetchInterval: 60000 },
+      { enabled: folder === "inbox", ...MAILBOX_READ_QUERY_OPTIONS, refetchInterval: 60000 },
     ),
   );
   // Once the list comes back without a departed row, forget it.
@@ -1669,7 +1677,7 @@ export function MailboxContentView({
     trpc.mailboxes.search.infiniteQueryOptions(searchQueryInput, {
       enabled: searchTerm !== null,
       getNextPageParam: (page) => page.nextCursor ?? undefined,
-      retry: false,
+      ...MAILBOX_READ_QUERY_OPTIONS,
       staleTime: 30_000,
     }),
   );
@@ -1698,7 +1706,7 @@ export function MailboxContentView({
   const searchFolders = useQuery(
     trpc.mailboxes.folders.queryOptions(
       { mailboxId: null },
-      { enabled: searching, staleTime: 60_000, retry: false },
+      { enabled: searching, staleTime: 60_000, ...MAILBOX_READ_QUERY_OPTIONS },
     ),
   );
   /** Where a search result lives, named for its row. */
@@ -1803,7 +1811,7 @@ export function MailboxContentView({
   useQuery(
     trpc.mailboxes.folders.queryOptions(
       { mailboxId: selectedBox?.id ?? NIL },
-      { enabled: !!selectedBox, retry: false },
+      { enabled: !!selectedBox, ...MAILBOX_READ_QUERY_OPTIONS },
     ),
   );
   const selectedRow =
@@ -1813,10 +1821,12 @@ export function MailboxContentView({
   const blockedRow = selectedRow && mailboxContentBlocked(selectedRow) ? selectedRow : null;
   const visibleItem = listingReady && selectedBox && selectedRow && !blockedRow ? selection : null;
   const readingSelection = visibleItem ?? (blockedRow ? selection : null);
+  const detailInput = visibleItem ?? { mailboxId: NIL, id: NIL };
+  const detailKey = trpc.mailboxes.item.queryKey(detailInput);
   const detail = useQuery(
-    trpc.mailboxes.item.queryOptions(visibleItem ?? { mailboxId: NIL, id: NIL }, {
+    trpc.mailboxes.item.queryOptions(detailInput, {
       enabled: !!visibleItem,
-      retry: false,
+      ...MAILBOX_READ_QUERY_OPTIONS,
       // A message read a moment ago, or prefetched on hover, opens at once.
       gcTime: 2 * 60_000,
       staleTime: 10_000,
@@ -1832,7 +1842,19 @@ export function MailboxContentView({
       },
     }),
   );
-  const item = visibleItem && !detail.isError ? detail.data : null;
+  const detailScope = JSON.stringify(visibleItem);
+  const currentDetailScope = useRef(detailScope);
+  currentDetailScope.current = detailScope;
+  const recoverDetail = () =>
+    recoverQuery(
+      queries,
+      detailKey,
+      () => detail.refetch(),
+      () => mounted.current && currentDetailScope.current === detailScope,
+    );
+  const detailRecovery = queryRecoveryPhase(detail) ?? "loading";
+  const detailRefused = mailboxReadAccessRefused(detail.error);
+  const item = visibleItem && mailboxReaderHasUsableData(detail) ? detail.data : null;
   const pendingSentReply = item?.kind === "sent" && !item.transportMessageId;
   // The person's own quick replies, or the built-in set in their language.
   const quickReplies = prefs.quickReplies ?? [
@@ -2281,7 +2303,7 @@ export function MailboxContentView({
     void queries.prefetchQuery(
       trpc.mailboxes.item.queryOptions(
         { mailboxId: row.mailboxId, id: row.id },
-        { retry: false, gcTime: 2 * 60_000, staleTime: 10_000 },
+        { ...MAILBOX_READ_QUERY_OPTIONS, gcTime: 2 * 60_000, staleTime: 10_000 },
       ),
     );
   }
@@ -3576,7 +3598,9 @@ export function MailboxContentView({
                 />
               ) : null}
               {mailboxesTruncated ? (
-                <p className={styles.trashHelp}>{t("organization.limitedList")}</p>
+                <p className={styles.trashHelp} role="note" data-mailbox-list-limited>
+                  {t("listLimit")}
+                </p>
               ) : null}
               {listingReady ? (
                 <div
@@ -4173,9 +4197,6 @@ export function MailboxContentView({
                   ) : null}
                 </div>
               )}
-              {mailboxesTruncated && !listing.isError ? (
-                <p className={styles.notice}>{t("listLimit")}</p>
-              ) : null}
             </div>
           </div>
           <MailboxColumnDivider
@@ -4445,7 +4466,7 @@ export function MailboxContentView({
                   <time dateTime={blockedRow.date.toISOString()}>{date(blockedRow.date)}</time>
                   <SafetyNotice assessment={blockedRow.inboundAssessment} quarantined />
                 </div>
-              ) : detail.isError && visibleItem ? (
+              ) : detail.isError && visibleItem && detailRefused ? (
                 <div role="alert" className={styles.emptyFolder}>
                   <p>{t("accessLost")}</p>
                   <button
@@ -4459,6 +4480,14 @@ export function MailboxContentView({
                     {t("refresh")}
                   </button>
                 </div>
+              ) : visibleItem && !item && (detail.isError || detail.fetchStatus === "paused") ? (
+                <QueryRecoveryNotice
+                  phase={detailRecovery}
+                  message={t(`recovery.${detailRecovery}`)}
+                  retryLabel={t("retry")}
+                  retry={recoverDetail}
+                  className={styles.emptyFolder}
+                />
               ) : visibleItem && detail.isPending ? (
                 // What the row already knows, at once; the body follows.
                 selectedRow ? (
@@ -4471,9 +4500,13 @@ export function MailboxContentView({
                       </p>
                       <small>{date(selectedRow.date)}</small>
                     </header>
-                    <p className={styles.readerLoading} aria-live="polite">
-                      {t("loading")}
-                    </p>
+                    <QueryRecoveryNotice
+                      phase={detailRecovery}
+                      message={t(`recovery.${detailRecovery}`)}
+                      retryLabel={t("retry")}
+                      retry={recoverDetail}
+                      className={styles.readerLoading}
+                    />
                   </article>
                 ) : (
                   <p className={styles.emptyFolder} aria-live="polite">
@@ -4482,6 +4515,15 @@ export function MailboxContentView({
                 )
               ) : item ? (
                 <article className={styles.message}>
+                  {detail.isError || detail.fetchStatus === "paused" ? (
+                    <QueryRecoveryNotice
+                      phase={detailRecovery}
+                      message={t(`recovery.${detailRecovery}`)}
+                      retryLabel={t("retry")}
+                      retry={recoverDetail}
+                      className={styles.notice}
+                    />
+                  ) : null}
                   {item.trashedAt ? (
                     <p className={styles.contentNotice}>{t("trashMessageHelp")}</p>
                   ) : null}

@@ -31,6 +31,7 @@ import { type NewMailNotice, newMailNotices, rememberUnread } from "@/lib/mailbo
 import { noticesWanted } from "@/lib/mailbox-notifications";
 import { MAILBOX_OPEN_LICENSE_EVENT } from "@/lib/mailbox-plans";
 import { applyCorreioTheme, useCorreioPrefs } from "@/lib/mailbox-preferences";
+import { MAILBOX_READ_QUERY_OPTIONS } from "@/lib/mailbox-read-retry";
 import type { MailboxPurchaseIntent } from "@/lib/public-intent";
 import { queryHasUsableData, queryRecoveryPhase, recoverQuery } from "@/lib/query-recovery";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
@@ -485,8 +486,7 @@ export function MailboxesView({
     trpc.mailboxes.list.queryOptions(undefined, {
       enabled: mayUseMail,
       refetchInterval: livePollMs(live, 15000),
-      retry: (count, error) =>
-        (error as { data?: { code?: string } }).data?.code !== "NOT_FOUND" && count < 3,
+      ...MAILBOX_READ_QUERY_OPTIONS,
     }),
   );
   const canCreate = registry.data?.canManage === true || registry.data?.canCreate === true;
@@ -638,7 +638,10 @@ export function MailboxesView({
   const folderList = useQuery(
     trpc.mailboxes.folders.queryOptions(
       { mailboxId: selected?.id ?? "00000000-0000-0000-0000-000000000000" },
-      { enabled: !!selected?.canRead && selected.status === "planned", retry: false },
+      {
+        enabled: !!selected?.canRead && selected.status === "planned",
+        ...MAILBOX_READ_QUERY_OPTIONS,
+      },
     ),
   );
   const canOrganize = !!selected?.ownerActive && selected.ownerUserId === session?.user.id;
@@ -669,7 +672,7 @@ export function MailboxesView({
   const unifiedFolders = useQuery(
     trpc.mailboxes.folders.queryOptions(
       { mailboxId: null },
-      { enabled: !selected && folderBoxes.length > 0, retry: false },
+      { enabled: !selected && folderBoxes.length > 0, ...MAILBOX_READ_QUERY_OPTIONS },
     ),
   );
   const reorderMutation = useMutation(
@@ -685,7 +688,7 @@ export function MailboxesView({
       {
         enabled: mayUseMail && !!registry.data && layout === "app",
         refetchInterval: 60000,
-        retry: false,
+        ...MAILBOX_READ_QUERY_OPTIONS,
       },
     ),
   );
@@ -696,7 +699,7 @@ export function MailboxesView({
       // The title, the desktop tray badge and the new-mail notice read these
       // counts, so they keep coming while the window is hidden or in the tray.
       refetchIntervalInBackground: true,
-      retry: false,
+      ...MAILBOX_READ_QUERY_OPTIONS,
     }),
   );
   // The inbox list starts loading with the page, beside the mailbox registry,
@@ -708,7 +711,11 @@ export function MailboxesView({
     void queries.prefetchInfiniteQuery(
       trpc.mailboxes.items.infiniteQueryOptions(
         { mailboxId: null, folder: "inbox", mailboxKind: undefined },
-        { getNextPageParam: (page) => page.nextCursor, retry: false, staleTime: 15_000 },
+        {
+          getNextPageParam: (page) => page.nextCursor,
+          ...MAILBOX_READ_QUERY_OPTIONS,
+          staleTime: 15_000,
+        },
       ),
     );
   }, [mayUseMail, layout, queries, trpc]);
@@ -1268,7 +1275,11 @@ export function MailboxesView({
           folder: next,
           mailboxKind: mailboxKind === "all" ? undefined : mailboxKind,
         },
-        { getNextPageParam: (page) => page.nextCursor, retry: false, staleTime: 15_000 },
+        {
+          getNextPageParam: (page) => page.nextCursor,
+          ...MAILBOX_READ_QUERY_OPTIONS,
+          staleTime: 15_000,
+        },
       ),
     );
   };

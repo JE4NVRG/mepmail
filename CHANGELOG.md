@@ -7,6 +7,22 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.155] - 2026-11-05
+
+### Changed
+
+- Correio keeps folders within reach with a compact, searchable mailbox selector,
+  preserving full mailbox identity, unread context and keyboard navigation.
+- The unified inbox explains its recent-message limit beside the list controls.
+
+### Fixed
+
+- Transient mailbox, folder and message reads receive bounded retries without
+  repeating permission refusals or any sending/mutation action.
+- A failed message refresh offers scoped recovery rather than misreporting lost
+  access. Private reader content remains hidden after any failed read until a
+  successful read, including a refusal followed by a connection failure.
+
 ## [0.90] - 2026-10-10
 
 ### Added

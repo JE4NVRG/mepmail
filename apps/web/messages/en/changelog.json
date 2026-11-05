@@ -24,6 +24,28 @@
   },
   "releases": [
     {
+      "version": "0.155",
+      "date": "2026-11-05",
+      "title": "A steadier inbox, with folders within reach",
+      "summary": "Switch mailboxes without losing your place, keep folders accessible and recover temporary reading failures without reloading the app.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "A compact, searchable mailbox selector keeps folders within reach, including when you have many people and agent mailboxes.",
+            "The recent-message limit in the unified inbox is explained beside the list controls."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "Mailbox and message reads make a small, bounded retry after temporary connection or server failures. Permission refusals are not retried.",
+            "A failed message refresh no longer looks like lost access and offers a scoped retry without reloading. After any failed private read, its body stays hidden until a successful read. Sending actions are never automatically repeated."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.154.1",
       "date": "2026-10-14",
       "title": "Correio on your phone's home screen",

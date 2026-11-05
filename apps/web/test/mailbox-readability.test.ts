@@ -12,12 +12,15 @@ const h = vi.hoisted(() => ({
   locale: "en" as "en" | "pt-BR",
   cursor: 0,
   states: {} as Record<number, unknown>,
+  effects: [] as { run: () => undefined | (() => void); deps?: readonly unknown[] }[],
 }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useId: () => "readability-fixture",
   useRef: (current: unknown) => ({ current }),
-  useEffect: () => {},
+  useEffect: (run: () => undefined | (() => void), deps?: readonly unknown[]) => {
+    h.effects.push({ run, deps });
+  },
   useState: (initial: unknown) => {
     const index = h.cursor++;
     const state = Object.hasOwn(h.states, index)
@@ -91,8 +94,25 @@ function rail(input = props()) {
   const tree = MailboxRail(input);
   return { tree, html: renderToStaticMarkup(tree), input };
 }
+function openSwitcher(input = props()) {
+  const trigger = nodes(rail(input).tree).find(
+    (node) =>
+      node.type === "button" && node.props["aria-controls"] === "readability-fixture-box-picker",
+  );
+  if (!trigger) throw new Error("Missing mailbox switcher");
+  expect(trigger.props["aria-expanded"]).toBe(false);
+  (trigger.props.onClick as () => void)();
+  const opened = rail(input);
+  expect(
+    nodes(opened.tree).find(
+      (node) => node.props["aria-controls"] === "readability-fixture-box-picker",
+    )?.props["aria-expanded"],
+  ).toBe(true);
+  return opened;
+}
 beforeEach(() => {
   h.states = {};
+  h.effects = [];
   h.cursor = 0;
 });
 
@@ -101,9 +121,9 @@ describe.each(["en", "pt-BR"] as const)("readable mailbox identity in %s", (loca
     h.locale = locale;
   });
   it("keeps the full name, secondary address and unread context available on the native selection button", () => {
-    const { tree, html, input } = rail();
+    const { tree, html, input } = openSwitcher();
     const button = nodes(tree).find(
-      (node) => node.type === "button" && String(node.props["aria-label"]).includes(target.address),
+      (node) => node.type === "button" && node.props["data-mailbox-id"] === target.id,
     );
     if (!button) throw new Error("Missing mailbox selection button");
     expect(button.props["aria-label"]).toContain(target.label);
@@ -118,6 +138,68 @@ describe.each(["en", "pt-BR"] as const)("readable mailbox identity in %s", (loca
     (button.props.onClick as () => void)();
     expect(input.onSelectBox).toHaveBeenCalledExactlyOnceWith(target.id);
   });
+  it("keeps unread context on the compact selected-mailbox trigger", () => {
+    const { tree } = rail();
+    const trigger = nodes(tree).find(
+      (node) =>
+        node.type === "button" && node.props["aria-controls"] === "readability-fixture-box-picker",
+    );
+    if (!trigger) throw new Error("Missing mailbox switcher");
+    expect(trigger.props["aria-label"]).toContain(target.label);
+    expect(trigger.props["aria-label"]).toContain(target.address);
+    expect(trigger.props["aria-label"]).toContain("7");
+    expect(
+      nodes(trigger).some((node) => node.props.role === "img" && node.props.children === 7),
+    ).toBe(true);
+  });
+  it("keeps an owned portaled menu pointer inside the disclosure but still dismisses an outside pointer", () => {
+    const input = props();
+    const { tree } = openSwitcher(input);
+    const capture = nodes(tree).find((node) => node.props.onPointerDownCapture);
+    const pickerEffect = h.effects.find((effect) => effect.deps?.[0] === true);
+    if (!capture || !pickerEffect) throw new Error("Missing open picker dismissal boundary");
+    const listeners = new Map<string, (event: unknown) => void>();
+    class SyntheticNode {}
+    vi.stubGlobal("Node", SyntheticNode);
+    vi.stubGlobal("document", {
+      documentElement: { dataset: {} },
+      addEventListener: (name: string, listener: (event: unknown) => void) => {
+        listeners.set(name, listener);
+      },
+      removeEventListener: (name: string) => listeners.delete(name),
+    });
+    let cleanup: undefined | (() => void);
+    try {
+      cleanup = pickerEffect.run();
+      const ownedPointer = { target: new SyntheticNode() };
+      (capture.props.onPointerDownCapture as (event: { nativeEvent: unknown }) => void)({
+        nativeEvent: ownedPointer,
+      });
+      listeners.get("pointerdown")?.(ownedPointer);
+      expect(rail(input).html).toContain("data-mailbox-picker-panel");
+      listeners.get("pointerdown")?.({ target: new SyntheticNode() });
+      expect(rail(input).html).not.toContain("data-mailbox-picker-panel");
+    } finally {
+      cleanup?.();
+      vi.unstubAllGlobals();
+    }
+  });
+  it.each(["all", "person", "agent"] as const)(
+    "keeps the %s scope action independent of mailbox identity and closes the picker",
+    (scope) => {
+      const input = props();
+      input.boxes.push({ ...target, id: "agent-box", kind: "agent" });
+      const control = nodes(openSwitcher(input).tree).find(
+        (node) => node.type === "button" && node.props["data-mailbox-scope"] === scope,
+      );
+      if (!control) throw new Error("Missing mailbox scope");
+      (control.props.onClick as () => void)();
+      expect(input.onScope).toHaveBeenCalledExactlyOnceWith(scope);
+      expect(input.onSelectBox).not.toHaveBeenCalled();
+      expect(input.onFolder).not.toHaveBeenCalled();
+      expect(rail(input).html).not.toContain("data-mailbox-picker-panel");
+    },
+  );
   it("retains the identifiable name and address after filtering a large mailbox collection", () => {
     const input = props();
     input.boxes = [
@@ -129,7 +211,7 @@ describe.each(["en", "pt-BR"] as const)("readable mailbox identity in %s", (loca
         address: `sales${index}@example.test`,
       })),
     ];
-    const search = nodes(rail(input).tree).find(
+    const search = nodes(openSwitcher(input).tree).find(
       (node) => node.type === "input" && node.props.type === "search",
     );
     if (!search) throw new Error("Missing mailbox search");

@@ -24,6 +24,28 @@
   },
   "releases": [
     {
+      "version": "0.155",
+      "date": "2026-11-05",
+      "title": "Uma caixa mais estável, com as pastas à mão",
+      "summary": "Troque de caixa sem perder o contexto, encontre as pastas com facilidade e recupere falhas temporárias de leitura sem recarregar o app.",
+      "changes": [
+        {
+          "kind": "changed",
+          "items": [
+            "Um seletor compacto e pesquisável mantém as pastas acessíveis, inclusive com muitas caixas de pessoas e agentes.",
+            "O limite de mensagens recentes da entrada unificada fica explicado junto aos controles da lista."
+          ]
+        },
+        {
+          "kind": "fixed",
+          "items": [
+            "A abertura de caixas e mensagens faz novas tentativas limitadas após falhas temporárias de conexão ou servidor. Recusas de permissão não são repetidas.",
+            "Uma falha ao atualizar a mensagem não parece mais perda de acesso e oferece uma nova tentativa sem recarregar. Após qualquer falha de leitura privada, o corpo fica oculto até uma leitura bem-sucedida. Ações de envio nunca são repetidas automaticamente."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.154.1",
       "date": "2026-10-14",
       "title": "Correio na tela inicial do celular",
