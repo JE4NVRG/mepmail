@@ -15,6 +15,8 @@ on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
   authorized scope, instead of stopping at the first twenty.
 - Folder and scheduled-view rails include the full owned mailbox scope. Folder
   totals use bounded, grouped queries rather than one serial query per mailbox.
+- Mark-all-read/unread splits requests by both message count and distinct
+  mailbox limits, preserving the server's organization authorization bound.
 
 ### Changed
 

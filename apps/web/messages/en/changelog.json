@@ -33,7 +33,8 @@
           "kind": "fixed",
           "items": [
             "The unified inbox and unread counts no longer stop at the first twenty authorized mailboxes.",
-            "Folder and scheduled-view rails include all owned mailboxes. Folder counts are gathered in bounded, grouped queries instead of querying each mailbox serially."
+            "Folder and scheduled-view rails include all owned mailboxes. Folder counts are gathered in bounded, grouped queries instead of querying each mailbox serially.",
+            "Mark-all-read and mark-all-unread split requests by both message count and distinct mailboxes, without widening organization permissions."
           ]
         },
         {

@@ -262,7 +262,7 @@ describe("listMailboxItemsMany", () => {
     ).rejects.toMatchObject({ code: "forbidden" });
   });
 
-  it("checks membership, mailbox state, support view, agents and size like the single read", async () => {
+  it("checks membership, mailbox state, support view, agents and page size across read batches", async () => {
     await grantMailboxRegistry(db, owner(), {
       mailboxId: alpha,
       userId: "delegate",
@@ -288,9 +288,11 @@ describe("listMailboxItemsMany", () => {
     await expect(
       listMailboxItemsMany(db, { ...owner(), agentAccess: true }, [alpha], { trashed: true }),
     ).rejects.toMatchObject({ code: "forbidden" });
+    // More than one authorization batch is valid input, but unknown mailboxes
+    // still refuse the entire read. The page-size bound remains below.
     const many = Array.from({ length: 51 }, () => randomUUID());
     await expect(listMailboxItemsMany(db, owner(), many, inbox)).rejects.toMatchObject({
-      code: "invalid",
+      code: "forbidden",
     });
     await expect(
       listMailboxItemsMany(db, owner(), [alpha], inbox, { limit: 102 }),

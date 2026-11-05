@@ -77,6 +77,7 @@ import {
   SEARCH_DEBOUNCE_MS,
   serverSearchTerm,
 } from "@/lib/mailbox-search";
+import { mailboxSeenBatches } from "@/lib/mailbox-seen-batches";
 import { MAILBOX_SHORTCUTS, mailboxShortcut } from "@/lib/mailbox-shortcuts";
 import { mailboxSignatureText } from "@/lib/mailbox-signature";
 import {
@@ -175,9 +176,6 @@ const MailboxRichEditor = dynamic(
     loading: () => <div className={styles.editorLoading} aria-hidden="true" />,
   },
 );
-
-/** Messages one setSeenMany call takes (server: MAILBOX_SEEN_BATCH). */
-const MAILBOX_SEEN_BATCH = 200;
 
 /**
  * Runs `run` over the items with at most `limit` in flight; counts what
@@ -2339,7 +2337,7 @@ export function MailboxContentView({
   /**
    * Marks rows read or unread: the list, its filter and the counts follow at
    * once (seenOverride); one message goes by setSeen, several by setSeenMany,
-   * MAILBOX_SEEN_BATCH a call instead of one round trip each.
+   * bounded by both message count and distinct mailboxes instead of one round trip each.
    */
   async function changeSeen(targets: Row[], seen: boolean, announce = true) {
     const eligible = targets.filter(
@@ -2367,11 +2365,9 @@ export function MailboxContentView({
         await seenMutation.mutateAsync({ mailboxId: row.mailboxId, id: row.id, seen: value });
         return;
       }
-      for (let start = 0; start < rows.length; start += MAILBOX_SEEN_BATCH)
+      for (const batch of mailboxSeenBatches(rows))
         await seenManyMutation.mutateAsync({
-          items: rows
-            .slice(start, start + MAILBOX_SEEN_BATCH)
-            .map((row) => ({ mailboxId: row.mailboxId, id: row.id })),
+          items: batch.map((row) => ({ mailboxId: row.mailboxId, id: row.id })),
           seen: value,
         });
     };

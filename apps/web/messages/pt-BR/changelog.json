@@ -33,7 +33,8 @@
           "kind": "fixed",
           "items": [
             "A caixa unificada e os contadores de não lidas não param mais nas primeiras vinte caixas autorizadas.",
-            "As pastas e visualizações de agendamento incluem todas as caixas próprias. Os contadores das pastas são consultados em lotes agrupados, em vez de uma consulta serial por caixa."
+            "As pastas e visualizações de agendamento incluem todas as caixas próprias. Os contadores das pastas são consultados em lotes agrupados, em vez de uma consulta serial por caixa.",
+            "Marcar todas como lidas ou não lidas divide as solicitações pelos limites de mensagens e de caixas distintas, sem ampliar as permissões de organização."
           ]
         },
         {

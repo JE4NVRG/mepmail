@@ -7,13 +7,15 @@ import {
   countUnreadMailboxItemsMany,
   EnvKeyring,
   listMailboxItemsMany,
+  setMailboxItemsSeenMany,
   withMailboxContentAccess,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { mailboxSeenBatches } from "@/lib/mailbox-seen-batches";
 import { getKeyring } from "@/server/keyring";
 import {
   getMailboxContentList,
@@ -182,6 +184,28 @@ describe("complete unified mailbox coverage", () => {
         })
       ).items,
     ).toHaveLength(33);
+    // The server keeps the organization cap. The actual UI helper covers the
+    // expanded scope in valid read/unread requests, including its inverse.
+    const bulkRows = [
+      ...rows.map(({ id, mailboxId }) => ({ id, mailboxId })),
+      { id: newId, mailboxId: ids[0]! },
+    ];
+    await expect(
+      setMailboxItemsSeenMany(db, owner, { items: bulkRows, seen: true }),
+    ).rejects.toMatchObject({ code: "invalid" });
+    const batches = mailboxSeenBatches(bulkRows);
+    expect(batches).toHaveLength(2);
+    let marked = 0;
+    for (const batch of batches)
+      marked += (await setMailboxItemsSeenMany(db, owner, { items: batch, seen: true })).changed;
+    expect(marked).toBe(66);
+    expect(
+      Object.values((await getMailboxUnreadCounts(db, owner)).counts).every((n) => n === 0),
+    ).toBe(true);
+    let restored = 0;
+    for (const batch of batches)
+      restored += (await setMailboxItemsSeenMany(db, owner, { items: batch, seen: false })).changed;
+    expect(restored).toBe(66);
     expect((await getMailboxUnreadCounts(db, owner)).counts[ids[64]!]).toBe(1);
     expect(Object.keys((await getMailboxUnreadCounts(db, owner)).counts)).toHaveLength(65);
     expect(await getMailboxFolderCounts(db, owner, { mailboxId: null })).toMatchObject({
@@ -253,5 +277,48 @@ describe("complete unified mailbox coverage", () => {
         { mailboxId: null, folder: "trash" },
       ),
     ).rejects.toMatchObject({ code: "forbidden" });
+    // Same conversation key in different mailboxes is not one conversation:
+    // retain each mailbox's representative, including the last SQL batch.
+    const sharedThreadKey = "c".repeat(64);
+    const threadRows = [rows[2]!, rows[3]!, rows[63]!];
+    await db
+      .update(schema.mailboxItems)
+      .set({ threadKey: sharedThreadKey })
+      .where(
+        inArray(
+          schema.mailboxItems.id,
+          threadRows.map((row) => row.id),
+        ),
+      );
+    const olderThreadId = randomUUID();
+    await db.insert(schema.mailboxItems).values({
+      ...rows[63]!,
+      id: olderThreadId,
+      sourceId: `coverage:${olderThreadId}`,
+      threadKey: sharedThreadKey,
+      createdAt: sql`'2026-10-01T10:00:00.000099Z'::timestamptz`,
+      ...(await encryptPayload(raw, keys, {
+        teamId,
+        rowId: `mailbox-private-v1:${ids[63]}:${olderThreadId}`,
+        kind: "email_body",
+      })),
+    });
+    const grouped = await getMailboxContentList(db, owner, {
+      mailboxId: null,
+      folder: "inbox",
+      limit: 100,
+      groupByThread: true,
+    });
+    expect(grouped.items).toHaveLength(65);
+    for (const row of threadRows) expect(grouped.items.map((item) => item.id)).toContain(row.id);
+    expect(grouped.items.map((item) => item.id)).not.toContain(olderThreadId);
+    const ungrouped = await getMailboxContentList(db, owner, {
+      mailboxId: null,
+      folder: "inbox",
+      limit: 100,
+      groupByThread: false,
+    });
+    expect(ungrouped.items).toHaveLength(66);
+    expect(ungrouped.items.map((item) => item.id)).toContain(olderThreadId);
   });
 });
