@@ -682,8 +682,8 @@ export async function getMailboxContentList(
         ? "sent"
         : "inbox";
   const metadata: MailboxListMetadata[] = [];
-  const mailboxesTruncated = readable.length > 20;
-  const listed = readable.slice(0, 20);
+  const mailboxesTruncated = false;
+  const listed = readable;
   const boxes = new Map(listed.map((box) => [box.id, box]));
   // One authorized read for every listed mailbox (a transaction per mailbox made
   // the round trips the cost); the store returns one page across them, in the
@@ -1016,16 +1016,14 @@ export interface MailboxDraftInput {
   uploads: { filename: string; base64: string }[];
 }
 /**
- * Unread Inbox messages per mailbox the actor may read (the first 20, like
- * the list), for the folder rail. Agents have no rail and get nothing.
+ * Unread Inbox messages for every readable mailbox, for the folder rail.
+ * Agents have no rail and get nothing.
  */
 export async function getMailboxUnreadCounts(db: Db, actor: MailboxContentActor) {
   actor = { ...actor };
   if (actor.agentAccess) throw new MailboxContentError("forbidden");
   const registry = await listMailboxRegistry(db, actor);
-  const readable = registry.mailboxes
-    .filter((box) => box.canRead && box.status === "planned")
-    .slice(0, 20);
+  const readable = registry.mailboxes.filter((box) => box.canRead && box.status === "planned");
   // One authorized read and one grouped count for every mailbox: the cost was the
   // round trips of a transaction per mailbox, not the counting.
   const unread = await countUnreadMailboxItemsMany(
@@ -1038,7 +1036,7 @@ export async function getMailboxUnreadCounts(db: Db, actor: MailboxContentActor)
   return { counts };
 }
 
-/** Mailboxes the folder rail spans: one, or every mailbox the actor owns (first 20). */
+/** Mailboxes the folder rail spans: one, or every mailbox the actor owns. */
 async function railMailboxes(db: Db, actor: MailboxContentActor, mailboxId: string | null) {
   if (actor.agentAccess) throw new MailboxContentError("forbidden");
   const registry = await listMailboxRegistry(db, actor);
@@ -1049,7 +1047,7 @@ async function railMailboxes(db: Db, actor: MailboxContentActor, mailboxId: stri
       (mailboxId ? box.id === mailboxId : box.ownerUserId === actor.userId),
   );
   if (mailboxId && !readable.length) throw new MailboxContentError("forbidden");
-  return { boxes: readable.slice(0, 20), mailboxesTruncated: readable.length > 20 };
+  return { boxes: readable, mailboxesTruncated: false };
 }
 
 /**
@@ -1071,7 +1069,12 @@ export async function getMailboxScheduleCounts(
     total.scheduled += counts.scheduled;
     total.followUps += counts.followUps;
   }
-  return total;
+  return withMailboxContentAccess(
+    db,
+    actor,
+    boxes.map((box) => box.id),
+    async () => total,
+  );
 }
 
 /**
@@ -1090,7 +1093,12 @@ export async function getMailboxRailFolders(
   const perBox = await runLimited(boxes, 4, (box) =>
     listMailboxFolders(db, actor, { mailboxId: box.id }),
   );
-  return perBox.flat();
+  return withMailboxContentAccess(
+    db,
+    actor,
+    boxes.map((box) => box.id),
+    async () => perBox.flat(),
+  );
 }
 
 /**
@@ -1107,14 +1115,16 @@ export async function getMailboxFolderCounts(
   const inbox = { unread: 0, total: 0 };
   const spam = { unread: 0, total: 0 };
   const folders: Record<string, { unread: number; total: number }> = {};
-  for (const box of boxes) {
-    const counts = await countMailboxViews(db, actor, box.id);
-    inbox.unread += counts.inbox.unread;
-    inbox.total += counts.inbox.total;
-    spam.unread += counts.spam.unread;
-    spam.total += counts.spam.total;
-    for (const [id, count] of counts.folders) folders[id] = count;
-  }
+  const counts = await countMailboxViews(
+    db,
+    actor,
+    boxes.map((box) => box.id),
+  );
+  inbox.unread += counts.inbox.unread;
+  inbox.total += counts.inbox.total;
+  spam.unread += counts.spam.unread;
+  spam.total += counts.spam.total;
+  for (const [id, count] of counts.folders) folders[id] = count;
   return { inbox, spam, folders, mailboxesTruncated };
 }
 

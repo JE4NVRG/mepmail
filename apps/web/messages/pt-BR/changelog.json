@@ -24,6 +24,27 @@
   },
   "releases": [
     {
+      "version": "0.156",
+      "date": "2026-11-05",
+      "title": "Caixa unificada completa, além de vinte caixas",
+      "summary": "Veja todas as caixas do escopo selecionado, com contadores completos e histórico carregado em páginas limitadas.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "A caixa unificada e os contadores de não lidas não param mais nas primeiras vinte caixas autorizadas.",
+            "As pastas e visualizações de agendamento incluem todas as caixas próprias. Os contadores das pastas são consultados em lotes agrupados, em vez de uma consulta serial por caixa."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "O histórico mantém os limites de página e a ordem estável dos cursores. Só as mensagens exibidas são descriptografadas, e as permissões atuais continuam sendo verificadas em todos os lotes."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.155",
       "date": "2026-11-05",
       "title": "Uma caixa mais estável, com as pastas à mão",

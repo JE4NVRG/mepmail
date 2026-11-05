@@ -233,8 +233,8 @@ async function scoped<T>(
 }
 
 /**
- * Mailboxes one authorized read may span: a page of list or search results
- * holds at most 50 rows, so never more distinct mailboxes than that.
+ * Maximum mailboxes per authorization/query batch. Read aggregation may span
+ * more batches; organization mutations retain this hard per-call bound.
  */
 const MAX_READ_MAILBOXES = 50;
 
@@ -316,12 +316,30 @@ async function scopedMany<T>(
     return operation(tx);
   });
 }
-const scopedRead = <T>(
+const scopedRead = async <T>(
   db: Db,
   actor: MailboxContentActor,
   mailboxIds: readonly string[],
   operation: (tx: Db) => Promise<T>,
-) => scopedMany(db, actor, mailboxIds, "read", operation);
+) => {
+  const ids = [...new Set(mailboxIds)].sort();
+  if (ids.length <= MAX_READ_MAILBOXES) return scopedMany(db, actor, ids, "read", operation);
+  // Savepoint release retains row locks until the outer transaction commits.
+  // Thus a revoked grant in ANY batch refuses the entire result, and earlier
+  // batches cannot lose permission while a later batch is read.
+  return db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    for (let start = 0; start < ids.length; start += MAX_READ_MAILBOXES)
+      await scopedMany(
+        tx,
+        actor,
+        ids.slice(start, start + MAX_READ_MAILBOXES),
+        "read",
+        async () => {},
+      );
+    return operation(tx);
+  });
+};
 
 /** Owner-only write admission, retained for scheduling and other owner actions.
  * Human send delegation uses withMailboxSendAccess without widening ownership.
@@ -1064,7 +1082,7 @@ export async function listMailboxItems(
 
 /**
  * The same listing over several mailboxes under one authorized read
- * (`scopedRead`, at most 50): one page across all of them, newest first by
+ * (`scopedRead`, batches of at most 50): one page across all of them, newest first by
  * the order each mailbox lists its own, i.e. the page that merging the
  * per-mailbox listings would give, in a few queries instead of a transaction
  * per mailbox.
@@ -1078,11 +1096,29 @@ export async function listMailboxItemsMany(
 ) {
   actor = { ...actor };
   filter = filter ? { ...filter } : undefined;
-  const ids = [...new Set(mailboxIds)];
+  const ids = [...new Set(mailboxIds)].sort();
   const checked = listPage(actor, filter, page);
-  return scopedRead(db, actor, ids, async (tx) =>
-    ids.length ? await listedItems(tx, actor, ids, filter, checked) : [],
-  );
+  return scopedRead(db, actor, ids, async (tx) => {
+    let merged: Awaited<ReturnType<typeof listedItems>> = [];
+    for (let start = 0; start < ids.length; start += MAX_READ_MAILBOXES) {
+      const rows = await listedItems(
+        tx,
+        actor,
+        ids.slice(start, start + MAX_READ_MAILBOXES),
+        filter,
+        checked,
+      );
+      // Keep only the global top page, not a page per mailbox/batch. This is
+      // exact because every batch uses the same strict (microseconds, UUID) key.
+      merged = [...merged, ...rows]
+        .sort((a, b) => {
+          const time = BigInt(b.orderAt) - BigInt(a.orderAt);
+          return time > 0n ? 1 : time < 0n ? -1 : a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+        })
+        .slice(0, checked.limit);
+    }
+    return merged;
+  });
 }
 
 /**
@@ -1114,13 +1150,19 @@ export async function countUnreadMailboxItemsMany(
   const ids = [...new Set(mailboxIds)];
   return scopedRead(db, actor, ids, async (tx) => {
     const counts = new Map(ids.map((id) => [id, 0]));
-    if (!ids.length) return counts;
-    const rows = await tx
-      .select({ mailboxId: schema.mailboxItems.mailboxId, count: sql<number>`count(*)::int` })
-      .from(schema.mailboxItems)
-      .where(unreadInbox(actor, inArray(schema.mailboxItems.mailboxId, ids)))
-      .groupBy(schema.mailboxItems.mailboxId);
-    for (const row of rows) counts.set(row.mailboxId, row.count);
+    for (let start = 0; start < ids.length; start += MAX_READ_MAILBOXES) {
+      const rows = await tx
+        .select({ mailboxId: schema.mailboxItems.mailboxId, count: sql<number>`count(*)::int` })
+        .from(schema.mailboxItems)
+        .where(
+          unreadInbox(
+            actor,
+            inArray(schema.mailboxItems.mailboxId, ids.slice(start, start + MAX_READ_MAILBOXES)),
+          ),
+        )
+        .groupBy(schema.mailboxItems.mailboxId);
+      for (const row of rows) counts.set(row.mailboxId, row.count);
+    }
     return counts;
   });
 }
@@ -1214,7 +1256,7 @@ export interface MailboxViewCount {
 export async function countMailboxViews(
   db: Db,
   actor: MailboxContentActor,
-  mailboxId: string,
+  mailboxId: string | readonly string[],
 ): Promise<{
   inbox: MailboxViewCount;
   spam: MailboxViewCount;
@@ -1222,51 +1264,54 @@ export async function countMailboxViews(
 }> {
   actor = { ...actor };
   if (actor.agentAccess) throw new MailboxContentError("forbidden");
-  return scoped(db, actor, mailboxId, "read", false, async (tx) => {
+  const ids = [...new Set(typeof mailboxId === "string" ? [mailboxId] : mailboxId)].sort();
+  return scopedRead(db, actor, ids, async (tx) => {
     const items = schema.mailboxItems;
-    const rows = await tx
-      .select({
-        folderId: items.folderId,
-        deliveryFolder: items.deliveryFolder,
-        kind: items.kind,
-        archived: sql<boolean>`${items.archivedAt} is not null`,
-        total: sql<number>`count(*)::int`,
-        unread: sql<number>`(count(*) filter (where ${items.seenAt} is null))::int`,
-      })
-      .from(items)
-      .where(
-        and(
-          eq(items.mailboxId, mailboxId),
-          eq(items.teamId, actor.teamId),
-          isNull(items.trashedAt),
-          // Snoozed messages leave every view until they come back.
-          sql`not ${snoozedNow(items)}`,
-        ),
-      )
-      .groupBy(
-        items.folderId,
-        items.deliveryFolder,
-        items.kind,
-        sql`${items.archivedAt} is not null`,
-      );
     const inbox = { unread: 0, total: 0 };
     const spam = { unread: 0, total: 0 };
     const folders = new Map<string, MailboxViewCount>();
-    for (const row of rows) {
-      const total = Number(row.total);
-      const unread = row.kind === "inbox" ? Number(row.unread) : 0;
-      if (row.folderId) {
-        if (row.deliveryFolder !== "inbox") continue;
-        const folder = folders.get(row.folderId) ?? { unread: 0, total: 0 };
-        folder.total += total;
-        folder.unread += unread;
-        folders.set(row.folderId, folder);
-      } else if (row.kind === "inbox" && row.deliveryFolder === "inbox" && !row.archived) {
-        inbox.total += total;
-        inbox.unread += unread;
-      } else if (row.kind === "inbox" && row.deliveryFolder === "spam") {
-        spam.total += total;
-        spam.unread += unread;
+    for (let start = 0; start < ids.length; start += MAX_READ_MAILBOXES) {
+      const rows = await tx
+        .select({
+          folderId: items.folderId,
+          deliveryFolder: items.deliveryFolder,
+          kind: items.kind,
+          archived: sql<boolean>`${items.archivedAt} is not null`,
+          total: sql<number>`count(*)::int`,
+          unread: sql<number>`(count(*) filter (where ${items.seenAt} is null))::int`,
+        })
+        .from(items)
+        .where(
+          and(
+            inArray(items.mailboxId, ids.slice(start, start + MAX_READ_MAILBOXES)),
+            eq(items.teamId, actor.teamId),
+            isNull(items.trashedAt),
+            // Snoozed messages leave every view until they come back.
+            sql`not ${snoozedNow(items)}`,
+          ),
+        )
+        .groupBy(
+          items.folderId,
+          items.deliveryFolder,
+          items.kind,
+          sql`${items.archivedAt} is not null`,
+        );
+      for (const row of rows) {
+        const total = Number(row.total);
+        const unread = row.kind === "inbox" ? Number(row.unread) : 0;
+        if (row.folderId) {
+          if (row.deliveryFolder !== "inbox") continue;
+          const folder = folders.get(row.folderId) ?? { unread: 0, total: 0 };
+          folder.total += total;
+          folder.unread += unread;
+          folders.set(row.folderId, folder);
+        } else if (row.kind === "inbox" && row.deliveryFolder === "inbox" && !row.archived) {
+          inbox.total += total;
+          inbox.unread += unread;
+        } else if (row.kind === "inbox" && row.deliveryFolder === "spam") {
+          spam.total += total;
+          spam.unread += unread;
+        }
       }
     }
     return { inbox, spam, folders };

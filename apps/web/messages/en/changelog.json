@@ -24,6 +24,27 @@
   },
   "releases": [
     {
+      "version": "0.156",
+      "date": "2026-11-05",
+      "title": "A complete unified inbox, beyond twenty mailboxes",
+      "summary": "See every mailbox in your selected scope, with complete unread and folder counts and bounded history pages.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "items": [
+            "The unified inbox and unread counts no longer stop at the first twenty authorized mailboxes.",
+            "Folder and scheduled-view rails include all owned mailboxes. Folder counts are gathered in bounded, grouped queries instead of querying each mailbox serially."
+          ]
+        },
+        {
+          "kind": "changed",
+          "items": [
+            "History pages keep their existing limits and stable cursor order. Only displayed messages are decrypted, and current access checks remain enforced across every batch."
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.155",
       "date": "2026-11-05",
       "title": "A steadier inbox, with folders within reach",

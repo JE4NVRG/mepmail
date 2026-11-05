@@ -7,6 +7,21 @@ Version numbers are the platform's deployment sequence; each entry is dated by
 the day the change reached `main`. The same releases are published, per locale,
 on the public [/changelog](https://mepmail.je4ndev.com/changelog) page.
 
+## [0.156] - 2026-11-05
+
+### Fixed
+
+- Correio's unified inbox and unread counts cover every mailbox in the selected
+  authorized scope, instead of stopping at the first twenty.
+- Folder and scheduled-view rails include the full owned mailbox scope. Folder
+  totals use bounded, grouped queries rather than one serial query per mailbox.
+
+### Changed
+
+- Global cursor pages remain bounded, ordered by microsecond timestamp and ID,
+  and only displayed messages are decrypted. Existing access and grant checks
+  remain fail-closed across mailbox batches.
+
 ## [0.155] - 2026-11-05
 
 ### Changed
