@@ -12,7 +12,7 @@ const h = vi.hoisted(() => ({
   locale: "en" as "en" | "pt-BR",
   cursor: 0,
   states: {} as Record<number, unknown>,
-  effects: [] as { run: () => undefined | (() => void); deps?: readonly unknown[] }[],
+  effects: [] as { run: () => undefined | (() => void); deps: readonly unknown[] | undefined }[],
 }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
