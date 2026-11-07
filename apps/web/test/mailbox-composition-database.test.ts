@@ -53,7 +53,7 @@ const { saveMailboxContentDraft, verifyMailboxDraftComposition, getMailboxConten
   "../src/server/mailbox-content"
 );
 
-let client: PGlite, db: Db, teamId: string, mailboxId: string;
+let client: PGlite, db: Db, teamId: string, mailboxId: string, grantId: string;
 const address = "support@composition.invalid",
   recipient = "owner@example.invalid";
 const owner = () => ({ teamId, userId: "composition-owner" });
@@ -109,13 +109,18 @@ afterAll(async () => {
   await client?.close();
 });
 beforeEach(async () => {
-  await grantMailboxRegistry(db, owner(), {
-    mailboxId,
-    userId: "composition-member",
-    permission: "draft",
-  });
+  grantId = (
+    await grantMailboxRegistry(db, owner(), {
+      mailboxId,
+      userId: "composition-member",
+      permission: "draft",
+    })
+  ).id;
   await updateMailboxRegistry(db, owner(), {
-    mailboxId,
+    id: mailboxId,
+    label: "Fixture",
+    ownerUserId: "composition-owner",
+    status: "planned",
     signatureText: "Synthetic support signature",
   });
   fixture.policy = JSON.stringify({
@@ -203,7 +208,7 @@ describe("canonical provider/core composition with real encrypted database and s
   });
   it("real grant revocation denies qualification rather than bypassing authority", async () => {
     const f = await prepared();
-    await revokeMailboxRegistry(db, owner(), { mailboxId, userId: "composition-member" });
+    await revokeMailboxRegistry(db, owner(), grantId);
     await expect(verifyMailboxDraftComposition(db, agent(), f.verify)).rejects.toMatchObject({
       code: "forbidden",
     });
@@ -245,6 +250,7 @@ describe("canonical provider/core composition with real encrypted database and s
           ? { attachments: [{ filename: "extra.txt", content: "extra" }] }
           : {}),
       });
+      if (!Buffer.isBuffer(changed.message)) throw new Error("Expected captured MIME buffer");
       const edited = await saveMailboxDraft(db, fixture.keyring!, owner(), {
         mailboxId,
         id: f.saved.id,

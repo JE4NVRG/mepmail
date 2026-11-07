@@ -364,7 +364,7 @@ describe("synthetic provider composition v1", () => {
       code: "invalid",
     });
     expect(
-      await saveMailboxContentDraft(db, { ...actor, agentAccess: undefined }, input()),
+      await saveMailboxContentDraft(db, { teamId: actor.teamId, userId: actor.userId }, input()),
     ).not.toHaveProperty("composition");
   });
   it.each([
