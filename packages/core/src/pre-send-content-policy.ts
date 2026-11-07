@@ -174,7 +174,43 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
   // every brand mentioned in the envelope. Keep generic account confirmations,
   // protected ownership, pressure and sensitive evidence conservative across
   // sentences/fields; only remove the unbound noun, never an imperative CTA.
+  // Suppression requires positive nominal/declarative account context in EVERY
+  // field/clause. Unknown wording retains the original action signal, without
+  // enumerating request verbs. A benign preface cannot authorize another CTA.
+  const informationalAccountClause = (clause: string): boolean =>
+    /^(?:rascunho|teste|validacao)(?: (?:de|da|do|integracao|validacao|interna|interno)){0,5} para (?:a |sua )?(?:propria )?conta(?: sem (?:atendimento|acao)(?: de terceiros| externa)?)?$/.test(
+      clause,
+    ) ||
+    /^(?:draft|test|validation)(?: (?:of|the|internal|integration|validation)){0,5} for (?:the |your )?(?:own )?account(?: (?:only|without external action))?$/.test(
+      clause,
+    ) ||
+    /^(?:a )?conta do servico [a-z0-9]{1,40}(?: [a-z0-9]{1,40}){0,3} (?:esta|permanece) em (?:validacao|teste) intern[ao]$/.test(
+      clause,
+    ) ||
+    /^the [a-z0-9]{1,40}(?: [a-z0-9]{1,40}){0,3} service account (?:is|remains) (?:in|under) internal (?:validation|testing)$/.test(
+      clause,
+    );
+  const unknownAccountContext = [
+    senderName(input.from),
+    input.subject,
+    visible,
+    input.text ?? "",
+  ].some((field) =>
+    field.split(/[.!?;\n\r]+/).some((rawClause) => {
+      const clause = foldText(rawClause);
+      return accountTerms.test(clause) && !informationalAccountClause(clause);
+    }),
+  );
+  // A separate navigation/resource cue stays bound even when it does not
+  // repeat "account". Account context above also rejects unknown request verbs;
+  // this additional cue never turns a benign informational preface into authority.
+  const accountNavigationContext =
+    /\b(?:acess\w*|access\w*|visit\w*|portals?|portais|painel|paineis|dashboards?|consoles?|links?|websites?|sites?|pages?|paginas?)\b/.test(
+      words,
+    );
   const nominalConfirmationBound =
+    accountNavigationContext ||
+    unknownAccountContext ||
     brandedAccountClaim ||
     sensitiveBody ||
     pressure ||
