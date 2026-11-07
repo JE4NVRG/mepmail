@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { env, unsubscribeBaseUrl } from "@millionsend/config";
 import {
   countMailboxSchedules,
@@ -48,6 +48,7 @@ import { decodeMailboxListSummary, encodeMailboxListSummary } from "../lib/mailb
 import { mailboxDraftHtml, mailboxSignatureText } from "../lib/mailbox-signature";
 import { getKeyring } from "./keyring";
 import { MAILBOX_COMPOSE_HTML_MAX, sanitizeMailboxComposeHtml } from "./mailbox-compose-html";
+import { mailboxCompositionReceipt, mailboxCompositionSemantics } from "./mailbox-composition";
 import { projectMailboxHtml } from "./mailbox-html";
 import { mailboxSenderHmacKey } from "./mailbox-sender-key";
 import { senderPictureToken } from "./mailbox-sender-picture";
@@ -288,6 +289,7 @@ export async function getMailboxContent(
       return {
         ...item,
         ...metadata,
+        contentSha256: createHash("sha256").update(raw).digest("hex"),
         // Captured MIME ID; for Sent this is not a claim about SES's final ID.
         messageId: mailboxMessageId(mime.messageId),
         // replyTo is the message's own Reply-To (or From) in every folder. Where a reply
@@ -1128,7 +1130,7 @@ export async function getMailboxFolderCounts(
   return { inbox, spam, folders, mailboxesTruncated };
 }
 
-export async function saveMailboxContentDraft(
+async function composeMailboxContentDraft(
   db: Db,
   actor: MailboxContentActor,
   input: MailboxDraftInput,
@@ -1182,7 +1184,11 @@ export async function saveMailboxContentDraft(
             throw new MailboxContentError("forbidden");
           if (input.id && item.revision !== input.expectedRevision)
             throw new MailboxContentError("conflict");
-          return { kind: item.kind, mime: await parse(item.raw) };
+          return {
+            kind: item.kind,
+            mime: await parse(item.raw),
+            contentSha256: createHash("sha256").update(item.raw).digest("hex"),
+          };
         },
       )
     : null;
@@ -1340,12 +1346,151 @@ export async function saveMailboxContentDraft(
   });
   if (!Buffer.isBuffer(result.message) || result.message.length > MAX_MIME)
     throw new MailboxContentError("invalid");
-  return saveMailboxDraft(db, getKeyring(), actor, {
-    mailboxId: box.id,
+  return { raw: result.message, box, source };
+}
+
+/** Only new agent plain replies to an actual Inbox source receive a v1 receipt. */
+function supportedComposition(actor: MailboxContentActor, input: MailboxDraftInput) {
+  return (
+    !!actor.agentAccess &&
+    !input.id &&
+    !!input.sourceItemId &&
+    (input.mode ?? "reply") === "reply" &&
+    input.to.length === 1 &&
+    !(input.cc?.length || input.bcc?.length) &&
+    input.html === undefined &&
+    input.retainedAttachments.length === 0 &&
+    input.uploads.length === 0
+  );
+}
+
+export async function saveMailboxContentDraft(
+  db: Db,
+  actor: MailboxContentActor,
+  input: MailboxDraftInput,
+) {
+  actor = { ...actor };
+  input = structuredClone(input);
+  const prepared = await composeMailboxContentDraft(db, actor, input);
+  // Commit the definitive ID/revision before any receipt readback. A lost ACK
+  // remains ambiguous; this operation never retries creation on receipt failure.
+  const saved = await saveMailboxDraft(db, getKeyring(), actor, {
+    mailboxId: input.mailboxId,
     ...(input.id ? { id: input.id } : {}),
     expectedRevision: input.expectedRevision,
-    raw: result.message,
+    raw: prepared.raw,
   });
+  if (!supportedComposition(actor, input) || prepared.source?.kind !== "inbox") return saved;
+  if (saved.revision !== input.expectedRevision + 1) throw new MailboxContentError("conflict");
+  const composition = await attestMailboxComposition(
+    db,
+    actor,
+    {
+      ...input,
+      id: saved.id,
+      expectedRevision: saved.revision,
+    },
+    prepared,
+  );
+  return { ...saved, composition };
+}
+
+type PreparedComposition = Awaited<ReturnType<typeof composeMailboxContentDraft>>;
+export type MailboxCompositionInput = MailboxDraftInput & { id: string; sourceItemId: string };
+
+async function attestMailboxComposition(
+  db: Db,
+  actor: MailboxContentActor,
+  input: MailboxDraftInput & { id: string },
+  prepared: PreparedComposition,
+) {
+  // Keep current mailbox/grant locks while checking current config and both rows.
+  return withMailboxContentAccess(db, actor, [input.mailboxId], async (tx) => {
+    const registry = await listMailboxRegistry(tx, actor);
+    const box = registry.mailboxes.find(
+      (b) => b.id === input.mailboxId && b.canRead && b.canDraft && b.status === "planned",
+    );
+    if (!box) throw new MailboxContentError("forbidden");
+    if (
+      box.address !== prepared.box.address ||
+      box.origin !== prepared.box.origin ||
+      JSON.stringify(box.signatureProfile) !== JSON.stringify(prepared.box.signatureProfile) ||
+      box.signatureText !== prepared.box.signatureText
+    )
+      throw new MailboxContentError("conflict");
+    return withMailboxItems(
+      tx,
+      getKeyring(),
+      actor,
+      {
+        mailboxId: input.mailboxId,
+        ids: [input.id, input.sourceItemId!],
+      },
+      async (items) => {
+        const draft = items.find((item) => item.id === input.id);
+        const source = items.find((item) => item.id === input.sourceItemId);
+        if (!draft || !source) throw new MailboxContentError("not_found");
+        if (
+          draft.kind !== "draft" ||
+          draft.trashedAt !== null ||
+          draft.revision !== input.expectedRevision ||
+          source.kind !== "inbox" ||
+          source.trashedAt !== null ||
+          source.deliveryFolder !== "inbox"
+        )
+          throw new MailboxContentError("conflict");
+        if (
+          !prepared.source ||
+          createHash("sha256").update(source.raw).digest("hex") !== prepared.source.contentSha256
+        )
+          throw new MailboxContentError("conflict");
+        const actual = await parse(draft.raw);
+        if (
+          mailboxCompositionSemantics(actual) !==
+          mailboxCompositionSemantics(await parse(prepared.raw))
+        )
+          throw new MailboxContentError("conflict");
+        return mailboxCompositionReceipt(
+          {
+            mailboxId: input.mailboxId,
+            draftId: draft.id,
+            draftRevision: draft.revision,
+            sourceItemId: source.id,
+            from: box.address,
+            recipient: input.to[0]!,
+            subject: input.subject,
+            text: input.text,
+          },
+          actual,
+          draft.raw,
+        );
+      },
+    );
+  });
+}
+
+/** Read-only requalification: sourceItemId is the original Inbox, not the edit source. */
+export async function verifyMailboxDraftComposition(
+  db: Db,
+  actor: MailboxContentActor,
+  input: MailboxCompositionInput,
+) {
+  actor = { ...actor };
+  input = structuredClone(input);
+  const { id, expectedRevision, ...original } = input;
+  if (
+    !Number.isInteger(expectedRevision) ||
+    expectedRevision < 1 ||
+    id === input.sourceItemId ||
+    !supportedComposition(actor, original as MailboxDraftInput)
+  )
+    throw new MailboxContentError("invalid");
+  const prepared = await composeMailboxContentDraft(db, actor, {
+    ...original,
+    expectedRevision: 0,
+  });
+  if (prepared.source?.kind !== "inbox") throw new MailboxContentError("conflict");
+  return attestMailboxComposition(db, actor, input, prepared);
 }
 
 export async function getMailboxAttachmentResponse(
