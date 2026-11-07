@@ -170,10 +170,36 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
         /\bpayments?\s+(?:(?:has|have|had)\s+been\s+|(?:is|are|was|were)\s+)?(?:fully\s+)?refunded\b/g,
         "refund completed",
       );
+  // A nominal confirmation in an unrelated clause is not a request to act on
+  // every brand mentioned in the envelope. Keep generic account confirmations,
+  // protected ownership, pressure and sensitive evidence conservative across
+  // sentences/fields; only remove the unbound noun, never an imperative CTA.
+  const nominalConfirmationBound =
+    brandedAccountClaim ||
+    sensitiveBody ||
+    pressure ||
+    /\b(?:account|conta|cuenta|compte) (?:confirmation|confirmacao|confirmacion)\b/.test(words) ||
+    `${senderName(input.from)}. ${input.subject}. ${visible}. ${input.text ?? ""}`
+      .split(/[.!?;]+/)
+      .map((clause) => foldText(clause))
+      .some(
+        (clause) =>
+          /\b(?:confirmation|confirmacao|confirmacion)\b/.test(clause) &&
+          (accountTerms.test(clause) ||
+            !/\b(?:(?:confirmation|confirmacao|confirmacion) (?:internal|interna|interne)|(?:internal|interna|interne) (?:confirmation|confirmacao|confirmacion))\b/.test(
+              clause,
+            ) ||
+            BRANDS.some((brand) =>
+              brand.terms.some((term) => ` ${clause} `.includes(` ${term} `)),
+            )),
+      );
+  const contextualActionWords = nominalConfirmationBound
+    ? actionWords
+    : actionWords.replace(/\b(?:confirmation|confirmacao|confirmacion)\b/g, " ");
   const action =
     (accountTerms.test(words) || sensitiveBody) &&
     /\b(verify|verifique|verificar|confirm|confirme|confirmar|update|atualize|atualizar|reset|redefin|recover|recuper|suspend|suspens|suspended|suspensa|bloquead|locked|failed|falhou|declined|recusad|expir|renew|renov|pagar|pay|regulariz|validate|validar|reativ|reactivat)\w*/.test(
-      actionWords,
+      contextualActionWords,
     );
   if (!action) return { action: "allow" };
   const links = [...html.matchAll(/\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)].map((m) =>
