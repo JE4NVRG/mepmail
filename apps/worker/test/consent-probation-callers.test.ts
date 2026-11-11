@@ -227,6 +227,10 @@ it("consent revoked during throttle blocks selected external relay before transp
 });
 it("password reset passes and atomic existing quota parks the 26th admission", async () => {
   const f = await setup();
+  await fixture.db
+    .update(schema.teams)
+    .set({ sendReviewClearedAt: null, sendReviewAt: null })
+    .where(eq(schema.teams.id, f.teamId));
   const results = [];
   for (let i = 0; i < 26; i++) results.push(await accept(f, "You requested a password reset."));
   expect(results.filter((r) => r.ok && !r.parked)).toHaveLength(25);
@@ -254,7 +258,11 @@ it("graduation boundary requires operator ceiling, clean history and fresh actua
   expect(probationCeiling({ ...input, ageDays: 7 })).toBe(200);
   expect(probationCeiling({ ...input, ageDays: 29.999 })).toBe(200);
   expect(probationCeiling({ ...input, ageDays: 30 })).toBe(1000);
-  expect(probationCeiling({ ...input, ageDays: 90, operatorCeiling: null })).toBe(25);
+  // A proven month-old sender graduates on its own; an operator ceiling can still
+  // raise it above the ladder, and a young one cannot be lifted by the number typed.
+  expect(probationCeiling({ ...input, ageDays: 90, operatorCeiling: null })).toBe(1000);
+  expect(probationCeiling({ ...input, ageDays: 90, operatorCeiling: 5000 })).toBe(5000);
+  expect(probationCeiling({ ...input, ageDays: 3, operatorCeiling: 5000 })).toBe(100);
   for (const key of ["reviewed", "dnsReady", "clean"] as const)
     expect(probationCeiling({ ...input, [key]: false, ageDays: 90 })).toBe(25);
   const f = await setup();
@@ -320,6 +328,10 @@ it("outer Correio SMTP and direct SES reject campaign with no consent", async ()
 });
 it("Correio outer/direct SES share one quota reservation; the 26th never invokes transport", async () => {
   const f = await setup();
+  await fixture.db
+    .update(schema.teams)
+    .set({ sendReviewClearedAt: null, sendReviewAt: null })
+    .where(eq(schema.teams.id, f.teamId));
   const id = await box(f);
   const send = vi.fn().mockResolvedValue({ MessageId: "synthetic-mail" });
   const direct = createMailboxSesSender(fixture.db, {
@@ -374,6 +386,10 @@ it("approved campaign reaches fake transport without a second reservation", asyn
 });
 it("external SMTP receives same 25/day cap; unknown acceptance keeps its charge", async () => {
   const f = await setup();
+  await fixture.db
+    .update(schema.teams)
+    .set({ sendReviewClearedAt: null, sendReviewAt: null })
+    .where(eq(schema.teams.id, f.teamId));
   const id = await box(f);
   const send = vi.fn().mockResolvedValue({ messageId: "synthetic-external" });
   const sender = createMailboxContentPolicySender(fixture.db, { send }, true);
