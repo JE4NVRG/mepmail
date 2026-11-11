@@ -29,17 +29,29 @@ describe("MepMail internal rolling-window policy", () => {
     expect(evaluateDeliverability(windows(s, b, c)).status).toBe("warning");
   });
   it.each([
-    [25, 1, 0],
     [25, 0, 1],
-    [1, 1, 0],
     [1, 0, 1],
     [99, 99, 99],
   ])(
-    "does not exempt trial-volume senders from a real over-limit outcome (%i/%i/%i)",
+    "pauses a trial-volume sender whose outcome is a complaint (%i/%i/%i)",
     (sent, hard, complaints) => {
       expect(evaluateDeliverability(windows(sent, hard, complaints)).status).toBe("paused");
     },
   );
+  it.each([
+    [19, 5, 0],
+    [20, 2, 0],
+    [1, 1, 0],
+    [25, 1, 0],
+  ])("holds a bounce pause under the sample floor (%i/%i/%i)", (sent, hard, complaints) => {
+    expect(evaluateDeliverability(windows(sent, hard, complaints)).status).not.toBe("paused");
+  });
+  it.each([
+    [20, 3, 0],
+    [100, 3, 0],
+  ])("pauses a bounce rate once the sample floor is met (%i/%i/%i)", (sent, hard, complaints) => {
+    expect(evaluateDeliverability(windows(sent, hard, complaints)).status).toBe("paused");
+  });
   it("applies the floor only to statistical warnings and stays zero-safe", () => {
     expect(evaluateDeliverability(windows(99, 1, 0)).status).toBe("ok");
     expect(evaluateDeliverability(windows(0))).toMatchObject({

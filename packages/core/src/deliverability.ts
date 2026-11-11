@@ -10,6 +10,10 @@ import { DAY_MS } from "./utc-day.js";
 /** Internal MepMail anti-abuse policy, NOT provider limits or guarantees.
  * Warning and pause both use an exact rolling 24-hour window (start, end].
  * Pause is strictly above the line; equality warns but does not pause.
+ * A bounce pause needs a real sample: MIN_PAUSE_SENDS sends AND
+ * MIN_PAUSE_HARD_BOUNCES hard bounces in the window, so one mistyped address
+ * in a young account cannot lock it out of sending. A complaint is a
+ * deliverability and consent signal on its own and pauses from the first one.
  */
 export const WARN_BOUNCE_RATE = 0.015;
 export const WARN_COMPLAINT_RATE = 0.0005;
@@ -18,7 +22,12 @@ export const PAUSE_COMPLAINT_RATE = 0.0008;
 /** Warning-only anti-noise floor. It must not exempt trial senders from pauses. */
 export const MIN_GUARDRAIL_VOLUME = 100;
 export const MIN_PAUSE_COMPLAINTS = 1;
-export const MIN_PAUSE_HARD_BOUNCES = 1;
+export const MIN_PAUSE_HARD_BOUNCES = 3;
+/** Denominator floor for a bounce pause. Below this the window is too small to
+ * call a rate: the account keeps sending instead of locking out on one typo. */
+export const MIN_PAUSE_SENDS = 20;
+/** Complaints keep no volume floor: one is enough, whatever the volume. */
+export const MIN_PAUSE_COMPLAINT_SENDS = 1;
 export const MIN_WARN_COMPLAINTS = 1;
 /** Compatibility day labels: these mean 24 elapsed hours, not UTC buckets. */
 export const GUARDRAIL_WINDOW_DAYS = 1;
@@ -91,11 +100,21 @@ export function evaluateDeliverability(
   const reasons: DeliverabilityReason[] = [];
   const judge = (
     metric: DeliverabilityReason["metric"],
-    lines: { warn: number; pause: number; minPauseEvents: number; minWarnEvents: number },
+    lines: {
+      warn: number;
+      pause: number;
+      minPauseEvents: number;
+      minPauseSends: number;
+      minWarnEvents: number;
+    },
   ) => {
     const events = metric === "bounce" ? "hardBounced" : "complained";
     const pauseRate = rateOf(pause[events], pause.sent);
-    if (pause.sent > 0 && pauseRate > lines.pause && pause[events] >= lines.minPauseEvents) {
+    if (
+      pause.sent >= lines.minPauseSends &&
+      pauseRate > lines.pause &&
+      pause[events] >= lines.minPauseEvents
+    ) {
       reasons.push({ metric, rate: pauseRate, tier: "paused", windowDays: PAUSE_WINDOW_DAYS });
       return;
     }
@@ -108,12 +127,14 @@ export function evaluateDeliverability(
     warn: WARN_BOUNCE_RATE,
     pause: PAUSE_BOUNCE_RATE,
     minPauseEvents: MIN_PAUSE_HARD_BOUNCES,
+    minPauseSends: MIN_PAUSE_SENDS,
     minWarnEvents: 1,
   });
   judge("complaint", {
     warn: WARN_COMPLAINT_RATE,
     pause: PAUSE_COMPLAINT_RATE,
     minPauseEvents: MIN_PAUSE_COMPLAINTS,
+    minPauseSends: MIN_PAUSE_COMPLAINT_SENDS,
     minWarnEvents: MIN_WARN_COMPLAINTS,
   });
 

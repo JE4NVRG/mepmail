@@ -77,7 +77,7 @@ describe("reputation review evidence is not a seven-day amnesty", () => {
     ).toEqual([]);
   });
 
-  it("a hard bounce below trial quota still pauses and persists the team hold", async () => {
+  it("hard bounces below trial quota still pause and persist the team hold", async () => {
     const teamId = await createTeam(db, randomUUID());
     const accepted = await db
       .insert(schema.emails)
@@ -93,16 +93,20 @@ describe("reputation review evidence is not a seven-day amnesty", () => {
         })),
       )
       .returning({ id: schema.emails.id });
-    await db.insert(schema.emailEvents).values({
-      emailId: accepted[0]!.id,
-      type: "bounced",
-      bounceType: "Permanent",
-      snsMessageId: randomUUID(),
-      occurredAt: new Date(at.getTime() - 30000),
-      createdAt: new Date(at.getTime() - 30000),
-    });
+    // The bounce sample floor needs three hard bounces in the window; one
+    // mistyped address must not lock a young account out of sending.
+    await db.insert(schema.emailEvents).values(
+      accepted.slice(0, 3).map((row) => ({
+        emailId: row.id,
+        type: "bounced",
+        bounceType: "Permanent",
+        snsMessageId: randomUUID(),
+        occurredAt: new Date(at.getTime() - 30000),
+        createdAt: new Date(at.getTime() - 30000),
+      })),
+    );
     const health = await fetchDeliverabilityHealth(db, teamId, { now: at });
-    expect(health).toMatchObject({ sent: 20, status: "paused", bounceRate: 0.05 });
+    expect(health).toMatchObject({ sent: 20, status: "paused", bounceRate: 0.15 });
     expect(
       await holdReputationRuns(
         db,
