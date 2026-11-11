@@ -1,5 +1,9 @@
 import {
   evaluateDeliverability,
+  MIN_PAUSE_COMPLAINT_SENDS,
+  MIN_PAUSE_COMPLAINTS,
+  MIN_PAUSE_HARD_BOUNCES,
+  MIN_PAUSE_SENDS,
   PAUSE_BOUNCE_RATE,
   PAUSE_COMPLAINT_RATE,
   WARN_BOUNCE_RATE,
@@ -29,8 +33,18 @@ it("the bounce warning distinguishes permanent suppression from transient failur
 });
 
 it.each([
-  { metric: "bounce" as const, rate: PAUSE_BOUNCE_RATE, events: "1 hard bounces" },
-  { metric: "complaint" as const, rate: PAUSE_COMPLAINT_RATE, events: "1 complaints" },
+  {
+    metric: "bounce" as const,
+    rate: PAUSE_BOUNCE_RATE,
+    events: `${MIN_PAUSE_HARD_BOUNCES} hard bounces`,
+    sends: MIN_PAUSE_SENDS,
+  },
+  {
+    metric: "complaint" as const,
+    rate: PAUSE_COMPLAINT_RATE,
+    events: `${MIN_PAUSE_COMPLAINTS} complaints`,
+    sends: MIN_PAUSE_COMPLAINT_SENDS,
+  },
 ])(
   "the $metric pause explains all independent criteria and the rolling decision window",
   (input) => {
@@ -43,7 +57,7 @@ it.each([
     });
     expect(mail.text).toContain("rolling 24-hour window");
     expect(mail.text).toContain("all three conditions in that same window");
-    expect(mail.text).toContain("at least 100 provider-confirmed accepted messages");
+    expect(mail.text).toContain(`at least ${input.sends} provider-confirmed accepted messages`);
     expect(mail.text).toContain(`at least ${input.events}`);
     expect(mail.text).toContain("New API and batch sends and new broadcast starts");
     expect(mail.text).toContain("internal MepMail pause line");

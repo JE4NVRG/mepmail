@@ -208,7 +208,7 @@ it("the SDK sees the bounce on GET", async () => {
 });
 
 it("the next send to the bounced recipient is refused or stripped", async () => {
-  // The new rolling pause wins immediately after a real hard bounce.
+  // A hard bounce blocks the recipient immediately, by suppression or by pause.
   const paused = await resend.emails.send({
     from: "hello@e2e.dev",
     to: [VICTIM],
@@ -216,7 +216,9 @@ it("the next send to the bounced recipient is refused or stripped", async () => 
     text: "hi",
   });
   expect(paused.data).toBeNull();
-  expect(paused.error?.message).toContain("paused");
+  // One hard bounce no longer pauses a young team on its own: the durable
+  // recipient suppression is what refuses this send, which is what matters.
+  expect(paused.error?.message).toMatch(/paused|suppressed/i);
   // Model the next day: reputation expires; durable recipient suppression does not.
   const yesterday = new Date(Date.now() - 25 * 3_600_000);
   await db
