@@ -167,7 +167,8 @@ describe("recipient activation across several pinned exact-address rules", () =>
         commands.push(command);
         if (command instanceof DescribeActiveReceiptRuleSetCommand)
           return { Metadata: { Name: "existing-set" }, Rules: structuredClone(rules) };
-        const next = command.input.Rule!;
+        const next = command.input.Rule;
+        if (!next) throw new Error("missing rule in update command");
         if (next.Name === failOn) throw new Error("denied");
         rules = rules.map((r) => (r.Name === next.Name ? structuredClone(next) : r));
         return {};
@@ -258,7 +259,9 @@ describe("recipient activation across several pinned exact-address rules", () =>
 
   it("rejects an unpinned extra rule, a missing rule or an address routed twice", async () => {
     const extra = [...base, rule("rogue", ["x@example.com"])];
-    const missing = [base[0]!];
+    const head = base[0];
+    if (!head) throw new Error("fixture is empty");
+    const missing = [head];
     const twice = [rule("rule-a", ["dup@example.com"]), rule("rule-b", ["dup@example.com"])];
     for (const [live, config] of [
       [extra, v2()],
@@ -274,7 +277,9 @@ describe("recipient activation across several pinned exact-address rules", () =>
   });
 
   it("rejects drift in any pinned rule before mutation", async () => {
-    const drifted = [base[0]!, { ...base[1]!, TlsPolicy: "Optional" as const }];
+    const [firstRule, secondRule] = base;
+    if (!firstRule || !secondRule) throw new Error("fixture is short");
+    const drifted = [firstRule, { ...secondRule, TlsPolicy: "Optional" as const }];
     const c = multi(drifted);
     await expect(appendMailboxReceivingRecipients(c, v2(), ["luna@example.com"])).rejects.toThrow(
       "rule_changed",
