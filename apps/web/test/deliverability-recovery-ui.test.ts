@@ -204,7 +204,7 @@ describe.each(["en", "pt-BR"] as const)("deliverability recovery in %s", (locale
     expect(text).toContain(t("recovery.pauseWindow"));
     expect(text).toContain(t("recovery.criteriaVolume", { sent: fmt.format(100) }));
     expect(text).toContain(
-      t("recovery.bounceCriteria", { count: fmt.format(1), rate: pct.format(0.02) }),
+      t("recovery.bounceCriteria", { count: fmt.format(3), rate: pct.format(0.02) }),
     );
     expect(text).toContain(
       t("recovery.complaintCriteria", { count: fmt.format(1), rate: pct.format(0.0008) }),

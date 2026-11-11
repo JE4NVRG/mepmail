@@ -21,7 +21,7 @@
     "pauseEvidence": "{metric}: {count} eventos em {sent} envios ({rate}), nas últimas 24 horas móveis.",
     "warningEvidence": "{metric}: taxa de {rate} nas últimas 24 horas móveis em UTC, em nível de aviso.",
     "criteriaTitle": "Quando novos envios são pausados",
-    "criteriaVolume": "Com ao menos um envio confirmado nas últimas 24 horas móveis, qualquer uma das condições pausa novos envios. O piso estatístico de aviso não isenta remetentes de baixo volume. Política interna MepMail, não limites da AWS:",
+    "criteriaVolume": "A pausa por rejeição exige amostra real: 20 ou mais envios confirmados e 3 rejeições permanentes nas últimas 24 horas móveis. Uma reclamação pausa a partir da primeira, em qualquer volume. O piso estatístico de aviso é de 100 envios. Política interna MepMail, não limites da AWS:",
     "bounceCriteria": "Pelo menos {count} rejeições permanentes e taxa estritamente superior a {rate}.",
     "complaintCriteria": "Pelo menos {count} reclamações e taxa estritamente superior a {rate}.",
     "stepsTitle": "O que revisar agora",

@@ -164,7 +164,7 @@
       },
       {
         "q": "Qual é a taxa de entrega de vocês?",
-        "a": "Não publicamos uma taxa de entrega da plataforma. Política interna MepMail, não limites do AWS SES: nas últimas 24 horas móveis (1 dia decorrido), novos envios pausam com taxa estritamente superior a 2% de rejeições permanentes ou 0,08% de reclamações, com ao menos 1 mensagem confirmada e 1 evento correspondente. Os avisos começam em 1,5% e 0,05% após 100 mensagens confirmadas na mesma janela. O piso exclusivo de aviso nunca isenta remetentes de baixo volume da pausa. Ficar abaixo do limite não libera mensagens retidas, não reativa contas suspensas nem retoma filas; outros controles continuam válidos.",
+        "a": "Não publicamos uma taxa de entrega da plataforma. Política interna MepMail, não limites do AWS SES: nas últimas 24 horas móveis (1 dia decorrido), novos envios pausam com taxa estritamente superior a 2% de rejeições permanentes apenas quando a janela tem ao menos 20 mensagens confirmadas e 3 rejeições permanentes, e acima de 0,08% de reclamações a partir da primeira reclamação, em qualquer volume. Os avisos começam em 1,5% e 0,05% após 100 mensagens confirmadas na mesma janela. Um endereço digitado errado em conta nova nunca pausa o envio. Ficar abaixo do limite não libera mensagens retidas, não reativa contas suspensas nem retoma filas; outros controles continuam válidos.",
         "link": {
           "label": "Pausas de envio",
           "href": "https://docs.mepmail.dev/pt-BR/errors#pausas-e-bloqueios-de-envio"

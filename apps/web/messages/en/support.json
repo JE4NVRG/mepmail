@@ -164,7 +164,7 @@
       },
       {
         "q": "What is your delivery rate?",
-        "a": "We do not publish a platform-wide delivery rate. Internal MepMail policy, not AWS SES limits: over the rolling last 24 hours (1 elapsed day), new sends pause strictly above 2% hard bounces or 0.08% complaints, with at least 1 confirmed message and 1 corresponding event. Warnings start at 1.5% and 0.05% after 100 confirmed messages in that same window. The warning-only floor never exempts low-volume senders from a pause. Falling below a threshold does not release held mail, reactivate suspended accounts or resume queues; other safety controls still apply.",
+        "a": "We do not publish a platform-wide delivery rate. Internal MepMail policy, not AWS SES limits: over the rolling last 24 hours (1 elapsed day), new sends pause strictly above 2% hard bounces only once the window holds at least 20 confirmed messages and 3 hard bounces, and strictly above 0.08% complaints from the first complaint at any volume. Warnings start at 1.5% and 0.05% after 100 confirmed messages in that same window. One mistyped address in a young account never pauses sending. Falling below a threshold does not release held mail, reactivate suspended accounts or resume queues; other safety controls still apply.",
         "link": {
           "label": "Sending pauses",
           "href": "https://docs.mepmail.dev/errors#sending-pauses-and-holds"

@@ -21,7 +21,7 @@
     "pauseEvidence": "{metric}: {count} events across {sent} sends ({rate}), in the rolling last 24 hours.",
     "warningEvidence": "{metric}: a rate of {rate} in the rolling last 24 hours in UTC, at warning level.",
     "criteriaTitle": "When new sends are paused",
-    "criteriaVolume": "With at least one confirmed send in the rolling last 24 hours, either condition pauses new sends. The statistical warning floor does not exempt low-volume senders. Internal MepMail policy, not AWS limits:",
+    "criteriaVolume": "A bounce pause needs a real sample: 20 or more confirmed sends and 3 hard bounces in the rolling last 24 hours. A complaint pauses from the first one, whatever the volume. The statistical warning floor is 100 sends. Internal MepMail policy, not AWS limits:",
     "bounceCriteria": "At least {count} hard bounces and a rate strictly above {rate}.",
     "complaintCriteria": "At least {count} complaints and a rate strictly above {rate}.",
     "stepsTitle": "What to review now",
