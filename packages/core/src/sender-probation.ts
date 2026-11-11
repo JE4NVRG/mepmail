@@ -4,9 +4,16 @@ import { and, eq, gte, inArray } from "drizzle-orm";
 import { campaignDomainDnsReady } from "./campaign-consent.js";
 import type { TeamQuota } from "./plans.js";
 
-/** Operator-controlled ramp using the EXISTING dailySendCeiling and atomic
- * quota ledger, never a second counter. Passing time does not raise a limit:
- * each step needs an operator-set ceiling and a clean retained history. */
+/** Ramp for a cloud sender, driven by the EXISTING dailySendCeiling and the
+ * atomic quota ledger, never by a second counter.
+ *
+ * An unproven team (no review, unusable DNS or a bounce/complaint in the last
+ * 30 days) stays at 25/day whatever its age or an operator ceiling asks for.
+ * A proven team graduates on its own by account age: 100/day before a week,
+ * 200/day before a month, 1000/day after. Until it is a month old the ladder
+ * also caps an operator ceiling, so a young team cannot be lifted by typing a
+ * big number. From a month of proven history an operator ceiling is used as
+ * typed, which is how a paid contract carries the volume it pays for. */
 export function probationCeiling(input: {
   reviewed: boolean;
   dnsReady: boolean;
@@ -14,15 +21,17 @@ export function probationCeiling(input: {
   ageDays: number;
   operatorCeiling: number | null;
 }): number {
-  const permitted =
-    !input.reviewed || !input.dnsReady || !input.clean
-      ? 25
-      : input.ageDays < 7
-        ? 100
-        : input.ageDays < 30
-          ? 200
-          : (input.operatorCeiling ?? 25);
-  return Math.min(input.operatorCeiling ?? 25, permitted);
+  const proven = input.reviewed && input.dnsReady && input.clean;
+  const ladder = !proven
+    ? 25
+    : input.ageDays < 7
+      ? 100
+      : input.ageDays < 30
+        ? 200
+        : 1000;
+  const requested = input.operatorCeiling ?? ladder;
+  const operatorMayRaise = proven && input.ageDays >= 30;
+  return operatorMayRaise ? requested : Math.min(requested, ladder);
 }
 
 /** Apply before reserveQuota at acceptance AND worker/drain reservations.
