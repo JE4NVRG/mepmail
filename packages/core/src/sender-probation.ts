@@ -22,13 +22,7 @@ export function probationCeiling(input: {
   operatorCeiling: number | null;
 }): number {
   const proven = input.reviewed && input.dnsReady && input.clean;
-  const ladder = !proven
-    ? 25
-    : input.ageDays < 7
-      ? 100
-      : input.ageDays < 30
-        ? 200
-        : 1000;
+  const ladder = !proven ? 25 : input.ageDays < 7 ? 100 : input.ageDays < 30 ? 200 : 1000;
   const requested = input.operatorCeiling ?? ladder;
   const operatorMayRaise = proven && input.ageDays >= 30;
   return operatorMayRaise ? requested : Math.min(requested, ladder);

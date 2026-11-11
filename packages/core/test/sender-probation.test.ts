@@ -5,13 +5,21 @@ const proven = { reviewed: true, dnsReady: true, clean: true };
 
 describe("probationCeiling", () => {
   it("holds an unproven team at 25 a day whatever its age", () => {
-    expect(probationCeiling({ ...proven, reviewed: false, ageDays: 90, operatorCeiling: null })).toBe(25);
-    expect(probationCeiling({ ...proven, dnsReady: false, ageDays: 90, operatorCeiling: null })).toBe(25);
-    expect(probationCeiling({ ...proven, clean: false, ageDays: 90, operatorCeiling: null })).toBe(25);
+    expect(
+      probationCeiling({ ...proven, reviewed: false, ageDays: 90, operatorCeiling: null }),
+    ).toBe(25);
+    expect(
+      probationCeiling({ ...proven, dnsReady: false, ageDays: 90, operatorCeiling: null }),
+    ).toBe(25);
+    expect(probationCeiling({ ...proven, clean: false, ageDays: 90, operatorCeiling: null })).toBe(
+      25,
+    );
   });
 
   it("never lets an operator ceiling lift an unproven team past the ladder", () => {
-    expect(probationCeiling({ ...proven, clean: false, ageDays: 0, operatorCeiling: 5_000 })).toBe(25);
+    expect(probationCeiling({ ...proven, clean: false, ageDays: 0, operatorCeiling: 5_000 })).toBe(
+      25,
+    );
   });
 
   it("graduates a proven team by age without any operator input", () => {
