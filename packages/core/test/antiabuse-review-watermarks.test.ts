@@ -95,16 +95,16 @@ describe("reputation review evidence is not a seven-day amnesty", () => {
       .returning({ id: schema.emails.id });
     // The bounce sample floor needs three hard bounces in the window; one
     // mistyped address must not lock a young account out of sending.
-    await db.insert(schema.emailEvents).values(
-      accepted.slice(0, 3).map((row) => ({
+    for (const row of accepted.slice(0, 3)) {
+      await db.insert(schema.emailEvents).values({
         emailId: row.id,
         type: "bounced",
         bounceType: "Permanent",
         snsMessageId: randomUUID(),
         occurredAt: new Date(at.getTime() - 30000),
         createdAt: new Date(at.getTime() - 30000),
-      })),
-    );
+      });
+    }
     const health = await fetchDeliverabilityHealth(db, teamId, { now: at });
     expect(health).toMatchObject({ sent: 20, status: "paused", bounceRate: 0.15 });
     expect(
