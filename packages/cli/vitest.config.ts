@@ -10,7 +10,12 @@ export default defineConfig({
     // limiter (10 req/s to the target): a hundred writes is ten seconds
     // before a 2-core CI runner adds its share.
     testTimeout: 60_000,
-    env: { SKIP_ENV_VALIDATION: "1" },
+    env: {
+      SKIP_ENV_VALIDATION: "1",
+      // The suite posts real bodies to /emails with fixture recipients; the
+      // recipient-domain gate is on in production and would resolve DNS.
+      RECIPIENT_DOMAIN_CHECK: "off",
+    },
     globalSetup: ["test/global-setup.ts"],
   },
 });

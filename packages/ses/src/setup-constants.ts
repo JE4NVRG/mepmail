@@ -438,6 +438,15 @@ MICROSOFT_CLIENT_SECRET=
 # EMAIL_METADATA_RETENTION_DAYS=30
 # OPEN_PREFETCH_WINDOW_SECONDS=10
 
+# Recipient-domain validation at accept (cloud only). Every distinct recipient
+# domain is resolved for MX before the quota reservation; recipients on a domain
+# that answers NXDOMAIN or publishes no MX are stripped, and the accept is
+# refused when no \`to\` recipient survives, when more than 50 distinct
+# recipients are invalid, or when the invalid share of the batch passes 10%.
+# Fails open on resolver errors and timeouts, so a DNS wobble never blocks
+# legitimate mail. Set exactly \`off\` to disable the gate.
+# RECIPIENT_DOMAIN_CHECK=on
+
 # Operator-owned transport policy (blank preserves existing routing).
 # Strict JSON, version 1: paused, allowedTeamIds, defaults and per-team routes.
 # Setting a provider id does NOT configure credentials, activate a provider,
