@@ -190,6 +190,12 @@ async function handleMessage(
     if (result.reason === "attachments_too_large") throw smtpError(552, "Attachments too large");
     if (result.reason === "disguised_sender") throw smtpError(554, disguiseMessage(result));
     if (result.reason === "all_suppressed") throw smtpError(550, "All recipients are suppressed");
+    if (result.reason === "recipient_domain_invalid") {
+      throw smtpError(
+        550,
+        "A recipient domain cannot receive mail: the domain does not exist or publishes no MX record",
+      );
+    }
     const unhandled: never = result.reason;
     throw new Error(`Unhandled accept rejection: ${JSON.stringify(unhandled)}`);
   }

@@ -7,6 +7,13 @@ export default defineConfig({
     hookTimeout: 60_000,
     testTimeout: 60_000,
     include: ["test/**/*.test.ts"],
-    env: { SKIP_ENV_VALIDATION: "1" },
+    env: {
+      SKIP_ENV_VALIDATION: "1",
+      // A test run must never answer DNS for real: the accept pipeline's
+      // recipient-domain gate is on in production and resolves MX over the
+      // network. Suites that exercise the gate stub the resolver and set
+      // RECIPIENT_DOMAIN_CHECK=on themselves (packages/core/accept-email.test.ts).
+      RECIPIENT_DOMAIN_CHECK: "off",
+    },
   },
 });

@@ -29,6 +29,15 @@ export default defineConfig({
     // must never report into whichever collector the shell happens to export;
     // suites that exercise the emission path (test/funnel-env-gate.test.ts)
     // stub the pair themselves.
-    env: { SKIP_ENV_VALIDATION: "1", UMAMI_ENDPOINT: "", UMAMI_WEBSITE_ID: "" },
+    env: {
+      SKIP_ENV_VALIDATION: "1",
+      UMAMI_ENDPOINT: "",
+      UMAMI_WEBSITE_ID: "",
+      // A test run must never answer DNS for real: the accept pipeline's
+      // recipient-domain gate is on in production and resolves MX over the
+      // network. Suites that exercise the gate stub the resolver and set
+      // RECIPIENT_DOMAIN_CHECK=on themselves (packages/core/accept-email.test.ts).
+      RECIPIENT_DOMAIN_CHECK: "off",
+    },
   },
 });

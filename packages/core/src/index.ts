@@ -828,6 +828,20 @@ export {
   reservePeriodQuota,
   reserveQuota,
 } from "./quota.js";
+export {
+  checkRecipientDomains,
+  type DomainCache,
+  type DomainVerdict,
+  type MxResolver,
+  RECIPIENT_DOMAIN_CACHE_MAX,
+  RECIPIENT_DOMAIN_CACHE_TTL_MS,
+  RECIPIENT_DOMAIN_CONCURRENCY,
+  RECIPIENT_DOMAIN_INVALID_MAX,
+  RECIPIENT_DOMAIN_INVALID_RATE,
+  RECIPIENT_DOMAIN_TIMEOUT_MS,
+  recipientDomain,
+  recipientDomainCheckOn,
+} from "./recipient-domains.js";
 export { parseScheduledAt, SCHEDULED_AT_FORMS } from "./scheduled-at.js";
 export {
   countSegment,

@@ -8,6 +8,15 @@ import type { Keyring } from "./crypto/keyring.js";
 import type { FunnelEventTarget } from "./funnel-events.js";
 import { attachmentLimit, type QuotaTeamRow, type TeamQuota, teamQuota } from "./plans.js";
 import { reserveQuota } from "./quota.js";
+import {
+  checkRecipientDomains,
+  type DomainCache,
+  type MxResolver,
+  RECIPIENT_DOMAIN_INVALID_MAX,
+  RECIPIENT_DOMAIN_INVALID_RATE,
+  recipientDomain,
+  recipientDomainCheckOn,
+} from "./recipient-domains.js";
 import { findDisguise, screenImpersonation, screenNewSender } from "./send-review.js";
 import { parseSingleSender } from "./sender-address.js";
 import { applySenderProbationQuota } from "./sender-probation.js";
@@ -169,7 +178,19 @@ export interface AcceptEmailDeps {
    * the worker records first_send only after actual provider success.
    */
   funnel?: FunnelEventTarget | undefined;
+  /**
+   * Test seam for the recipient-domain MX gate. Production callers leave it
+   * unset and `node:dns` answers; suites inject a stub so no test run ever
+   * depends on live DNS.
+   */
+  recipientDomainResolver?: MxResolver | undefined;
 }
+
+/**
+ * Process-wide verdict cache for the auth gate: one MX lookup per domain per
+ * ten minutes, shared by every accept in the process (api, smtp, worker).
+ */
+const recipientDomainCache: DomainCache = new Map();
 
 /** SECURITY: must come from verified authentication, never from the payload. */
 export interface AcceptEmailAuth {
@@ -269,6 +290,8 @@ export type AcceptEmailResult =
       quota: TeamQuota;
     }
   | { ok: false; reason: "all_suppressed" }
+  /** Every recipient domain that could receive mail was stripped, or too much of the batch was invalid. */
+  | { ok: false; reason: "recipient_domain_invalid" }
   /** Look-alike letters or hidden characters in the sender name or subject (send-review). */
   | { ok: false; reason: "disguised_sender"; field: "from" | "subject"; sample: string }
   | { ok: false; reason: "attachments_too_large"; maxBytes: number }
@@ -391,10 +414,54 @@ export async function acceptEmail(
     for (const r of optedOut) suppressed.add(r);
   }
   const keep = (list: string[] | undefined) => list?.filter((r) => !suppressed.has(r));
-  const to = keep(payload.to) ?? [];
+  let to = keep(payload.to) ?? [];
   if (to.length === 0) return { ok: false, reason: "all_suppressed" };
-  const cc = keep(payload.cc);
-  const bcc = keep(payload.bcc);
+  let cc = keep(payload.cc);
+  let bcc = keep(payload.bcc);
+
+  // Recipient-domain gate, cloud only, before any quota is reserved: a cold
+  // list of domains that cannot receive mail is what hard-bounced 4.7% of a
+  // 21k blast and cost the SES account its region. Recipients on a domain
+  // that does not exist or publishes no MX are stripped from every field; the
+  // accept is refused only when nothing addressable remains in `to`, when the
+  // batch carries more than RECIPIENT_DOMAIN_INVALID_MAX invalid recipients,
+  // or when the invalid share of the batch passes
+  // RECIPIENT_DOMAIN_INVALID_RATE — a mostly-cold list is a mistake, not a send.
+  if (deps.isCloud && recipientDomainCheckOn()) {
+    const domains = [...to, ...(cc ?? []), ...(bcc ?? [])]
+      .map(recipientDomain)
+      .filter((domain) => domain.length > 0);
+    const verdicts = await checkRecipientDomains(
+      domains,
+      deps.recipientDomainResolver
+        ? { resolve: deps.recipientDomainResolver }
+        : { cache: recipientDomainCache },
+    );
+    const invalidDomains = new Set(
+      verdicts.filter((verdict) => !verdict.ok).map((verdict) => verdict.domain),
+    );
+    if (invalidDomains.size > 0) {
+      const isInvalid = (recipient: string) => invalidDomains.has(recipientDomain(recipient));
+      const distinctBefore = countDistinctRecipients(to, cc, bcc);
+      const invalidRecipients = countDistinctRecipients(
+        to.filter(isInvalid),
+        (cc ?? []).filter(isInvalid),
+        (bcc ?? []).filter(isInvalid),
+      );
+      const drop = (list: string[] | undefined) => list?.filter((r) => !isInvalid(r));
+      to = drop(to) ?? [];
+      cc = drop(cc);
+      bcc = drop(bcc);
+      const invalidShare = distinctBefore === 0 ? 0 : invalidRecipients / distinctBefore;
+      if (
+        to.length === 0 ||
+        invalidRecipients > RECIPIENT_DOMAIN_INVALID_MAX ||
+        invalidShare > RECIPIENT_DOMAIN_INVALID_RATE
+      ) {
+        return { ok: false, reason: "recipient_domain_invalid" };
+      }
+    }
+  }
   // Quota is charged per distinct mailbox, not per email: every recipient is
   // one SES message and one unit of shared reputation.
   const recipientCount = countDistinctRecipients(to, cc, bcc);

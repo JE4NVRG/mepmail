@@ -3,8 +3,9 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { and, eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  type AcceptEmailDeps,
   type AcceptEmailPayload,
   acceptEmail,
   MAX_ATTACHMENT_BYTES,
@@ -20,6 +21,7 @@ import {
   teamRung,
 } from "../src/plans.js";
 import { readPeriodUsage } from "../src/quota.js";
+import type { MxResolver } from "../src/recipient-domains.js";
 import { DAY_MS, utcDay } from "../src/utc-day.js";
 import { approveCampaignFixture } from "./antiabuse-contract-fixture.js";
 
@@ -343,5 +345,165 @@ describe("acceptEmail", () => {
       periodEnd,
       overage: true,
     });
+  });
+});
+
+describe("acceptEmail recipient-domain gate", () => {
+  let gateTeamId: string;
+  let gateDomainId: string;
+
+  // Domains answered NXDOMAIN by the stub; every other domain "exists" and
+  // publishes MX. No test in this file answers real DNS.
+  const dead = new Set(["dead.example", "gone.example"]);
+  const resolver: MxResolver = async (domain) => {
+    if (dead.has(domain)) throw Object.assign(new Error("nxdomain"), { code: "ENOTFOUND" });
+    return [{ exchange: `mx.${domain}` }];
+  };
+
+  beforeAll(async () => {
+    gateTeamId = await createTeam(db, "recipient-domains");
+    const [domain] = await db
+      .insert(schema.domains)
+      .values({ teamId: gateTeamId, name: "gate.example", region: "us-east-1", status: "verified" })
+      .returning({ id: schema.domains.id });
+    if (!domain) throw new Error("domain insert failed");
+    gateDomainId = domain.id;
+    // A cloud team needs approved campaign consent before any accept, exactly
+    // like the suite team above; this also clears send-review.
+    await approveCampaignFixture(db, gateTeamId, "member-1", "gate.example");
+    // The suite-wide env keeps the gate off so no other accept answers DNS;
+    // these tests opt back in explicitly.
+    vi.stubEnv("RECIPIENT_DOMAIN_CHECK", "on");
+  });
+  afterAll(() => vi.unstubAllEnvs());
+
+  const gateDeps = (over: Partial<AcceptEmailDeps> = {}): AcceptEmailDeps => ({
+    ...deps(),
+    recipientDomainResolver: resolver,
+    ...over,
+  });
+  const gateAuth = () => ({ teamId: gateTeamId, billing: FREE, apiKeyId: null });
+  const gatePayload = (over: Partial<AcceptEmailPayload> = {}): AcceptEmailPayload => ({
+    from: "a@gate.example",
+    to: ["ok@live.example"],
+    subject: "s",
+    text: "t",
+    domainId: gateDomainId,
+    ...over,
+  });
+  const rowOf = async (id: string) => {
+    const [row] = await db
+      .select({ to: schema.emails.to, cc: schema.emails.cc, bcc: schema.emails.bcc })
+      .from(schema.emails)
+      .where(eq(schema.emails.id, id));
+    return row;
+  };
+  const gateEmails = async () =>
+    (
+      await db
+        .select({ id: schema.emails.id })
+        .from(schema.emails)
+        .where(eq(schema.emails.teamId, gateTeamId))
+    ).length;
+  const live = (n: number) => Array.from({ length: n }, (_, i) => `r${i}@live.example`);
+
+  it("strips recipients on an unreachable domain and accepts the rest", async () => {
+    const result = await acceptEmail(
+      gateDeps(),
+      gateAuth(),
+      gatePayload({
+        // 2 invalid of 22 distinct recipients (9.1%): stripped, still accepted.
+        to: [...live(19), "bad@dead.example"],
+        cc: ["ops@gone.example", "cc@live.example"],
+      }),
+    );
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) throw new Error("expected an accept");
+    const row = await rowOf(result.id);
+    expect(row?.to).toEqual(live(19));
+    expect(row?.cc).toEqual(["cc@live.example"]);
+    expect(result.recipientCount).toBe(20);
+  });
+
+  it("refuses when no `to` recipient survives the domain gate", async () => {
+    const before = await gateEmails();
+    const result = await acceptEmail(
+      gateDeps(),
+      gateAuth(),
+      gatePayload({ to: ["bad@dead.example"], cc: ["cc@live.example"] }),
+    );
+    expect(result).toEqual({ ok: false, reason: "recipient_domain_invalid" });
+    // Refused before any row: nothing was accepted, nothing was charged.
+    expect(await gateEmails()).toBe(before);
+  });
+
+  it("refuses when more than 10% of the batch is on unreachable domains", async () => {
+    const before = await gateEmails();
+    const result = await acceptEmail(
+      gateDeps(),
+      gateAuth(),
+      gatePayload({ to: [...live(8), "a@dead.example", "b@gone.example"] }),
+    );
+    expect(result).toEqual({ ok: false, reason: "recipient_domain_invalid" });
+    expect(await gateEmails()).toBe(before);
+  });
+
+  it("refuses past 50 invalid recipients even when the ratio stays under 10%", async () => {
+    const before = await gateEmails();
+    const invalid = Array.from({ length: 51 }, (_, i) => `cold${i}@dead.example`);
+    const result = await acceptEmail(
+      gateDeps(),
+      gateAuth(),
+      // 51/651 = 7.8%: the ratio alone would pass, the absolute count does not.
+      gatePayload({ to: [...live(600), ...invalid] }),
+    );
+    expect(result).toEqual({ ok: false, reason: "recipient_domain_invalid" });
+    expect(await gateEmails()).toBe(before);
+  });
+
+  it("keeps a clean batch untouched, and a small invalid tail is stripped, not refused", async () => {
+    const clean = await acceptEmail(
+      gateDeps(),
+      gateAuth(),
+      gatePayload({ to: live(3), cc: ["cc@live.example"] }),
+    );
+    expect(clean).toMatchObject({ ok: true, recipientCount: 4 });
+
+    // One invalid of twenty distinct recipients: 5%, under both limits.
+    const tail = await acceptEmail(
+      gateDeps(),
+      gateAuth(),
+      gatePayload({ to: [...live(19), "one@dead.example"] }),
+    );
+    expect(tail).toMatchObject({ ok: true, recipientCount: 19 });
+    if (!tail.ok) throw new Error("expected an accept");
+    expect((await rowOf(tail.id))?.to).toEqual(live(19));
+  });
+
+  it("leaves recipients alone when RECIPIENT_DOMAIN_CHECK=off", async () => {
+    vi.stubEnv("RECIPIENT_DOMAIN_CHECK", "off");
+    try {
+      const result = await acceptEmail(
+        gateDeps(),
+        gateAuth(),
+        gatePayload({ to: ["bad@dead.example", "ok@live.example"] }),
+      );
+      expect(result).toMatchObject({ ok: true });
+      if (!result.ok) throw new Error("expected an accept");
+      expect((await rowOf(result.id))?.to).toEqual(["bad@dead.example", "ok@live.example"]);
+    } finally {
+      vi.stubEnv("RECIPIENT_DOMAIN_CHECK", "on");
+    }
+  });
+
+  it("is cloud-only: a self-host accept never consults DNS", async () => {
+    const result = await acceptEmail(
+      gateDeps({ isCloud: false }),
+      gateAuth(),
+      gatePayload({ to: ["bad@dead.example"] }),
+    );
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) throw new Error("expected an accept");
+    expect((await rowOf(result.id))?.to).toEqual(["bad@dead.example"]);
   });
 });

@@ -413,6 +413,15 @@ function acceptRejection(result: Exclude<AcceptEmailResult, { ok: true }>) {
         status: 422 as const,
         body: errorBody(422, "all_recipients_suppressed", "All recipients are suppressed"),
       };
+    case "recipient_domain_invalid":
+      return {
+        status: 422 as const,
+        body: errorBody(
+          422,
+          "recipient_domain_invalid",
+          "One or more recipient domains cannot receive mail: the domain does not exist or publishes no MX record",
+        ),
+      };
     case "disguised_sender":
       return {
         status: 422 as const,

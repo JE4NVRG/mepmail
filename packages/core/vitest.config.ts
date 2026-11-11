@@ -12,6 +12,11 @@ export default defineConfig({
       // Tests construct partial environments; boot-time validation is
       // exercised explicitly in config's own tests, not implicitly here.
       SKIP_ENV_VALIDATION: "1",
+      // A test run must never answer DNS for real: the accept pipeline's
+      // recipient-domain gate is on in production and resolves MX over the
+      // network. Suites that exercise the gate stub the resolver and set
+      // RECIPIENT_DOMAIN_CHECK=on themselves (packages/core/accept-email.test.ts).
+      RECIPIENT_DOMAIN_CHECK: "off",
     },
   },
 });
