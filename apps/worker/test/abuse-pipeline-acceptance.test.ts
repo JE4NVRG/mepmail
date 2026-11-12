@@ -441,7 +441,7 @@ it("email sink failure retries intent without repeating judge, risk or pause", a
     .where(eq(schema.teamMonitor.teamId, f.teamId));
   const blocks: string[] = [];
   const mailer = {
-    send: vi.fn(async () => {
+    send: vi.fn(async (): Promise<void> => {
       throw Error("fixture mail sink unavailable");
     }),
   };
@@ -549,4 +549,46 @@ it("lost sweep processes at most 100 and never invents verdicts", async () => {
     .from(schema.monitorSamples)
     .where(eq(schema.monitorSamples.teamId, f.teamId));
   expect(samples.every((a) => a.status === "unjudged" && a.score === null)).toBe(true);
+});
+
+it("informational pause audit failure cannot abort the verdict, risk, holds or durable intents", async () => {
+  vi.stubEnv("OPERATOR_ALERTS_SINK", "audit");
+  const f = await seed("pause-audit-failure");
+  const sample = await capture(f, []);
+  await db
+    .update(schema.teamMonitor)
+    .set({ riskNum: 20, riskDen: 20 })
+    .where(eq(schema.teamMonitor.teamId, f.teamId));
+  await db.execute(
+    sql`alter table audit_log add constraint fixture_refuse_pause_audit check (action <> 'monitor.broadcasts_paused') not valid`,
+  );
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  const blocks: string[] = [];
+  const deps = { judge: adapter(100, blocks), keyring, settings, now: () => now };
+  try {
+    expect(await judgeSample(db, deps, { sampleId: sample.sampleId ?? "" })).toBe("judged");
+    expect(await row(sample.sampleId ?? "")).toMatchObject({ status: "judged", score: 100 });
+    const state = await monitor(f.teamId);
+    expect(state?.broadcastsPausedAt).toEqual(now);
+    expect(state?.riskNum).toBeGreaterThan(0);
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, f.teamId));
+    expect(team?.broadcastsPausedByOperatorAt).toEqual(now);
+    const alerts = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        and(eq(schema.auditLog.teamId, f.teamId), eq(schema.auditLog.action, "operator.alert")),
+      );
+    expect(alerts.map((a) => a.data?.kind).sort()).toEqual([
+      "monitor.alert",
+      "monitor.broadcasts_paused",
+    ]);
+    await judgeSample(db, deps, { sampleId: sample.sampleId ?? "" });
+    expect(blocks).toHaveLength(1);
+    expect(await monitor(f.teamId)).toEqual(state);
+  } finally {
+    errors.mockRestore();
+    await db.execute(sql`alter table audit_log drop constraint fixture_refuse_pause_audit`);
+    vi.unstubAllEnvs();
+  }
 });

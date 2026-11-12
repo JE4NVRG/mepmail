@@ -366,6 +366,9 @@ export async function recordMonitorSample(
 ): Promise<string | null> {
   const sample = await db.transaction(async (tx) => {
     const t = tx as unknown as Db;
+    // Global budget precedes the team lock for every kind, including cap exceptions.
+    // A competing team's count/insert cannot observe the same final slot.
+    await t.execute(sql`select pg_advisory_xact_lock(18475923, 21)`);
     await t.execute(sql`select pg_advisory_xact_lock(hashtext(${input.teamId}))`);
     const [owner] = await t
       .select({ plan: schema.teams.plan })
@@ -662,13 +665,22 @@ export async function applyJudgedSample(
     return { risk: next.risk, tier, alert, paused };
   });
   if (outcome.paused) {
-    await recordAudit(db, {
-      teamId: input.teamId,
-      actor: "system",
-      action: "monitor.broadcasts_paused",
-      target: { type: "team", id: input.teamId },
-      metadata: { risk: Number(outcome.risk.toFixed(3)), score: input.score, tier: outcome.tier },
-    });
+    // This may be inside judgeSample's outer transaction. A swallowed SQL error
+    // would still abort PostgreSQL's transaction, so isolate the optional trail
+    // in its own savepoint and recover it before the safety hold continues.
+    try {
+      await db.transaction(async (auditTx) => {
+        await auditTx.insert(schema.auditLog).values({
+          teamId: input.teamId,
+          actorId: "system",
+          action: "monitor.broadcasts_paused",
+          target: `team:${input.teamId}`,
+          data: { risk: Number(outcome.risk.toFixed(3)), score: input.score, tier: outcome.tier },
+        });
+      });
+    } catch {
+      console.error("monitor pause informational audit unavailable");
+    }
   }
   return outcome;
 }
