@@ -430,3 +430,32 @@ it("direct SES rechecks revocation after throttle; explicit deferral refunds onc
     .where(eq(schema.usageCounters.teamId, f.teamId));
   expect(counter?.accepted).toBe(0);
 });
+
+it("Native personal CC passes campaign-disabled policy and cloud consent, unlike public Send", async () => {
+  const f = await setup();
+  const id = await box(f);
+  const input = {
+    ...mail(f, id, "Can we meet tomorrow to discuss the document?"),
+    cc: ["colleague@example.test"],
+  };
+  input.raw = Buffer.from(
+    input.raw.toString().replace("Subject:", "Cc: colleague@example.test\r\nSubject:"),
+  );
+  const send = vi.fn().mockResolvedValue({ messageId: "synthetic-personal-cc" });
+  const azure = { send: vi.fn() };
+  await createMailboxContentPolicySender(
+    fixture.db,
+    { send },
+    true,
+    { version: 1, defaults: { transactional: "ses", campaign: "disabled" } },
+    azure,
+  ).send(input);
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(azure.send).not.toHaveBeenCalled();
+  expect(campaignMessage({ to: input.to, cc: input.cc })).toBe(true);
+  const [counter] = await fixture.db
+    .select()
+    .from(schema.usageCounters)
+    .where(eq(schema.usageCounters.teamId, f.teamId));
+  expect(counter?.accepted).toBe(2);
+});

@@ -21,10 +21,7 @@ import {
 } from "@millionsend/ses";
 import { and, eq } from "drizzle-orm";
 import { simpleParser } from "mailparser";
-import {
-  campaignMessage,
-  checkCampaignMessage,
-} from "../../../packages/core/src/campaign-consent.js";
+import { checkCampaignMessage } from "../../../packages/core/src/campaign-consent.js";
 import { screenPreSendContent } from "../../../packages/core/src/pre-send-content-policy.js";
 import { releaseQuota, reserveQuota } from "../../../packages/core/src/quota.js";
 import { isSendReviewHeld } from "../../../packages/core/src/send-review.js";
@@ -33,6 +30,10 @@ import { utcDay } from "../../../packages/core/src/utc-day.js";
 import { mailboxOutbox } from "../../../packages/db/src/schema/mailbox-transport.js";
 import type { SesSender } from "./handlers/send-email.js";
 import { isSesEnforcementRefusal, type SesQuotaGate } from "./handlers/ses-quota.js";
+import {
+  assertMailboxCorrespondenceRecipients,
+  mailboxCorrespondenceCampaign,
+} from "./mailbox-correspondence.js";
 import { mailboxAzureCompliance } from "./mailbox-optout.js";
 import {
   copyMailboxSesOutboundRegions,
@@ -90,9 +91,7 @@ async function checkMailboxContent(
     const authored = parsed.headerLines.some((h) => h.key === "list-unsubscribe")
       ? await mailboxAzureCompliance(db, input)
       : null;
-    const consent = await checkCampaignMessage(db, {
-      teamId: input.teamId,
-      from: parsed.from?.text ?? input.from,
+    const declaredCampaign = mailboxCorrespondenceCampaign({
       to: input.to,
       cc: input.cc,
       bcc: input.bcc,
@@ -102,6 +101,11 @@ async function checkMailboxContent(
       headers: authored
         ? authored.headers
         : Object.fromEntries(parsed.headerLines.map((line) => [line.key, line.line])),
+    });
+    const consent = await checkCampaignMessage(db, {
+      teamId: input.teamId,
+      from: parsed.from?.text ?? input.from,
+      declaredCampaign,
     });
     if (!consent.allowed) throw new MailboxSendDeferredError();
   } catch {
@@ -119,6 +123,7 @@ export function withMailboxProbation(
 ): MailboxOutboxSender {
   return {
     async send(input) {
+      assertMailboxCorrespondenceRecipients(input);
       if (!isCloud || probationReserved.has(input)) return sender.send(input);
       await checkMailboxContent(db, input);
       const [team] = await db
@@ -176,6 +181,7 @@ export function createMailboxContentPolicySender(
         cc: [...input.cc],
         bcc: [...input.bcc],
       };
+      assertMailboxCorrespondenceRecipients(input);
       if (isCloud) await checkMailboxContent(db, input);
       if (policy) {
         const parsed = await simpleParser(input.raw, {
@@ -263,7 +269,7 @@ export function createMailboxContentPolicySender(
           fromAddress: input.from,
           messageClass:
             insight.marketing ||
-            campaignMessage({
+            mailboxCorrespondenceCampaign({
               to: input.to,
               cc: input.cc,
               bcc: input.bcc,
