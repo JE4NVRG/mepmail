@@ -59,6 +59,26 @@ it.each([
 
 const newsletterConversations = [
   {
+    name: "individual public-profile pitch references newsletter placement and invites direct reply",
+    subject: "A small one-time option",
+    text: "We noticed ExampleCo in a developer publication. We offer a one-time public profile, not a newsletter insertion.\n\nIf useful, use the page or reply here. Email is the easiest way to reach us.",
+  },
+  {
+    name: "Portuguese public-profile proposal invites reply without a question mark",
+    subject: "Uma opção pontual",
+    text: "Vi o histórico de vocês. Temos uma opção de perfil público, não outra inserção em newsletter.\n\nSe fizer sentido, responda aqui para conversarmos.",
+  },
+  {
+    name: "individual pitch references earlier newsletter sponsorship before closing question",
+    subject: "A small one-time option",
+    text: "An industry record shows ExampleCo advertising in developer newsletters. We offer a smaller one-time sponsor profile, not another newsletter insertion.\n\nWould you like to discuss this option?",
+  },
+  {
+    name: "Portuguese business context can precede closing question",
+    subject: "Uma opção pontual",
+    text: "Vi o histórico de patrocínio de vocês em newsletter. Temos uma opção de parceria pontual, sem enviar outra newsletter.\n\nPodemos conversar sobre os detalhes?",
+  },
+  {
     name: "ordinary sponsorship noun phrase ending a sentence",
     subject: "Business question",
     text: "Hello editor, I would like to discuss sponsorship of the newsletter. Could we talk about availability?",
@@ -116,6 +136,11 @@ it.each(newsletterConversations)(
   },
 );
 const newsletterDistributions = [
+  {
+    name: "newsletter distribution remains blocked even with public-profile offer and reply invitation",
+    subject: "Our weekly newsletter",
+    text: "Our weekly newsletter: public profile and sponsorship news. Reply here for more details.",
+  },
   {
     name: "standalone read-more imperative remains distribution",
     subject: "Newsletter sponsorship",

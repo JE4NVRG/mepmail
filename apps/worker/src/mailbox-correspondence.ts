@@ -24,9 +24,9 @@ export function assertMailboxCorrespondenceRecipients(input: Recipients): void {
 // a sponsorship preface must not exempt a separate newsletter distribution.
 const NEWSLETTER = /\bnewsletter\b/gi;
 const BUSINESS_DISCUSSION =
-  /\b(sponsor(?:ship|ing|ed|s)?|partnership|patroc[ií]nio|patrocinar|parceria|anunciar)\b/i;
+  /\b(sponsor(?:ship|ing|ed|s)?|partnerships?|patroc[ií]nios?|patrocinar|parcerias?|anunciar|advertising|public profile|perfil p[úu]blico)\b/i;
 const CONVERSATION =
-  /\?|\b(discuss|interested|inquiry|enquiry|could we|would like|can we|conversar|gostaria|podemos|interesse|pergunta)\b/i;
+  /\?|\b(discuss|interested|inquiry|enquiry|could we|would like|can we|reply here|reply to this email|reply to me|reach us|reach me|conversar|gostaria|podemos|interesse|pergunta|responda este e-mail|responder este e-mail|responda aqui)\b/i;
 const DISTRIBUTION_OR_CTA =
   /\b(welcome to (?:our|my|the)|in this (?:issue|edition)|this week['’]s (?:newsletter|stories)|latest (?:news|stories)|view (?:this email )?in (?:your )?browser|buy now|shop now|subscribe|sign up|bem[- ]vind[oa]s? [aà]|nesta edi[çc][aã]o|[uú]ltimas not[ií]cias|compre agora|assine|inscreva-se)\b/i;
 // A distribution heading/imperative starts a sentence or line. Ordinary noun
@@ -44,15 +44,18 @@ function readableContent(value: string): string {
 }
 
 function newsletterDiscussion(value: string): boolean {
-  // Paragraph boundaries and a local window prevent a distant business preface
-  // from changing the meaning of an unrelated occurrence. Ambiguity stays strict.
-  const paragraphs = readableContent(value).split(/\n\s*\n/);
+  // An individual business pitch can state its context first and ask its
+  // question in a closing paragraph. Keep business context local to EVERY
+  // newsletter mention, but accept conversational framing across this MIME part.
+  const readable = readableContent(value);
+  if (!CONVERSATION.test(readable)) return false;
+  const paragraphs = readable.split(/\n\s*\n/);
   let mentions = 0;
   for (const paragraph of paragraphs) {
     for (const match of paragraph.matchAll(NEWSLETTER)) {
       mentions++;
       const context = paragraph.slice(Math.max(0, match.index - 320), match.index + 640);
-      if (!BUSINESS_DISCUSSION.test(context) || !CONVERSATION.test(context)) return false;
+      if (!BUSINESS_DISCUSSION.test(context)) return false;
     }
   }
   return mentions > 0;
