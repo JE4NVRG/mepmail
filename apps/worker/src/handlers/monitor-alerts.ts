@@ -60,7 +60,7 @@ export async function flushMonitorAlerts(
           intent.path,
           intent.values,
           deps.appBaseUrl,
-          { teamId: locked.teamId },
+          { teamId: locked.teamId, strictAudit: true },
         );
         if (!ok) {
           await t.update(n).set({ sentAt: new Date() }).where(where);

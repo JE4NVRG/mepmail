@@ -498,15 +498,13 @@ it("dead-letter lost transition is atomic, idempotent and notified by the existi
 it("health intent survives sink failure and restart; concurrent recovery does not duplicate", async () => {
   vi.stubEnv("OPERATOR_ALERTS_SINK", "audit");
   const f = await seed("health-durable");
-  await db
-    .insert(schema.monitorSamples)
-    .values({
-      teamId: f.teamId,
-      kind: "tier",
-      status: "unjudged",
-      errorClass: "no_credentials",
-      createdAt: new Date("2026-11-20T00:00:00Z"),
-    });
+  await db.insert(schema.monitorSamples).values({
+    teamId: f.teamId,
+    kind: "tier",
+    status: "unjudged",
+    errorClass: "no_credentials",
+    createdAt: new Date("2026-11-20T00:00:00Z"),
+  });
   const healthNow = new Date("2026-11-20T00:01:00Z");
   await db.execute(
     sql`CREATE FUNCTION fail_health_fixture() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'operator.alert' THEN RAISE EXCEPTION 'fixture sink failure'; END IF; RETURN NEW; END $$`,
@@ -536,15 +534,13 @@ it("health intent survives sink failure and restart; concurrent recovery does no
 it("lost sweep processes at most 100 and never invents verdicts", async () => {
   const f = await seed("lost-bound");
   const at = new Date("2026-11-01T00:00:00Z");
-  await db
-    .insert(schema.monitorSamples)
-    .values(
-      Array.from({ length: 101 }, () => ({
-        teamId: f.teamId,
-        kind: "tier" as const,
-        createdAt: at,
-      })),
-    );
+  await db.insert(schema.monitorSamples).values(
+    Array.from({ length: 101 }, () => ({
+      teamId: f.teamId,
+      kind: "tier" as const,
+      createdAt: at,
+    })),
+  );
   expect(await markLostSamples(db, now)).toBe(100);
   expect(await markLostSamples(db, now)).toBe(1);
   expect(await markLostSamples(db, now)).toBe(0);

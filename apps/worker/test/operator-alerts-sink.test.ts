@@ -1,7 +1,7 @@
 import { buildAccountMail, holdTeamForReview, recordOperatorAlert } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { notifySendReviews } from "../src/handlers/safety-flags.js";
 import { mailOperator, type SystemMailer } from "../src/system-mail.js";
@@ -187,4 +187,27 @@ describe("OPERATOR_ALERTS_SINK", () => {
     ]);
     expect(await operatorAlerts()).toHaveLength(0);
   });
+});
+
+it("preserves legacy best-effort sink failures while durable owners opt into strict retry", async () => {
+  vi.stubEnv("OPERATOR_ALERTS_SINK", "audit");
+  await db.execute(
+    sql`alter table audit_log add constraint fixture_refuse_operator_alert check (action <> 'operator.alert') not valid`,
+  );
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    await expect(
+      mailOperator(db, mailer, "monitor.degraded", "/console", degradedValues, appBaseUrl),
+    ).resolves.toBe(true);
+    await expect(
+      mailOperator(db, mailer, "monitor.degraded", "/console", degradedValues, appBaseUrl, {
+        strictAudit: true,
+      }),
+    ).rejects.toThrow();
+    expect(await operatorAlerts()).toHaveLength(0);
+    expect(sends).toHaveLength(0);
+  } finally {
+    errors.mockRestore();
+    await db.execute(sql`alter table audit_log drop constraint fixture_refuse_operator_alert`);
+  }
 });

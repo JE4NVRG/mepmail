@@ -1,5 +1,6 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
+import { recordAudit } from "./audit.js";
 
 /**
  * The one action the operator-alert relay reads. Every internal operator
@@ -36,10 +37,31 @@ export function operatorAlertText(text: string): string {
 }
 
 /**
- * Strict alert write: callers must retain/retry their intent on failure.
- * Unlike the informational audit trail, this row is the delivery itself.
+ * Legacy producers remain best-effort. A durable-intent owner opts into
+ * strict audit delivery and is responsible for retaining/retrying on failure.
  */
-export async function recordOperatorAlert(db: Db, alert: OperatorAlert): Promise<void> {
+export async function recordOperatorAlert(
+  db: Db,
+  alert: OperatorAlert,
+  opts: { strict?: boolean } = {},
+): Promise<void> {
+  if (!opts.strict) {
+    // Preserve unrelated producers: only durable-intent owners opt into throws.
+    await recordAudit(db, {
+      teamId: alert.teamId ?? null,
+      actor: "system",
+      action: OPERATOR_ALERT_ACTION,
+      ...(alert.target ? { target: alert.target } : {}),
+      metadata: {
+        kind: alert.kind,
+        subject: alert.subject,
+        text: operatorAlertText(alert.text),
+        url: alert.url ?? "",
+        ...(alert.periodKey ? { periodKey: alert.periodKey } : {}),
+      },
+    });
+    return;
+  }
   await db.insert(schema.auditLog).values({
     teamId: alert.teamId ?? null,
     actorId: "system",

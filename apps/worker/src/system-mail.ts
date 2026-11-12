@@ -135,6 +135,7 @@ export async function alertOperator(
     teamId?: string | null;
     /** The alerts box; absent means the instance operator. */
     to?: string | null;
+    strictAudit?: boolean;
   },
 ): Promise<boolean> {
   const url = `${alert.appBaseUrl ?? ""}${alert.path}`;
@@ -146,13 +147,17 @@ export async function alertOperator(
       url,
       values: alert.values,
     });
-    await recordOperatorAlert(db, {
-      kind: alert.kind,
-      subject: mail.subject,
-      text: mail.text,
-      url,
-      teamId: alert.teamId ?? null,
-    });
+    await recordOperatorAlert(
+      db,
+      {
+        kind: alert.kind,
+        subject: mail.subject,
+        text: mail.text,
+        url,
+        teamId: alert.teamId ?? null,
+      },
+      { strict: alert.strictAudit === true },
+    );
     return true;
   }
   if (!recipient || !mailer) return false;
@@ -176,7 +181,7 @@ export async function mailOperator(
   path: string,
   values: Record<string, string>,
   appBaseUrl: string | undefined,
-  opts: { teamId?: string | null } = {},
+  opts: { teamId?: string | null; strictAudit?: boolean } = {},
 ): Promise<boolean> {
   return alertOperator(db, mailer, {
     kind,
@@ -184,5 +189,6 @@ export async function mailOperator(
     values,
     appBaseUrl,
     teamId: opts.teamId ?? null,
+    strictAudit: opts.strictAudit === true,
   });
 }
