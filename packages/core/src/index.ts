@@ -677,6 +677,7 @@ export {
   mailboxSendHold,
   mailboxSendHoldCode,
 } from "./mailbox-send-hold.js";
+export { alertRetainedMailboxSends } from "./mailbox-send-hold-alerts.js";
 export { deriveMailboxSenderKey } from "./mailbox-senders.js";
 export {
   assertMailboxStorage,

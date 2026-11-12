@@ -13,6 +13,11 @@ const handler = source.match(
 if (!handler) throw new Error("Missing actual sends.reconcile handler");
 const code = `module.exports = ${handler};`;
 
+it("exports the registry-only handler's real alert dependency", async () => {
+  const core = await import("@millionsend/core");
+  expect(typeof core.alertRetainedMailboxSends).toBe("function");
+});
+
 it.each([
   { registry: true, transport: true, domain: 1, directAlert: 0 },
   { registry: true, transport: false, domain: 0, directAlert: 1 },

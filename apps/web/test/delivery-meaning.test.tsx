@@ -112,7 +112,9 @@ it("guards the actual list and Mail Sent detail consumers, not an unused label",
     "utf8",
   );
   expect(table).toContain("<StatusBadge status={row.latestStatus} />");
-  expect(mailbox).toContain("mailboxDeliveryLabel(t, row.sendStatus, row.outboundSummary)");
+  expect(mailbox).toMatch(
+    /mailboxDeliveryLabel\(\s*t,\s*row\.sendStatus,\s*row\.outboundSummary,?\s*\)/,
+  );
   expect(mailbox).toContain("mailboxDeliveryLabel(t, item.sendStatus, item.outboundSummary)");
   expect(mailbox).toMatch(/<dt>\{t\(`results\.\$\{row\.key\}`\)\}<\/dt>/);
   expect(mailbox).toContain('<p>{t("results.noReading")}</p>');
