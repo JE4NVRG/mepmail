@@ -17,6 +17,7 @@ import { MarkerRail, MobileStepBar, StepRail } from "@/components/stepper";
 import { Tooltip } from "@/components/tooltip";
 import { isAwsCredentialError } from "@/lib/aws-errors";
 import { codeRichTags } from "@/lib/code-rich-tags";
+import { recommendedDomainRegion } from "@/lib/domain-region-recommendation";
 import { purchaseReturnPath, withPurchaseReturn } from "@/lib/purchase-return";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
@@ -248,7 +249,7 @@ export function AddDomainForm({ userEmail }: { userEmail: string }) {
   const [region, setRegion] = useState("");
   useEffect(() => {
     if (served && region === "") {
-      setRegion((served.find((r) => r.production) ?? served[0])?.code ?? "");
+      setRegion(recommendedDomainRegion(served));
     }
   }, [served, region]);
   const [returnPath, setReturnPath] = useState("send");
@@ -355,6 +356,11 @@ export function AddDomainForm({ userEmail }: { userEmail: string }) {
                   : {}),
               }))}
             />
+            {served && !served.find((r) => r.code === region)?.sendingHealthy ? (
+              <p role="status" style={{ ...hintStyle, color: "var(--ms-warning)" }}>
+                {t("new.regionUnavailable")}
+              </p>
+            ) : null}
           </div>
 
           <details

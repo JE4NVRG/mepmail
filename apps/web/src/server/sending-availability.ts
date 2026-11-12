@@ -10,6 +10,8 @@ export function sendingAvailability(input: {
   policyRaw: string | undefined;
   relayConfigured: boolean;
   now?: Date;
+  healthySesRoute?: boolean;
+  relayDomainNames?: readonly string[];
 }): SendingAvailability {
   let policy: ReturnType<typeof parseSendingProviderPolicy>;
   try {
@@ -28,20 +30,37 @@ export function sendingAvailability(input: {
   if (policy?.restoration) {
     const own = policy.restoration.teams[input.teamId];
     const exactCampaign = policy.restoration.campaignCohort;
-    relayScope = !!own && own.senders.length > 0 && now.getTime() >= Date.parse(own.notBefore);
+    relayScope =
+      !!own &&
+      own.senders.some(
+        (sender) =>
+          input.relayDomainNames === undefined ||
+          input.relayDomainNames.includes(sender.split("@")[1] ?? ""),
+      ) &&
+      now.getTime() >= Date.parse(own.notBefore);
     if (exactCampaign?.teamId === input.teamId) {
       relayScope =
-        exactCampaign.messages.length > 0 && campaignSendWindowOpen(exactCampaign.sendWindow, now);
+        exactCampaign.messages.length > 0 &&
+        campaignSendWindowOpen(exactCampaign.sendWindow, now) &&
+        (input.relayDomainNames === undefined ||
+          input.relayDomainNames.includes(exactCampaign.from.split("@")[1] ?? ""));
     }
     // A closed restoration cannot return to SES just because the platform probe recovers.
     if (!relayScope) return { state: "paused" };
   }
   if (
     input.relayConfigured &&
+    (input.relayDomainNames === undefined || input.relayDomainNames.length > 0) &&
     relayScope &&
     [transactional, campaign].some((p) => p === "azure_smtp" || p === "customer_smtp")
   ) {
     return { state: "limited" };
+  }
+  if (!policy?.restoration && input.healthySesRoute !== undefined) {
+    return {
+      state:
+        input.healthySesRoute && [transactional, campaign].includes("ses") ? "limited" : "paused",
+    };
   }
   if (!policy?.restoration && !input.sesPaused && [transactional, campaign].includes("ses")) {
     return { state: "normal" };

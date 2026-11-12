@@ -218,8 +218,8 @@ describe("system.sesAccount", () => {
       },
     }));
     const expected = [
-      { code: "sa-east-1", production: true },
-      { code: "us-east-1", production: false },
+      { code: "sa-east-1", production: true, sendingHealthy: false },
+      { code: "us-east-1", production: false, sendingHealthy: false },
     ];
     expect((await caller.system.features()).regions).toEqual(expected);
     // A second read within the minute reuses the answers.
@@ -227,7 +227,7 @@ describe("system.sesAccount", () => {
     expect(asked).toEqual(["sa-east-1", "us-east-1"]);
   });
 
-  it("features serves an expired answer at once and refreshes it in the background", async () => {
+  it("features awaits fresh health after expiry instead of claiming a stale ready region", async () => {
     vi.useFakeTimers();
     try {
       vi.stubEnv("AWS_REGIONS", "sa-east-1");
@@ -240,17 +240,17 @@ describe("system.sesAccount", () => {
         },
       }));
       expect((await caller.system.features()).regions).toEqual([
-        { code: "sa-east-1", production: false },
+        { code: "sa-east-1", production: false, sendingHealthy: false },
       ]);
       production = true;
       vi.advanceTimersByTime(61_000);
-      // The stale answer comes back; the refreshing probe has been issued.
+      // Expired account health is refreshed before recommending a sending region.
       expect((await caller.system.features()).regions).toEqual([
-        { code: "sa-east-1", production: false },
+        { code: "sa-east-1", production: true, sendingHealthy: false },
       ]);
       expect(asked).toEqual(["sa-east-1", "sa-east-1"]);
       expect((await caller.system.features()).regions).toEqual([
-        { code: "sa-east-1", production: true },
+        { code: "sa-east-1", production: true, sendingHealthy: false },
       ]);
     } finally {
       vi.useRealTimers();
@@ -267,7 +267,7 @@ describe("system.sesAccount", () => {
       },
     }));
     expect((await caller.system.features()).regions).toEqual([
-      { code: "sa-east-1", production: false },
+      { code: "sa-east-1", production: false, sendingHealthy: false },
     ]);
     expect(asked).toEqual([]);
   });

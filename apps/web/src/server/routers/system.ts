@@ -4,6 +4,7 @@ import {
   EMAIL_RETENTION_DAYS_DEFAULT,
   env,
   isCloudDeployment,
+  parseSnsTopicArns,
   SES_MAX_SEND_RATE_DEFAULT,
   SES_TRANSACTIONAL_RESERVE_DEFAULT,
   servedRegions,
@@ -23,12 +24,17 @@ import {
   type SesAccountClient,
 } from "@millionsend/ses";
 import { TRPCError } from "@trpc/server";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { isAwsCredentialError } from "@/lib/aws-errors";
 import { recordAudit } from "../audit";
 import { isInstanceOperator } from "../instance-operator";
 import type { SessionRole } from "../membership";
+import {
+  createRegionalSendingStatusProbe,
+  sesPresentationPermitted,
+  teamHasHealthySesRoute,
+} from "../regional-sending-presentation";
 import { sendingAvailability } from "../sending-availability";
 import { cloudSendingPaused, createSesPauseProbe } from "../ses-pause";
 import { awsCredentialsConfigured, passwordRecoveryEnabled } from "../system-mail";
@@ -96,35 +102,11 @@ const defaultSesDeps: SystemSesDeps = {
     }),
 };
 
-/** How long a region's production-access answer is reused by `features`. */
-const PRODUCTION_PROBE_TTL_MS = 60_000;
-
 export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
-  // Production access per served region, for the add-domain form: one
-  // GetAccount per region at most once a minute — features runs on every
-  // dashboard page and the non-send SES API is throttled at one request per
-  // second per region. Only a region's first probe is awaited (bounded by
-  // the client's timeouts); an expired answer is served at once while the
-  // probe refreshes it, so a region that stops answering never stalls the
-  // screens. A failed probe keeps the last answer; without credentials
-  // nothing is probed (the SDK chain fails slowly) and every region reads
-  // alike.
-  const productionProbes = new Map<string, { at: number; value: Promise<boolean> }>();
-  const productionAccess = (region: string): Promise<boolean> => {
-    const cached = productionProbes.get(region);
-    if (cached && Date.now() - cached.at < PRODUCTION_PROBE_TTL_MS) return cached.value;
-    const value = awsCredentialsConfigured()
-      ? getAccountOverview(deps.accountClient(region)).then(
-          (overview) => overview.productionAccess,
-          () => cached?.value ?? false,
-        )
-      : Promise.resolve(false);
-    productionProbes.set(region, { at: Date.now(), value });
-    return cached ? cached.value : value;
-  };
   // SES's own pause per served region, on the same once-a-minute cadence:
   // the dashboard's strip reads it on every page.
   const sesPaused = createSesPauseProbe(deps.accountClient);
+  const regionalStatus = createRegionalSendingStatusProbe(deps.accountClient);
   return router({
     /**
      * Whether SES has paused sending in any region this deployment serves:
@@ -135,14 +117,59 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
     sendingPaused: teamProcedure.query(() => cloudSendingPaused(sesPaused)),
 
     /** Team-scoped presentation only; sending/consent/standing guards stay server-side. */
-    sendingAvailability: teamProcedure.query(async ({ ctx }) =>
-      sendingAvailability({
+    sendingAvailability: teamProcedure.query(async ({ ctx }) => {
+      const domains = await ctx.db
+        .select({
+          id: schema.domains.id,
+          teamId: schema.domains.teamId,
+          name: schema.domains.name,
+          region: schema.domains.region,
+          status: schema.domains.status,
+          relayEnabledAt: schema.domains.relayEnabledAt,
+        })
+        .from(schema.domains)
+        .where(eq(schema.domains.teamId, ctx.teamId));
+      const native = await ctx.db
+        .select({ domainId: schema.mailboxes.domainId })
+        .from(schema.mailboxes)
+        .where(
+          and(
+            eq(schema.mailboxes.teamId, ctx.teamId),
+            eq(schema.mailboxes.origin, "domain"),
+            eq(schema.mailboxes.status, "planned"),
+            isNull(schema.mailboxes.deletionRequestedAt),
+          ),
+        );
+      const permitted = sesPresentationPermitted(ctx.teamId, env.SENDING_PROVIDER_POLICY_JSON);
+      const healthySesRoute =
+        permitted &&
+        (await teamHasHealthySesRoute({
+          teamId: ctx.teamId,
+          domains,
+          nativePermitted: sesPresentationPermitted(
+            ctx.teamId,
+            env.SENDING_PROVIDER_POLICY_JSON,
+            "transactional",
+          ),
+          nativeDomainIds: new Set(native.flatMap((m) => (m.domainId ? [m.domainId] : []))),
+          bindingsRaw: process.env.MAILBOX_SES_OUTBOUND_REGIONS,
+          topics: parseSnsTopicArns(process.env.SNS_TOPIC_ARNS) ?? [],
+          healthy: async (region) =>
+            (
+              await regionalStatus(region, awsCredentialsConfigured())
+            ).sendingHealthy,
+        }));
+      return sendingAvailability({
         teamId: ctx.teamId,
-        sesPaused: await cloudSendingPaused(sesPaused),
+        sesPaused: true,
+        healthySesRoute,
         policyRaw: env.SENDING_PROVIDER_POLICY_JSON,
         relayConfigured: !!customerSmtpRelay(),
-      }),
-    ),
+        relayDomainNames: domains
+          .filter((d) => d.status === "verified" && d.relayEnabledAt !== null)
+          .map((d) => d.name),
+      });
+    }),
 
     /**
      * Env-level deployment readiness, behind team auth like everything else.
@@ -188,11 +215,20 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
      * Deployment facts every tenant's screens need, cloud included — nothing
      * here describes the operator's account.
      */
-    features: teamProcedure.query(async () => ({
+    features: teamProcedure.query(async ({ ctx }) => ({
       // Regions new domain identities may be provisioned in, the default
       // first, and whether AWS has granted production access in each.
       regions: await Promise.all(
-        servedRegions().map(async (code) => ({ code, production: await productionAccess(code) })),
+        servedRegions().map(async (code) => {
+          const status = await regionalStatus(code, awsCredentialsConfigured());
+          return {
+            code,
+            production: status.production,
+            sendingHealthy:
+              sesPresentationPermitted(ctx.teamId, env.SENDING_PROVIDER_POLICY_JSON) &&
+              status.sendingHealthy,
+          };
+        }),
       ),
       // Local tracking hosts get a "links will not resolve" warning.
       appBaseUrl: env.APP_BASE_URL ?? null,

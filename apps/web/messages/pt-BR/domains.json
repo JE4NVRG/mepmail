@@ -51,6 +51,7 @@
     "region": "Região",
     "recommended": "Recomendado",
     "regionHint": "Os domínios são provisionados em uma das regiões do SES que esta instalação atende. Cada domínio tem uma região: para mudá-la, exclua o domínio e adicione de novo.",
+    "regionUnavailable": "A disponibilidade de envio nesta região está indisponível ou não foi confirmada. Você pode configurar o DNS, mas verificar o domínio não libera envios. Domínios existentes e o recebimento não mudam.",
     "regionSandbox": "sandbox — sem acesso de produção",
     "advanced": "Opções avançadas",
     "returnPath": "Return-Path personalizado",
