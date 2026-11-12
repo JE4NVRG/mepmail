@@ -4,7 +4,9 @@ import {
   type AbuseJudge,
   composeJudgeVerdict,
   JudgeError,
+  type JudgeTelemetry,
   type JudgeVerdict,
+  judgeErrorClass,
   judgeStatusClass,
 } from "@millionsend/core";
 import type { FetchLike } from "./typesafe.js";
@@ -111,47 +113,98 @@ export function createOpenAiJudge(opts: {
   return {
     provider: "openai",
     model: opts.model,
-    async judge(block, { signal }): Promise<JudgeVerdict> {
-      if (!opts.apiKey) throw new JudgeError("no_credentials", "ABUSE_JUDGE_API_KEY is unset");
-      let res: Response;
-      try {
-        res = await fetcher(url, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${opts.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: opts.model,
-            temperature: 0,
-            response_format: { type: "json_object" },
-            messages: [
-              { role: "system", content: OPENAI_JUDGE_SYSTEM_PROMPT },
-              { role: "user", content: `<email>\n${block}\n</email>` },
-            ],
-          }),
-          signal,
-        });
-      } catch (err) {
-        const name = (err as { name?: string } | null)?.name;
-        if (name === "AbortError" || name === "TimeoutError") {
-          throw new JudgeError("timeout", "judge call timed out", { cause: err });
+    async judge(block, { signal, onTelemetry }): Promise<JudgeVerdict> {
+      const started = performance.now();
+      let phase: JudgeTelemetry["phase"] = "headers";
+      let headersMs: number | undefined;
+      let bodyMs: number | undefined;
+      let httpStatus: number | undefined;
+      const observe = (errorClass?: JudgeTelemetry["errorClass"]) => {
+        try {
+          const emitted = onTelemetry?.({
+            phase,
+            elapsedMs: Math.round(performance.now() - started),
+            ...(headersMs === undefined ? {} : { headersMs }),
+            ...(bodyMs === undefined ? {} : { bodyMs }),
+            ...(httpStatus === undefined ? {} : { httpStatus }),
+            ...(errorClass === undefined ? {} : { errorClass }),
+          });
+          void Promise.resolve(emitted).catch(() => {});
+        } catch {
+          // Observability must never change a verdict or the error being classified.
         }
-        throw new JudgeError("upstream", "judge request failed", { cause: err });
-      }
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new JudgeError(judgeStatusClass(res.status, detail), `judge answered ${res.status}`);
-      }
-      let json: { choices?: { message?: { content?: unknown } }[] };
+      };
       try {
-        json = (await res.json()) as typeof json;
+        if (!opts.apiKey) throw new JudgeError("no_credentials", "ABUSE_JUDGE_API_KEY is unset");
+        let res: Response;
+        try {
+          res = await fetcher(url, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${opts.apiKey}`,
+            },
+            body: JSON.stringify({
+              model: opts.model,
+              temperature: 0,
+              response_format: { type: "json_object" },
+              messages: [
+                { role: "system", content: OPENAI_JUDGE_SYSTEM_PROMPT },
+                { role: "user", content: `<email>\n${block}\n</email>` },
+              ],
+            }),
+            signal,
+          });
+        } catch (err) {
+          const name = (err as { name?: string } | null)?.name;
+          if (name === "AbortError" || name === "TimeoutError") {
+            throw new JudgeError("timeout", "judge call timed out", { cause: err });
+          }
+          throw new JudgeError("upstream", "judge request failed", { cause: err });
+        }
+        headersMs = Math.round(performance.now() - started);
+        httpStatus = res.status;
+        phase = "body";
+        const bodyStarted = performance.now();
+        if (!res.ok) {
+          let detail: string;
+          try {
+            detail = await res.text();
+            bodyMs = Math.round(performance.now() - bodyStarted);
+          } catch (err) {
+            if (judgeErrorClass(err) === "timeout") {
+              throw new JudgeError("timeout", "judge body timed out", { cause: err });
+            }
+            // Preserve status mapping when an error body is unreadable for another reason.
+            detail = "";
+          }
+          throw new JudgeError(
+            judgeStatusClass(res.status, detail),
+            `judge answered ${res.status}`,
+          );
+        }
+        let json: { choices?: { message?: { content?: unknown } }[] };
+        try {
+          json = (await res.json()) as typeof json;
+          bodyMs = Math.round(performance.now() - bodyStarted);
+        } catch (err) {
+          throw new JudgeError(
+            judgeErrorClass(err) === "timeout" ? "timeout" : "parse_error",
+            "judge body could not be read",
+            { cause: err },
+          );
+        }
+        phase = "content";
+        const content = json.choices?.[0]?.message?.content;
+        if (typeof content !== "string") throw new JudgeError("parse_error", "no message content");
+        const verdict = composeJudgeVerdict(foldOpenAiAnswers(parseJudgeContent(content)));
+        phase = "complete";
+        observe();
+        return verdict;
       } catch (err) {
-        throw new JudgeError("parse_error", "judge body was not JSON", { cause: err });
+        observe(judgeErrorClass(err));
+        throw err;
       }
-      const content = json.choices?.[0]?.message?.content;
-      if (typeof content !== "string") throw new JudgeError("parse_error", "no message content");
-      return composeJudgeVerdict(foldOpenAiAnswers(parseJudgeContent(content)));
     },
   };
 }

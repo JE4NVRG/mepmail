@@ -18,10 +18,23 @@ export interface JudgeVerdict {
   language: string;
 }
 
+/** One sanitized terminal observation; timings exist only for completed reads. */
+export interface JudgeTelemetry {
+  phase: "headers" | "body" | "content" | "complete";
+  elapsedMs: number;
+  headersMs?: number;
+  bodyMs?: number;
+  httpStatus?: number;
+  errorClass?: JudgeErrorClass;
+}
+
 export interface AbuseJudge {
   readonly provider: JudgeProvider;
   readonly model: string;
-  judge(block: string, opts: { signal: AbortSignal }): Promise<JudgeVerdict>;
+  judge(
+    block: string,
+    opts: { signal: AbortSignal; onTelemetry?: (event: JudgeTelemetry) => void },
+  ): Promise<JudgeVerdict>;
 }
 
 /**

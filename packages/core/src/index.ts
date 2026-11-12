@@ -24,6 +24,7 @@ export {
   JudgeError,
   type JudgeErrorClass,
   type JudgeProvider,
+  type JudgeTelemetry,
   type JudgeVerdict,
   judgeErrorClass,
   judgeStatusClass,

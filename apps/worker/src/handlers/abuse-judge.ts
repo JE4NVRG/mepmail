@@ -79,6 +79,17 @@ export async function judgeSample(
   try {
     verdict = await deps.judge.judge(block, {
       signal: AbortSignal.timeout(deps.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+      onTelemetry: (event) => {
+        console.info("abuse.judge.phase", {
+          sampleId: sample.id,
+          phase: event.phase,
+          elapsedMs: event.elapsedMs,
+          ...(event.headersMs === undefined ? {} : { headersMs: event.headersMs }),
+          ...(event.bodyMs === undefined ? {} : { bodyMs: event.bodyMs }),
+          ...(event.httpStatus === undefined ? {} : { httpStatus: event.httpStatus }),
+          ...(event.errorClass === undefined ? {} : { errorClass: event.errorClass }),
+        });
+      },
     });
   } catch (err) {
     const errorClass = judgeErrorClass(err);

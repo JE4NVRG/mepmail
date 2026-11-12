@@ -123,6 +123,19 @@ const failures = [
     },
   ],
   ["parse_error", async () => new Response("invalid JSON")],
+  ...[200, 429, 503].map(
+    (status) =>
+      [
+        "timeout",
+        async () => {
+          const response = new Response(null, { status });
+          vi.spyOn(response, status === 200 ? "json" : "text").mockRejectedValue(
+            new DOMException("SECRET_CONTENT_SENTINEL", "AbortError"),
+          );
+          return response;
+        },
+      ] as const,
+  ),
   ["no_credentials", async () => new Response("denied", { status: 401 })],
   ["throttled", async () => new Response("slow down", { status: 429 })],
 ] as const;
@@ -162,7 +175,33 @@ it.each([false, true])(
           }).toEqual({ ...before, votes: before.votes.filter((vote) => vote.id !== sampleId) });
         }
       }
+      const telemetry = vi.spyOn(console, "info").mockImplementation(() => {});
       expect(await judgeSample(db, deps, { sampleId })).toBe("unjudged");
+      expect(telemetry).toHaveBeenCalledWith(
+        "abuse.judge.phase",
+        expect.objectContaining({
+          sampleId,
+          errorClass,
+          elapsedMs: expect.any(Number),
+        }),
+      );
+      const event = telemetry.mock.calls[0]?.[1] as Record<string, unknown>;
+      expect(
+        Object.keys(event).every((key) =>
+          [
+            "sampleId",
+            "phase",
+            "errorClass",
+            "elapsedMs",
+            "headersMs",
+            "bodyMs",
+            "httpStatus",
+          ].includes(key),
+        ),
+      ).toBe(true);
+      expect(JSON.stringify(telemetry.mock.calls)).not.toContain("SECRET_CONTENT_SENTINEL");
+      expect(JSON.stringify(telemetry.mock.calls)).not.toContain("Fixture content");
+      telemetry.mockRestore();
       const after = await protectedState(teamId);
       const failed = after.votes.find((vote) => vote.id === sampleId);
       expect(failed).toMatchObject({ status: "unjudged", errorClass, score: null, verdict: null });
@@ -180,3 +219,46 @@ it.each([false, true])(
     }
   },
 );
+
+it("observes complete telemetry through the actual worker consumer, without content or key", async () => {
+  const { sampleId } = await seed(false);
+  const telemetry = vi.spyOn(console, "info").mockImplementation(() => {});
+  try {
+    const judge = createOpenAiJudge({
+      model: "SECRET_CONTENT_SENTINEL",
+      baseUrl: "https://offline.example.test",
+      apiKey: "SECRET_CONTENT_SENTINEL",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({ is_abuse: 0, category: "clean", language: "en" }),
+                },
+              },
+            ],
+          }),
+        ),
+    });
+    expect(
+      await judgeSample(
+        db,
+        { judge, keyring, settings: async () => MONITOR_SETTING_DEFAULTS, now: () => NOW },
+        { sampleId },
+      ),
+    ).toBe("judged");
+    expect(telemetry).toHaveBeenCalledWith("abuse.judge.phase", {
+      sampleId,
+      phase: "complete",
+      elapsedMs: expect.any(Number),
+      headersMs: expect.any(Number),
+      bodyMs: expect.any(Number),
+      httpStatus: 200,
+    });
+    expect(JSON.stringify(telemetry.mock.calls)).not.toContain("SECRET_CONTENT_SENTINEL");
+    expect(JSON.stringify(telemetry.mock.calls)).not.toContain("Fixture content");
+  } finally {
+    telemetry.mockRestore();
+  }
+});
