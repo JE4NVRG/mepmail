@@ -56,3 +56,165 @@ it.each([
 ])("retains campaign signals without trusting a negative declaration: %j", (signal) => {
   expect(mailboxCorrespondenceCampaign({ ...personal, ...signal })).toBe(true);
 });
+
+const newsletterConversations = [
+  {
+    name: "ordinary sponsorship noun phrase ending a sentence",
+    subject: "Business question",
+    text: "Hello editor, I would like to discuss sponsorship of the newsletter. Could we talk about availability?",
+  },
+  {
+    name: "first-person read-more request is not a distribution CTA",
+    subject: "Business question",
+    text: "Hello editor, could we discuss sponsorship of your newsletter? I would like to read more about your advertising options.",
+  },
+  {
+    name: "question about reading more is not a distribution CTA",
+    subject: "Re: Newsletter sponsorship",
+    text: "Could we discuss newsletter sponsorship? Can I read more about your partnership options?",
+  },
+  {
+    name: "English inquiry with ordinary subject and edition terms",
+    subject: "A quick business question",
+    text: "Hello editor, I read your newsletter and would like to discuss sponsorship of an upcoming weekly edition. Are you open to a partnership?",
+  },
+  {
+    name: "Portuguese inquiry with ordinary subject and edition terms",
+    subject: "Uma pergunta rápida",
+    text: "Olá, acompanho sua newsletter e gostaria de conversar sobre patrocínio de uma edição semanal. Vocês têm espaço para uma parceria?",
+  },
+  {
+    name: "English reply and ordinary CC",
+    subject: "Re: Newsletter sponsorship",
+    text: "Thanks for the newsletter sponsorship details. Could we discuss the partnership timing?",
+    cc: ["colleague@example.test"],
+  },
+  {
+    name: "Portuguese ordinary discussion",
+    subject: "Re: parceria",
+    text: "Podemos conversar sobre o patrocínio da newsletter e a próxima edição?",
+    cc: ["colleague@example.test"],
+  },
+  {
+    name: "HTML sponsorship question",
+    subject: "Business question",
+    html: "<p>Hello, could we discuss sponsorship of your newsletter and an upcoming edition?</p>",
+  },
+  {
+    name: "neutral newsletter subject, sponsorship only in body",
+    subject: "An idea for your newsletter",
+    text: "Hello editor, could we discuss sponsorship of an upcoming edition of your newsletter?",
+  },
+];
+it.each(newsletterConversations)(
+  "Native newsletter conversation: $name",
+  ({ name: _name, ...message }) => {
+    const input = { to: ["editor@example.test"], ...message };
+    expect(mailboxCorrespondenceCampaign(input)).toBe(false);
+    expect(campaignMessage(input)).toBe(true);
+    expect(mailboxCorrespondenceCampaign({ ...input, declaredCampaign: false })).toBe(false);
+  },
+);
+const newsletterDistributions = [
+  {
+    name: "standalone read-more imperative remains distribution",
+    subject: "Newsletter sponsorship",
+    text: "Could we discuss newsletter sponsorship? Read more about our products online.",
+  },
+  {
+    name: "single weekly distribution",
+    subject: "Our weekly newsletter",
+    text: "Hello reader, here are the latest stories from our weekly newsletter.",
+  },
+  {
+    name: "distribution despite sponsorship and question",
+    subject: "Newsletter sponsorship",
+    text: "Would you consider sponsorship? Welcome to our weekly newsletter. In this edition we share the latest news.",
+  },
+  {
+    name: "unrelated promotion after sponsorship preface",
+    subject: "Business question",
+    text: "Could we discuss newsletter sponsorship? Buy now and save on all products.",
+  },
+  {
+    name: "Portuguese promotional CTA",
+    subject: "Parceria",
+    text: "Podemos conversar sobre patrocínio da newsletter? Compre agora com desconto.",
+  },
+  {
+    name: "newsletter unsubscribe",
+    subject: "Business question",
+    text: "Could we discuss newsletter sponsorship? Unsubscribe here.",
+  },
+  {
+    name: "newsletter list ID",
+    subject: "Business question",
+    text: "Could we discuss newsletter sponsorship?",
+    headers: {
+      "List-ID": "members.example.test",
+    },
+  },
+  {
+    name: "bare newsletter remains strict",
+    subject: "Newsletter",
+    text: "Hello there.",
+  },
+  {
+    name: "unrelated sponsorship is not an exemption",
+    subject: "Sponsorship question",
+    text: "Could we discuss sponsorship?\n\nOur weekly newsletter covers our latest stories.",
+  },
+  {
+    name: "newsletter sign up CTA",
+    text: "Could we discuss newsletter sponsorship? Subscribe now.",
+  },
+  {
+    name: "Portuguese distribution",
+    text: "Olá, bem-vindo à nossa newsletter semanal. Nesta edição trazemos as últimas notícias.",
+  },
+];
+it.each(newsletterDistributions)(
+  "retains newsletter/marketing restrictions: $name",
+  ({ name: _name, ...message }) => {
+    expect(
+      mailboxCorrespondenceCampaign({
+        to: ["reader@example.test"],
+        ...message,
+        declaredCampaign: false,
+      }),
+    ).toBe(true);
+  },
+);
+
+it("sponsorship prefaces cannot exempt a newsletter distribution heading", () => {
+  expect(
+    mailboxCorrespondenceCampaign({
+      to: ["reader@example.test"],
+      subject: "Newsletter sponsorship",
+      text: "Could we discuss sponsorship? Our weekly newsletter: product updates and company announcements.",
+    }),
+  ).toBe(true);
+});
+it("contextual newsletter inquiries retain every explicit campaign restriction", () => {
+  const inquiry = { to: ["editor@example.test"], text: "Could we discuss newsletter sponsorship?" };
+  for (const signal of [
+    { declaredCampaign: true },
+    { broadcastId: "broadcast" },
+    { topicId: "topic" },
+    { headers: { "List-ID": "list.example.test" } },
+    { headers: { "List-Unsubscribe": "<https://example.test/unsubscribe>" } },
+    { subject: "Black Friday special offer" },
+  ]) {
+    expect(mailboxCorrespondenceCampaign({ ...inquiry, ...signal })).toBe(true);
+  }
+  expect(mailboxCorrespondenceCampaign({ ...inquiry, to: [] })).toBe(true);
+  expect(
+    mailboxCorrespondenceCampaign({
+      ...inquiry,
+      cc: Array.from({ length: 20 }, (_, i) => `person${i}@example.test`),
+    }),
+  ).toBe(true);
+  expect(mailboxCorrespondenceCampaign({ ...inquiry, html: "<p>Our weekly newsletter</p>" })).toBe(
+    true,
+  );
+});
