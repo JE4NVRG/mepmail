@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRegionSendControls } from "../src/handlers/ses-regions.js";
+import { mailboxSesControlRegions } from "../src/mailbox-outbound-region.js";
 
 type Quota = { max24h: number; sentLast24h: number; maxSendRate: number };
 
@@ -49,6 +50,27 @@ const sandboxFull: Quota = { max24h: 200, sentLast24h: 199, maxSendRate: 1 };
 afterEach(() => vi.useRealTimers());
 
 describe("per-region send controls", () => {
+  it("adds explicit outbound destinations once without serving them and stays closed until a successful account read", async () => {
+    const regions = mailboxSesControlRegions(
+      ["us-east-1"],
+      [{ teamId: "t", domainId: "d", domain: "example.invalid", region: "eu-west-1" }],
+      "eu-west-1",
+    );
+    expect(regions).toEqual(["us-east-1", "eu-west-1"]);
+    const h = harness({ "us-east-1": production, "eu-west-1": new Error("unavailable") });
+    expect(h.controls.exhausted("eu-west-1")).toBe(true);
+    await h.controls.refreshAll();
+    expect(h.controls.exhausted("eu-west-1")).toBe(true);
+    h.quotas["eu-west-1"] = { max24h: 1000, sentLast24h: 0, maxSendRate: 1 };
+    await h.controls.refresh("eu-west-1");
+    expect(h.controls.exhausted("eu-west-1")).toBe(false);
+    h.quotas["eu-west-1"] = new Error("lost account health");
+    await h.controls.refresh("eu-west-1");
+    expect(h.controls.exhausted("eu-west-1")).toBe(true);
+    h.quotas["eu-west-1"] = { max24h: 0, sentLast24h: 0, maxSendRate: 0 };
+    await h.controls.refresh("eu-west-1");
+    expect(h.controls.exhausted("eu-west-1")).toBe(true);
+  });
   it("finishes a 20-recipient envelope above bucket capacity at the shared recipient rate", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
@@ -132,9 +154,12 @@ describe("per-region send controls", () => {
     expect(h.reads).toEqual(["sa-east-1", "us-east-1"]);
     expect(h.controls.exhausted("sa-east-1")).toBe(false);
     expect(h.controls.exhausted("us-east-1")).toBe(true);
-    // No region (platform mail) and an unserved region read the default region's gate.
+    // Only absent region is platform/default. An explicit unknown region fails closed.
     expect(h.controls.exhausted()).toBe(false);
-    expect(h.controls.exhausted("eu-west-1")).toBe(false);
+    expect(h.controls.exhausted("eu-west-1")).toBe(true);
+    expect(h.controls.accountPaused?.("eu-west-1")).toBe(true);
+    await expect(h.controls.throttle("eu-west-1")).rejects.toThrow("unknown_ses_control_region");
+    expect(await h.controls.refresh("eu-west-1")).toBe(true);
     expect(h.controls.regions).toEqual(["sa-east-1", "us-east-1"]);
   });
 

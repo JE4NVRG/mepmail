@@ -26,13 +26,13 @@ import type { TrustedMailboxNotification } from "../../worker/src/mailbox-receiv
 import { mailboxWorkerMime } from "../../worker/src/mailbox-sender.js";
 
 const topicArn = "arn:aws:sns:us-east-1:123456789012:private-ses-events";
-const westTopic = "arn:aws:sns:us-west-2:123456789012:private-ses-events";
+const westTopic = "arn:aws:sns:eu-west-1:123456789012:private-ses-events";
 const raw = Buffer.from(
   "From: person@evidence.invalid\r\nTo: recipient@example.invalid\r\nCc: copy@example.invalid\r\nSubject: Private evidence\r\nMessage-ID: <submitted@evidence.invalid>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nprivate submitted revision\r\n",
 );
 
 describe("authenticated private SES acceptance evidence", () => {
-  let client: PGlite, db: Db, keys: Keyring, teamId: string, mailboxId: string;
+  let client: PGlite, db: Db, keys: Keyring, teamId: string, mailboxId: string, domainId: string;
   beforeEach(async () => {
     client = new PGlite();
     const base = fileURLToPath(new URL("../../../packages/db/drizzle/", import.meta.url));
@@ -83,6 +83,7 @@ describe("authenticated private SES acceptance evidence", () => {
         region: "us-east-1",
       })
       .returning();
+    domainId = domain!.id;
     mailboxId = (
       await createMailboxRegistry(
         db,
@@ -264,22 +265,41 @@ describe("authenticated private SES acceptance evidence", () => {
     expect((await outbox(row.id)).ciphertext).not.toBeNull();
   });
 
-  it("accepts the failover region's evidence only for a listed domain", async () => {
+  it("accepts alternate evidence only for exact team/domain bindings, preserving late original-region receipts", async () => {
     const { row } = await unknown();
     const fromWest = { ...notification(row.id, row.attemptId!), topicArn: westTopic };
-    const withFailover = (domains: string[]) =>
+    const withBinding = (extra = {}) =>
       createMailboxEvidenceHandler({
         db,
         keys,
         mime: mailboxWorkerMime,
         enabled: true,
         topics: [topicArn, westTopic],
-        failover: { region: "us-west-2", domains: new Set(domains) },
+        outboundRegions: [
+          { teamId, domainId, domain: "evidence.invalid", region: "eu-west-1", ...extra },
+        ],
       });
-    await expect(withFailover(["other.invalid"])(fromWest)).rejects.toThrow("evidence");
+    for (const wrong of [
+      { teamId: randomUUID() },
+      { domainId: randomUUID() },
+      { domain: "foreign.invalid" },
+    ])
+      await expect(withBinding(wrong)(fromWest)).rejects.toThrow("evidence");
+    await expect(
+      createMailboxEvidenceHandler({
+        db,
+        keys,
+        mime: mailboxWorkerMime,
+        enabled: true,
+        topics: [topicArn, westTopic],
+        failover: { region: "eu-west-1", domains: new Set(["evidence.invalid"]) },
+      })(fromWest),
+    ).rejects.toThrow("evidence");
     expect((await outbox(row.id)).status).toBe("unknown");
-    expect(await withFailover(["evidence.invalid"])(fromWest)).toBe(true);
+    expect(await withBinding()(fromWest)).toBe(true);
     expect((await outbox(row.id)).status).toBe("accepted");
+    expect(await withBinding()(notification(row.id, row.attemptId!))).toBe(true);
+    expect(await handler()(notification(row.id, row.attemptId!))).toBe(true);
   });
 
   it("rejects spoofed/out-of-attempt evidence and binds exact source, envelope, count, account and region", async () => {

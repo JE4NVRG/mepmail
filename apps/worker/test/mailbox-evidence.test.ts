@@ -51,7 +51,13 @@ function fixture() {
     rawBytes: raw.length,
     rawSha256: createHash("sha256").update(raw).digest("hex"),
   };
-  const bound = { outbox, address: from, region: "us-east-1" };
+  const bound = {
+    outbox,
+    address: from,
+    region: "us-east-1",
+    domainId: "55555555-5555-4555-8555-555555555555",
+    domainName: "fixture.invalid",
+  };
   const chain = {
     from: vi.fn(() => chain),
     innerJoin: vi.fn(() => chain),
@@ -96,6 +102,37 @@ beforeEach(() => {
 });
 
 describe("private trusted SNS outcome boundary", () => {
+  it("authenticates alternate topic + exact tenant/domain, not global domain-name failover", async () => {
+    const f = fixture();
+    const alternate = "arn:aws:sns:eu-west-1:123456789012:private-fixture";
+    const row = {
+      teamId,
+      domainId: f.bound.domainId,
+      domain: f.bound.domainName,
+      region: "eu-west-1",
+    };
+    const make = (extra = {}, topics = [topicArn, alternate]) =>
+      createMailboxEvidenceHandler({
+        db: f.db,
+        keys: {} as Keyring,
+        mime: f.mime,
+        enabled: true,
+        topics,
+        outboundRegions: [{ ...row, ...extra }],
+      });
+    const input = { ...f.notification("Send", { send: {} }), topicArn: alternate };
+    for (const bad of [
+      { teamId: randomUUID() },
+      { domainId: randomUUID() },
+      { domain: "foreign.invalid" },
+    ])
+      await expect(make(bad)(input)).rejects.toThrow("mailbox_provider_evidence");
+    await expect(make({}, [topicArn])(input)).rejects.toThrow("mailbox_provider_topic");
+    expect(mocked.accept).not.toHaveBeenCalled();
+    expect(await make()(input)).toBe(true);
+    expect(await make()(f.notification("Send", { send: {} }))).toBe(true);
+    expect(mocked.accept).toHaveBeenCalledTimes(2);
+  });
   it.each([
     ["Send", { send: {} }, "send", destinations],
     [

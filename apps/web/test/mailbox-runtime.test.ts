@@ -1,6 +1,7 @@
 import { MailboxSendDeferredError, MailboxSendRejectedError } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { parseMailboxSesOutboundRegions } from "../../worker/src/mailbox-outbound-region.js";
 import {
   createMailboxSesSender,
   mailboxWorkerMime,
@@ -26,6 +27,7 @@ function database(extra = {}) {
   const row = {
     region: "us-east-1",
     domainName: "example.invalid",
+    domainId: "22222222-2222-4222-8222-222222222222",
     status: "verified",
     address: "person@example.invalid",
     suspendedAt: null,
@@ -56,7 +58,7 @@ const input = {
   idempotencyKey: "outbox_fixture",
   outboxId: "outbox_fixture",
   attemptId: "attempt_fixture",
-  teamId: "team_fixture",
+  teamId: "11111111-1111-4111-8111-111111111111",
   mailboxId: "box_fixture",
   from: "person@example.invalid",
   to: ["recipient@example.invalid"],
@@ -72,7 +74,162 @@ beforeEach(() => {
   provider.inputs.length = 0;
   provider.send.mockReset().mockResolvedValue({ MessageId: "accepted_fixture" });
 });
+const outboundRegions = parseMailboxSesOutboundRegions(
+  JSON.stringify([
+    {
+      teamId: input.teamId,
+      domainId: "22222222-2222-4222-8222-222222222222",
+      domain: "example.invalid",
+      region: "eu-west-1",
+    },
+  ]),
+);
+const regionalSets = { ...configurationSets, "eu-west-1": "private_mail_eu" };
 describe("private Mail runtime adapters", () => {
+  it("selects an exact destination BEFORE the home pause, binds all regional gates and never mutates inbound metadata", async () => {
+    const paused = vi.fn((region: string) => region === "us-east-1");
+    const exhausted = vi.fn((_region: string) => false);
+    const throttle = vi.fn().mockResolvedValue(undefined);
+    await createMailboxSesSender(database(), {
+      configurationSets: regionalSets,
+      outboundRegions,
+      paused,
+      exhausted,
+      throttle,
+      clientFactory,
+    }).send(input);
+    expect(paused.mock.calls.every(([region]) => region === "eu-west-1")).toBe(true);
+    expect(exhausted.mock.calls.every(([region]) => region === "eu-west-1")).toBe(true);
+    expect(throttle).toHaveBeenCalledWith("eu-west-1", 1);
+    expect(provider.options[0]).toMatchObject({ region: "eu-west-1", maxAttempts: 1 });
+    expect(provider.inputs.at(-1)).toMatchObject({ ConfigurationSetName: "private_mail_eu" });
+    expect(provider.inputs.at(-1)).not.toHaveProperty("TenantName");
+  });
+  it("fails closed on destination pause/quota/configset/mismatched bindings with no relay or automatic retry", async () => {
+    const sendRaw = vi.fn();
+    for (const extra of [
+      { paused: (region: string) => region === "eu-west-1" },
+      { exhausted: (region: string) => region === "eu-west-1" },
+      { configurationSets },
+      {
+        outboundRegions: parseMailboxSesOutboundRegions(
+          JSON.stringify([
+            { ...outboundRegions[0], teamId: "33333333-3333-4333-8333-333333333333" },
+          ]),
+        ),
+      },
+    ])
+      await expect(
+        createMailboxSesSender(database(), {
+          configurationSets: regionalSets,
+          outboundRegions,
+          clientFactory,
+          relay: { name: "fixture", sender: { sendRaw } },
+          ...extra,
+        }).send(input),
+      ).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    expect(provider.send).not.toHaveBeenCalled();
+    expect(sendRaw).not.toHaveBeenCalled();
+  });
+  it("does not fail over after destination errors and retains recipient/team gates", async () => {
+    const timeout = new Error("ambiguous");
+    provider.send.mockRejectedValueOnce(timeout);
+    await expect(
+      createMailboxSesSender(database(), {
+        configurationSets: regionalSets,
+        outboundRegions,
+        clientFactory,
+      }).send(input),
+    ).rejects.toBe(timeout);
+    expect(provider.send).toHaveBeenCalledTimes(1);
+    provider.send.mockClear();
+    await expect(
+      createMailboxSesSender(database(), {
+        configurationSets: regionalSets,
+        outboundRegions,
+        checkRecipients: async () => false,
+        clientFactory,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendRejectedError);
+    await expect(
+      createMailboxSesSender(database({ sendReviewAt: new Date() }), {
+        configurationSets: regionalSets,
+        outboundRegions,
+        clientFactory,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    expect(provider.send).not.toHaveBeenCalled();
+  });
+  it("provisions identity AND private set in destination despite matching original metadata, rechecks tenant health each send", async () => {
+    const commands: string[] = [];
+    provider.send.mockImplementation(async (command: { constructor: { name: string } }) => {
+      commands.push(command.constructor.name);
+      if (command.constructor.name === "CreateTenantCommand")
+        return { TenantArn: "arn:aws:ses:eu-west-1:123456789012:tenant/tenant_fixture/tn-1" };
+      if (command.constructor.name === "GetTenantCommand")
+        return { Tenant: { SendingStatus: "ENABLED" } };
+      return { MessageId: "accepted_fixture" };
+    });
+    const sender = createMailboxSesSender(
+      database({ tenantAssociatedAt: null, tenantConfigSet: "private_mail_eu" }),
+      { configurationSets: regionalSets, outboundRegions, tenants: true, clientFactory },
+    );
+    await sender.send(input);
+    await sender.send(input);
+    expect(provider.inputs).toContainEqual({
+      TenantName: "tenant_fixture",
+      ResourceArn: "arn:aws:ses:eu-west-1:123456789012:identity/example.invalid",
+    });
+    expect(provider.inputs).toContainEqual({
+      TenantName: "tenant_fixture",
+      ResourceArn: "arn:aws:ses:eu-west-1:123456789012:configuration-set/private_mail_eu",
+    });
+    expect(commands.filter((name) => name === "GetTenantCommand")).toHaveLength(2);
+    expect(provider.inputs.at(-1)).toMatchObject({
+      TenantName: "tenant_fixture",
+      ConfigurationSetName: "private_mail_eu",
+    });
+  });
+  it.each([
+    "association",
+    "DISABLED",
+    "missing",
+    "no-name",
+    "pause-during-provision",
+    "quota-during-provision",
+  ])("defers regional tenant failure %s instead of sending untagged", async (failure) => {
+    let blocked = false;
+    const sends: string[] = [];
+    provider.send.mockImplementation(async (command: { constructor: { name: string } }) => {
+      const name = command.constructor.name;
+      sends.push(name);
+      if (name === "CreateTenantCommand")
+        return { TenantArn: "arn:aws:ses:eu-west-1:123456789012:tenant/tenant_fixture/tn-1" };
+      if (name === "CreateTenantResourceAssociationCommand" && failure === "association")
+        throw new Error("denied");
+      if (name === "GetTenantCommand") {
+        blocked = true;
+        return {
+          Tenant: {
+            SendingStatus:
+              failure === "missing" ? undefined : failure === "DISABLED" ? "DISABLED" : "ENABLED",
+          },
+        };
+      }
+      return { MessageId: "accepted_fixture" };
+    });
+    await expect(
+      createMailboxSesSender(database(failure === "no-name" ? { tenantName: null } : {}), {
+        configurationSets: regionalSets,
+        outboundRegions,
+        tenants: true,
+        clientFactory,
+        paused: () => failure === "pause-during-provision" && blocked,
+        exhausted: () => failure === "quota-during-provision" && blocked,
+      }).send(input),
+    ).rejects.toBeInstanceOf(MailboxSendDeferredError);
+    expect(sends).not.toContain("SendEmailCommand");
+  });
   it("rejects duplicated From headers even when the parser collapses them to one", async () => {
     const bad = Buffer.from("From: evil@example.invalid\r\n" + input.raw.toString());
     await expect(mailboxTransportMime.parse(bad)).rejects.toMatchObject({ code: "invalid" });

@@ -67,7 +67,7 @@ import {
   nodeDnsResolver,
   type SesIdentityClient,
 } from "@millionsend/ses";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { parseMailboxLaunchCohort } from "../../../packages/core/src/mailbox-launch-cohort.js";
 import { parseSendingProviderPolicy } from "../../../packages/core/src/sending-provider-policy.js";
 import { createAbuseJudge } from "./abuse-judge/index.js";
@@ -118,6 +118,12 @@ import { syncTenants, watchTenants } from "./handlers/tenants.js";
 import { createMailboxAzureSender } from "./mailbox-azure-sender.js";
 import { createMailboxExternalAwareSender } from "./mailbox-external-sender.js";
 import { createMailboxIngress, parseMailboxInboundConfiguration } from "./mailbox-ingress.js";
+import {
+  assertMailboxSesOutboundBindings,
+  assertMailboxSesOutboundTopics,
+  mailboxSesControlRegions,
+  parseMailboxSesOutboundRegions,
+} from "./mailbox-outbound-region.js";
 import { readMailboxSearchDocument } from "./mailbox-search-document.js";
 import {
   createMailboxContentPolicySender,
@@ -162,12 +168,27 @@ const mailboxSearchKey = deriveMailboxSearchKey(Buffer.from(env.MASTER_ENCRYPTIO
 // Receipt stages in one aggregate line every 10 minutes (SES->stored, queue wait, processing).
 const receiptTimings = new TimingWindow();
 startTimingLog(receiptTimings, "[worker] timings 10m", 10 * 60_000);
+const mailboxOutboundRegions = parseMailboxSesOutboundRegions(
+  process.env.MAILBOX_SES_OUTBOUND_REGIONS,
+);
+assertMailboxSesOutboundTopics(mailboxOutboundRegions, env.SNS_TOPIC_ARNS ?? []);
+await assertMailboxSesOutboundBindings(mailboxOutboundRegions, async (ids) =>
+  db
+    .select({
+      domainId: schema.domains.id,
+      teamId: schema.domains.teamId,
+      domain: schema.domains.name,
+    })
+    .from(schema.domains)
+    .where(inArray(schema.domains.id, ids)),
+);
 const mailboxIngress = createMailboxIngress({
   db,
   keys: keyring,
   mime: mailboxWorkerMime,
   enabled: mailboxTransportEnabled,
   eventTopics: env.SNS_TOPIC_ARNS ?? [],
+  outboundRegions: mailboxOutboundRegions,
   inbound: parseMailboxInboundConfiguration(process.env.MAILBOX_INBOUND_CONFIG),
   failover,
   // The owner's sender decisions (Aprovação de remetentes): blocked senders go to Spam.
@@ -186,6 +207,7 @@ if (relay) console.log(`customer SMTP relay: ${relay.name}`);
 const mailboxSes = mailboxTransportEnabled
   ? createMailboxSesSender(db, {
       isCloud: env.IS_CLOUD,
+      outboundRegions: mailboxOutboundRegions,
       configurationSets:
         parseMailboxSesConfigurationSets(process.env.MAILBOX_SES_CONFIGURATION_SETS) ?? undefined,
       exhausted: (region) => sendControls.exhausted(region),
@@ -230,8 +252,7 @@ const unsubscribe = unsubscribeHost
 const regions = servedRegions();
 // The failover region gets its own quota gate and send bucket without being
 // served: no new domain can be created there.
-const controlRegions =
-  failover && !regions.includes(failover.region) ? [...regions, failover.region] : regions;
+const controlRegions = mailboxSesControlRegions(regions, mailboxOutboundRegions, failover?.region);
 const ses = createSesSender(regions[0] ?? env.AWS_REGION);
 // The platform's own mail leaves through it while SES has paused the account.
 const fallback = env.SMTP_FALLBACK_URL ? createSmtpFallback(env.SMTP_FALLBACK_URL) : undefined;

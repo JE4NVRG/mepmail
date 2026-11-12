@@ -10,6 +10,7 @@ import {
   type MailboxPrivateObjectLocation,
 } from "../../../packages/ses/src/mailbox-storage.js";
 import { createMailboxEvidenceHandler } from "./mailbox-evidence.js";
+import type { MailboxSesOutboundRegions } from "./mailbox-outbound-region.js";
 import {
   createMailboxReceiver,
   isMailboxReceipt,
@@ -96,16 +97,18 @@ export function createMailboxIngress(options: {
   eventTopics: readonly string[];
   inbound: MailboxInboundConfiguration | null;
   failover?: SesFailover | undefined;
+  outboundRegions?: MailboxSesOutboundRegions | undefined;
   senderKey?: Buffer | undefined;
   enqueueWebhook?: WebhookEnqueue | undefined;
   timings?: TimingWindow | undefined;
 }) {
+  const { outboundRegions, ...inboundOptions } = options;
   const evidence = createMailboxEvidenceHandler({ ...options, topics: options.eventTopics });
   const inbound = options.inbound;
   const receiver =
     inbound && options.enabled
       ? createMailboxReceiver({
-          ...options,
+          ...inboundOptions,
           topics: inbound.topics,
           locations: inbound.locations,
           reader: createMailboxPrivateObjectReader({

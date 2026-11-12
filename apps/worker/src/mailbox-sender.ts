@@ -13,7 +13,12 @@ import {
   stripMailboxPrivateHeaders,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
-import { associateTenantResources, ensureTenant, type SesTenantClient } from "@millionsend/ses";
+import {
+  associateTenantResources,
+  ensureTenant,
+  getTenantSendingStatus,
+  type SesTenantClient,
+} from "@millionsend/ses";
 import { and, eq } from "drizzle-orm";
 import { simpleParser } from "mailparser";
 import {
@@ -29,6 +34,11 @@ import { mailboxOutbox } from "../../../packages/db/src/schema/mailbox-transport
 import type { SesSender } from "./handlers/send-email.js";
 import { isSesEnforcementRefusal, type SesQuotaGate } from "./handlers/ses-quota.js";
 import { mailboxAzureCompliance } from "./mailbox-optout.js";
+import {
+  copyMailboxSesOutboundRegions,
+  type MailboxSesOutboundRegions,
+  resolveMailboxSesOutboundRegion,
+} from "./mailbox-outbound-region.js";
 import type { SesFailover } from "./ses-failover.js";
 
 export const mailboxWorkerMime: MailboxTransportMimeAdapter = {
@@ -340,6 +350,7 @@ export function createMailboxSesSender(
     /** Cloud-only abuse policy; self-hosted transport contract stays unchanged. */
     isCloud?: boolean;
     configurationSets?: MailboxSesConfigurationSets | null | undefined;
+    outboundRegions?: MailboxSesOutboundRegions | undefined;
     exhausted?: (region: string) => boolean;
     throttle?: (region: string, recipients: number) => Promise<void>;
     checkRecipients?: (input: {
@@ -361,6 +372,7 @@ export function createMailboxSesSender(
   } = {},
 ): MailboxOutboxSender {
   const configurationSets = copyConfigurationSets(opts.configurationSets ?? {});
+  const outboundRegions = copyMailboxSesOutboundRegions(opts.outboundRegions ?? []);
   const clients = new Map<string, MailboxSesClient>();
   // Region + tenant + Mail configuration set already associated by this process.
   const tenantSets = new Set<string>();
@@ -375,11 +387,33 @@ export function createMailboxSesSender(
       tenantConfigSet: string | null;
     },
     configurationSet: string,
+    regionalOverride: boolean,
   ): Promise<string | undefined> {
+    if (regionalOverride) {
+      if (!opts.tenants) return undefined;
+      if (!domain.tenantName) throw new MailboxSendDeferredError();
+      try {
+        const tenants = client as unknown as SesTenantClient;
+        const { accountId } = await ensureTenant(tenants, { tenantName: domain.tenantName });
+        await associateTenantResources(tenants, {
+          tenantName: domain.tenantName,
+          accountId,
+          region: domain.region,
+          identity: domain.domainName,
+          configurationSet,
+        });
+        const status = await getTenantSendingStatus(tenants, { tenantName: domain.tenantName });
+        if (status !== "ENABLED" && status !== "REINSTATED") throw new Error("tenant_not_enabled");
+        return domain.tenantName;
+      } catch {
+        // Original-region DB metadata is not authority in the destination. Never send untagged.
+        throw new MailboxSendDeferredError();
+      }
+    }
     if (!domain.tenantAssociatedAt || !domain.tenantName) return undefined;
     if (domain.tenantConfigSet === configurationSet) return domain.tenantName;
     if (!opts.tenants) return undefined;
-    const key = `${domain.region}|${domain.tenantName}|${configurationSet}`;
+    const key = `${domain.region}|${domain.domainName}|${domain.tenantName}|${configurationSet}`;
     if (tenantSets.has(key)) return domain.tenantName;
     try {
       // The identity is already in the tenant (domain sync); add the Mail set too.
@@ -448,6 +482,7 @@ export function createMailboxSesSender(
           .select({
             region: schema.domains.region,
             domainName: schema.domains.name,
+            domainId: schema.domains.id,
             status: schema.domains.status,
             configurationSet: schema.domains.sesConfigurationSet,
             address: schema.mailboxes.address,
@@ -485,26 +520,37 @@ export function createMailboxSesSender(
         // it keeps the team's API mail.
         if (isSendReviewHeld(domain)) throw new MailboxSendDeferredError();
         if (opts.isCloud) await checkMailboxContent(db, input);
+        let region: string;
+        try {
+          region = resolveMailboxSesOutboundRegion(outboundRegions, {
+            teamId: input.teamId,
+            domainId: domain.domainId,
+            domain: domain.domainName,
+            region: domain.region,
+          });
+        } catch {
+          throw new MailboxSendDeferredError();
+        }
         const accountPaused = () =>
-          opts.paused?.(domain.region) === true ||
-          opts.sesQuota?.accountPaused?.(domain.region) === true;
+          opts.paused?.(region) === true || opts.sesQuota?.accountPaused?.(region) === true;
         // An SES enforcement stop never authorizes automatic relay/region failover.
         if (accountPaused()) throw new MailboxSendDeferredError();
-        const region = domain.region;
         const configurationSet = configurationSets[region];
         if (!configurationSet) throw new MailboxSendDeferredError();
         // Campaign configuration can enable SES Open/Click body rewriting. Mail
         // always requires its own explicit regional operator configuration.
         if (configurationSet === domain.configurationSet) throw new MailboxSendRejectedError();
         await refuseSesOverrides(input.raw);
-        if (opts.exhausted?.(region)) throw new MailboxSendDeferredError();
+        if (opts.exhausted?.(region) || opts.sesQuota?.exhausted(region))
+          throw new MailboxSendDeferredError();
         try {
           await opts.throttle?.(region, recipientCount);
         } catch {
           // Cancellation or a failed local permit cannot have accepted this message.
           throw new MailboxSendDeferredError();
         }
-        if (opts.exhausted?.(region)) throw new MailboxSendDeferredError();
+        if (opts.exhausted?.(region) || opts.sesQuota?.exhausted(region))
+          throw new MailboxSendDeferredError();
         await allowedRecipients(input.teamId, recipients);
         let client = clients.get(region);
         if (!client) {
@@ -517,11 +563,17 @@ export function createMailboxSesSender(
           client = opts.clientFactory ? opts.clientFactory(options) : new SESv2Client(options);
           clients.set(region, client);
         }
-        const tenantName = await sendingTenant(client, domain, configurationSet);
+        const tenantName = await sendingTenant(
+          client,
+          { ...domain, region },
+          configurationSet,
+          region !== domain.region,
+        );
         // Tenant provisioning can wait on the network after the first gate.
         // A restriction introduced during that wait still precedes the send.
         await allowedRecipients(input.teamId, recipients);
-        if (accountPaused()) throw new MailboxSendDeferredError();
+        if (accountPaused() || opts.exhausted?.(region) || opts.sesQuota?.exhausted(region))
+          throw new MailboxSendDeferredError();
         if (opts.isCloud) await checkMailboxContent(db, input);
         let response: Awaited<ReturnType<MailboxSesClient["send"]>>;
         try {

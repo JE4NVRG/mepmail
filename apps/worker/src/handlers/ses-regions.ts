@@ -7,9 +7,8 @@ import { createSesQuotaGate, type SendQuotaControls } from "./ses-quota.js";
  * The per-region send controls: SES's 24-hour quota and its maximum send rate
  * are both per region, so each served region gets its own quota gate and
  * token bucket, fed by one GetAccount probe per region. A send with no region
- * (platform mail, no domain row) and one in a region this deployment does not
- * serve use the default region's controls — the first served region — rather
- * than probing a region nothing was provisioned in.
+ * (platform mail, no domain row) uses the first served region. An explicit
+ * unknown region is closed, never allowed to borrow the default region's gate.
  *
  * On top of the total gate sits the broadcast share: the part of the window
  * bulk mail may hold, with the rest kept for transactional mail. The room
@@ -120,7 +119,10 @@ export function createRegionSendControls(opts: {
           state.quota = quota;
           return quota;
         },
-        (err) => onError(region, err),
+        (err) => {
+          state.quota = null;
+          onError(region, err);
+        },
       );
       const bucket = createTokenBucket(state.rate);
       const probe = async (): Promise<boolean> => {
@@ -134,9 +136,9 @@ export function createRegionSendControls(opts: {
     }),
   );
   const pick = (region?: string) => {
-    const key = region !== undefined && controls.has(region) ? region : defaultRegion;
+    const key = region ?? defaultRegion;
     const control = controls.get(key);
-    if (!control) throw new Error(`no send controls for ${defaultRegion}`);
+    if (!control) throw new Error("unknown_ses_control_region");
     return { key, ...control };
   };
   const shareOf = (c: ReturnType<typeof pick>) =>
@@ -218,9 +220,19 @@ export function createRegionSendControls(opts: {
   };
   return {
     regions: opts.regions,
-    exhausted: (region) => pick(region).gate.exhausted(),
-    accountPaused: (region) => pick(region).gate.accountPaused?.() ?? false,
-    refresh: (region) => pick(region).probe(),
+    exhausted: (region) =>
+      region !== undefined && !controls.has(region)
+        ? true
+        : pick(region).state.quota === null ||
+          pick(region).state.quota?.max24h === 0 ||
+          pick(region).state.quota?.maxSendRate === 0 ||
+          pick(region).gate.exhausted(),
+    accountPaused: (region) =>
+      region !== undefined && !controls.has(region)
+        ? true
+        : (pick(region).gate.accountPaused?.() ?? false),
+    refresh: (region) =>
+      region !== undefined && !controls.has(region) ? Promise.resolve(true) : pick(region).probe(),
     async throttle(region, recipients = 1) {
       if (!Number.isSafeInteger(recipients) || recipients < 1 || recipients > 20)
         throw new RangeError("invalid_recipient_rate_cost");

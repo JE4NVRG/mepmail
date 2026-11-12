@@ -13,6 +13,11 @@ import { and, eq } from "drizzle-orm";
 import { simpleParser } from "mailparser";
 import { mailboxMessageId } from "../../../packages/core/src/mailbox-message-id.js";
 import {
+  copyMailboxSesOutboundRegions,
+  type MailboxSesOutboundRegions,
+  resolveMailboxSesOutboundRegion,
+} from "./mailbox-outbound-region.js";
+import {
   assertMailboxNotificationTopic,
   MailboxProviderEventError,
   mailboxProviderAddress,
@@ -163,11 +168,12 @@ export function createMailboxEvidenceHandler(options: {
   mime: MailboxTransportMimeAdapter;
   enabled: boolean;
   topics: readonly string[];
-  /** A listed domain's mail may also report from the failover region it sent from. */
+  outboundRegions?: MailboxSesOutboundRegions | undefined;
+  /** Legacy compatibility only; automatic failover does not authorize private evidence. */
   failover?: SesFailover | undefined;
 }) {
   const topics = [...options.topics];
-  const failover = options.failover;
+  const outboundRegions = copyMailboxSesOutboundRegions(options.outboundRegions ?? []);
   return async (input: TrustedMailboxNotification): Promise<boolean> => {
     if (!isPrivateMailboxEvent(input.event)) return false;
     if (!options.enabled) throw new MailboxProviderEventError("disabled");
@@ -195,6 +201,7 @@ export function createMailboxEvidenceHandler(options: {
         address: schema.mailboxes.address,
         region: schema.domains.region,
         domainName: schema.domains.name,
+        domainId: schema.domains.id,
       })
       .from(schema.mailboxOutbox)
       .innerJoin(
@@ -212,17 +219,25 @@ export function createMailboxEvidenceHandler(options: {
         ),
       )
       .where(eq(schema.mailboxOutbox.id, outboxId));
+    let outboundRegion: string | undefined;
+    if (bound && bound.region !== topic.region) {
+      try {
+        outboundRegion = resolveMailboxSesOutboundRegion(outboundRegions, {
+          teamId: bound.outbox.teamId,
+          domainId: bound.domainId,
+          domain: bound.domainName,
+          region: bound.region,
+        });
+      } catch {
+        throw new MailboxProviderEventError("evidence");
+      }
+    }
     if (
       !bound ||
       bound.outbox.attemptId !== attemptId ||
       !["sending", "unknown", "accepted"].includes(bound.outbox.status) ||
       bound.address !== from ||
-      (bound.region !== topic.region &&
-        !(
-          failover &&
-          topic.region === failover.region &&
-          failover.domains.has(bound.domainName)
-        )) ||
+      (bound.region !== topic.region && outboundRegion !== topic.region) ||
       bound.outbox.recipientCount !== destination.length ||
       (bound.outbox.status === "accepted" && bound.outbox.providerMessageId !== messageId)
     )
