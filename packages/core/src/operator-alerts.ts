@@ -1,6 +1,5 @@
 import type { Db } from "@millionsend/db";
-
-import { recordAudit } from "./audit.js";
+import { schema } from "@millionsend/db";
 
 /**
  * The one action the operator-alert relay reads. Every internal operator
@@ -37,17 +36,16 @@ export function operatorAlertText(text: string): string {
 }
 
 /**
- * One operator alert as an audit row instead of an e-mail. Best-effort like
- * every audit write (a failure is logged, never thrown), so an alert sink can
- * not fail the sweep that produced it.
+ * Strict alert write: callers must retain/retry their intent on failure.
+ * Unlike the informational audit trail, this row is the delivery itself.
  */
 export async function recordOperatorAlert(db: Db, alert: OperatorAlert): Promise<void> {
-  await recordAudit(db, {
+  await db.insert(schema.auditLog).values({
     teamId: alert.teamId ?? null,
-    actor: "system",
+    actorId: "system",
     action: OPERATOR_ALERT_ACTION,
-    ...(alert.target ? { target: alert.target } : {}),
-    metadata: {
+    target: alert.target ? `${alert.target.type}:${alert.target.id}` : null,
+    data: {
       kind: alert.kind,
       subject: alert.subject,
       text: operatorAlertText(alert.text),

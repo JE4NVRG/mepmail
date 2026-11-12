@@ -71,16 +71,17 @@ it("records the hour's probes, marks lost samples, and mails the operator once p
     { probe: "monitor_samples_1h", value: 25, ok: true },
     { probe: "monitor_unjudged_rate", value: 0.2, ok: true },
   ]);
-  expect(sends).toEqual([]);
+  expect(sends).toHaveLength(1);
+  expect(sends[0]).toMatchObject({ kind: "monitor.stalled" });
 
   await seed(10, "unjudged");
   const later = new Date(NOW.getTime() + 600_000);
   const second = await runMonitorHealth(db, { judge, mailer, state, now: later });
   expect(second).toMatchObject({ samples: 35, unjudged: 15, degraded: true });
-  expect(sends).toHaveLength(1);
-  expect(sends[0]).toMatchObject({ to: "op@example.com", kind: "monitor.degraded" });
-  expect(sends[0]?.text).toContain("15 of 35");
-  expect(sends[0]?.text).toContain("typesafe · jev-latest");
+  expect(sends).toHaveLength(2);
+  expect(sends[1]).toMatchObject({ to: "op@example.com", kind: "monitor.degraded" });
+  expect(sends[1]?.text).toContain("15 of 35");
+  expect(sends[1]?.text).toContain("typesafe · jev-latest");
   expect(state.degradedMailedAt).toEqual(later);
   const rate = await db
     .select()
@@ -92,9 +93,9 @@ it("records the hour's probes, marks lost samples, and mails the operator once p
   const hourOn = new Date(later.getTime() + 3600_000);
   await seed(30, "unjudged", new Date(hourOn.getTime() - 60_000));
   await runMonitorHealth(db, { judge, mailer, state, now: hourOn });
-  expect(sends).toHaveLength(1);
+  expect(sends).toHaveLength(2);
   const sixOn = new Date(later.getTime() + 6 * 3600_000);
   await seed(30, "unjudged", new Date(sixOn.getTime() - 60_000));
   await runMonitorHealth(db, { judge, mailer, state, now: sixOn });
-  expect(sends).toHaveLength(2);
+  expect(sends).toHaveLength(3);
 });

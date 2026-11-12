@@ -41,6 +41,7 @@ import {
   hashRecipient,
   indexMailboxSearch,
   type MonitorDeps,
+  markLostSamples,
   monitorSettingsReader,
   pacingHorizonDays,
   pausedRegions,
@@ -68,7 +69,7 @@ import {
   nodeDnsResolver,
   type SesIdentityClient,
 } from "@millionsend/ses";
-import { and, eq, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { parseMailboxLaunchCohort } from "../../../packages/core/src/mailbox-launch-cohort.js";
 import { parseSendingProviderPolicy } from "../../../packages/core/src/sending-provider-policy.js";
 import { createAbuseJudge } from "./abuse-judge/index.js";
@@ -849,12 +850,7 @@ await queue.workDeadLetter("webhook.drain", async ({ endpointId }) => {
 // A judge job that kept throwing (database or decrypt errors, not the judge's
 // own failures, which never throw): the sample reads as unjudged, never pending.
 await queue.workDeadLetter("abuse.judge", async ({ sampleId }) => {
-  await db
-    .update(schema.monitorSamples)
-    .set({ status: "unjudged", errorClass: "lost", judgedAt: new Date() })
-    .where(
-      and(eq(schema.monitorSamples.id, sampleId), eq(schema.monitorSamples.status, "pending")),
-    );
+  await markLostSamples(db, new Date(), sampleId);
   console.error(`abuse.judge: dead-lettered sample ${sampleId}`);
 });
 

@@ -9,13 +9,13 @@ import {
   type Keyring,
   type MonitorSettings,
   openAttachments,
-  teamMonitorOverview,
   teamMonitorRow,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
-import { mailOperator, type SystemMailer } from "../system-mail.js";
+import type { SystemMailer } from "../system-mail.js";
+import { flushMonitorAlerts } from "./monitor-alerts.js";
 
 export interface JudgeDeps {
   /** Null when the monitor is off: every sample is recorded unjudged. */
@@ -51,7 +51,10 @@ export async function judgeSample(
 ): Promise<JudgeOutcome> {
   const now = deps.now?.() ?? new Date();
   const [sample] = await db.select().from(ms).where(eq(ms.id, payload.sampleId));
-  if (sample?.status !== "pending") return "skipped";
+  if (sample?.status !== "pending") {
+    if (sample?.status === "judged") await flushMonitorAlerts(db, deps, sample.teamId);
+    return "skipped";
+  }
   const unjudged = async (errorClass: string, latencyMs?: number) => {
     await db
       .update(ms)
@@ -114,20 +117,21 @@ export async function judgeSample(
       .returning({ id: ms.id });
     // A concurrent run already wrote this sample: its verdict stands, the risk moved once.
     if (!judged) return null;
-    return applyJudgedSample(t, settings, { teamId: sample.teamId, score: verdict.score, now });
+    const folded = await applyJudgedSample(t, settings, {
+      teamId: sample.teamId,
+      score: verdict.score,
+      now,
+    });
+    await holdOnContentVerdict(t, {
+      teamId: sample.teamId,
+      score: verdict.score,
+      categories: verdict.categories,
+      now,
+    });
+    return folded;
   });
   if (!outcome) return "skipped";
-  // A near-certain verdict on a young team holds its transactional mail too;
-  // the safety sweep tells the operator about the hold.
-  await holdOnContentVerdict(db, {
-    teamId: sample.teamId,
-    score: verdict.score,
-    categories: verdict.categories,
-    now,
-  });
-  if ((outcome.alert || outcome.paused) && deps.mailer) {
-    await notifyOperator(db, deps, sample.teamId, verdict.score, outcome, settings, now);
-  }
+  await flushMonitorAlerts(db, deps, sample.teamId);
   return "judged";
 }
 
@@ -142,7 +146,7 @@ async function loadBlockInput(
     .select({ name: schema.teams.name, plan: schema.teams.plan })
     .from(schema.teams)
     .where(eq(schema.teams.id, sample.teamId));
-  if (!team) return null;
+  if (!team || team.plan === "system") return null;
   const domains = await db
     .select({ name: schema.domains.name })
     .from(schema.domains)
@@ -157,7 +161,7 @@ async function loadBlockInput(
     plan: team.plan as string,
   };
   if (sample.kind === "broadcast_skeleton") {
-    if (!sample.broadcastId) return null;
+    if (!sample.broadcastId || sample.emailId) return null;
     const [broadcast] = await db
       .select({
         from: schema.broadcasts.from,
@@ -167,7 +171,12 @@ async function loadBlockInput(
         text: schema.broadcasts.text,
       })
       .from(schema.broadcasts)
-      .where(eq(schema.broadcasts.id, sample.broadcastId));
+      .where(
+        and(
+          eq(schema.broadcasts.id, sample.broadcastId),
+          eq(schema.broadcasts.teamId, sample.teamId),
+        ),
+      );
     if (!broadcast) return null;
     return {
       team: context,
@@ -179,10 +188,30 @@ async function loadBlockInput(
       attachments: [],
     };
   }
-  if (!sample.emailId) return null;
-  const [email] = await db.select().from(schema.emails).where(eq(schema.emails.id, sample.emailId));
+  if (
+    !sample.emailId ||
+    (sample.kind === "broadcast_copy" ? !sample.broadcastId : sample.broadcastId !== null)
+  )
+    return null;
+  if (sample.kind === "broadcast_copy") {
+    const [broadcast] = await db
+      .select({ id: schema.broadcasts.id })
+      .from(schema.broadcasts)
+      .where(
+        and(
+          eq(schema.broadcasts.id, sample.broadcastId as string),
+          eq(schema.broadcasts.teamId, sample.teamId),
+        ),
+      );
+    if (!broadcast) return null;
+  }
+  const [email] = await db
+    .select()
+    .from(schema.emails)
+    .where(and(eq(schema.emails.id, sample.emailId), eq(schema.emails.teamId, sample.teamId)));
   if (
     !email ||
+    email.broadcastId !== sample.broadcastId ||
     email.bodyPurgedAt ||
     !email.bodyCiphertext ||
     !email.bodyIv ||
@@ -217,56 +246,4 @@ async function loadBlockInput(
     text: body.text,
     attachments,
   };
-}
-
-async function notifyOperator(
-  db: Db,
-  deps: JudgeDeps,
-  teamId: string,
-  score: number,
-  outcome: { risk: number; tier: string; alert: boolean; paused: boolean },
-  settings: MonitorSettings,
-  now: Date,
-): Promise<void> {
-  if (!deps.mailer) return;
-  const [team] = await db
-    .select({ name: schema.teams.name })
-    .from(schema.teams)
-    .where(eq(schema.teams.id, teamId));
-  const name = team?.name ?? teamId;
-  const path = `/console/safety/${teamId}`;
-  const risk = outcome.risk.toFixed(2);
-  try {
-    if (outcome.paused) {
-      await mailOperator(
-        db,
-        deps.mailer,
-        "monitor.broadcasts_paused",
-        path,
-        { team: name, risk, score: String(score) },
-        deps.appBaseUrl,
-        { teamId },
-      );
-    }
-    if (outcome.alert) {
-      const overview = await teamMonitorOverview(db, teamId, settings, now);
-      await mailOperator(
-        db,
-        deps.mailer,
-        "monitor.alert",
-        path,
-        {
-          team: name,
-          risk,
-          tier: outcome.tier,
-          samples: String(overview.judged7d),
-          flagged: String(overview.flagged7d),
-        },
-        deps.appBaseUrl,
-        { teamId },
-      );
-    }
-  } catch (err) {
-    console.error(`abuse.judge: operator mail for team ${teamId} failed`, err);
-  }
 }

@@ -125,7 +125,7 @@ export async function mailOwners(
  */
 export async function alertOperator(
   db: Db,
-  mailer: SystemMailer,
+  mailer: SystemMailer | undefined,
   alert: {
     kind: AccountMailKind;
     path: string;
@@ -155,7 +155,7 @@ export async function alertOperator(
     });
     return true;
   }
-  if (!recipient) return false;
+  if (!recipient || !mailer) return false;
   const locale = await accountLocale(db, accountEmailFrom(), recipient);
   await mailer.send(recipient, {
     ...buildAccountMail({ kind: alert.kind, locale, url, values: alert.values }),
@@ -171,7 +171,7 @@ export async function alertOperator(
  */
 export async function mailOperator(
   db: Db,
-  mailer: SystemMailer,
+  mailer: SystemMailer | undefined,
   kind: AccountMailKind,
   path: string,
   values: Record<string, string>,

@@ -364,34 +364,84 @@ export async function recordMonitorSample(
     now: Date;
   },
 ): Promise<string | null> {
-  const since = dayStart(input.now);
-  const [team] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(ms)
-    .where(and(eq(ms.teamId, input.teamId), gte(ms.createdAt, since)));
-  if ((team?.n ?? 0) >= s.teamDailyCap) return null;
-  if (input.kind !== "first_sends" && input.kind !== "anomaly") {
-    const [all] = await db
+  const sample = await db.transaction(async (tx) => {
+    const t = tx as unknown as Db;
+    await t.execute(sql`select pg_advisory_xact_lock(hashtext(${input.teamId}))`);
+    const [owner] = await t
+      .select({ plan: schema.teams.plan })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, input.teamId));
+    if (!owner || owner.plan === "system") return null;
+    if (input.kind === "broadcast_skeleton") {
+      if (!input.broadcastId || input.emailId) return null;
+    } else if (
+      !input.emailId ||
+      (input.kind === "broadcast_copy" ? !input.broadcastId : input.broadcastId !== null)
+    )
+      return null;
+    if (input.broadcastId) {
+      const [broadcast] = await t
+        .select({ id: schema.broadcasts.id })
+        .from(schema.broadcasts)
+        .where(
+          and(
+            eq(schema.broadcasts.id, input.broadcastId),
+            eq(schema.broadcasts.teamId, input.teamId),
+          ),
+        );
+      if (!broadcast) return null;
+    }
+    if (input.emailId) {
+      const [email] = await t
+        .select({ broadcastId: schema.emails.broadcastId })
+        .from(schema.emails)
+        .where(and(eq(schema.emails.id, input.emailId), eq(schema.emails.teamId, input.teamId)));
+      if (!email || email.broadcastId !== input.broadcastId) return null;
+    }
+    const [existing] = await t
+      .select({ id: ms.id })
+      .from(ms)
+      .where(
+        and(
+          eq(ms.teamId, input.teamId),
+          input.emailId ? undefined : eq(ms.kind, input.kind),
+          input.emailId ? eq(ms.emailId, input.emailId) : isNull(ms.emailId),
+          input.broadcastId ? eq(ms.broadcastId, input.broadcastId) : isNull(ms.broadcastId),
+        ),
+      )
+      .limit(1);
+    if (existing) return null;
+    const since = dayStart(input.now);
+    const [team] = await t
       .select({ n: sql<number>`count(*)::int` })
       .from(ms)
-      .where(gte(ms.createdAt, since));
-    if ((all?.n ?? 0) >= s.instanceDailyCap) return null;
-  }
-  const [sample] = await db
-    .insert(ms)
-    .values({
-      teamId: input.teamId,
-      emailId: input.emailId,
-      broadcastId: input.broadcastId,
-      kind: input.kind,
-      createdAt: input.now,
-    })
-    .returning({ id: ms.id });
-  if (!sample) throw new Error("monitor sample insert returned nothing");
-  await db
-    .insert(tm)
-    .values({ teamId: input.teamId, lastSampleAt: input.now, updatedAt: input.now })
-    .onConflictDoUpdate({ target: tm.teamId, set: { lastSampleAt: input.now } });
+      .where(and(eq(ms.teamId, input.teamId), gte(ms.createdAt, since)));
+    if ((team?.n ?? 0) >= s.teamDailyCap) return null;
+    if (input.kind !== "first_sends" && input.kind !== "anomaly") {
+      const [all] = await t
+        .select({ n: sql<number>`count(*)::int` })
+        .from(ms)
+        .where(gte(ms.createdAt, since));
+      if ((all?.n ?? 0) >= s.instanceDailyCap) return null;
+    }
+    const [sample] = await t
+      .insert(ms)
+      .values({
+        teamId: input.teamId,
+        emailId: input.emailId,
+        broadcastId: input.broadcastId,
+        kind: input.kind,
+        createdAt: input.now,
+      })
+      .returning({ id: ms.id });
+    if (!sample) throw new Error("monitor sample insert returned nothing");
+    await t
+      .insert(tm)
+      .values({ teamId: input.teamId, lastSampleAt: input.now, updatedAt: input.now })
+      .onConflictDoUpdate({ target: tm.teamId, set: { lastSampleAt: input.now } });
+    return sample;
+  });
+  if (!sample) return null;
   await deps.enqueueJudge(sample.id);
   return sample.id;
 }
@@ -407,6 +457,11 @@ export async function sampleAcceptedEmail(
   input: { teamId: string; emailId: string; broadcast: boolean; anomalies: number; now?: Date },
 ): Promise<{ sampleId: string | null; decision: RateDecision | null }> {
   const now = input.now ?? new Date();
+  const [ownedEmail] = await db
+    .select({ id: schema.emails.id })
+    .from(schema.emails)
+    .where(and(eq(schema.emails.id, input.emailId), eq(schema.emails.teamId, input.teamId)));
+  if (!ownedEmail) return { sampleId: null, decision: null };
   const row = await noteAcceptedSend(db, input.teamId, now);
   if (input.broadcast) return { sampleId: null, decision: null };
   const s = await deps.settings();
@@ -436,6 +491,13 @@ export async function planBroadcastSamples(
   input: { teamId: string; broadcastId: string; now?: Date },
 ): Promise<{ skeletonSampleId: string | null; copies: number }> {
   const now = input.now ?? new Date();
+  const [broadcast] = await db
+    .select({ id: schema.broadcasts.id })
+    .from(schema.broadcasts)
+    .where(
+      and(eq(schema.broadcasts.id, input.broadcastId), eq(schema.broadcasts.teamId, input.teamId)),
+    );
+  if (!broadcast) return { skeletonSampleId: null, copies: 0 };
   const s = await deps.settings();
   const state = await loadMonitorState(db, await teamMonitorRow(db, input.teamId), now);
   const tier = monitorTier(state, s, now);
@@ -444,7 +506,13 @@ export async function planBroadcastSamples(
   const [existing] = await db
     .select({ id: ms.id })
     .from(ms)
-    .where(and(eq(ms.broadcastId, input.broadcastId), eq(ms.kind, "broadcast_skeleton")))
+    .where(
+      and(
+        eq(ms.teamId, input.teamId),
+        eq(ms.broadcastId, input.broadcastId),
+        eq(ms.kind, "broadcast_skeleton"),
+      ),
+    )
     .limit(1);
   const skeletonSampleId =
     existing?.id ??
@@ -560,6 +628,36 @@ export async function applyJudgedSample(
           paused = true;
         }
       }
+    }
+    const [team] = await t
+      .select({ name: schema.teams.name })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, input.teamId));
+    const overview = alert ? await teamMonitorOverview(t, input.teamId, s, now) : null;
+    for (const kind of [
+      ...(alert ? ["monitor.alert"] : []),
+      ...(paused ? ["monitor.broadcasts_paused"] : []),
+    ]) {
+      await t
+        .insert(schema.teamNotifications)
+        .values({
+          teamId: input.teamId,
+          kind: `monitor.pending.${kind}`,
+          periodKey: JSON.stringify({
+            at: now.toISOString(),
+            path: `/console/safety/${input.teamId}`,
+            values: {
+              team: team?.name ?? input.teamId,
+              risk: next.risk.toFixed(2),
+              score: String(input.score),
+              tier,
+              samples: String(overview?.judged7d ?? 0),
+              flagged: String(overview?.flagged7d ?? 0),
+            },
+          }),
+          sentAt: now,
+        })
+        .onConflictDoNothing();
     }
     return { risk: next.risk, tier, alert, paused };
   });
@@ -687,18 +785,62 @@ export async function monitorHealth(
 }
 
 /** Pending samples whose job never came back are unjudged, not lost in a count. */
-export async function markLostSamples(db: Db, now: Date = new Date()): Promise<number> {
-  const rows = await db
-    .update(ms)
-    .set({ status: "unjudged", errorClass: "lost", judgedAt: now })
-    .where(
-      and(
-        eq(ms.status, "pending"),
-        sql`${ms.createdAt} < ${new Date(now.getTime() - MONITOR_LOST_AFTER_MS)}`,
-      ),
-    )
-    .returning({ id: ms.id });
-  return rows.length;
+export async function markLostSamples(
+  db: Db,
+  now: Date = new Date(),
+  sampleId?: string,
+): Promise<number> {
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db;
+    const pending = await t
+      .select({ id: ms.id })
+      .from(ms)
+      .where(
+        and(
+          eq(ms.status, "pending"),
+          sampleId
+            ? eq(ms.id, sampleId)
+            : sql`${ms.createdAt} < ${new Date(now.getTime() - MONITOR_LOST_AFTER_MS)}`,
+        ),
+      )
+      .orderBy(ms.createdAt, ms.id)
+      .limit(100)
+      .for("update", { skipLocked: true });
+    if (pending.length === 0) return 0;
+    const rows = await t
+      .update(ms)
+      .set({ status: "unjudged", errorClass: "lost", judgedAt: now })
+      .where(
+        and(
+          inArray(
+            ms.id,
+            pending.map((p) => p.id),
+          ),
+          eq(ms.status, "pending"),
+        ),
+      )
+      .returning({ id: ms.id, teamId: ms.teamId });
+    for (const row of rows)
+      await t
+        .insert(schema.teamNotifications)
+        .values({
+          teamId: row.teamId,
+          kind: "monitor.pending.monitor.stalled",
+          periodKey: JSON.stringify({
+            at: now.toISOString(),
+            path: "/console",
+            values: {
+              count: String(rows.filter((r) => r.teamId === row.teamId).length),
+              error: "lost",
+              provider: "queue",
+              model: "not_called",
+            },
+          }),
+          sentAt: now,
+        })
+        .onConflictDoNothing();
+    return rows.length;
+  });
 }
 
 export async function pruneMonitorSamples(db: Db, now: Date = new Date()): Promise<number> {

@@ -5,14 +5,17 @@ import {
   recordProbes,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
-import { mailOperator, type SystemMailer } from "../system-mail.js";
+import { schema } from "@millionsend/db";
+import { and, desc, eq, gte, like, sql } from "drizzle-orm";
+import type { SystemMailer } from "../system-mail.js";
+import { flushMonitorAlerts } from "./monitor-alerts.js";
 
 export interface MonitorHealthDeps {
-  /** What the env named; null when the monitor is off, and then nothing is sampled or written. */
+  /** Null disables new judgments/probes; existing durable recovery still runs. */
   judge: { provider: string; model: string } | null;
   mailer?: SystemMailer | undefined;
   appBaseUrl?: string | undefined;
-  /** Kept by the caller across runs: when the degraded notice last went out. */
+  /** Compatibility observation only; durable ledger owns notification cadence. */
   state: { degradedMailedAt: Date | null };
   now?: Date | undefined;
 }
@@ -25,8 +28,8 @@ export const MONITOR_DEGRADED_MAIL_INTERVAL_MS = 6 * 3600_000;
 /**
  * The last hour's sample count and unjudged share as probes for the console,
  * pending samples whose job never came back marked, and one notice to the
- * operator when the judge keeps failing. ponytail: the notice's clock lives
- * in the worker's memory, so a restart may repeat it once early.
+ * operator when the judge keeps failing. Intent, retry and rolling cadence
+ * survive worker restart in the existing notification ledger.
  */
 export async function runMonitorHealth(
   db: Db,
@@ -39,8 +42,10 @@ export async function runMonitorHealth(
   stalled: boolean;
 }> {
   const now = deps.now ?? new Date();
-  if (!deps.judge) return { samples: 0, unjudged: 0, lost: 0, degraded: false, stalled: false };
   const lost = await markLostSamples(db, now);
+  await flushMonitorAlerts(db, deps);
+  if (!deps.judge) return { samples: 0, unjudged: 0, lost, degraded: false, stalled: false };
+  const judge = deps.judge;
   const health = await monitorHealth(db, now);
   const hourly =
     health.samples >= MONITOR_DEGRADED_MIN_SAMPLES &&
@@ -59,45 +64,68 @@ export async function runMonitorHealth(
     ],
     now,
   );
-  const last = deps.state.degradedMailedAt;
-  if (
-    degraded &&
-    deps.mailer &&
-    (last === null || now.getTime() - last.getTime() >= MONITOR_DEGRADED_MAIL_INTERVAL_MS)
-  ) {
-    deps.state.degradedMailedAt = now;
-    try {
-      if (hourly)
-        await mailOperator(
-          db,
-          deps.mailer,
-          "monitor.degraded",
-          "/console",
-          {
-            rate: `${Math.round((health.unjudgedRate ?? 0) * 100)}%`,
-            unjudged: String(health.unjudged),
-            samples: String(health.samples),
-            provider: deps.judge.provider,
-            model: deps.judge.model,
-          },
-          deps.appBaseUrl,
-        );
-      else
-        await mailOperator(
-          db,
-          deps.mailer,
-          "monitor.stalled",
-          "/console",
-          {
-            count: String(health.unjudgedStreak),
-            error: health.lastErrorClass ?? "upstream",
-            provider: deps.judge.provider,
-            model: deps.judge.model,
-          },
-          deps.appBaseUrl,
-        );
-    } catch (err) {
-      console.error("monitor.health: operator mail failed", err);
+  if (degraded) {
+    const [sample] = await db
+      .select({ teamId: schema.monitorSamples.teamId })
+      .from(schema.monitorSamples)
+      .where(eq(schema.monitorSamples.status, "unjudged"))
+      .orderBy(desc(schema.monitorSamples.createdAt), desc(schema.monitorSamples.id))
+      .limit(1);
+    if (sample) {
+      const kind = hourly ? "monitor.degraded" : "monitor.stalled";
+      const period = new Date(
+        Math.floor(now.getTime() / MONITOR_DEGRADED_MAIL_INTERVAL_MS) *
+          MONITOR_DEGRADED_MAIL_INTERVAL_MS,
+      ).toISOString();
+      // One stable cadence key per instance incident kind; payload is snapshot metadata only.
+      await db.transaction(async (tx) => {
+        const t = tx as unknown as Db;
+        await t.execute(sql`select pg_advisory_xact_lock(hashtext('monitor.health.alert'))`);
+        const n = schema.teamNotifications;
+        const [sent] = await t
+          .select()
+          .from(n)
+          .where(
+            and(
+              like(n.kind, "monitor.delivered.monitor.%:%"),
+              gte(n.sentAt, new Date(now.getTime() - MONITOR_DEGRADED_MAIL_INTERVAL_MS + 1)),
+            ),
+          )
+          .limit(1);
+        const [pending] = await t
+          .select()
+          .from(n)
+          .where(like(n.kind, "monitor.pending.monitor.%:%"))
+          .limit(1);
+        if (!sent && !pending)
+          await t
+            .insert(n)
+            .values({
+              teamId: sample.teamId,
+              kind: `monitor.pending.${kind}:${period}`,
+              periodKey: JSON.stringify({
+                path: "/console",
+                values: hourly
+                  ? {
+                      rate: `${Math.round((health.unjudgedRate ?? 0) * 100)}%`,
+                      unjudged: String(health.unjudged),
+                      samples: String(health.samples),
+                      provider: judge.provider,
+                      model: judge.model,
+                    }
+                  : {
+                      count: String(health.unjudgedStreak),
+                      error: health.lastErrorClass ?? "upstream",
+                      provider: judge.provider,
+                      model: judge.model,
+                    },
+              }),
+              sentAt: now,
+            })
+            .onConflictDoNothing();
+      });
+      const count = await flushMonitorAlerts(db, deps);
+      if (count > 0) deps.state.degradedMailedAt = now;
     }
   }
   return { samples: health.samples, unjudged: health.unjudged, lost, degraded, stalled };
