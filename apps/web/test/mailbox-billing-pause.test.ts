@@ -120,7 +120,7 @@ function presentationDb(
     options.member === null ? [] : [options.member ?? paidSendingMember],
     options.subscription === null ? [] : [options.subscription ?? subscription],
     [],
-    options.checkout ? [options.checkout] : [],
+    options.checkout ? [{ trialDays: 0, ...options.checkout }] : [],
     [],
     options.managementRequest ? [options.managementRequest] : [],
   ];

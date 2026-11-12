@@ -1,5 +1,5 @@
 import { PurchaseEligibilityError } from "@millionsend/billing";
-import type { Db } from "@millionsend/db";
+import { type Db, schema } from "@millionsend/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mailboxBillingOffers } from "@/server/mailbox-billing";
 import { mailboxesRouter } from "@/server/routers/mailboxes";
@@ -176,22 +176,27 @@ type Member = {
   suspendedAt: Date | null;
   sendBillingContract?: SendBillingContract | null;
 } & Partial<Omit<typeof paidSendingMember, "sendBillingContract">>;
-type Pending = typeof small & { seats: number; livemode: boolean };
+type Pending = typeof small & { seats: number; livemode: boolean; trialDays: number };
 
 /** Only read rows are synthetic. The real presentation rechecks them; this
  * handle has no transaction or writes, and cannot contact a database/provider.
  */
-function customer(options: { member?: Member | null; pending?: Pending } = {}) {
+function customer(
+  options: { member?: Member | null; pending?: Pending; trialClaimed?: boolean } = {},
+) {
   const rows = [
     options.member === null ? [] : [options.member ?? paidSendingMember],
     [],
     [],
     options.pending ? [{ ...options.pending, priceId: options.pending.priceId }] : [],
     [],
+    ...(mailboxBillingOffers().some((offer) => offer.trialDays > 0)
+      ? [[], [], options.trialClaimed ? [{ hash: "consumed-trial-fixture" }] : []]
+      : []),
     [],
   ];
   let index = 0;
-  const select = vi.fn(() => {
+  const select = vi.fn((_fields?: unknown) => {
     const query = Object.assign(Promise.resolve(rows[index++]), {
       from: (): unknown => query,
       innerJoin: (): unknown => query,
@@ -212,7 +217,7 @@ function customer(options: { member?: Member | null; pending?: Pending } = {}) {
   return { db, select, caller: createCaller(context), createCaller, context };
 }
 function pending(price = large): Pending {
-  return { ...price, seats: 2, livemode: false };
+  return { ...price, seats: 2, livemode: false, trialDays: 0 };
 }
 function offerFor(storageBytes: number) {
   const offer = mailboxBillingOffers().find(
@@ -377,6 +382,58 @@ describe("customer checkout resolves only server-approved mailbox offers", () =>
     noCheckout();
   });
 
+  it.each([0, 7])(
+    "presents the persisted pending trial (%s days), not the current catalog promise",
+    async (trialDays) => {
+      vi.stubEnv(
+        "MAILBOX_BILLING_CATALOG",
+        JSON.stringify({ ...catalog, prices: catalog.prices.map((p) => ({ ...p, trialDays: 7 })) }),
+      );
+      const options = { pending: { ...pending(), trialDays }, trialClaimed: trialDays === 0 };
+      const { caller, select } = customer(options);
+      const result = await caller.mailboxes.billing();
+      expect(result.pendingOffer?.trialDays).toBe(trialDays);
+      expect(result).toMatchObject({
+        canPurchase: true,
+        checkoutPending: true,
+        pendingCheckoutSeats: 2,
+        pendingOffer: { unitAmount: large.unitAmount, trialDays },
+      });
+      expect(select.mock.calls[3]?.[0]).toMatchObject({
+        trialDays: schema.mailboxCheckouts.trialDays,
+      });
+      expect(result.offers.every((offer) => offer.trialDays === trialDays)).toBe(true);
+      expect(result.pendingOfferId).toBe(offerFor(large.storageBytesPerMailbox));
+      const originalId = result.pendingOfferId;
+      // First-purchase eligibility and catalog changes do not rewrite a durable lease.
+      vi.stubEnv("MAILBOX_BILLING_CATALOG", JSON.stringify(catalog));
+      const changed = await customer(options).caller.mailboxes.billing();
+      expect(changed.pendingOffer?.trialDays).toBe(trialDays);
+      expect(changed.pendingOfferId).toBe(originalId);
+      expect(changed.offers.every((offer) => offer.trialDays === 0)).toBe(true);
+      noCheckout();
+    },
+  );
+  it.each(["price", "mode", "amount"] as const)(
+    "does not project a trial from a pending lease with mismatched %s",
+    async (mismatch) => {
+      const lease = {
+        ...pending(),
+        trialDays: 7,
+        ...(mismatch === "price" ? { priceId: "price_unknown_pending" } : {}),
+        ...(mismatch === "mode" ? { livemode: true } : {}),
+        ...(mismatch === "amount" ? { unitAmount: 1 } : {}),
+      };
+      expect(await customer({ pending: lease }).caller.mailboxes.billing()).toMatchObject({
+        canPurchase: false,
+        availability: "recovery_required",
+        pendingOffer: null,
+        pendingOfferId: null,
+        checkoutPending: true,
+      });
+      noCheckout();
+    },
+  );
   it("resumes pending 10 GiB terms without offerId instead of falling back to the 1 GiB default", async () => {
     const { caller } = customer({ pending: pending() });
     await caller.mailboxes.checkout({ seats: 2 });

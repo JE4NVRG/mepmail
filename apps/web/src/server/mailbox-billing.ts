@@ -301,6 +301,7 @@ export async function mailboxBillingPresentation(
   const [checkout] = await db
     .select({
       seats: schema.mailboxCheckouts.seats,
+      trialDays: schema.mailboxCheckouts.trialDays,
       priceId: schema.mailboxCheckouts.stripePriceId,
       livemode: schema.mailboxCheckouts.livemode,
       currency: schema.mailboxCheckouts.currency,
@@ -348,7 +349,12 @@ export async function mailboxBillingPresentation(
             checkout.includedOutboundPerMailbox === price.includedOutboundPerMailbox,
         )
       : null;
-  const pendingOffer = catalog && pendingPrice ? publicOffer(catalog, pendingPrice) : null;
+  // A resumed purchase keeps the trial already agreed in its same-team lease,
+  // even when the catalog or first-purchase eligibility has changed since then.
+  const pendingOffer =
+    catalog && pendingPrice && checkout
+      ? { ...publicOffer(catalog, pendingPrice), trialDays: checkout.trialDays }
+      : null;
   const defaultPrice = purchasableTerms(catalog).find(
     (price) => price.priceId === catalog?.checkoutPriceId,
   );

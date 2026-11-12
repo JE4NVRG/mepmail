@@ -1224,6 +1224,30 @@ describe.each(["en", "pt-BR"] as const)("mailbox plan choices in %s", (locale) =
       offerId: tenOffer.offerId,
     });
   });
+  it.each([0, 7])("renders the persisted pending trial promise (%s days)", (trialDays) => {
+    fixture.mode = "panel";
+    const catalogOffer = { ...tenOffer, trialDays: 7 };
+    const pendingOffer = { ...catalogOffer, trialDays };
+    purchasable({
+      offers: [catalogOffer],
+      offer: catalogOffer,
+      defaultOfferId: catalogOffer.offerId,
+      pendingOfferId: pendingOffer.offerId,
+      pendingOffer,
+      pendingCheckoutSeats: 2,
+      checkoutPending: true,
+    });
+    const text = plain(render(locale));
+    const t = createTranslator({
+      locale,
+      messages: messages[locale],
+      namespace: "mailboxes-service",
+    });
+    if (trialDays > 0) expect(text).toContain(t("trialOffer", { days: trialDays }));
+    else expect(text).not.toContain(t("trialOffer", { days: 7 }));
+    expect(text).toContain(t("retryCheckout"));
+    expect(fixture.checkout).not.toHaveBeenCalled();
+  });
   it("resumes the pending 10 GiB purchase even when the default and requested choice are 1 GiB", () => {
     fixture.mode = "panel";
     fixture.initialOfferId = oneOffer.offerId;
