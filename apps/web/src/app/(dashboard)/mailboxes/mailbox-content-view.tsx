@@ -78,6 +78,7 @@ import {
   serverSearchTerm,
 } from "@/lib/mailbox-search";
 import { mailboxSeenBatches } from "@/lib/mailbox-seen-batches";
+import { MailboxSendHoldNotice, mailboxSendHoldPresentation } from "@/lib/mailbox-send-hold";
 import { MAILBOX_SHORTCUTS, mailboxShortcut } from "@/lib/mailbox-shortcuts";
 import { mailboxSignatureText } from "@/lib/mailbox-signature";
 import {
@@ -2120,8 +2121,11 @@ export function MailboxContentView({
     (sendKey ? (held?.key === sendKey ? "waiting" : sendStates[sendKey]) : undefined);
   // The open draft already says how its send is going: the bar above the list
   // stays quiet instead of repeating the same sentence.
+  const sendHoldNotice = item ? mailboxSendHoldPresentation(t, item) : null;
   const draftSendNotice =
-    item?.kind === "draft" && sendState ? t(sendStateMessage(sendState)) : null;
+    item?.kind === "draft" && sendState
+      ? (sendHoldNotice?.detail ?? t(sendStateMessage(sendState)))
+      : null;
   const barNotice = notice && notice !== draftSendNotice ? notice : "";
   const deliveryReady = capability.data?.deliveryReady === true;
   const isOwner = !!selectedBox?.ownerActive && selectedBox.ownerUserId === currentUserId;
@@ -4027,11 +4031,26 @@ export function MailboxContentView({
                                     </span>
                                   ) : null}
                                   {!blocked &&
-                                  mailboxDeliveryLabel(t, row.sendStatus, row.outboundSummary) ? (
-                                    <span>
-                                      {mailboxDeliveryLabel(t, row.sendStatus, row.outboundSummary)}
-                                    </span>
-                                  ) : null}
+                                    (mailboxSendHoldPresentation(t, row) ? (
+                                      <MailboxSendHoldNotice
+                                        t={t}
+                                        source={row}
+                                        variant="badge"
+                                        className={styles.warningBadge}
+                                      />
+                                    ) : mailboxDeliveryLabel(
+                                        t,
+                                        row.sendStatus,
+                                        row.outboundSummary,
+                                      ) ? (
+                                      <span>
+                                        {mailboxDeliveryLabel(
+                                          t,
+                                          row.sendStatus,
+                                          row.outboundSummary,
+                                        )}
+                                      </span>
+                                    ) : null)}
                                   {!blocked && row.snoozedUntil ? (
                                     <span>
                                       {t("timing.snoozedBadge", {
@@ -4679,6 +4698,7 @@ export function MailboxContentView({
                     <small>{date(item.date ?? item.updatedAt)}</small>
                   </header>
                   <div className={styles.messageBadges}>
+                    <MailboxSendHoldNotice t={t} source={item} variant="badge" />
                     {approval ? <span>{approvalText(approval)}</span> : null}
                     {item.kind === "sent" &&
                     mailboxDeliveryLabel(t, item.sendStatus, item.outboundSummary) ? (
@@ -4725,8 +4745,12 @@ export function MailboxContentView({
                     </p>
                   ) : item.kind === "draft" && sendState ? (
                     <p className={styles.contentNotice}>
-                      <span role="status">{t(sendStateMessage(sendState))}</span>
-                      {sendState === "unknown" ? (
+                      {sendHoldNotice ? (
+                        <MailboxSendHoldNotice t={t} source={item} />
+                      ) : (
+                        <span role="status">{t(sendStateMessage(sendState))}</span>
+                      )}
+                      {sendState === "unknown" || sendHoldNotice ? (
                         <>
                           {" "}
                           <button

@@ -1111,12 +1111,47 @@ describe("session-authenticated mailbox content", () => {
     );
     const queuedContent = await as().item({ mailboxId, id: saved.id });
     expect(queuedContent.sendStatus).toBe("queued");
+    expect(queuedContent.sendHold).toBeNull();
+    await db
+      .update(schema.mailboxOutbox)
+      .set({ errorCode: "mailbox_deferred:campaign_sending_disabled" })
+      .where(eq(schema.mailboxOutbox.id, queued.id));
+    const held = await as().item({ mailboxId, id: saved.id });
+    expect(held.sendHold).toMatchObject({
+      reason: "campaign_sending_disabled",
+      actionRequired: "contact_support",
+      automaticRetry: true,
+      nextRetryAt: null,
+    });
+    const list = await getMailboxContentList(db, actor(), { mailboxId, folder: "drafts" });
+    expect(list.items.find((item) => item.id === saved.id)?.sendHold).toEqual(held.sendHold);
+    const holdKey = await createMailboxAgentKey(db, actor(), {
+      mailboxId,
+      label: "Synthetic hold read",
+      scopes: ["read"],
+    });
+    await withMailboxAgentAccess(
+      db,
+      holdKey.token,
+      "read",
+      async ({ db: tx, actor: bearer, mailboxId: box }) => {
+        const read = await getMailboxContent(tx, bearer, { mailboxId: box, id: saved.id });
+        expect(read.sendHold).toEqual(held.sendHold);
+        const page = await getMailboxContentList(tx, bearer, { mailboxId: box, folder: "drafts" });
+        expect(page.items.find((item) => item.id === saved.id)?.sendHold).toEqual(held.sendHold);
+        await expect(
+          getMailboxContent(tx, bearer, { mailboxId: agentId, id: saved.id }),
+        ).rejects.toThrow();
+      },
+    );
+
     expect(queuedContent.outboundSummary).toMatchObject({ delivered: 0, unconfirmed: 1 });
     await db
       .update(schema.mailboxOutbox)
       .set({ status: "sending", attemptId: randomUUID(), attemptedAt: new Date() })
       .where(eq(schema.mailboxOutbox.id, queued.id));
     expect((await as().item({ mailboxId, id: saved.id })).sendStatus).toBe("sending");
+    expect((await as().item({ mailboxId, id: saved.id })).sendHold).toBeNull();
     for (const status of ["unknown", "failed"] as const) {
       await db
         .update(schema.mailboxOutbox)

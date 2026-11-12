@@ -14,6 +14,8 @@ import {
   MailboxContentError,
   type MailboxListPosition,
   type MailboxOutboundSummary,
+  type MailboxSendHold,
+  mailboxSendHold,
   saveMailboxDraft,
   storeMailboxListSummaries,
   summarizeMailboxThreads,
@@ -319,6 +321,7 @@ export async function getMailboxContent(
   let transportMessageId: string | null = null;
   let replyToSentItemId: string | null = null;
   let sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null = null;
+  let sendHold: MailboxSendHold | null = null;
   let sentBy: { kind: "human" | "agent"; label: string | null; draftedBy?: string | null } | null =
     null;
   let outboxId: string | null = null;
@@ -361,7 +364,13 @@ export async function getMailboxContent(
   }
   if (content.kind === "draft") {
     const [submitted] = await db
-      .select({ id: schema.mailboxOutbox.id, status: schema.mailboxOutbox.status })
+      .select({
+        id: schema.mailboxOutbox.id,
+        status: schema.mailboxOutbox.status,
+        errorCode: schema.mailboxOutbox.errorCode,
+        createdAt: schema.mailboxOutbox.createdAt,
+        updatedAt: schema.mailboxOutbox.updatedAt,
+      })
       .from(schema.mailboxOutbox)
       .where(
         and(
@@ -373,6 +382,7 @@ export async function getMailboxContent(
       )
       .limit(1);
     sendStatus = submitted?.status ?? null;
+    sendHold = submitted ? mailboxSendHold(submitted) : null;
     outboxId = submitted?.id ?? null;
   }
   const results = outboxId
@@ -389,6 +399,7 @@ export async function getMailboxContent(
     transportMessageId,
     replyToSentItemId,
     sendStatus,
+    sendHold,
     sentBy,
     outboundSummary,
   }));
@@ -407,6 +418,7 @@ async function listRowContents(
   type Content = ReturnType<typeof listDto> & {
     sentBy: { kind: "human" | "agent"; label: string | null; draftedBy?: string | null } | null;
     sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null;
+    sendHold: MailboxSendHold | null;
     outboundSummary: MailboxOutboundSummary | null;
     senderDecision: "allow" | "block" | "none" | null;
   };
@@ -478,6 +490,9 @@ async function listRowContents(
             draftId: schema.mailboxOutbox.draftId,
             draftRevision: schema.mailboxOutbox.draftRevision,
             status: schema.mailboxOutbox.status,
+            errorCode: schema.mailboxOutbox.errorCode,
+            createdAt: schema.mailboxOutbox.createdAt,
+            updatedAt: schema.mailboxOutbox.updatedAt,
           })
           .from(schema.mailboxOutbox)
           .where(
@@ -508,6 +523,7 @@ async function listRowContents(
       : null;
     await runLimited(parsed, 8, async ({ id, kind, revision, ...content }) => {
       let sendStatus: Content["sendStatus"] = null;
+      let sendHold: MailboxSendHold | null = null;
       let sentBy: Content["sentBy"] = null;
       let outboxId: string | null = null;
       if (kind === "sent") {
@@ -528,6 +544,7 @@ async function listRowContents(
           (entry) => entry.draftId === id && entry.draftRevision === revision,
         );
         sendStatus = match?.status ?? null;
+        sendHold = match ? mailboxSendHold(match) : null;
         outboxId = match?.id ?? null;
       }
       const results = outboxId
@@ -536,6 +553,7 @@ async function listRowContents(
       contents.set(`${mailboxId}:${id}`, {
         ...content,
         sendStatus,
+        sendHold,
         sentBy,
         outboundSummary: outboundDto(results),
         senderDecision:
@@ -801,6 +819,7 @@ export async function buildMailboxListRows(
     inboundAssessment: (typeof schema.mailboxItems.$inferSelect)["inboundAssessment"];
     sentBy: { kind: "human" | "agent"; label: string | null; draftedBy?: string | null } | null;
     sendStatus: (typeof schema.mailboxOutbox.$inferSelect)["status"] | null;
+    sendHold: MailboxSendHold | null;
     outboundSummary: MailboxOutboundSummary | null;
     senderDecision: "allow" | "block" | "none" | null;
     blocked: boolean;
@@ -857,6 +876,7 @@ export async function buildMailboxListRows(
         category: null,
         sentBy: null,
         sendStatus: null,
+        sendHold: null,
         outboundSummary: null,
         senderDecision: null,
         blocked: true,
@@ -902,6 +922,7 @@ export async function buildMailboxListRows(
       inboundAssessment: row.inboundAssessment,
       sentBy: item.sentBy,
       sendStatus: item.sendStatus,
+      sendHold: item.sendHold,
       outboundSummary: item.outboundSummary,
       senderDecision: item.senderDecision,
       blocked: false,

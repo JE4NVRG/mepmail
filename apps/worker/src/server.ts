@@ -26,6 +26,7 @@ import {
   unsubscribeBaseUrl,
 } from "@millionsend/config";
 import {
+  alertRetainedMailboxSends,
   checkMailboxRecipientBlocks,
   claimDueMailboxExternalAccounts,
   committedDailyVolume,
@@ -416,6 +417,9 @@ await queue.scheduleCrons(
             await queue.send("mailbox.send", { outboxId }, { dedupeKey: outboxId });
           },
         });
+      // Connected SMTP accounts run with the registry even when SES/domain
+      // transport is disabled. Keep their alert coverage without enabling it.
+      if (mailboxRegistryEnabled && !mailboxTransportEnabled) await alertRetainedMailboxSends(db);
     },
     "retention.purge": async () => {
       const purged = await purgeExpiredEmailBodies(db, {

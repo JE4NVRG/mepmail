@@ -670,6 +670,13 @@ export {
   mailboxSearchTerms,
   parseMailboxSearchQuery,
 } from "./mailbox-search.js";
+export {
+  MAILBOX_SEND_HOLD_REASONS,
+  type MailboxSendHold,
+  type MailboxSendHoldReason,
+  mailboxSendHold,
+  mailboxSendHoldCode,
+} from "./mailbox-send-hold.js";
 export { deriveMailboxSenderKey } from "./mailbox-senders.js";
 export {
   assertMailboxStorage,

@@ -7,10 +7,18 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createMailboxExternalAwareSender } from "../../../apps/worker/src/mailbox-external-sender.js";
-import { createMailboxSesSender } from "../../../apps/worker/src/mailbox-sender.js";
+import {
+  createMailboxContentPolicySender,
+  createMailboxSesSender,
+} from "../../../apps/worker/src/mailbox-sender.js";
 import { EnvKeyring } from "../src/crypto/keyring.js";
 import { createMailboxExternalAccount } from "../src/mailbox-external-accounts.js";
 import { saveMailboxDraft } from "../src/mailbox-private-store.js";
+import {
+  MAILBOX_SEND_HOLD_REASONS,
+  mailboxSendHold,
+  mailboxSendHoldCode,
+} from "../src/mailbox-send-hold.js";
 import {
   acceptMailboxOutbox,
   checkMailboxRecipientBlocks,
@@ -646,4 +654,195 @@ it("independently configured customer external mail still sends while platform S
   ).toEqual({ messageId: "independent-fixture" });
   expect(smtp).toHaveBeenCalledTimes(1);
   expect(ses).not.toHaveBeenCalled();
+});
+
+describe("truthful Native send holds", () => {
+  it("retains an approved queue after the same-team domain loses readiness, without sending", async () => {
+    const f = await setup();
+    const q = await f.queued();
+    const send = vi.fn();
+    await db
+      .update(schema.domains)
+      .set({ status: "pending" })
+      .where(eq(schema.domains.teamId, f.teamId));
+    const result = await sendMailboxOutbox(db, keys, q.id, { send }, mime);
+    expect(result.status).toBe("queued");
+    expect(result.hold).toMatchObject({
+      reason: "domain_not_ready",
+      actionRequired: "verify_domain",
+    });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("persists pre-claim signup review without claiming or sending and preserves reservation", async () => {
+    const f = await setup();
+    const q = await f.queued();
+    await db.insert(schema.teamSignupRisk).values({
+      teamId: f.teamId,
+      principalUserId: f.actor.userId,
+      level: "hold",
+      signals: {} as never,
+    });
+    const before = (
+      await db.select().from(schema.mailboxOutbox).where(eq(schema.mailboxOutbox.id, q.id))
+    )[0]!;
+    const send = vi.fn();
+    const result = await sendMailboxOutbox(db, keys, q.id, { send }, mime);
+    expect(result.status).toBe("queued");
+    expect(result.hold?.reason).toBe("review_required");
+    expect(send).not.toHaveBeenCalled();
+    const after = (
+      await db.select().from(schema.mailboxOutbox).where(eq(schema.mailboxOutbox.id, q.id))
+    )[0]!;
+    expect(after.attemptId).toBeNull();
+    expect(after.ciphertext).toEqual(before.ciphertext);
+    expect(after.periodStart).toEqual(before.periodStart);
+    expect(after.periodEnd).toEqual(before.periodEnd);
+  });
+
+  it.each(MAILBOX_SEND_HOLD_REASONS)(
+    "persists trusted %s with sealed payload and reservation",
+    async (reason) => {
+      const f = await setup();
+      const q = await f.queued();
+      const before = (
+        await db.select().from(schema.mailboxOutbox).where(eq(schema.mailboxOutbox.id, q.id))
+      )[0]!;
+      const result = await sendMailboxOutbox(
+        db,
+        keys,
+        q.id,
+        {
+          send: async () => {
+            throw new MailboxSendDeferredError(reason);
+          },
+        },
+        mime,
+      );
+      expect(result.status).toBe("queued");
+      expect(result.hold).toMatchObject({
+        reason,
+        automaticRetry: true,
+        nextRetryAt: null,
+        queuedSince: before.createdAt,
+      });
+      const after = (
+        await db.select().from(schema.mailboxOutbox).where(eq(schema.mailboxOutbox.id, q.id))
+      )[0]!;
+      expect(after.errorCode).toBe(mailboxSendHoldCode(reason));
+      expect(after.attemptId).toBeNull();
+      expect(after.ciphertext).toEqual(before.ciphertext);
+      expect(after.periodStart).toEqual(before.periodStart);
+      expect(after.periodEnd).toEqual(before.periodEnd);
+      let claimed = false;
+      const accepted = await sendMailboxOutbox(
+        db,
+        keys,
+        q.id,
+        {
+          send: async () => {
+            const row = (
+              await db.select().from(schema.mailboxOutbox).where(eq(schema.mailboxOutbox.id, q.id))
+            )[0]!;
+            expect(row.status).toBe("sending");
+            expect(row.errorCode).toBeNull();
+            expect(mailboxSendHold(row)).toBeNull();
+            claimed = true;
+            return { messageId: "hold-fixture" };
+          },
+        },
+        mime,
+      );
+      expect(claimed).toBe(true);
+      expect(accepted.status).toBe("accepted");
+      expect(accepted.hold).toBeNull();
+    },
+  );
+  it("keeps legacy and ambiguous states hold-free without interpreting raw errors", async () => {
+    const f = await setup();
+    const q = await f.queued();
+    expect(q.hold).toBeNull();
+    const send = vi.fn(async () => {
+      throw new Error("sending_paused secret fixture");
+    });
+    const result = await sendMailboxOutbox(db, keys, q.id, { send }, mime);
+    expect(result.status).toBe("unknown");
+    expect(result.hold).toBeNull();
+    await sendMailboxOutbox(db, keys, q.id, { send }, mime);
+    expect(send).toHaveBeenCalledTimes(1);
+    for (const status of ["sending", "accepted", "unknown", "failed"])
+      expect(
+        mailboxSendHold({
+          status,
+          errorCode: mailboxSendHoldCode("review_required"),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ).toBeNull();
+  });
+  it.each([
+    ["sending_paused", { paused: () => true }],
+    ["configuration_unavailable", { configurationSets: {} }],
+    ["quota_exceeded", { exhausted: () => true }],
+    [
+      "rate_limited",
+      {
+        throttle: async () => {
+          throw new Error("private adapter detail");
+        },
+      },
+    ],
+    [
+      "recipient_check_unavailable",
+      {
+        checkRecipients: async () => {
+          throw new Error("private adapter detail");
+        },
+      },
+    ],
+  ] as const)("maps the actual SES %s gate", async (reason, options) => {
+    const f = await setup();
+    const q = await f.queued();
+    const send = vi.fn();
+    const sender = createMailboxSesSender(db, {
+      configurationSets: { "us-east-1": "private_fixture" },
+      ...options,
+      clientFactory: () => ({ send }),
+    });
+    const result = await sendMailboxOutbox(db, keys, q.id, sender, mime);
+    expect(result.hold?.reason).toBe(reason);
+    expect(send).not.toHaveBeenCalled();
+    expect(JSON.stringify(result.hold)).not.toContain("private adapter detail");
+  });
+  it("reports explicit campaign disable only at the reached trusted routing gate", async () => {
+    const f = await setup();
+    const q = await f.queued();
+    const send = vi.fn();
+    const policy = {
+      version: 1,
+      defaults: { campaign: "disabled", transactional: "disabled" },
+    } as const;
+    // Synthetic newsletter data only, never customer MIME.
+    const input = {
+      idempotencyKey: q.id,
+      outboxId: q.id,
+      attemptId: randomUUID(),
+      teamId: f.teamId,
+      mailboxId: q.mailboxId,
+      from: (await mime.parse(f.raw)).from,
+      to: ["one@example.invalid"],
+      cc: [],
+      bcc: [],
+      raw: Buffer.from(
+        `From: ${(await mime.parse(f.raw)).from}\r\nTo: one@example.invalid\r\nSubject: Newsletter\r\n\r\nNewsletter`,
+      ),
+    };
+    const router = createMailboxContentPolicySender(db, { send }, false, policy);
+    await expect(router.send(input)).rejects.toMatchObject({ reason: "campaign_sending_disabled" });
+    input.raw = Buffer.from(
+      `From: ${(await mime.parse(f.raw)).from}\r\nTo: one@example.invalid\r\nSubject: Hello\r\n\r\nHello`,
+    );
+    await expect(router.send(input)).rejects.toMatchObject({ reason: "provider_unavailable" });
+    expect(send).not.toHaveBeenCalled();
+  });
 });

@@ -82,9 +82,10 @@ async function checkMailboxContent(
         })
       ).action === "hold"
     )
-      throw new MailboxSendDeferredError();
-  } catch {
-    throw new MailboxSendDeferredError();
+      throw new MailboxSendDeferredError("content_review");
+  } catch (error) {
+    if (error instanceof MailboxSendDeferredError) throw error;
+    throw new MailboxSendDeferredError("preflight_unavailable");
   }
   try {
     const parsed = await simpleParser(input.raw, { skipImageLinks: true, skipTextToHtml: true });
@@ -107,9 +108,10 @@ async function checkMailboxContent(
       from: parsed.from?.text ?? input.from,
       declaredCampaign,
     });
-    if (!consent.allowed) throw new MailboxSendDeferredError();
-  } catch {
-    throw new MailboxSendDeferredError();
+    if (!consent.allowed) throw new MailboxSendDeferredError("campaign_consent_required");
+  } catch (error) {
+    if (error instanceof MailboxSendDeferredError) throw error;
+    throw new MailboxSendDeferredError("preflight_unavailable");
   }
 }
 
@@ -140,14 +142,16 @@ export function withMailboxProbation(
         isSendReviewHeld(team) ||
         !(await checkSignupSend(db, input.teamId, [...input.to, ...input.cc, ...input.bcc])).allowed
       )
-        throw new MailboxSendDeferredError();
+        throw new MailboxSendDeferredError(
+          !team ? "preflight_unavailable" : team.suspendedAt ? "sending_paused" : "review_required",
+        );
       const quota = await applySenderProbationQuota(db, input.teamId, { kind: "none" }, true);
       const count = new Set([...input.to, ...input.cc, ...input.bcc].map((s) => s.toLowerCase()))
         .size;
       const at = new Date();
       const day = utcDay(at);
       if (!(await reserveQuota(db, { teamId: input.teamId, count, quota, at, day })).reserved)
-        throw new MailboxSendDeferredError();
+        throw new MailboxSendDeferredError("quota_exceeded");
       probationReserved.add(input);
       try {
         await checkMailboxContent(db, input);
@@ -263,31 +267,44 @@ export function createMailboxContentPolicySender(
           !!box.relayEnabledAt &&
           box.address === input.from;
         const provider = box?.origin === "external" ? "customer_smtp" : "ses";
+        const messageClass =
+          insight.marketing ||
+          mailboxCorrespondenceCampaign({
+            to: input.to,
+            cc: input.cc,
+            bcc: input.bcc,
+            subject: parsed.subject,
+            html,
+            text: authored ? authored.text : parsed.text,
+            headers: authored
+              ? authored.headers
+              : Object.fromEntries(parsed.headerLines.map((line) => [line.key, line.line])),
+          })
+            ? "campaign"
+            : "transactional";
         const route = resolveSendingProvider(policy, {
           teamId: input.teamId,
           ...(outbox ? { createdAt: outbox.createdAt } : {}),
           fromAddress: input.from,
-          messageClass:
-            insight.marketing ||
-            mailboxCorrespondenceCampaign({
-              to: input.to,
-              cc: input.cc,
-              bcc: input.bcc,
-              subject: parsed.subject,
-              html,
-              text: authored ? authored.text : parsed.text,
-              headers: authored
-                ? authored.headers
-                : Object.fromEntries(parsed.headerLines.map((line) => [line.key, line.line])),
-            })
-              ? "campaign"
-              : "transactional",
+          messageClass,
           legacyProvider: provider,
           availableProviders: new Set(
             box ? [provider, ...(azureAllowed ? ["azure_smtp"] : [])] : [],
           ),
         });
-        if (route.kind === "held") throw new MailboxSendDeferredError();
+        if (route.kind === "held") {
+          const selected =
+            policy.teams?.[input.teamId]?.[messageClass] ?? policy.defaults?.[messageClass];
+          throw new MailboxSendDeferredError(
+            route.reason === "operator_paused" || route.reason === "provider_paused"
+              ? "sending_paused"
+              : route.reason === "provider_unavailable" &&
+                  messageClass === "campaign" &&
+                  selected === "disabled"
+                ? "campaign_sending_disabled"
+                : "provider_unavailable",
+          );
+        }
         if (route.provider === "azure_smtp") return azure!.send(input);
       }
       return withMailboxProbation(db, sender, isCloud).send(input);
@@ -397,7 +414,7 @@ export function createMailboxSesSender(
   ): Promise<string | undefined> {
     if (regionalOverride) {
       if (!opts.tenants) return undefined;
-      if (!domain.tenantName) throw new MailboxSendDeferredError();
+      if (!domain.tenantName) throw new MailboxSendDeferredError("configuration_unavailable");
       try {
         const tenants = client as unknown as SesTenantClient;
         const { accountId } = await ensureTenant(tenants, { tenantName: domain.tenantName });
@@ -413,7 +430,7 @@ export function createMailboxSesSender(
         return domain.tenantName;
       } catch {
         // Original-region DB metadata is not authority in the destination. Never send untagged.
-        throw new MailboxSendDeferredError();
+        throw new MailboxSendDeferredError("configuration_unavailable");
       }
     }
     if (!domain.tenantAssociatedAt || !domain.tenantName) return undefined;
@@ -455,7 +472,9 @@ export function createMailboxSesSender(
       team.suspended ||
       !(await checkSignupSend(db, teamId, recipients)).allowed
     ) {
-      throw new MailboxSendDeferredError();
+      throw new MailboxSendDeferredError(
+        !team ? "preflight_unavailable" : team.suspended ? "sending_paused" : "review_required",
+      );
     }
     if (!opts.checkRecipients) return;
     let allowed: boolean;
@@ -463,7 +482,7 @@ export function createMailboxSesSender(
       allowed = await opts.checkRecipients({ teamId, recipients });
     } catch {
       // A failed lookup is a preflight failure, never evidence of provider acceptance.
-      throw new MailboxSendDeferredError();
+      throw new MailboxSendDeferredError("recipient_check_unavailable");
     }
     if (allowed !== true) throw new MailboxSendRejectedError();
   }
@@ -524,7 +543,7 @@ export function createMailboxSesSender(
           throw new MailboxSendRejectedError();
         // A send-review hold keeps the message for the operator's release, as
         // it keeps the team's API mail.
-        if (isSendReviewHeld(domain)) throw new MailboxSendDeferredError();
+        if (isSendReviewHeld(domain)) throw new MailboxSendDeferredError("review_required");
         if (opts.isCloud) await checkMailboxContent(db, input);
         let region: string;
         try {
@@ -535,28 +554,28 @@ export function createMailboxSesSender(
             region: domain.region,
           });
         } catch {
-          throw new MailboxSendDeferredError();
+          throw new MailboxSendDeferredError("preflight_unavailable");
         }
         const accountPaused = () =>
           opts.paused?.(region) === true || opts.sesQuota?.accountPaused?.(region) === true;
         // An SES enforcement stop never authorizes automatic relay/region failover.
-        if (accountPaused()) throw new MailboxSendDeferredError();
+        if (accountPaused()) throw new MailboxSendDeferredError("sending_paused");
         const configurationSet = configurationSets[region];
-        if (!configurationSet) throw new MailboxSendDeferredError();
+        if (!configurationSet) throw new MailboxSendDeferredError("configuration_unavailable");
         // Campaign configuration can enable SES Open/Click body rewriting. Mail
         // always requires its own explicit regional operator configuration.
         if (configurationSet === domain.configurationSet) throw new MailboxSendRejectedError();
         await refuseSesOverrides(input.raw);
         if (opts.exhausted?.(region) || opts.sesQuota?.exhausted(region))
-          throw new MailboxSendDeferredError();
+          throw new MailboxSendDeferredError("quota_exceeded");
         try {
           await opts.throttle?.(region, recipientCount);
         } catch {
           // Cancellation or a failed local permit cannot have accepted this message.
-          throw new MailboxSendDeferredError();
+          throw new MailboxSendDeferredError("rate_limited");
         }
         if (opts.exhausted?.(region) || opts.sesQuota?.exhausted(region))
-          throw new MailboxSendDeferredError();
+          throw new MailboxSendDeferredError("quota_exceeded");
         await allowedRecipients(input.teamId, recipients);
         let client = clients.get(region);
         if (!client) {
@@ -579,7 +598,7 @@ export function createMailboxSesSender(
         // A restriction introduced during that wait still precedes the send.
         await allowedRecipients(input.teamId, recipients);
         if (accountPaused() || opts.exhausted?.(region) || opts.sesQuota?.exhausted(region))
-          throw new MailboxSendDeferredError();
+          throw new MailboxSendDeferredError(accountPaused() ? "sending_paused" : "quota_exceeded");
         if (opts.isCloud) await checkMailboxContent(db, input);
         let response: Awaited<ReturnType<MailboxSesClient["send"]>>;
         try {
@@ -603,7 +622,7 @@ export function createMailboxSesSender(
         } catch (error) {
           // Only explicit documented SES refusals prove there was no acceptance.
           if (await isSesEnforcementRefusal(error, opts.sesQuota, region))
-            throw new MailboxSendDeferredError();
+            throw new MailboxSendDeferredError("sending_paused");
           const name = error instanceof Error ? error.name : "";
           if (
             [

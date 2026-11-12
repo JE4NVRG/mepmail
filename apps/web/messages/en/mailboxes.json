@@ -1298,5 +1298,31 @@
     "expired": "The time to restore has ended and the mailbox is being erased.",
     "mismatch": "The address you typed does not match.",
     "error": "Could not finish right now. Try again."
+  },
+  "sendHold": {
+    "label": "Send on hold",
+    "automaticRetry": "We will check again automatically; delivery time is not confirmed.",
+    "noAutomaticRetry": "No automatic retry is scheduled. Use Check status for the latest state.",
+    "noResend": "Do not resend this message: it is already queued.",
+    "reasons": {
+      "review_required": "Sending is awaiting a safety review.",
+      "campaign_consent_required": "This campaign needs recipient consent confirmation.",
+      "campaign_sending_disabled": "This type of send is currently unavailable.",
+      "sending_paused": "Sending is temporarily paused.",
+      "provider_unavailable": "The sending service is temporarily unavailable.",
+      "quota_exceeded": "The sending allowance has been reached.",
+      "rate_limited": "Sending is temporarily rate-limited.",
+      "domain_not_ready": "The sending domain is not ready.",
+      "recipient_check_unavailable": "Recipient checks are temporarily unavailable.",
+      "configuration_unavailable": "Sending setup could not be checked.",
+      "content_review": "This message is awaiting a content review.",
+      "preflight_unavailable": "Pre-send checks are temporarily unavailable."
+    },
+    "actions": {
+      "none": "No action is needed from you right now.",
+      "review": "Review the sending notice in your account. Contact support if you need help.",
+      "verify_domain": "Check your sending domain verification in Settings.",
+      "contact_support": "Contact support for help with this hold."
+    }
   }
 }

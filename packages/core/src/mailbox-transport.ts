@@ -50,6 +50,12 @@ import {
   mailboxRuleFor,
   mailboxRuleTargetUsable,
 } from "./mailbox-rules.js";
+import {
+  type MailboxSendHoldReason,
+  mailboxSendHold,
+  mailboxSendHoldCode,
+} from "./mailbox-send-hold.js";
+import { alertRetainedMailboxSends } from "./mailbox-send-hold-alerts.js";
 import { isMailboxSenderBlocked } from "./mailbox-senders.js";
 import {
   assertMailboxStorage,
@@ -114,7 +120,7 @@ export class MailboxSendRejectedError extends Error {
  * proving nonacceptance. Never wrap a timeout, disconnect, 5xx or lost response.
  */
 export class MailboxSendDeferredError extends Error {
-  constructor() {
+  constructor(readonly reason: MailboxSendHoldReason = "preflight_unavailable") {
     super("mailbox_provider_preflight_deferred");
   }
 }
@@ -582,6 +588,7 @@ function outboxDto(row: Outbox, duplicate: boolean) {
     attemptedAt: row.attemptedAt,
     acceptedAt: row.acceptedAt,
     errorCode: row.errorCode,
+    hold: mailboxSendHold(row),
     duplicate,
   };
 }
@@ -1415,7 +1422,8 @@ export async function sendMailboxOutbox(
           .from(schema.domains)
           .where(and(eq(schema.domains.id, box!.domainId!), eq(schema.domains.teamId, row!.teamId)))
           .for("share");
-        if (domain?.status !== "verified") throw new MailboxContentError("forbidden");
+        if (!domain) throw new MailboxContentError("forbidden");
+        if (domain.status !== "verified") throw new MailboxSendDeferredError("domain_not_ready");
       }
       const raw = await open(row!, keys);
       if (hash(raw) !== row!.rawSha256) throw new MailboxContentError("invalid");
@@ -1424,7 +1432,7 @@ export async function sendMailboxOutbox(
         throw new MailboxContentError("invalid");
       const recipients = [...parsed.to, ...parsed.cc, ...parsed.bcc];
       if (!(await checkSignupSend(tx, row!.teamId, recipients)).allowed) {
-        throw new MailboxSendDeferredError();
+        throw new MailboxSendDeferredError("review_required");
       }
       const recipientHashes = approvedHashes(row!.teamId, recipients, parsed.count);
       if (
@@ -1441,6 +1449,7 @@ export async function sendMailboxOutbox(
         .update(mailboxOutbox)
         .set({
           status: "sending",
+          errorCode: null,
           recipientHashes,
           attemptId: randomUUID(),
           attemptedAt: now,
@@ -1474,6 +1483,29 @@ export async function sendMailboxOutbox(
       throw new MailboxAgentAccessError("forbidden");
     }
   } catch (error) {
+    if (error instanceof MailboxSendDeferredError) {
+      const [deferred] = await db
+        .update(mailboxOutbox)
+        .set({
+          errorCode: mailboxSendHoldCode(error.reason),
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(mailboxOutbox.id, known.id),
+            eq(mailboxOutbox.teamId, known.teamId),
+            eq(mailboxOutbox.mailboxId, known.mailboxId),
+            eq(mailboxOutbox.status, "queued"),
+            eq(mailboxOutbox.approvedBy, known.approvedBy),
+            eq(mailboxOutbox.approvedMembershipId, known.approvedMembershipId),
+          ),
+        )
+        .returning();
+      if (deferred) return outboxDto(deferred, false);
+      const [current] = await db.select().from(mailboxOutbox).where(eq(mailboxOutbox.id, known.id));
+      if (!current) throw new MailboxContentError("not_found");
+      return outboxDto(current, true);
+    }
     if (
       !(error instanceof MailboxContentError) &&
       !(error instanceof MailboxServiceError) &&
@@ -1529,7 +1561,7 @@ export async function sendMailboxOutbox(
           status: "queued",
           attemptId: null,
           attemptedAt: null,
-          errorCode: null,
+          errorCode: mailboxSendHoldCode(error.reason),
           updatedAt: new Date(),
         })
         .where(
@@ -1595,6 +1627,7 @@ export async function reconcileMailboxOutbox(
     .where(eq(mailboxOutbox.status, "queued"))
     .orderBy(asc(mailboxOutbox.createdAt), asc(mailboxOutbox.id))
     .limit(1000);
+  await alertRetainedMailboxSends(db, now);
   for (const row of pending) await opts.enqueue(row.id);
   return { requeued: pending.length, unknown: interrupted.length };
 }

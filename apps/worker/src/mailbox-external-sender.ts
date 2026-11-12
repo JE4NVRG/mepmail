@@ -43,16 +43,19 @@ export function createMailboxExternalAwareSender(
     async send(input) {
       const recipients = [...input.to, ...input.cc, ...input.bcc];
       const standing = await fetchTeamStanding(db, input.teamId);
-      if (standing?.suspended || standing?.sendReview) throw new MailboxSendDeferredError();
+      if (standing?.suspended || standing?.sendReview)
+        throw new MailboxSendDeferredError(
+          standing.suspended ? "sending_paused" : "review_required",
+        );
       if (!(await checkSignupSend(db, input.teamId, recipients)).allowed)
-        throw new MailboxSendDeferredError();
+        throw new MailboxSendDeferredError("review_required");
       const [box] = await db
         .select({ origin: schema.mailboxes.origin })
         .from(schema.mailboxes)
         .where(eq(schema.mailboxes.id, input.mailboxId));
       if (box?.origin !== "external") {
         // SES off (MAILBOX_TRANSPORT_ENABLED unset): domain mailboxes wait, as before.
-        if (!ses) throw new MailboxSendDeferredError();
+        if (!ses) throw new MailboxSendDeferredError("provider_unavailable");
         return ses.send(input);
       }
       const account = await openMailboxExternalAccount(db, keyring, input.mailboxId);
@@ -106,9 +109,12 @@ export function createMailboxExternalAwareSender(
       try {
         // Credentials/DNS may have waited: a new restriction still precedes SMTP.
         const latest = await fetchTeamStanding(db, input.teamId);
-        if (latest?.suspended || latest?.sendReview) throw new MailboxSendDeferredError();
+        if (latest?.suspended || latest?.sendReview)
+          throw new MailboxSendDeferredError(
+            latest.suspended ? "sending_paused" : "review_required",
+          );
         if (!(await checkSignupSend(db, input.teamId, recipients)).allowed)
-          throw new MailboxSendDeferredError();
+          throw new MailboxSendDeferredError("review_required");
         const info = await transport.sendMail({
           envelope: { from: input.from, to: [...input.to, ...input.cc, ...input.bcc] },
           // Bcc and the format marker stay on the sealed copies and never leave.

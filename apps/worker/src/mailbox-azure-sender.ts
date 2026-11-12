@@ -30,12 +30,13 @@ export function createMailboxAzureSender(
 ): MailboxOutboxSender {
   const unavailable: MailboxOutboxSender = {
     async send() {
-      throw new MailboxSendDeferredError();
+      throw new MailboxSendDeferredError("provider_unavailable");
     },
   };
   const attempt: MailboxOutboxSender = {
     async send(input) {
-      if (options.relay.name !== "azure") throw new MailboxSendDeferredError();
+      if (options.relay.name !== "azure")
+        throw new MailboxSendDeferredError("provider_unavailable");
       const recipients = [
         ...new Set([...input.to, ...input.cc, ...input.bcc].map((r) => r.toLowerCase())),
       ];
@@ -45,24 +46,27 @@ export function createMailboxAzureSender(
           !(await checkSignupSend(db, input.teamId, recipients)).allowed ||
           !(await checkMailboxRecipientBlocks(db, { teamId: input.teamId, recipients }))
         )
-          throw new MailboxSendDeferredError();
+          throw new MailboxSendDeferredError("preflight_unavailable");
         const standing = await fetchTeamStanding(db, input.teamId);
         if (!standing || standing.suspended || standing.sendReview)
-          throw new MailboxSendDeferredError();
+          throw new MailboxSendDeferredError(
+            standing?.sendReview ? "review_required" : "sending_paused",
+          );
         // Re-read domain/relay, grants, seat, license and credential expiry after
         // slow checks. No caller-declared actor or stale queue approval grants access.
         await assertMailboxOutboxSendAccess(db, input);
       };
       try {
         await authorize();
-      } catch {
-        throw new MailboxSendDeferredError();
+      } catch (error) {
+        if (error instanceof MailboxSendDeferredError) throw error;
+        throw new MailboxSendDeferredError("preflight_unavailable");
       }
       const reserved = await reserveMailboxAzureBudget(db, {
         ...input,
         recipients: recipients.length,
       });
-      if (reserved === "quota") throw new MailboxSendDeferredError();
+      if (reserved === "quota") throw new MailboxSendDeferredError("quota_exceeded");
       // A replay/stale attempt cannot reset to queued: only evidence can resolve it.
       if (reserved !== "reserved") throw new Error("mailbox_azure_attempt_fenced");
       try {

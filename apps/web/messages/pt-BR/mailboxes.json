@@ -1298,5 +1298,31 @@
     "expired": "O prazo para restaurar acabou e a caixa está sendo apagada.",
     "mismatch": "O endereço digitado não confere.",
     "error": "Não deu para concluir agora. Tente de novo."
+  },
+  "sendHold": {
+    "label": "Envio retido",
+    "automaticRetry": "Vamos verificar novamente de forma automática; o prazo de entrega não está confirmado.",
+    "noAutomaticRetry": "Não há nova tentativa automática agendada. Use Verificar estado para consultar a situação atual.",
+    "noResend": "Não reenvie esta mensagem: ela já está na fila.",
+    "reasons": {
+      "review_required": "O envio aguarda uma análise de segurança.",
+      "campaign_consent_required": "Esta campanha precisa de confirmação do consentimento dos destinatários.",
+      "campaign_sending_disabled": "Este tipo de envio está indisponível no momento.",
+      "sending_paused": "Os envios estão temporariamente pausados.",
+      "provider_unavailable": "O serviço de envio está temporariamente indisponível.",
+      "quota_exceeded": "O limite de envio foi atingido.",
+      "rate_limited": "O ritmo de envio está temporariamente limitado.",
+      "domain_not_ready": "O domínio de envio ainda não está pronto.",
+      "recipient_check_unavailable": "A verificação dos destinatários está temporariamente indisponível.",
+      "configuration_unavailable": "Não foi possível verificar a configuração de envio.",
+      "content_review": "Esta mensagem aguarda uma análise de conteúdo.",
+      "preflight_unavailable": "As verificações anteriores ao envio estão temporariamente indisponíveis."
+    },
+    "actions": {
+      "none": "Você não precisa fazer nada neste momento.",
+      "review": "Confira o aviso de envio na sua conta. Fale com o suporte se precisar de ajuda.",
+      "verify_domain": "Confira a verificação do domínio de envio em Configurações.",
+      "contact_support": "Fale com o suporte para obter ajuda com este envio retido."
+    }
   }
 }
