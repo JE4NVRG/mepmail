@@ -17,14 +17,17 @@ it("Native personal To/Cc/reply-all stays transactional; public Send remains str
   expect(mailboxCorrespondenceCampaign(personal)).toBe(false);
   expect(campaignMessage(personal)).toBe(true);
   expect(mailboxCorrespondenceCampaign({ ...personal, cc: [] })).toBe(false);
-  expect(mailboxCorrespondenceCampaign({
-    ...personal,
-    cc: Array.from({ length: 6 }, (_, i) => `person${i}@example.test`),
-  })).toBe(false);
+  expect(
+    mailboxCorrespondenceCampaign({
+      ...personal,
+      cc: Array.from({ length: 6 }, (_, i) => `person${i}@example.test`),
+    }),
+  ).toBe(false);
 });
 it("matches existing composer ceiling and rejects empty/mass recipients at adapter boundary", () => {
   const transport = readFileSync(
-    new URL("../../../packages/core/src/mailbox-transport.ts", import.meta.url), "utf8",
+    new URL("../../../packages/core/src/mailbox-transport.ts", import.meta.url),
+    "utf8",
   );
   expect(transport).toContain(`const MAX_RECIPIENTS = ${MAILBOX_CORRESPONDENCE_MAX_RECIPIENTS};`);
   const bounded = {
@@ -33,7 +36,10 @@ it("matches existing composer ceiling and rejects empty/mass recipients at adapt
   };
   expect(mailboxCorrespondenceCampaign(bounded)).toBe(false);
   expect(() => assertMailboxCorrespondenceRecipients(bounded)).not.toThrow();
-  for (const invalid of [{ ...bounded, bcc: ["extra@example.test"] }, { to: [], cc: [] }]) {
+  for (const invalid of [
+    { ...bounded, bcc: ["extra@example.test"] },
+    { to: [], cc: [] },
+  ]) {
     expect(mailboxCorrespondenceCampaign(invalid)).toBe(true);
     expect(() => assertMailboxCorrespondenceRecipients(invalid)).toThrow();
   }
