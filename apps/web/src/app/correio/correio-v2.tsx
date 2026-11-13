@@ -1,6 +1,7 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { DocsLink } from "@/components/public-events";
+import { SignupAvailability } from "@/components/signup-availability";
 import {
   PublicFooter,
   PublicHeader,
@@ -15,6 +16,7 @@ import { legalLinks } from "@/lib/legal-links";
 import { signupMailboxHref } from "@/lib/public-intent";
 import { correioJsonLd, faqJsonLd, siteBaseUrl } from "@/lib/structured-data";
 import { titlePhrases } from "@/lib/title-phrases";
+import { publicMarketingAdmission } from "@/server/public-marketing-admission";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "../site-v2.css";
@@ -44,6 +46,7 @@ export async function CorreioV2() {
     getTranslations("landing"),
     getLocale(),
   ]);
+  const { closed, copy } = await publicMarketingAdmission(locale);
   const brazil = locale === "pt-BR";
   const site = {
     skip: l("skip"),
@@ -75,7 +78,7 @@ export async function CorreioV2() {
   ];
   const b = (chunks: ReactNode) => <strong>{chunks}</strong>;
 
-  return (
+  const content = (
     <div className="gtm v2">
       <StructuredData graph={graph} />
       <PublicHeader labels={site} page="correio" />
@@ -90,7 +93,7 @@ export async function CorreioV2() {
               <p className="v2-lead">{t("hero.lead")}</p>
               <div className="v2-actions">
                 <SignupLink
-                  label={l("domainHero.cta")}
+                  label={closed ? copy.check : l("domainHero.cta")}
                   className="v2-btn v2-btn-ink"
                   mailboxPlan="choose"
                 />
@@ -98,11 +101,15 @@ export async function CorreioV2() {
                   {t("hero.plans")}
                 </a>
               </div>
-              <p className="v2-note">{t.rich("hero.note", { price: mailFrom, b })}</p>
+              <p className="v2-note">
+                {closed ? copy.admissionBody : t.rich("hero.note", { price: mailFrom, b })}
+              </p>
               <p className="v2-actions">
-                <span className="v2-pill v2-pill-ok">{c("release.heroStatus")}</span>
-                <a className="v2-link-accent" href={MAIL_SIGNUP}>
-                  {t("hero.noDomain")} <span aria-hidden="true">→</span>
+                <span className="v2-pill v2-pill-ok">
+                  {closed ? copy.admissionTitle : c("release.heroStatus")}
+                </span>
+                <a className="v2-link-accent" href={closed ? "/status#admission" : MAIL_SIGNUP}>
+                  {closed ? copy.check : t("hero.noDomain")} <span aria-hidden="true">→</span>
                 </a>
               </p>
             </div>
@@ -174,8 +181,10 @@ export async function CorreioV2() {
               <span>{t("facts.domainsLabel")}</span>
             </li>
             <li className="v2-fact">
-              <strong>{t("facts.trial", { count: LAUNCH_OFFER.correioTrialDays })}</strong>
-              <span>{t("facts.trialLabel")}</span>
+              <strong>
+                {closed ? "—" : t("facts.trial", { count: LAUNCH_OFFER.correioTrialDays })}
+              </strong>
+              <span>{closed ? copy.admissionTitle : t("facts.trialLabel")}</span>
             </li>
             <li className="v2-fact">
               <strong>{t("facts.free")}</strong>
@@ -243,10 +252,10 @@ export async function CorreioV2() {
         >
           <div className="v2-wrap">
             <h2 id="correio-setup-title" className="v2-h2">
-              {t("setup.title")}
+              {closed ? copy.catalog : t("setup.title")}
             </h2>
             <ol className="v2-steps">
-              {steps.map((step, index) => (
+              {(closed ? [] : steps).map((step, index) => (
                 <li className="v2-step" key={step.title}>
                   <span className="v2-step-num" aria-hidden="true">
                     {index + 1}
@@ -270,9 +279,9 @@ export async function CorreioV2() {
         <section className="v2-violet v2-sec" id="ja-tenho" aria-labelledby="correio-free-title">
           <div className="v2-wrap v2-row">
             <div className="v2-stack">
-              <p className="v2-eyebrow">{t("free.eyebrow")}</p>
+              <p className="v2-eyebrow">{closed ? copy.admissionTitle : t("free.eyebrow")}</p>
               <h2 id="correio-free-title" className="v2-h2">
-                {t("free.title")}
+                {closed ? copy.admissionTitle : t("free.title")}
               </h2>
               <p className="v2-lead">{t("free.body")}</p>
             </div>
@@ -285,8 +294,8 @@ export async function CorreioV2() {
                 ))}
               </ul>
               <p>
-                <a className="v2-btn v2-btn-bone" href={MAIL_SIGNUP}>
-                  {t("free.cta")}
+                <a className="v2-btn v2-btn-bone" href={closed ? "/status#admission" : MAIL_SIGNUP}>
+                  {closed ? copy.check : t("free.cta")}
                 </a>
               </p>
             </div>
@@ -359,16 +368,17 @@ export async function CorreioV2() {
                     </ul>
                     <a
                       className={`v2-btn v2-btn-block ${featured ? "v2-btn-bone" : "v2-btn-line"}`}
-                      href={signupMailboxHref(plan.id)}
+                      href={closed ? "/status#admission" : signupMailboxHref(plan.id)}
                     >
-                      {t("plans.cta", { plan: name })}
+                      {closed ? copy.check : t("plans.cta", { plan: name })}
                     </a>
                   </article>
                 );
               })}
             </div>
             <p className="v2-note v2-gap">
-              {t("plans.note", { abroad: abroad.join(" · ") })} {c("release.plansNote")}
+              {closed ? copy.catalog : t("plans.note", { abroad: abroad.join(" · ") })}{" "}
+              {c("release.plansNote")}
             </p>
             <details className="v2-details">
               <summary>{t("plans.limits")}</summary>
@@ -449,7 +459,7 @@ export async function CorreioV2() {
             </h2>
             <div className="v2-actions">
               <SignupLink
-                label={l("domainHero.cta")}
+                label={closed ? copy.check : l("domainHero.cta")}
                 className="v2-btn v2-btn-bone"
                 mailboxPlan="choose"
               />
@@ -457,7 +467,9 @@ export async function CorreioV2() {
                 {t("close.plans")}
               </a>
             </div>
-            <p className="v2-note">{t("close.note", { price: mailFrom })}</p>
+            <p className="v2-note">
+              {closed ? copy.admissionBody : t("close.note", { price: mailFrom })}
+            </p>
           </div>
         </section>
       </main>
@@ -468,5 +480,8 @@ export async function CorreioV2() {
         legal={legalLinks()}
       />
     </div>
+  );
+  return (
+    <SignupAvailability closedLabel={closed ? copy.check : null}>{content}</SignupAvailability>
   );
 }

@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/site-chrome";
 import { legalLinks } from "@/lib/legal-links";
+import { publicSignupCopy } from "@/lib/public-signup-copy";
 import { readPublicStatus } from "@/lib/public-status";
 import { PUBLISHED_INCIDENTS } from "@/lib/public-status-history";
+import { newSubscriptionsPaused } from "@/server/new-subscriptions";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "./status.css";
@@ -34,6 +36,8 @@ export default async function StatusPage() {
     nav: l.raw("nav"),
     footer: l.raw("footer"),
   } as PublicSiteLabels;
+  const admissionPaused = newSubscriptionsPaused();
+  const copy = publicSignupCopy(locale);
   const available = snapshot.checks.every((check) => check.available);
   const stamp = new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
@@ -56,6 +60,17 @@ export default async function StatusPage() {
             <p className="gtm-note">
               {t("checkedAt", { time: stamp.format(new Date(snapshot.checkedAt)) })}
             </p>
+            <article
+              id="admission"
+              className="ms-card gtm-status-service"
+              aria-labelledby="admission-title"
+            >
+              <h2 id="admission-title">{admissionPaused ? copy.admissionTitle : copy.check}</h2>
+              <p>{admissionPaused ? copy.admissionBody : copy.availabilityBody}</p>
+              <a href="/login">{copy.login}</a>
+              {" · "}
+              <a href="/support">{copy.contact}</a>
+            </article>
             <div className="gtm-status-grid">
               {snapshot.checks.map((check) => (
                 <article className="ms-card gtm-status-service" key={check.id}>

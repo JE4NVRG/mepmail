@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { trackEvent } from "@/lib/analytics";
 import type { LandingPlan, PlanCopy } from "@/lib/landing-plans";
+import { useClosedSignupLabel } from "./signup-availability";
 import { SignupCta } from "./signup-cta";
 
 /**
@@ -27,6 +28,7 @@ export interface PlanCardLabels {
 
 export function PlanCard({ plan, labels }: { plan: LandingPlan; labels: PlanCardLabels }) {
   const copy: PlanCopy = plan.copy;
+  const closedLabel = useClosedSignupLabel();
   const card = useRef<HTMLElement | null>(null);
   // One view per card per page load: scrolling away and back is not a new view,
   // and the Scale cards fire only once the <details> fold is opened.
@@ -81,7 +83,9 @@ export function PlanCard({ plan, labels }: { plan: LandingPlan; labels: PlanCard
         plan={plan.name}
         rung={plan.rung}
       />
-      {plan.price !== "US$ 0" ? <p className="gtm-cta-note">{labels.ctaNote}</p> : null}
+      {!closedLabel && plan.price !== "US$ 0" ? (
+        <p className="gtm-cta-note">{labels.ctaNote}</p>
+      ) : null}
     </article>
   );
 }

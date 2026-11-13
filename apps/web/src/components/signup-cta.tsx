@@ -60,7 +60,7 @@ export function SignupCta({
   }
   if (closedLabel) {
     return (
-      <a className={className} href="/signup">
+      <a className={className} href="/status#admission">
         {closedLabel}
       </a>
     );

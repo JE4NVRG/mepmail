@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { SignupAvailability } from "@/components/signup-availability";
 import { publicSignupCopy } from "@/lib/public-signup-copy";
+import { newSubscriptionsPaused } from "@/server/new-subscriptions";
 import { publicPageUrls } from "@/server/public-seo";
 import { publicSignupAvailability } from "@/server/public-signup";
 import { LegacyHome, standaloneMailOpen } from "./home-legacy";
@@ -36,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function RootPage() {
   // Called, not mounted: the page resolves the whole tree, as before the split.
-  const availability = await publicSignupAvailability();
+  const availability = newSubscriptionsPaused() ? "paused" : await publicSignupAvailability();
   const closedLabel = availability === "open" ? null : publicSignupCopy(await getLocale()).check;
   const home = standaloneMailOpen() ? await HomeV2() : await LegacyHome();
   return <SignupAvailability closedLabel={closedLabel}>{home}</SignupAvailability>;

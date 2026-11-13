@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { PlanCard, type PlanCardLabels } from "@/components/plan-card";
+import { SignupAvailability } from "@/components/signup-availability";
 import { SignupCta } from "@/components/signup-cta";
 import {
   PublicFooter,
@@ -24,6 +25,7 @@ import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { signupMailboxHref } from "@/lib/public-intent";
 import { faqJsonLd } from "@/lib/structured-data";
+import { publicMarketingAdmission } from "@/server/public-marketing-admission";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "../site-v2.css";
@@ -68,6 +70,7 @@ export default async function PricingPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const locale = await getLocale();
+  const { closed, copy } = await publicMarketingAdmission(locale);
   // Only an explicit Mail selection changes the default Send-first ordering.
   const params = (await searchParams) ?? {};
   const sendFirst = params.focus !== "mail";
@@ -207,7 +210,7 @@ export default async function PricingPage({
             </li>
           ))}
         </ul>
-        <p className="v2-fine">{t("board.mailNote")}</p>
+        <p className="v2-fine">{closed ? copy.catalog : t("board.mailNote")}</p>
       </div>
       <div className="v2p-panel v2p-panel-send">
         <h2 id="pricing-board-send" className="v2p-panel-title">
@@ -323,7 +326,7 @@ export default async function PricingPage({
                       </li>
                       <li>{t("correio.planInbound", { count: plan.monthlyInboundMessages })}</li>
                       <li>{t("correio.domains", { count: plan.domains })}</li>
-                      <li>{t("correio.trial")}</li>
+                      <li>{closed ? copy.catalog : t("correio.trial")}</li>
                       <li>
                         {t("correio.planLocal", {
                           price: brazil
@@ -334,9 +337,9 @@ export default async function PricingPage({
                     </ul>
                     <a
                       className={`v2-btn v2-btn-block ${featured ? "v2-btn-bone" : "v2-btn-line"}`}
-                      href={signupMailboxHref(plan.id)}
+                      href={closed ? "/status#admission" : signupMailboxHref(plan.id)}
                     >
-                      {t("v2.correioCta", { plan: name })}
+                      {closed ? copy.check : t("v2.correioCta", { plan: name })}
                     </a>
                   </article>
                 );
@@ -356,7 +359,9 @@ export default async function PricingPage({
                 </article>
               ))}
         </div>
-        {standaloneOpen ? <p className="v2-note v2-gap">{t("v2.correioFree")}</p> : null}
+        {standaloneOpen ? (
+          <p className="v2-note v2-gap">{closed ? copy.catalog : t("v2.correioFree")}</p>
+        ) : null}
         <details className="v2-details">
           <summary>{t("v2.correioDetails")}</summary>
           <div>
@@ -391,7 +396,7 @@ export default async function PricingPage({
     </section>
   );
 
-  return (
+  const content = (
     <div className="gtm v2">
       <StructuredData graph={[faqJsonLd(faq)]} />
       <PublicHeader labels={site} page="pricing" />
@@ -418,15 +423,15 @@ export default async function PricingPage({
           <section className="v2-dark v2-sec pricing-intro">
             <div className="v2-wrap v2-stack">
               <p className="v2-eyebrow v2-eyebrow-mono">{t("sendHero.eyebrow")}</p>
-              <h1>{t("choice.sendTitle")}</h1>
-              <p className="v2-lead">{t("sendHero.lead")}</p>
+              <h1>{closed ? copy.admissionTitle : t("choice.sendTitle")}</h1>
+              <p className="v2-lead">{closed ? copy.admissionBody : t("sendHero.lead")}</p>
               <p className="pricing-entry-note">
-                {t("choice.sendEntry", { price: allPlans[1]?.price ?? "" })}
+                {closed ? copy.catalog : t("choice.sendEntry", { price: allPlans[1]?.price ?? "" })}
               </p>
               <div className="v2-actions">
                 <SignupCta
                   className="v2-btn v2-btn-bone"
-                  label={t("choice.freeCta")}
+                  label={closed ? copy.check : t("choice.freeCta")}
                   plan="Free"
                   rung="free"
                 />
@@ -434,7 +439,7 @@ export default async function PricingPage({
                   {t("sendHero.plansLink")}
                 </a>
               </div>
-              <p className="v2-note">{t("note")}</p>
+              <p className="v2-note">{closed ? copy.admissionBody : t("note")}</p>
             </div>
           </section>
         ) : (
@@ -445,15 +450,19 @@ export default async function PricingPage({
                 <h1>{t("choice.mailTitle")}</h1>
                 <p className="v2-lead">{t("v2.lead")}</p>
                 <p className="pricing-entry-note">
-                  {t(standaloneOpen ? "choice.mailEntry" : "choice.mailClosed", {
-                    price: money(correioPlans[0].brlMonthlyCents, correioPlans[0].monthlyCents),
-                  })}
+                  {closed
+                    ? copy.catalog
+                    : t(standaloneOpen ? "choice.mailEntry" : "choice.mailClosed", {
+                        price: money(correioPlans[0].brlMonthlyCents, correioPlans[0].monthlyCents),
+                      })}
                 </p>
-                {brazil && standaloneOpen ? <p className="v2-note">{t("choice.mailPix")}</p> : null}
+                {brazil && standaloneOpen && !closed ? (
+                  <p className="v2-note">{t("choice.mailPix")}</p>
+                ) : null}
                 <div className="v2-actions">
                   {standaloneOpen ? (
                     <SignupLink
-                      label={l("plans.cta")}
+                      label={closed ? copy.check : l("plans.cta")}
                       className="v2-btn v2-btn-bone"
                       mailboxPlan="choose"
                     />
@@ -466,7 +475,7 @@ export default async function PricingPage({
                     {t("alternatives.cta")}
                   </a>
                 </div>
-                <p className="v2-note">{t("note")}</p>
+                <p className="v2-note">{closed ? copy.admissionBody : t("note")}</p>
               </div>
               {planBoard}
             </div>
@@ -479,9 +488,9 @@ export default async function PricingPage({
           <div className="v2-wrap">
             <p className="v2-eyebrow v2-eyebrow-mono">{t("v2.envioEyebrow")}</p>
             <h2 id="pricing-plans-title" className="v2-h2-sans">
-              {t("v2.envioTitle")}
+              {closed ? copy.admissionTitle : t("v2.envioTitle")}
             </h2>
-            <p className="v2-lead v2-gap-sm">{t("plans.intro")}</p>
+            <p className="v2-lead v2-gap-sm">{closed ? copy.catalog : t("plans.intro")}</p>
             <div className="gtm-plan-grid">
               {allPlans.slice(0, 3).map((plan) => (
                 <PlanCard key={plan.name} plan={plan} labels={cardLabels} />
@@ -502,7 +511,9 @@ export default async function PricingPage({
                     <th scope="col">{t("v2.table.price")}</th>
                     <th scope="col">{t("v2.table.overage")}</th>
                     <th scope="col">
-                      <span className="gtm-sr-only">{t("v2.table.choose")}</span>
+                      <span className="gtm-sr-only">
+                        {closed ? copy.check : t("v2.table.choose")}
+                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -519,7 +530,7 @@ export default async function PricingPage({
                       <td>
                         <SignupCta
                           className="v2-link-accent"
-                          label={t("v2.table.choose")}
+                          label={closed ? copy.check : t("v2.table.choose")}
                           plan={plan.name}
                           rung={plan.rung}
                         />
@@ -605,7 +616,7 @@ export default async function PricingPage({
               <h2 id="launch-pro-title" className="v2-h2-sans">
                 {t("launch.title")}
               </h2>
-              <p className="v2-lead v2-gap-sm">{t("launch.body")}</p>
+              <p className="v2-lead v2-gap-sm">{closed ? copy.catalog : t("launch.body")}</p>
               <div className="v2-grid">
                 <article className="v2-card v2-card-raised v2-cell">
                   <h3 className="v2-h3">{t("launch.monthTitle")}</h3>
@@ -742,14 +753,17 @@ export default async function PricingPage({
         <section className="v2-violet v2-sec v2-center" aria-labelledby="pricing-close-title">
           <div className="v2-wrap v2-stack">
             <h2 id="pricing-close-title" className="v2-h2 v2-close-title">
-              {t("v2.closeTitle")}
+              {closed ? copy.admissionTitle : t("v2.closeTitle")}
             </h2>
-            <p className="v2-lead">{t("close.body")}</p>
+            <p className="v2-lead">{closed ? copy.admissionBody : t("close.body")}</p>
             <div className="v2-actions">
-              <SignupLink label={t("close.cta")} className="v2-btn v2-btn-bone" />
+              <SignupLink
+                label={closed ? copy.check : t("close.cta")}
+                className="v2-btn v2-btn-bone"
+              />
               {standaloneOpen ? (
-                <a className="v2-btn v2-btn-line" href={MAIL_SIGNUP}>
-                  {t("correio.subscribe")}
+                <a className="v2-btn v2-btn-line" href={closed ? "/status#admission" : MAIL_SIGNUP}>
+                  {closed ? copy.check : t("correio.subscribe")}
                 </a>
               ) : null}
             </div>
@@ -758,5 +772,8 @@ export default async function PricingPage({
       </main>
       <PublicFooter labels={site} page="pricing" contact={contact} legal={legalLinks()} />
     </div>
+  );
+  return (
+    <SignupAvailability closedLabel={closed ? copy.check : null}>{content}</SignupAvailability>
   );
 }

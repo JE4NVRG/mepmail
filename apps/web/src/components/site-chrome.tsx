@@ -146,7 +146,7 @@ export function SignupLink({
 
 /** Status must remain independent of signup storage, even during an incident. */
 async function publicChromeClosedLabel(page: PublicPage): Promise<string | null> {
-  if (page !== "status") {
+  if (!newSubscriptionsPaused() && page !== "status") {
     try {
       if ((await publicSignupAvailability()) === "open") return null;
     } catch {
@@ -253,7 +253,7 @@ export async function PublicHeader({
           {/* A CTA fica FORA da .gtm-nav: ela precisa continuar visível na 1ª
               linha do header quando a nav colapsa no mobile (ver landing.css). */}
           <div className="gtm-header-cta">
-            <PublicAccount login={labels.nav.login} signup={labels.nav.signup} />
+            <PublicAccount login={labels.nav.login} signup={closedLabel ?? labels.nav.signup} />
           </div>
         </div>
       </header>
@@ -293,7 +293,7 @@ export async function PublicFooter({
                 <li key={point}>{point}</li>
               ))}
             </ul>
-            <SignupLink label={labels.footer.cta} />
+            <SignupLink label={closedLabel ?? labels.footer.cta} />
           </div>
           <nav className="gtm-footer-col" aria-label={labels.footer.colProduct}>
             <h3>{labels.footer.colProduct}</h3>
@@ -342,7 +342,7 @@ export async function PublicFooter({
           </nav>
           <nav className="gtm-footer-col" aria-label={labels.footer.colAccount}>
             <h3>{labels.footer.colAccount}</h3>
-            <SignupLink label={labels.nav.signup} />
+            <SignupLink label={closedLabel ?? labels.nav.signup} />
             <a href="/login">{labels.footer.login}</a>
             <a href="/support">{labels.nav.support}</a>
             <a href={contact}>{labels.footer.contact}</a>

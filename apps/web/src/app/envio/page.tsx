@@ -8,6 +8,7 @@ import { IntegrationTabs } from "@/components/integration-tabs";
 import { PlanCard, type PlanCardLabels } from "@/components/plan-card";
 import { DocsLink, GithubLink, McpConfigCopy } from "@/components/public-events";
 import { PublicStarterGallery } from "@/components/public-starter-gallery";
+import { SignupAvailability } from "@/components/signup-availability";
 import {
   PublicFooter,
   PublicHeader,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/landing-pricing";
 import { legalLinks } from "@/lib/legal-links";
 import { faqJsonLd } from "@/lib/structured-data";
+import { publicMarketingAdmission } from "@/server/public-marketing-admission";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "../landing-cro.css";
@@ -143,6 +145,7 @@ export default async function EnvioPage() {
     getTranslations("landing"),
     getLocale(),
   ]);
+  const { closed, copy } = await publicMarketingAdmission(locale);
   const brazil = locale === "pt-BR";
   const launchOfferEnabled = process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
   const site = {
@@ -188,7 +191,7 @@ export default async function EnvioPage() {
   const docs = `${DOCS_URL}${brazil ? "/pt-BR" : ""}`;
   const b = (chunks: ReactNode) => <strong className="v2-strong">{chunks}</strong>;
 
-  return (
+  const content = (
     <div className="gtm v2">
       <StructuredData graph={[faqJsonLd(faq)]} />
       <PublicHeader labels={site} page="envio" />
@@ -203,19 +206,24 @@ export default async function EnvioPage() {
               </h1>
               <p className="v2-lead">{t("hero.lead")}</p>
               <div className="v2-actions">
-                <SignupLink label={t("hero.cta")} className="v2-btn v2-btn-bone" />
+                <SignupLink
+                  label={closed ? copy.check : t("hero.cta")}
+                  className="v2-btn v2-btn-bone"
+                />
                 <a className="v2-btn v2-btn-line" href="#migrar">
                   {t("hero.migrate")}
                 </a>
               </div>
               <p className="v2-note">
-                {t.rich("hero.note", { free: freeVolume, starter: starterPrice, b })}
+                {closed
+                  ? copy.admissionBody
+                  : t.rich("hero.note", { free: freeVolume, starter: starterPrice, b })}
               </p>
             </div>
             <figure>
               <div className="v2-code">
                 <IntegrationTabs
-                  label={t("hero.codeAria")}
+                  label={closed ? copy.check : t("hero.codeAria")}
                   tabs={[
                     { label: "Node", content: <ResendDiff brazil={brazil} /> },
                     { label: ".env", content: <pre>{brazil ? ENV_EXAMPLE : ENV_EXAMPLE_EN}</pre> },
@@ -469,7 +477,7 @@ export default async function EnvioPage() {
         <section className="v2-ground v2-sec" id="planos" aria-labelledby="envio-plans-title">
           <div className="v2-wrap">
             <h2 id="envio-plans-title" className="v2-h2-sans">
-              {t("plans.title")}
+              {closed ? copy.admissionTitle : t("plans.title")}
             </h2>
             <p className="v2-lead v2-gap-sm">{t("plans.lead")}</p>
             <div className="gtm-plan-grid">
@@ -512,11 +520,16 @@ export default async function EnvioPage() {
         <section className="v2-violet v2-sec v2-center" aria-labelledby="envio-close-title">
           <div className="v2-wrap v2-stack">
             <h2 id="envio-close-title" className="v2-display-sans">
-              {t("close.title")}
+              {closed ? copy.admissionTitle : t("close.title")}
             </h2>
-            <p className="v2-lead">{t("close.body", { free: freeVolume })}</p>
+            <p className="v2-lead">
+              {closed ? copy.admissionBody : t("close.body", { free: freeVolume })}
+            </p>
             <div className="v2-actions">
-              <SignupLink label={t("close.cta")} className="v2-btn v2-btn-bone" />
+              <SignupLink
+                label={closed ? copy.check : t("close.cta")}
+                className="v2-btn v2-btn-bone"
+              />
               <DocsLink className="v2-btn v2-btn-line" href={docs}>
                 {t("close.docs")}
               </DocsLink>
@@ -538,5 +551,8 @@ export default async function EnvioPage() {
       </main>
       <PublicFooter labels={site} page="envio" contact={contact} legal={legalLinks()} />
     </div>
+  );
+  return (
+    <SignupAvailability closedLabel={closed ? copy.check : null}>{content}</SignupAvailability>
   );
 }

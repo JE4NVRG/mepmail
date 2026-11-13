@@ -161,8 +161,8 @@ describe("public SEO and security boundaries", () => {
     const root = source("../src/app/layout.tsx");
     expect(root).toContain("robots: { index: false, follow: false }");
     expect(root).toContain("(await cookies()).get(THEME_KEY)");
-    expect(root).toContain(
-      'publicMarketingMessages((await headers()).get("x-mepmail-next"), locale)',
+    expect(root).toMatch(
+      /publicMarketingMessages\(\s*\(await headers\(\)\)\.get\("x-mepmail-next"\),\s*locale,\s*newSubscriptionsPaused\(\),?\s*\)/,
     );
     expect(root).not.toMatch(/force-static|s-maxage|unstable_cache|use cache/);
     expect(source("../src/i18n/request.ts")).not.toMatch(/unstable_cache|use cache/);

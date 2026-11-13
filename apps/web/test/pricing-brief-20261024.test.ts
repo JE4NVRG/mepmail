@@ -8,6 +8,10 @@ import enPricing from "../messages/en/pricing.json";
 import ptLanding from "../messages/pt-BR/landing.json";
 import ptPricing from "../messages/pt-BR/pricing.json";
 
+vi.mock("@/server/public-marketing-admission", () => ({
+  publicMarketingAdmission: async () => ({ closed: false, copy: {} }),
+}));
+
 const context = vi.hoisted(() => ({ locale: "en" }));
 vi.mock("next-intl/server", () => ({
   getLocale: async () => context.locale,

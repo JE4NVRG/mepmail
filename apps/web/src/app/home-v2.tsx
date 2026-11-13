@@ -27,6 +27,7 @@ import { legalLinks } from "@/lib/legal-links";
 import { publicSignupCopy } from "@/lib/public-signup-copy";
 import { faqJsonLd, organizationJsonLd, siteBaseUrl, websiteJsonLd } from "@/lib/structured-data";
 import { titlePhrases } from "@/lib/title-phrases";
+import { newSubscriptionsPaused } from "@/server/new-subscriptions";
 import { publicSignupAvailability } from "@/server/public-signup";
 import "./landing.css";
 import "./landing-cro.css";
@@ -80,7 +81,7 @@ export async function HomeV2() {
     getLocale(),
   ]);
   const brazil = locale === "pt-BR";
-  const availability = await publicSignupAvailability();
+  const availability = newSubscriptionsPaused() ? "paused" : await publicSignupAvailability();
   const closed = availability !== "open";
   const signupCopy = publicSignupCopy(locale);
   const launchOfferEnabled = process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
@@ -227,7 +228,10 @@ export async function HomeV2() {
               <figcaption className="v2-fine v2-gap-sm">{mail("demo.foot")}</figcaption>
             </figure>
             <p>
-              <a className="v2-link-accent" href="/signup?next=/mail">
+              <a
+                className="v2-link-accent"
+                href={closed ? "/status#admission" : "/signup?next=/mail"}
+              >
                 {closed ? signupCopy.check : t("correio.noDomain")}{" "}
                 <span aria-hidden="true">→</span>
               </a>
@@ -499,7 +503,9 @@ export async function HomeV2() {
                     </div>
                   ))}
                 </div>
-                <p className="v2-note v2-gap-sm">{t("prices.correioNote")}</p>
+                <p className="v2-note v2-gap-sm">
+                  {closed ? signupCopy.catalog : t("prices.correioNote")}
+                </p>
               </div>
               <div className="v2-card v2-card-raised v2-cell">
                 <p className="v2-eyebrow v2-eyebrow-mono">{t("prices.envio")}</p>

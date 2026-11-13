@@ -36,6 +36,7 @@ const APP_ONLY_COMMON_KEYS: ReadonlySet<string> = new Set([
 export function publicMarketingMessages(
   trustedRequestTarget: string | null | undefined,
   locale: string,
+  acquisitionClosed = false,
 ): Record<string, unknown> | undefined {
   if (!trustedRequestTarget?.startsWith("/") || trustedRequestTarget.startsWith("//")) {
     return undefined;
@@ -54,11 +55,20 @@ export function publicMarketingMessages(
     ...messages,
     // Legacy Mail sections are server-rendered only for the closed/add-on fallback.
     // Its calculator is the only client consumer; do not leak inactive offer text.
-    correio: Object.fromEntries(
-      Object.entries(messages.correio as Record<string, unknown>).filter(([key]) =>
-        ["meta", "preview", "release", "v2"].includes(key),
-      ),
-    ),
+    landing: acquisitionClosed
+      ? Object.fromEntries(
+          Object.entries(messages.landing as Record<string, unknown>).filter(([key]) =>
+            ["account", "lang"].includes(key),
+          ),
+        )
+      : messages.landing,
+    correio: acquisitionClosed
+      ? {}
+      : Object.fromEntries(
+          Object.entries(messages.correio as Record<string, unknown>).filter(([key]) =>
+            ["meta", "preview", "release", "v2"].includes(key),
+          ),
+        ),
     common: Object.fromEntries(
       Object.entries(common).filter(([key]) => !APP_ONLY_COMMON_KEYS.has(key)),
     ),

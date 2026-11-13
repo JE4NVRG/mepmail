@@ -9,6 +9,7 @@ import {
 import { legalLinks } from "@/lib/legal-links";
 import { correioJsonLd, faqJsonLd, siteBaseUrl } from "@/lib/structured-data";
 import { titlePhrases } from "@/lib/title-phrases";
+import { publicMarketingAdmission } from "@/server/public-marketing-admission";
 import { publicPageUrls } from "@/server/public-seo";
 import { AgentDemo, type AgentDemoLabels } from "./agent-demo";
 import { LaunchPlanPreview } from "./launch-plan-preview";
@@ -43,6 +44,7 @@ export async function CorreioLegacy() {
     nav: l.raw("nav"),
     footer: l.raw("footer"),
   } as PublicSiteLabels;
+  const { closed, copy } = await publicMarketingAdmission(locale);
   const docs = `${docsOrigin}${locale === "pt-BR" ? "/pt-BR" : ""}`;
   const audiences = t.raw("hero.audiences") as string[];
   const useCases = t.raw("use.items") as UseCase[];
@@ -96,9 +98,11 @@ export async function CorreioLegacy() {
                 </a>
               </div>
               <p className="correio-note correio-hero-note">
-                {t(mailOpen ? "release.heroNote" : "hero.note")}
+                {closed ? copy.admissionBody : t(mailOpen ? "release.heroNote" : "hero.note")}
               </p>
-              <p className="correio-status">{t(mailOpen ? "release.heroStatus" : "hero.status")}</p>
+              <p className="correio-status">
+                {closed ? copy.admissionTitle : t(mailOpen ? "release.heroStatus" : "hero.status")}
+              </p>
               {/* The Store copy is signed by Microsoft and updated by the Store; the direct
                   installer stays for PCs where the Store is blocked. Linux has its own page. */}
               <div className="correio-windows-links">
@@ -274,9 +278,12 @@ export async function CorreioLegacy() {
                 <article className="correio-plan">
                   <p className="correio-eyebrow">{t("plans.solo.label")}</p>
                   <h3>{t("plans.solo.title")}</h3>
-                  <p>{t("plans.solo.body")}</p>
-                  <a className="ms-btn ms-btn-primary correio-action" href="/signup?next=/mail">
-                    {t("plans.solo.cta")}
+                  <p>{closed ? copy.catalog : t("plans.solo.body")}</p>
+                  <a
+                    className="ms-btn ms-btn-primary correio-action"
+                    href={closed ? "/status#admission" : "/signup?next=/mail"}
+                  >
+                    {closed ? copy.check : t("plans.solo.cta")}
                   </a>
                 </article>
               ) : null}
@@ -293,7 +300,7 @@ export async function CorreioLegacy() {
                 <h3>{t("plans.mail.title")}</h3>
                 <p>{t("plans.mail.body")}</p>
                 <p className="correio-note">
-                  {t(mailOpen ? "release.mailNote" : "plans.mail.note")}
+                  {closed ? copy.catalog : t(mailOpen ? "release.mailNote" : "plans.mail.note")}
                 </p>
                 {mailOpen ? (
                   <a className="ms-btn ms-btn-secondary correio-action" href="/mail">
@@ -333,7 +340,7 @@ export async function CorreioLegacy() {
               {t(standaloneOpen ? "release.plansNote" : "comparison.earlyNote")}
             </p>
             {/* The Envio + add-on calculator; the plans need none (their prices are above). */}
-            {standaloneOpen ? null : <LaunchPlanPreview earlyAccessOpen={mailOpen} />}
+            {standaloneOpen || closed ? null : <LaunchPlanPreview earlyAccessOpen={mailOpen} />}
             <p className="correio-note correio-under-grid">{t("plans.terms")}</p>
           </div>
         </section>
@@ -355,7 +362,7 @@ export async function CorreioLegacy() {
           <div className="gtm-container">
             <p className="correio-eyebrow">{t("close.eyebrow")}</p>
             <h2 id="correio-close-title">{t("close.title")}</h2>
-            <p>{t("close.body")}</p>
+            <p>{closed ? copy.admissionBody : t("close.body")}</p>
             <div className="correio-actions">
               <a className="ms-btn ms-btn-primary correio-action" href="/pricing">
                 {t("close.primary")} <span aria-hidden="true">→</span>

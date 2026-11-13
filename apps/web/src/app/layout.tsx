@@ -1,3 +1,4 @@
+import { newSubscriptionsPaused } from "@/server/new-subscriptions";
 import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/700.css";
@@ -68,7 +69,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // these long namespaces on the server, and shipping them made every page (the 404
   // included) carry ~110 KB of copy it never uses.
   const messages =
-    publicMarketingMessages((await headers()).get("x-mepmail-next"), locale) ??
+    publicMarketingMessages(
+      (await headers()).get("x-mepmail-next"),
+      locale,
+      newSubscriptionsPaused(),
+    ) ??
     Object.fromEntries(
       Object.entries(await getMessages()).filter(([ns]) => !SERVER_ONLY_NAMESPACES.has(ns)),
     );
