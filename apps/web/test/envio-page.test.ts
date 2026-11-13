@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { createTranslator, NextIntlClientProvider } from "next-intl";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CHECKS } from "../../../packages/core/src/email-insights";
 import { MCP_TOOLS } from "../../../packages/core/src/mcp-tools";
 import { WEBHOOK_EVENT_TYPES } from "../../../packages/core/src/webhooks";
@@ -25,6 +25,8 @@ vi.mock("@millionsend/core", async () => ({
   WEBHOOK_EVENT_TYPES: (await import("../../../packages/core/src/webhooks")).WEBHOOK_EVENT_TYPES,
 }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
+// Signup authority is a server boundary; these catalog/intent fixtures model open admission.
+vi.mock("@/server/public-signup", () => ({ publicSignupAvailability: async () => "open" }));
 vi.mock("next-intl/server", () => ({
   getLocale: async () => current.locale,
   getTranslations: async (namespace: "envio" | "landing") =>
@@ -71,6 +73,7 @@ const text = (html: string) =>
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ");
 
+beforeEach(() => vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false"));
 afterEach(() => vi.unstubAllEnvs());
 
 for (const locale of ["en", "pt-BR"] as const) {

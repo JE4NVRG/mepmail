@@ -76,7 +76,7 @@ describe("public admission: actual public consumers", () => {
         for (const [purchasePaused, signup] of [
           ["true", "open"],
           ["false", "paused"],
-        ]) {
+        ] as const) {
           context.availability = signup;
           vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", purchasePaused);
           vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");

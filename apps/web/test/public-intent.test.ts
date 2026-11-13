@@ -114,6 +114,8 @@ const messages = (locale: Locale) =>
     ? { landing: enLanding, pricing: enPricing }
     : { landing: ptLanding, pricing: ptPricing };
 
+// Signup authority is a server boundary; these catalog/intent fixtures model open admission.
+vi.mock("@/server/public-signup", () => ({ publicSignupAvailability: async () => "open" }));
 vi.mock("next-intl/server", () => ({
   getLocale: async () => current.locale,
   getTranslations: async (namespace: string) =>
@@ -183,6 +185,7 @@ async function render(params: Record<string, string>) {
 }
 
 beforeEach(() => {
+  vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false");
   vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "true");
   vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
   vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");

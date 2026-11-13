@@ -41,6 +41,8 @@ vi.mock("@/components/site-chrome", async () => ({
       label,
     ),
 }));
+// Signup authority is a server boundary; these catalog/intent fixtures model open admission.
+vi.mock("@/server/public-signup", () => ({ publicSignupAvailability: async () => "open" }));
 vi.mock("next-intl/server", () => ({
   getLocale: async () => current.locale,
   getTranslations: async (namespace: "correio" | "correio.v2" | "landing" | "pricing") =>
@@ -206,6 +208,8 @@ async function render(locale: Locale): Promise<string> {
     }),
   );
 }
+
+beforeEach(() => vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false"));
 
 describe.each(["en", "pt-BR"] as const)("Correio closed preview fallback in %s", (locale) => {
   afterEach(() => vi.unstubAllEnvs());

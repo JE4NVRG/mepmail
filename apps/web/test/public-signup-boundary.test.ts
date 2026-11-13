@@ -444,11 +444,12 @@ describe("public signup server-boundary regression", () => {
     }
   });
   for (const locale of ["en", "pt-BR"])
-    for (const mode of ["status", "unknown", "open", "paused", "full"])
+    for (const mode of ["status", "unknown", "open", "paused", "full", "purchase-paused"])
       it(`chrome SSR ${locale}/${mode}`, async () => {
         reset({
           locale,
-          allow: mode === "open" || mode === "full",
+          allow: mode === "open" || mode === "full" || mode === "purchase-paused",
+          subscriptions: mode === "purchase-paused",
           cap: mode === "full" ? 1 : undefined,
           error: ["status", "unknown"].includes(mode) ? Error("storage unavailable") : null,
         });
@@ -472,18 +473,24 @@ describe("public signup server-boundary regression", () => {
           );
           const copy = load("apps/web/src/lib/public-signup-copy.ts").publicSignupCopy(locale);
           assert.match(markup, /href="\/login"/);
-          const anchors = [
+          const signupAnchors = [
             ...markup.matchAll(/<a\b[^>]*href="\/signup[^"]*"[^>]*>([\s\S]*?)<\/a>/g),
           ];
-          assert.ok(anchors.length);
-          if (mode === "open") assert.match(markup, /data-funnel-signup/);
-          else {
-            for (const a of anchors) assert.ok(a[1].includes(copy.check));
+          if (mode === "open") {
+            assert.ok(signupAnchors.length);
+            assert.match(markup, /data-funnel-signup/);
+          } else {
+            assert.equal(signupAnchors.length, 0);
+            const statusAnchors = [
+              ...markup.matchAll(/<a\b[^>]*href="\/status#admission"[^>]*>([\s\S]*?)<\/a>/g),
+            ];
+            assert.ok(statusAnchors.length);
+            for (const a of statusAnchors) assert.ok(a[1].includes(copy.check));
             assert.doesNotMatch(markup, /data-funnel-signup/);
             assert.ok(!markup.includes(copy.paused) && !markup.includes(copy.full));
           }
         }
-        if (mode === "status") {
+        if (mode === "status" || mode === "purchase-paused") {
           assert.equal(state.calls, 0);
           assert.equal(state.dbCalls, 0);
         }
