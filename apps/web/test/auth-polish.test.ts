@@ -5,6 +5,7 @@ import { ForgotPasswordForm, ResetPasswordForm } from "../src/components/auth/re
 
 // Harness sintético de hooks e cliente: testa handlers/estados, não OAuth ou backend real.
 const h = vi.hoisted(() => ({
+  ownApp: false,
   states: [] as unknown[],
   cursor: 0,
   params: new URLSearchParams(),
@@ -33,6 +34,7 @@ vi.mock("react", async (original) => ({
   useRef: () => ({ current: { focus: h.focus } }),
   useEffect: () => undefined,
 }));
+vi.mock("@/lib/use-android-app", () => ({ useInAndroidApp: () => h.ownApp }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: h.push }),
   useSearchParams: () => h.params,
@@ -73,6 +75,7 @@ function render(
   providers = { google: false, github: false, microsoft: false },
   mailDelayed = false,
   requireLoginCaptcha = true,
+  signupClosedLabel: string | null = null,
 ) {
   h.cursor = 0;
   return AuthForm({
@@ -82,6 +85,7 @@ function render(
     forgotPassword: true,
     mailDelayed,
     requireLoginCaptcha,
+    signupClosedLabel,
   });
 }
 function input(tree: ReactNode, id: string, value: string) {
@@ -97,6 +101,7 @@ const alert = (tree: ReactNode) => find(tree, (n) => n.props.role === "alert");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  h.ownApp = false;
   h.states = [];
   h.cursor = 0;
   h.params = new URLSearchParams();
@@ -105,6 +110,42 @@ beforeEach(() => {
 });
 
 describe("auth UX: synthetic component state harness", () => {
+  it.each(["Consultar disponibilidade", "Check availability"])(
+    "closed login uses the server label %s and preserves email-first behavior",
+    async (label) => {
+      h.params = new URLSearchParams("next=%2Finvite%2Ftest");
+      const closed = () => render("login", undefined, false, false, label);
+      h.ownApp = true;
+      const tree = closed();
+      expect(
+        nodes(tree).some(
+          (n) => Array.isArray(n.props.children) && n.props.children.includes("auth.appIntro.body"),
+        ),
+      ).toBe(false);
+      expect(find(tree, (n) => n.props.href === "/status#admission").props.children).toBe(label);
+      expect(nodes(tree).some((n) => String(n.props.href ?? "").startsWith("/signup"))).toBe(false);
+      expect(nodes(tree).some((n) => n.props.children === "auth.login.sublineLink")).toBe(false);
+      expect(
+        nodes(tree)
+          .filter((n) => n.type === "input")
+          .map((n) => n.props.id),
+      ).toEqual(["email"]);
+      input(tree, "email", "preview@example.invalid");
+      await submit(closed());
+      expect(find(closed(), (n) => n.props.id === "password")).toBeTruthy();
+      expect(h.email).not.toHaveBeenCalled();
+      expect(h.signup).not.toHaveBeenCalled();
+    },
+  );
+  it.each(["/invite/test", "/oauth/consent?request=fixture", "/mail?purchase=duo"])(
+    "open login keeps the exact safe signup intent %s",
+    (next) => {
+      h.params = new URLSearchParams({ next });
+      expect(
+        find(render(), (n) => n.props.href === `/signup?next=${encodeURIComponent(next)}`),
+      ).toBeTruthy();
+    },
+  );
   it("email-first reveals/focuses password without a request, preserving safe next", async () => {
     h.params = new URLSearchParams("next=%2Finvite%2Ftest");
     let tree = render();

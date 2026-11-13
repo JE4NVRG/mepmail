@@ -1560,7 +1560,30 @@
   outline: 2px solid var(--ms-violet);
   outline-offset: 3px;
 }
+/* Long translated actions need their own row, not space borrowed from the brand. */
 @media (max-width: 600px) {
+  .gtm-header-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+  .gtm-header .gtm-brand-group {
+    min-width: max-content;
+  }
+  .gtm-header .gtm-nav-burger {
+    order: 2;
+  }
+  .gtm-header .gtm-header-cta {
+    order: 3;
+    grid-column: 1 / -1;
+    margin-inline: 0;
+    justify-content: center;
+  }
+  .gtm-header .gtm-public-account {
+    width: auto;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
   .gtm-account-signout {
     display: none;
   }

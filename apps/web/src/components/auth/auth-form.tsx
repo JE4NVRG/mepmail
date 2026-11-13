@@ -77,6 +77,7 @@ export function AuthForm({
   requireLoginCaptcha = true,
   productUpdates = false,
   mailDelayed = false,
+  signupClosedLabel = null,
 }: {
   mode: "login" | "signup";
   providers: SocialProviderFlags;
@@ -91,6 +92,8 @@ export function AuthForm({
   productUpdates?: boolean;
   /** SES is paused with no fallback: the verification link runs late, so point at social sign-in. */
   mailDelayed?: boolean;
+  /** Server-owned hint; existing-account authentication is unchanged. */
+  signupClosedLabel?: string | null;
 }) {
   const t = useTranslations(`auth.${mode}`);
   const tSocial = useTranslations("auth.social");
@@ -329,7 +332,9 @@ export function AuthForm({
 
   const otherPage =
     mode === "login"
-      ? `/signup?next=${encodeURIComponent(next)}`
+      ? signupClosedLabel
+        ? "/status#admission"
+        : `/signup?next=${encodeURIComponent(next)}`
       : nextParam
         ? `/login?next=${encodeURIComponent(next)}`
         : "/login";
@@ -428,10 +433,16 @@ export function AuthForm({
   return (
     <AuthScreen title={t("title")} panel={mode}>
       <p className={styles.subline}>
-        {t("subline")} <Link href={otherPage}>{t("sublineLink")}</Link>
+        {mode === "login" && signupClosedLabel ? (
+          <Link href={otherPage}>{signupClosedLabel}</Link>
+        ) : (
+          <>
+            {t("subline")} <Link href={otherPage}>{t("sublineLink")}</Link>
+          </>
+        )}
       </p>
       {mode === "signup" ? <p className={styles.freeNote}>{t("freeNote")}</p> : null}
-      {mode === "login" && ownApp ? (
+      {mode === "login" && ownApp && !signupClosedLabel ? (
         <p className={styles.appIntro}>
           {tAuth("appIntro.body")} <Link href={otherPage}>{tAuth("appIntro.cta")}</Link>
         </p>

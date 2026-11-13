@@ -162,7 +162,7 @@ export default async function EnvioPage() {
     overageLabel: l("plans.overageLabel"),
     attachmentLabel: l("plans.attachmentLabel"),
     cta: l("plans.cta"),
-    ctaNote: l("plans.ctaNote"),
+    ctaNote: closed ? copy.admissionBody : l("plans.ctaNote"),
     featuredBadge: l("plans.featuredBadge"),
   } satisfies PlanCardLabels;
   const allPlans = plansWithCopy(

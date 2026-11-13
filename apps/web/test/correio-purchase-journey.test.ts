@@ -10,6 +10,9 @@ import { requestedMailboxPurchase, signupMailboxHref } from "@/lib/public-intent
 
 const h = vi.hoisted(() => ({ signedIn: false, hasTeam: false }));
 // Presentation fixtures own the optional server availability boundary.
+vi.mock("@/server/public-marketing-admission", () => ({
+  publicMarketingAdmission: async () => ({ closed: false, copy: { check: "Check availability" } }),
+}));
 vi.mock("@/server/public-signup", () => ({
   publicSignupAvailability: vi.fn(async () => "open" as const),
 }));

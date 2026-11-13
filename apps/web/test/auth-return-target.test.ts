@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 // Presentation fixtures own the optional server availability boundary.
+vi.mock("@/server/public-marketing-admission", () => ({
+  publicMarketingAdmission: async () => ({ closed: false, copy: { check: "Check availability" } }),
+}));
 vi.mock("@/server/public-signup", () => ({
   publicSignupAvailability: vi.fn(async () => "open" as const),
 }));
@@ -10,7 +13,10 @@ vi.mock("next/navigation", () => ({
     throw new Error(`redirect:${url}`);
   },
 }));
-vi.mock("next-intl/server", () => ({ getTranslations: async () => (key: string) => key }));
+vi.mock("next-intl/server", () => ({
+  getLocale: async () => "en",
+  getTranslations: async () => (key: string) => key,
+}));
 vi.mock("@/components/auth/auth-form", () => ({ AuthForm: vi.fn() }));
 vi.mock("@/server/auth", () => ({ hasSession: async () => true, enabledSocialProviders: vi.fn() }));
 vi.mock("@/server/public-seo", () => ({

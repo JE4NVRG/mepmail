@@ -36,6 +36,8 @@ const realFiles = new Set([
   "apps/web/src/app/home-v2.tsx",
   "apps/web/src/app/home-legacy.tsx",
   "apps/web/src/app/signup/page.tsx",
+  "apps/web/src/app/login/page.tsx",
+  "apps/web/src/server/public-marketing-admission.ts",
 ]);
 const source = (name: string) => fs.readFileSync(path.join(root, name), "utf8");
 const old = source;
@@ -165,6 +167,8 @@ function ext(id: string): VmValue {
     };
   if (s === "server/new-subscriptions")
     return { newSubscriptionsPaused: () => state.subscriptions };
+  if (s === "server/system-mail") return { passwordRecoveryEnabled: () => false };
+  if (s === "server/signup-bot-protection") return { signupBotProtectionEnabled: () => false };
   if (s === "server/ses-pause") return { accountMailDelayed: async () => false };
   if (s === "server/public-seo")
     return {
@@ -347,6 +351,37 @@ afterAll(() => {
 });
 beforeEach(() => reset());
 describe("public signup server-boundary regression", () => {
+  for (const locale of ["en", "pt-BR"])
+    for (const mode of ["open", "paused", "full", "purchase-paused"])
+      it(`login authentic admission props ${locale}/${mode}`, async () => {
+        reset({
+          locale,
+          allow: mode !== "paused",
+          subscriptions: mode === "purchase-paused",
+          cap: mode === "full" ? 1 : undefined,
+        });
+        const view = await load("apps/web/src/app/login/page.tsx").default({
+          searchParams: Promise.resolve({ next: "/invite/fixture" }),
+        });
+        const copy = load("apps/web/src/lib/public-signup-copy.ts").publicSignupCopy(locale);
+        assert.equal(view.props.mode, "login");
+        assert.equal(view.props.signupClosedLabel, mode === "open" ? null : copy.check);
+        assert.deepEqual(view.props.providers, { google: true, github: true, microsoft: false });
+        assert.equal(view.props.requireLoginCaptcha, true);
+        if (mode === "purchase-paused") assert.equal(state.dbCalls, 0);
+      });
+  it("narrow header reserves an account row instead of accepting overflow-free overlap", () => {
+    const css = source("apps/web/src/app/landing.css");
+    assert.match(
+      css,
+      /@media \(max-width: 600px\)\s*\{\s*\.gtm-header-inner\s*\{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\) 44px;/,
+    );
+    assert.match(css, /\.gtm-header \.gtm-header-cta\s*\{[^}]*grid-column: 1 \/ -1/);
+    assert.match(
+      css,
+      /\.gtm-header \.gtm-public-account\s*\{[^}]*width: auto;[^}]*flex-wrap: wrap;/,
+    );
+  });
   it("scopes the closed login CTA above generic auth links without altering its route", async () => {
     const css = source("apps/web/src/components/auth/auth.module.css");
     const rule = css.match(/\.column\s+a\.closedLogin\s*\{([^}]*)\}/)?.[1];

@@ -1,10 +1,11 @@
 import { env } from "@millionsend/config";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { AuthForm } from "@/components/auth/auth-form";
 import { POST_LOGIN_PATH, postAuthNext } from "@/lib/nav";
 import { enabledSocialProviders, hasSession } from "@/server/auth";
+import { publicMarketingAdmission } from "@/server/public-marketing-admission";
 import { publicPageUrls } from "@/server/public-seo";
 import { accountMailDelayed } from "@/server/ses-pause";
 import { signupBotProtectionEnabled } from "@/server/signup-bot-protection";
@@ -19,9 +20,11 @@ export default async function LoginPage({
 }) {
   // An authenticated visitor has no business on the auth screens.
   if (await hasSession()) redirect(postAuthNext((await searchParams).next, POST_LOGIN_PATH, true));
+  const { closed, copy } = await publicMarketingAdmission(await getLocale());
   return (
     <AuthForm
       mode="login"
+      signupClosedLabel={closed ? copy.check : null}
       providers={enabledSocialProviders()}
       legal={{ termsUrl: env.TERMS_URL ?? "/terms", privacyUrl: env.PRIVACY_URL ?? "/privacy" }}
       forgotPassword={passwordRecoveryEnabled()}
