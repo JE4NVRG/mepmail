@@ -102,6 +102,25 @@ export function parseJudgeContent(content: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
+/** Only this qualified provider/model pair accepts the non-thinking override. */
+function useCommandCodeNonThinking(model: string, baseUrl: string): boolean {
+  if (model !== "deepseek/deepseek-v4.1-flash") return false;
+  try {
+    const base = new URL(baseUrl);
+    return (
+      base.origin === "https://api.commandcode.ai" &&
+      (base.pathname === "/provider/v1" || base.pathname === "/provider/v1/") &&
+      !base.username &&
+      !base.password &&
+      !base.search &&
+      !base.hash
+    );
+  } catch {
+    // Keep malformed-base failures at the existing fetch/error-classification boundary.
+    return false;
+  }
+}
+
 export function createOpenAiJudge(opts: {
   model: string;
   baseUrl: string;
@@ -146,6 +165,9 @@ export function createOpenAiJudge(opts: {
             },
             body: JSON.stringify({
               model: opts.model,
+              ...(useCommandCodeNonThinking(opts.model, opts.baseUrl)
+                ? { reasoning_effort: "off" }
+                : {}),
               temperature: 0,
               response_format: { type: "json_object" },
               messages: [

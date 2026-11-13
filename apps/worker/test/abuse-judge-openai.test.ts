@@ -1,5 +1,5 @@
 import { ABUSE_JUDGE_POLICY, ABUSE_JUDGE_QUESTIONS, JudgeError } from "@millionsend/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createAbuseJudge } from "../src/abuse-judge/index.js";
 import {
   createOpenAiJudge,
@@ -66,6 +66,138 @@ describe("OpenAI-compatible judge", () => {
       expect(OPENAI_JUDGE_SYSTEM_PROMPT).toContain(`"${key}"`);
     }
     expect(messages[1]?.content).toMatch(/^<email>\n[\s\S]*\n<\/email>$/);
+  });
+
+  it.each([
+    [
+      "canonical base",
+      "deepseek/deepseek-v4.1-flash",
+      "https://api.commandcode.ai/provider/v1",
+      true,
+    ],
+    [
+      "trailing slash",
+      "deepseek/deepseek-v4.1-flash",
+      "https://api.commandcode.ai/provider/v1/",
+      true,
+    ],
+    [
+      "default HTTPS port",
+      "deepseek/deepseek-v4.1-flash",
+      "https://api.commandcode.ai:443/provider/v1",
+      true,
+    ],
+    [
+      "default port and slash",
+      "deepseek/deepseek-v4.1-flash",
+      "https://api.commandcode.ai:443/provider/v1/",
+      true,
+    ],
+    ["other provider", "deepseek/deepseek-v4.1-flash", "https://api.openai.com/v1", false],
+    [
+      "lookalike host",
+      "deepseek/deepseek-v4.1-flash",
+      "https://api.commandcode.ai.example.test/provider/v1",
+      false,
+    ],
+    ["wrong path", "deepseek/deepseek-v4.1-flash", "https://api.commandcode.ai/v1", false],
+    ["path case", "deepseek/deepseek-v4.1-flash", "https://api.commandcode.ai/Provider/v1", false],
+    ["HTTP base", "deepseek/deepseek-v4.1-flash", "http://api.commandcode.ai/provider/v1", false],
+    [
+      "other port",
+      "deepseek/deepseek-v4.1-flash",
+      "https://api.commandcode.ai:444/provider/v1",
+      false,
+    ],
+    [
+      "query string",
+      "deepseek/deepseek-v4.1-flash",
+      "https://api.commandcode.ai/provider/v1?x=1",
+      false,
+    ],
+    ["fragment", "deepseek/deepseek-v4.1-flash", "https://api.commandcode.ai/provider/v1#x", false],
+    [
+      "userinfo",
+      "deepseek/deepseek-v4.1-flash",
+      "https://user@api.commandcode.ai/provider/v1",
+      false,
+    ],
+    ["unrelated model", "unrelated-model", "https://api.commandcode.ai/provider/v1", false],
+    [
+      "model suffix",
+      "deepseek/deepseek-v4.1-flash-extra",
+      "https://api.commandcode.ai/provider/v1",
+      false,
+    ],
+    ["invalid base", "deepseek/deepseek-v4.1-flash", "not a URL", false],
+  ])(
+    "preserves the factory request contract for %s",
+    async (_name, model, baseUrl, nonThinking) => {
+      const requestSignal = signal();
+      const block = "Team name: Contract fixture\nSubject: Informational notice";
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(
+          reply(JSON.stringify({ is_abuse: 0.02, category: "clean", language: "en" })),
+        );
+      try {
+        const judge = createAbuseJudge({
+          provider: "openai",
+          model: String(model),
+          baseUrl: String(baseUrl),
+          apiKey: "contract-fixture",
+          timeoutMs: 20_000,
+        });
+        if (!judge) throw new Error("factory did not create a judge");
+        await expect(judge.judge(block, { signal: requestSignal })).resolves.toMatchObject({
+          score: 2,
+          verdict: "clean",
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const [url, init] = fetchMock.mock.calls[0] ?? [];
+        expect(url).toBe(`${String(baseUrl).replace(/\/$/, "")}/chat/completions`);
+        expect(init?.method).toBe("POST");
+        expect(init?.signal).toBe(requestSignal);
+        expect(new Headers(init?.headers)).toEqual(
+          new Headers({
+            "content-type": "application/json",
+            authorization: "Bearer contract-fixture",
+          }),
+        );
+        expect(JSON.parse(String(init?.body))).toEqual({
+          model,
+          temperature: 0,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: OPENAI_JUDGE_SYSTEM_PROMPT },
+            { role: "user", content: `<email>\n${block}\n</email>` },
+          ],
+          ...(nonThinking ? { reasoning_effort: "off" } : {}),
+        });
+      } finally {
+        fetchMock.mockRestore();
+      }
+    },
+  );
+
+  it("keeps an invalid base failure at request time rather than throwing at construction", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("invalid URL"));
+    try {
+      const judge = createAbuseJudge({
+        provider: "openai",
+        model: "deepseek/deepseek-v4.1-flash",
+        baseUrl: "not a URL",
+        apiKey: "contract-fixture",
+        timeoutMs: 20_000,
+      });
+      if (!judge) throw new Error("factory did not create a judge");
+      await expect(judge.judge("fixture", { signal: signal() })).rejects.toMatchObject({
+        class: "upstream",
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      fetchMock.mockRestore();
+    }
   });
 
   it("reads clean mail as clean and tolerates TypeSafe-shaped values", () => {
