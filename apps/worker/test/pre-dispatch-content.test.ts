@@ -392,3 +392,123 @@ it("real sealed attachments are held rather than represented as a clean filename
   await held(f.id, deps(judge));
   expect(judge.judge).not.toHaveBeenCalled();
 });
+
+it.each(["cc", "bcc", "replyTo", "headers"] as const)(
+  "authenticated system origin rejects later nonempty %s, without modeling credentials",
+  async (field) => {
+    const f = await seed({ text: "setup only" });
+    const name = `account-${randomUUID()}.sender.example`;
+    await fixture.db
+      .insert(schema.domains)
+      .values({
+        teamId: f.teamId,
+        name,
+        region: "us-east-1",
+        status: "verified",
+        verifiedAt: new Date(),
+      });
+    let id = "";
+    await sendSystemMail(
+      {
+        db: fixture.db,
+        keyring,
+        isCloud: false,
+        enqueueEmailSend: async (value) => {
+          id = value;
+        },
+        raw: async () => {
+          throw new Error("raw forbidden");
+        },
+      },
+      {
+        from: `account@${name}`,
+        to: "r@example.com",
+        subject: "Reset",
+        html: `<a href="https://${name}/reset?token=PRIVATE">Reset password</a>`,
+        text: "Requested reset",
+        kind: "password_reset",
+      },
+    );
+    const patch =
+      field === "headers"
+        ? { headers: { "X-Customer-Override": "not producer-owned" } }
+        : { [field]: ["other@example.com"] };
+    await fixture.db.update(schema.emails).set(patch).where(eq(schema.emails.id, id));
+    const judge = { ...syntheticCleanContentJudge, judge: vi.fn(async () => abuse) };
+    const d = deps(judge);
+    await held(id, d);
+    expect(judge.judge).not.toHaveBeenCalled();
+  },
+);
+it.each(["recipient", "body"])(
+  "a %s mutation AFTER CLEAN decision is refused at final snapshot read",
+  async (changed) => {
+    const f = await seed({ text: "Requested receipt" });
+    let mutated = false;
+    const judge = {
+      ...syntheticCleanContentJudge,
+      judge: vi.fn(async () => syntheticCleanVerdict),
+    };
+    const d = deps(judge);
+    const db = fixture.db;
+    // The mandatory audit runs after the verdict and its first row revalidation.
+    // Mutate there to exercise the real final pre-provider freshness guard.
+    const intercepted = new Proxy(db, {
+      get(target, key, receiver) {
+        const value = Reflect.get(target, key, receiver);
+        if (key === "insert")
+          return (table: unknown) => {
+            const builder = Reflect.apply(value, target, [table]);
+            if (table !== schema.auditLog) return builder;
+            return new Proxy(builder, {
+              get(query, method) {
+                const fn = Reflect.get(query, method);
+                if (method === "values")
+                  return (values: { action?: string; data?: Record<string, unknown> }) => {
+                    const pending = Reflect.apply(fn, query, [values]);
+                    if (
+                      values.action !== "sending.content_pre_dispatch" ||
+                      values.data?.result !== "clean"
+                    )
+                      return pending;
+                    return (async () => {
+                      mutated = true;
+                      if (changed === "recipient")
+                        await db
+                          .update(schema.emails)
+                          .set({ to: ["other@example.com"] })
+                          .where(eq(schema.emails.id, f.id));
+                      else {
+                        const encrypted = await encryptEmailBody(
+                          { html: null, text: bank },
+                          keyring,
+                          { teamId: f.teamId, rowId: f.id },
+                        );
+                        await db
+                          .update(schema.emails)
+                          .set({
+                            bodyCiphertext: encrypted.ciphertext,
+                            bodyIv: encrypted.iv,
+                            bodyWrappedDek: encrypted.wrappedDek,
+                            bodyKeyVersion: encrypted.keyVersion,
+                          })
+                          .where(eq(schema.emails.id, f.id));
+                      }
+                      return await pending;
+                    })();
+                  };
+                return typeof fn === "function" ? fn.bind(query) : fn;
+              },
+            });
+          };
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    expect(await sendEmail(intercepted, d.value, { emailId: f.id })).toBe("parked");
+    expect(mutated).toBe(true);
+    expect(judge.judge).toHaveBeenCalledTimes(1);
+    expect(d.sendRaw).not.toHaveBeenCalled();
+    expect((await row(f.id)).sentAt).toBeNull();
+    expect((await row(f.id)).bodyPurgedAt).toBeNull();
+  },
+);

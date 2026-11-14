@@ -864,7 +864,11 @@ export async function sendEmail(
     (systemOrigin &&
       (systemOrigin.from !== email.from ||
         systemOrigin.subject !== email.subject ||
-        JSON.stringify(systemOrigin.to) !== JSON.stringify(email.to))) ||
+        JSON.stringify(systemOrigin.to) !== JSON.stringify(email.to) ||
+        (email.cc?.length ?? 0) > 0 ||
+        (email.bcc?.length ?? 0) > 0 ||
+        (email.replyTo?.length ?? 0) > 0 ||
+        Object.keys(email.headers ?? {}).length > 0)) ||
     (!systemMail && !customerMail && email.tags?.[SYSTEM_MAIL_TAG] !== undefined)
   ) {
     await parkQueued(db, email, "message provenance requires reissue");
