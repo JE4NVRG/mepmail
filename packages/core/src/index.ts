@@ -828,6 +828,12 @@ export {
   releaseRegion,
 } from "./platform-breaker.js";
 export {
+  approveProductionVolume,
+  observeProductionVolume,
+  productionVolumeStatus,
+  revokeProductionVolume,
+} from "./production-volume.js";
+export {
   dailyCeiling,
   type QuotaResult,
   quotaRoom,

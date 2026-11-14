@@ -3,6 +3,7 @@ import { schema } from "@millionsend/db";
 import { and, eq, gte, inArray } from "drizzle-orm";
 import { campaignDomainDnsReady } from "./campaign-consent.js";
 import type { TeamQuota } from "./plans.js";
+import { productionVolumeStatus } from "./production-volume.js";
 
 /** Ramp for a cloud sender, driven by the EXISTING dailySendCeiling and the
  * atomic quota ledger, never by a second counter.
@@ -64,9 +65,11 @@ export async function applySenderProbationQuota(
       ),
     )
     .limit(1);
+  const volume = await productionVolumeStatus(db, teamId, now);
   const ceiling = team.suspendedAt
     ? 0
-    : probationCeiling({
+    : (volume.ceiling ??
+      probationCeiling({
         reviewed: Boolean(team.reviewedAt && (!team.heldAt || team.reviewedAt >= team.heldAt)),
         // A persisted actual verification pass, not a paid/domain-status flag.
         // Ramp eligibility expires after 24h; send paths never resolve DNS.
@@ -97,7 +100,7 @@ export async function applySenderProbationQuota(
           ).length === 0,
         ageDays: Math.max(0, (now.getTime() - team.createdAt.getTime()) / 86400000),
         operatorCeiling: team.ceiling,
-      });
+      }));
   if (quota.kind === "day")
     return { ...quota, dailyCeiling: Math.min(quota.dailyCeiling ?? ceiling, ceiling) };
   if (quota.kind === "month")

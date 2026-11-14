@@ -1,10 +1,17 @@
-import { randomBytes } from "node:crypto";
-import { DAY_MS, EnvKeyring, generateApiKey } from "@millionsend/core";
+import { randomBytes, randomUUID } from "node:crypto";
+import {
+  approveProductionVolume,
+  DAY_MS,
+  EnvKeyring,
+  generateApiKey,
+  observeProductionVolume,
+} from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { createTeam, createTestDb } from "@millionsend/test-utils";
+import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { verifiedDns } from "../../../packages/core/test/antiabuse-contract-fixture.js";
 import { createApi } from "../src/app.js";
 
 let db: Db;
@@ -62,6 +69,12 @@ describe("GET /usage", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { today: { resets_at: string } };
     expect(body).toEqual({
+      sending: {
+        nominal_emails_per_day: 100,
+        effective_emails_per_day: 25,
+        state: "restricted",
+        reason: "not_approved",
+      },
       object: "usage",
       cloud: true,
       plan: "free",
@@ -143,4 +156,99 @@ describe("GET /usage", () => {
     expect(await res.json()).toMatchObject({ statusCode: 403, name: "restricted_api_key" });
     expect((await cloud.request("/usage")).status).toBe(401);
   });
+});
+
+it("usage separates actual 110K entitlement from explicit young-team effective 4000/day", async () => {
+  const id = await createTeam(db, `volume-usage-${randomUUID()}`);
+  const op = randomUUID(),
+    principal = randomUUID();
+  await db.insert(schema.user).values([
+    {
+      id: op,
+      name: "Operator",
+      email: `${op}@example.test`,
+      emailVerified: true,
+      createdAt: new Date(0),
+    },
+    { id: principal, name: "Principal", email: `${principal}@example.test`, emailVerified: true },
+  ]);
+  await db.insert(schema.teamSignupRisk).values({
+    teamId: id,
+    principalUserId: principal,
+    level: "good",
+    signals: {
+      domain: "example.test",
+      disposable: false,
+      mx: "present",
+      domainAgeDays: 100,
+      catchAll: "unknown",
+      randomLocal: false,
+      ipKey: null,
+      asn: null,
+      signupsIp1h: 0,
+      signupsDomain24h: 0,
+      signupsAsn1h: 0,
+    },
+  });
+  const start = new Date(Date.now() - DAY_MS),
+    end = new Date(Date.now() + 29 * DAY_MS);
+  await db
+    .update(schema.teams)
+    .set({
+      ...verifiedMonthlyBilling({
+        teamId: id,
+        periodStart: start,
+        periodEnd: end,
+        included: 110000,
+      }),
+      plan: "pro",
+      planStatus: "active",
+      planQuota: 110000,
+      currentPeriodStart: start,
+      currentPeriodEnd: end,
+      dailySendCeiling: 4000,
+    })
+    .where(eq(schema.teams.id, id));
+  await db.insert(schema.domains).values({
+    teamId: id,
+    name: "volume-usage.example.test",
+    region: "us-east-1",
+    status: "verified",
+    ...verifiedDns("volume-usage.example.test"),
+    lastCheckedAt: new Date(),
+  });
+  const key = generateApiKey();
+  await db.insert(schema.apiKeys).values({
+    teamId: id,
+    name: "fixture",
+    tokenPrefix: key.tokenPrefix,
+    keyHash: key.keyHash,
+    last4: key.last4,
+  });
+  const headers = { authorization: `Bearer ${key.token}` };
+  expect(await (await cloud.request("/usage", { headers })).json()).toMatchObject({
+    limits: { emails_per_month: 110000 },
+    sending: { effective_emails_per_day: 25, state: "restricted" },
+  });
+  await approveProductionVolume(db, {
+    teamId: id,
+    operatorId: op,
+    expectedEpoch: (await observeProductionVolume(db, id)).epoch,
+    dailyCeiling: 4000,
+    reason: "Synthetic independent reviewed volume",
+    evidenceReference: "fixture-evidence-42",
+  });
+  const body = await (await cloud.request("/usage", { headers })).json();
+  expect(body).toMatchObject({
+    limits: { emails_per_month: 110000 },
+    period: { included: 110000, overage_usd_per_1k: 1.3 },
+    sending: {
+      nominal_emails_per_day: 4000,
+      effective_emails_per_day: 4000,
+      state: "approved",
+      reason: "approved",
+    },
+  });
+  expect(JSON.stringify(body)).not.toContain("fixture-evidence-42");
+  expect(JSON.stringify(body)).not.toContain(principal);
 });

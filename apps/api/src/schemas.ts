@@ -498,6 +498,14 @@ export const usageResponseSchema = z
         .nullable()
         .describe("Contacts the team may hold; null = unlimited or self-hosted"),
     }),
+    sending: z
+      .object({
+        nominal_emails_per_day: z.number().int().nullable(),
+        effective_emails_per_day: z.number().int().nullable(),
+        state: z.enum(["approved", "restricted", "unrestricted"]),
+        reason: z.string(),
+      })
+      .optional(),
     today: z.object({
       emails_sent: z.number().int().describe("Emails accepted so far this UTC day"),
       resets_at: z.string().describe("Next UTC midnight, when the daily counter resets"),

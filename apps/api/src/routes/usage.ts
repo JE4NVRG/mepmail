@@ -1,8 +1,10 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import {
+  applySenderProbationQuota,
   nextUtcDayStart,
   PLAN_CONTACT_LIMIT,
   PLAN_DOMAIN_LIMIT,
+  productionVolumeStatus,
   readPeriodUsage,
   teamQuota,
   utcDay,
@@ -67,6 +69,17 @@ export function registerUsageRoutes(
       // The authenticated team id selects the authoritative financial row. An
       // older auth DTO may not yet carry the signed annual contract fields.
       const quota = teamQuota(team, deps.isCloud, now);
+      const effective = await applySenderProbationQuota(
+        deps.db,
+        auth.teamId,
+        quota,
+        deps.isCloud,
+        now,
+      );
+      const volume =
+        deps.isCloud && team.plan !== "system"
+          ? await productionVolumeStatus(deps.db, auth.teamId, now)
+          : null;
       const counters = schema.usageCounters;
       const [[today], period] = await Promise.all([
         deps.db
@@ -155,6 +168,31 @@ export function registerUsageRoutes(
             domains: plan ? PLAN_DOMAIN_LIMIT[plan] : null,
             contacts: plan ? PLAN_CONTACT_LIMIT[plan] : null,
           },
+          ...(volume
+            ? {
+                sending: {
+                  nominal_emails_per_day:
+                    quota.kind === "day"
+                      ? quota.limit
+                      : quota.kind === "month"
+                        ? (quota.dailyCeiling ?? null)
+                        : null,
+                  effective_emails_per_day:
+                    effective.kind === "none"
+                      ? null
+                      : effective.kind === "day"
+                        ? Math.min(effective.limit, effective.dailyCeiling ?? effective.limit)
+                        : (effective.dailyCeiling ?? null),
+                  state:
+                    volume?.ceiling != null
+                      ? ("approved" as const)
+                      : volume
+                        ? ("restricted" as const)
+                        : ("unrestricted" as const),
+                  reason: volume?.reason ?? "not_applicable",
+                },
+              }
+            : {}),
           today: {
             emails_sent: today?.accepted ?? 0,
             resets_at: nextUtcDayStart(now).toISOString(),

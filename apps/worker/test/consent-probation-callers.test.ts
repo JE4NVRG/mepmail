@@ -1,9 +1,19 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { acceptEmail, EnvKeyring, MailboxSendDeferredError } from "@millionsend/core";
+import {
+  acceptEmail,
+  approveProductionVolume,
+  EnvKeyring,
+  findInstanceOperator,
+  MailboxSendDeferredError,
+  observeProductionVolume,
+  productionVolumeStatus,
+  teamQuota,
+  utcDay,
+} from "@millionsend/core";
 import { schema } from "@millionsend/db";
-import { createTeam, createTestDb } from "@millionsend/test-utils";
+import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import {
@@ -11,6 +21,7 @@ import {
   reviewCampaignConsent,
   submitCampaignConsent,
 } from "../../../packages/core/src/campaign-consent.js";
+import { processProviderEvent } from "../../../packages/core/src/process-provider-event.js";
 import {
   applySenderProbationQuota,
   probationCeiling,
@@ -464,4 +475,307 @@ it("Native personal CC passes campaign-disabled policy and cloud consent, unlike
     .from(schema.usageCounters)
     .where(eq(schema.usageCounters.teamId, f.teamId));
   expect(counter?.accepted).toBe(2);
+});
+
+async function volumeFixture() {
+  const f = await setup(true);
+  let operator = await findInstanceOperator(fixture.db);
+  if (!operator) {
+    const id = randomUUID();
+    await fixture.db.insert(schema.user).values({
+      id,
+      name: "Operator",
+      email: `${id}@example.test`,
+      emailVerified: true,
+      createdAt: new Date(0),
+    });
+    operator = await findInstanceOperator(fixture.db);
+  }
+  if (!operator) throw new Error("missing operator");
+  const id = randomUUID();
+  await fixture.db
+    .insert(schema.user)
+    .values({ id, name: "Principal", email: `${id}@example.test`, emailVerified: true });
+  await fixture.db.insert(schema.teamSignupRisk).values({
+    teamId: f.teamId,
+    principalUserId: id,
+    level: "good",
+    signals: {
+      domain: "example.test",
+      disposable: false,
+      mx: "present",
+      domainAgeDays: 100,
+      catchAll: "unknown",
+      randomLocal: false,
+      ipKey: null,
+      asn: null,
+      signupsIp1h: 0,
+      signupsDomain24h: 0,
+      signupsAsn1h: 0,
+    },
+  });
+  const start = new Date(Date.now() - 86400000),
+    end = new Date(Date.now() + 29 * 86400000);
+  const binding = verifiedMonthlyBilling({
+    teamId: f.teamId,
+    periodStart: start,
+    periodEnd: end,
+    included: 110000,
+  });
+  const customerId = `cus_${f.teamId}`,
+    subscriptionId = `sub_${f.teamId}`;
+  await fixture.db
+    .update(schema.teams)
+    .set({
+      plan: "pro",
+      overageEnabled: false,
+      planStatus: "active",
+      planQuota: 110000,
+      currentPeriodStart: start,
+      currentPeriodEnd: end,
+      ...verifiedMonthlyBilling({
+        teamId: f.teamId,
+        periodStart: start,
+        periodEnd: end,
+        included: 110000,
+      }),
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+      sendBillingContract: { ...binding.sendBillingContract, customerId, subscriptionId },
+      billingTerms: { ...binding.billingTerms, customerId, subscriptionId },
+      createdAt: new Date(),
+      dailySendCeiling: 4000,
+    })
+    .where(eq(schema.teams.id, f.teamId));
+  const [team] = await fixture.db.select().from(schema.teams).where(eq(schema.teams.id, f.teamId));
+  if (!team) throw new Error("missing team");
+  const oldAt = new Date(Date.now() - 2 * 86400000);
+  const [historical] = await fixture.db
+    .insert(schema.emails)
+    .values({
+      teamId: f.teamId,
+      from: f.from,
+      to: ["old@example.test"],
+      subject: "Reviewed history",
+      latestStatus: "bounced",
+      createdAt: oldAt,
+      sentAt: oldAt,
+      sesMessageId: `old-${f.teamId}`,
+    })
+    .returning();
+  if (!historical) throw new Error("missing history");
+  await fixture.db.insert(schema.emailEvents).values({
+    emailId: historical.id,
+    type: "bounced",
+    bounceType: "Permanent",
+    occurredAt: oldAt,
+    createdAt: oldAt,
+    data: {},
+  });
+  const decision = async (overrides = {}) =>
+    approveProductionVolume(fixture.db, {
+      teamId: f.teamId,
+      operatorId: operator.id,
+      expectedEpoch: (await observeProductionVolume(fixture.db, f.teamId)).epoch,
+      dailyCeiling: 4000,
+      reason: "Synthetic independent review including historical outcomes",
+      evidenceReference: "fixture-remediation-42",
+      ...overrides,
+    });
+  return { ...f, team, principal: id, operatorId: operator.id, decision };
+}
+it("young explicit approval enqueues, sends once with CLEAN, retains 110K and UTC ledger, retry skips", async () => {
+  const f = await volumeFixture();
+  expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBeNull();
+  await f.decision();
+  expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBe(4000);
+  expect(
+    await applySenderProbationQuota(fixture.db, f.teamId, teamQuota(f.team, true), true),
+  ).toMatchObject({ kind: "month", included: 110000, dailyCeiling: 4000 });
+  const enqueue = vi.fn();
+  const result = await acceptEmail(
+    { db: fixture.db, keyring, isCloud: true, enqueueEmailSend: enqueue },
+    { teamId: f.teamId, billing: f.team, apiKeyId: null },
+    {
+      from: f.from,
+      to: ["recipient@example.test"],
+      subject: "Message",
+      text: promo,
+      domainId: f.domain.id,
+    },
+  );
+  expect(result).toMatchObject({ ok: true, parked: false });
+  expect(enqueue).toHaveBeenCalledTimes(1);
+  if (!result.ok) throw new Error("not accepted");
+  const sendRaw = vi.fn().mockResolvedValue({ messageId: "synthetic-explicit-volume" });
+  const deps = {
+    keyring,
+    isCloud: true,
+    contentJudge: syntheticCleanContentJudge,
+    ses: { sendRaw },
+  };
+  expect(await sendEmail(fixture.db, deps, { emailId: result.id })).toBe("sent");
+  expect(await sendEmail(fixture.db, deps, { emailId: result.id })).toBe("skipped");
+  expect(sendRaw).toHaveBeenCalledTimes(1);
+  const [email] = await fixture.db
+    .select()
+    .from(schema.emails)
+    .where(eq(schema.emails.id, result.id));
+  expect(email?.sentAt).toBeInstanceOf(Date);
+  const [counter] = await fixture.db
+    .select()
+    .from(schema.usageCounters)
+    .where(eq(schema.usageCounters.teamId, f.teamId));
+  const [period] = await fixture.db
+    .select()
+    .from(schema.usagePeriods)
+    .where(eq(schema.usagePeriods.teamId, f.teamId));
+  expect(counter).toMatchObject({ day: utcDay(), accepted: 1 });
+  expect(period?.accepted).toBe(1);
+});
+it("approval denies self/forged operator/null cap/unknown principal/stale epoch and suspended state", async () => {
+  const f = await volumeFixture();
+  await expect(f.decision({ operatorId: f.principal })).rejects.toThrow("volume_operator_required");
+  await expect(f.decision({ operatorId: "forged-reviewer" })).rejects.toThrow(
+    "volume_operator_required",
+  );
+  await expect(f.decision({ dailyCeiling: null })).rejects.toThrow(
+    "volume_finite_ceiling_required",
+  );
+  const epoch = (await observeProductionVolume(fixture.db, f.teamId)).epoch;
+  await fixture.db
+    .update(schema.teams)
+    .set({ suspendedAt: new Date() })
+    .where(eq(schema.teams.id, f.teamId));
+  await expect(f.decision({ expectedEpoch: epoch })).rejects.toThrow("volume_stale_epoch");
+  await expect(f.decision()).rejects.toThrow("volume_current_safety_or_cap_required");
+  await fixture.db
+    .update(schema.teams)
+    .set({ suspendedAt: null })
+    .where(eq(schema.teams.id, f.teamId));
+  await fixture.db.delete(schema.user).where(eq(schema.user.id, f.principal));
+  await expect(f.decision()).rejects.toThrow("volume_verified_principal_required");
+});
+it("lower cap wins; upper cap, new hold, expired DNS revoke elevated eligibility", async () => {
+  const f = await volumeFixture();
+  await f.decision();
+  await fixture.db
+    .update(schema.teams)
+    .set({ dailySendCeiling: 2000 })
+    .where(eq(schema.teams.id, f.teamId));
+  expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBe(2000);
+  await fixture.db
+    .update(schema.teams)
+    .set({ dailySendCeiling: 5000 })
+    .where(eq(schema.teams.id, f.teamId));
+  expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBeNull();
+  await fixture.db
+    .update(schema.teams)
+    .set({ dailySendCeiling: 4000, sendReviewAt: new Date(Date.now() + 1) })
+    .where(eq(schema.teams.id, f.teamId));
+  expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBeNull();
+  await fixture.db
+    .update(schema.teams)
+    .set({ sendReviewAt: null })
+    .where(eq(schema.teams.id, f.teamId));
+  await fixture.db
+    .update(schema.domains)
+    .set({ lastCheckedAt: new Date(Date.now() - 86400001) })
+    .where(eq(schema.domains.id, f.domain.id));
+  expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBeNull();
+});
+it("benign single confirmed hard bounce retains volume; complaint and late old evidence fail closed", async () => {
+  const f = await volumeFixture();
+  await f.decision();
+  const [email] = await fixture.db
+    .insert(schema.emails)
+    .values({
+      teamId: f.teamId,
+      from: f.from,
+      to: ["typo@example.test"],
+      subject: "History",
+      sentAt: new Date(),
+      sesMessageId: "fixture-volume-history",
+    })
+    .returning();
+  if (!email) throw new Error("missing history");
+  await fixture.db.insert(schema.emailEvents).values({
+    emailId: email.id,
+    type: "bounced",
+    bounceType: "Permanent",
+    occurredAt: new Date(),
+    createdAt: new Date(),
+    data: {},
+  });
+  expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBe(4000);
+  await fixture.db.insert(schema.emailEvents).values({
+    emailId: email.id,
+    type: "complained",
+    occurredAt: new Date(Date.now() - 7 * 86400000),
+    createdAt: new Date(),
+    data: {},
+  });
+  expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBeNull();
+});
+
+it("approved volume cannot overshoot the monthly last unit under concurrent acceptance", async () => {
+  const f = await volumeFixture();
+  await f.decision();
+  if (!f.team.currentPeriodStart) throw new Error("missing financial period");
+  await fixture.db
+    .insert(schema.usagePeriods)
+    .values({ teamId: f.teamId, periodStart: f.team.currentPeriodStart, accepted: 109999 });
+  const results = await Promise.all([
+    accept(f, "You requested a password reset."),
+    accept(f, "You requested a password reset."),
+  ]);
+  expect(results.filter((v) => v.ok && !v.parked)).toHaveLength(1);
+  expect(results.filter((v) => !v.ok && v.reason === "monthly_quota_exceeded")).toHaveLength(1);
+  const [period] = await fixture.db
+    .select()
+    .from(schema.usagePeriods)
+    .where(eq(schema.usagePeriods.teamId, f.teamId));
+  expect(period?.accepted).toBe(110000);
+});
+it("real ingestion preserves benign bounce eligibility and permanently revokes late complaint", async () => {
+  const f = await volumeFixture();
+  await f.decision();
+  const sesMessageId = `provider-${f.teamId}`;
+  await fixture.db.insert(schema.emails).values({
+    teamId: f.teamId,
+    from: f.from,
+    to: ["outcome@example.test"],
+    subject: "Outcome",
+    sentAt: new Date(),
+    sesMessageId,
+  });
+  await processProviderEvent(
+    fixture.db,
+    {
+      eventType: "Bounce",
+      sesMessageId,
+      occurredAt: new Date().toISOString(),
+      data: {},
+      bounce: { bounceType: "Permanent", recipients: ["outcome@example.test"] },
+    },
+    { snsMessageId: randomUUID() },
+  );
+  expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBe(4000);
+  await processProviderEvent(
+    fixture.db,
+    {
+      eventType: "Complaint",
+      sesMessageId,
+      occurredAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+      data: {},
+      complaint: { recipients: ["outcome@example.test"] },
+    },
+    { snsMessageId: randomUUID() },
+  );
+  expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBeNull();
+  const [email] = await fixture.db
+    .select()
+    .from(schema.emails)
+    .where(eq(schema.emails.sesMessageId, sesMessageId));
+  expect(email?.latestStatus).toBe("complained");
 });

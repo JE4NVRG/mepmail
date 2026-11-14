@@ -13,6 +13,7 @@ import {
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
+import { revalidateProductionVolumeOutcome } from "./production-volume.js";
 export interface SerializedSesEvent {
   eventType: string;
   sesMessageId: string;
@@ -176,6 +177,12 @@ export async function processProviderEvent(
   const deliveries: QueuedWebhookDelivery[] = [];
   const applied = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Db;
+    if (eventType === "bounced" || eventType === "complained")
+      await txDb
+        .select({ id: schema.teams.id })
+        .from(schema.teams)
+        .where(eq(schema.teams.id, email.teamId))
+        .for("update");
     if (email.matchedByTag) {
       const [joined] = await txDb
         .update(schema.emails)
@@ -197,6 +204,7 @@ export async function processProviderEvent(
       .insert(schema.emailEvents)
       .values({
         emailId: email.id,
+        createdAt: sql`date_trunc('milliseconds', clock_timestamp())`,
         type: eventType,
         occurredAt: new Date(event.occurredAt),
         snsMessageId: opts.snsMessageId ?? null,
@@ -208,6 +216,13 @@ export async function processProviderEvent(
     if (!inserted) return false;
 
     await applyStatusCas(txDb, email.id, status);
+    if (eventType === "bounced" || eventType === "complained")
+      await revalidateProductionVolumeOutcome(txDb, {
+        teamId: email.teamId,
+        type: eventType,
+        occurredAt: event.occurredAt,
+        bounceType: event.bounce?.bounceType,
+      });
 
     // Fan the now-recorded event out to the team's webhook endpoints —
     // delivery rows join the transaction; the queue enqueue happens after

@@ -37,3 +37,16 @@ describe("probationCeiling", () => {
     expect(probationCeiling({ ...proven, ageDays: 3, operatorCeiling: 5_000 })).toBe(100);
   });
 });
+
+// Explicit production volume must never be inferred from a legacy ceiling.
+it("does not infer volume approval from payment-era clearance", () => {
+  expect(
+    probationCeiling({
+      reviewed: true,
+      dnsReady: true,
+      clean: true,
+      ageDays: 1,
+      operatorCeiling: 4000,
+    }),
+  ).toBe(100);
+});

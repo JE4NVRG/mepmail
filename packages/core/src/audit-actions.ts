@@ -87,6 +87,8 @@ export const AUDIT_ACTIONS = [
   "team.deleted",
   "team.type_changed",
   "team.limits_updated",
+  "team.production_volume_approved",
+  "team.production_volume_revoked",
   "team.broadcasts_paused",
   "team.broadcasts_resumed",
   "team.suspended",

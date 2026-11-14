@@ -2,6 +2,7 @@ import { isLiveKey } from "@millionsend/billing";
 import { customerSmtpRelay, env, isCloudDeployment, supportViewEnabled } from "@millionsend/config";
 import {
   accountMailPhrase,
+  approveProductionVolume,
   claimNotification,
   clearTeamSignupRisk,
   fetchAccountScore,
@@ -12,9 +13,11 @@ import {
   isSendReviewHeld,
   liveSupportViewForTeam,
   type MailLocale,
+  observeProductionVolume,
   PLAN_RUNGS,
   type Plan,
   raisesQuota,
+  revokeProductionVolume,
   SUPPORT_VIEW_REASONS,
   SUSPENSION_REASONS,
   type SupportViewReason,
@@ -186,6 +189,30 @@ function reasonText(
 }
 
 export const consoleTeamsRouter = router({
+  productionVolumeObservation: operatorProcedure
+    .input(z.object({ id: z.uuid() }).strict())
+    .query(async ({ ctx, input }) => ({
+      epoch: (await observeProductionVolume(ctx.db, input.id)).epoch,
+    })),
+  approveProductionVolume: operatorProcedure
+    .input(
+      z
+        .object({
+          id: z.uuid(),
+          expectedEpoch: z.string().regex(/^[a-f0-9]{64}$/),
+          dailyCeiling: z.number().int().min(1).max(100_000_000),
+          reason: z.string().trim().min(15).max(500),
+          evidenceReference: z.string().trim().min(5).max(200),
+        })
+        .strict(),
+    )
+    .mutation(({ ctx, input }) =>
+      approveProductionVolume(ctx.db, {
+        ...input,
+        teamId: input.id,
+        operatorId: ctx.operator.id,
+      }),
+    ),
   /** Invitations into any team, from the console (console/team-invitations.ts). */
   invitations: consoleTeamInvitationsRouter,
 
@@ -557,18 +584,29 @@ export const consoleTeamsRouter = router({
       const team = await loadTeam(ctx.db, input.id);
       const now = new Date();
       const pausedBefore = team.broadcastsPausedByOperatorAt !== null;
-      await ctx.db
-        .update(t)
-        .set({
-          dailySendCeiling: input.dailySendCeiling,
-          // An explicit operator decision supersedes the signup allowance,
-          // including reaffirming the same number or restoring the plan limit.
-          betaDailySendCeiling: null,
-          broadcastsPausedByOperatorAt: input.broadcastsPaused
-            ? (team.broadcastsPausedByOperatorAt ?? now)
-            : null,
-        })
-        .where(eq(t.id, team.id));
+      await ctx.db.transaction(async (tx) => {
+        const d = tx as unknown as typeof ctx.db;
+        const [current] = await d.select().from(t).where(eq(t.id, team.id)).for("update");
+        if (
+          current &&
+          (input.dailySendCeiling === null ||
+            (current.dailySendCeiling !== null &&
+              input.dailySendCeiling > current.dailySendCeiling))
+        )
+          await revokeProductionVolume(d, team.id, "upper_cap_mutation");
+        await d
+          .update(t)
+          .set({
+            dailySendCeiling: input.dailySendCeiling,
+            // An explicit operator decision supersedes the signup allowance,
+            // including reaffirming the same number or restoring the plan limit.
+            betaDailySendCeiling: null,
+            broadcastsPausedByOperatorAt: input.broadcastsPaused
+              ? (team.broadcastsPausedByOperatorAt ?? now)
+              : null,
+          })
+          .where(eq(t.id, team.id));
+      });
       if (!input.broadcastsPaused) {
         // Lifting the hold lifts the monitor's pause too, as Resume does.
         await ctx.db

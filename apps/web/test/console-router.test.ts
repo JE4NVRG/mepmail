@@ -966,3 +966,22 @@ describe("console.regions pacing numbers", () => {
     await db.delete(schema.domains).where(eq(schema.domains.id, domain.id));
   });
 });
+
+it("production volume boundary refuses owner, anonymous actor and forged reviewer input", async () => {
+  await expect(
+    member().console.teams.productionVolumeObservation({ id: teamId }),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  await expect(
+    callerFor(null).console.teams.productionVolumeObservation({ id: teamId }),
+  ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  await expect(
+    operator().console.teams.approveProductionVolume({
+      id: teamId,
+      expectedEpoch: "0".repeat(64),
+      dailyCeiling: 4000,
+      reason: "Synthetic operator review",
+      evidenceReference: "fixture-42",
+      reviewerId: MEMBER,
+    } as never),
+  ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+});
