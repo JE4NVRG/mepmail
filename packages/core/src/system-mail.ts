@@ -3,7 +3,13 @@ import { schema } from "@millionsend/db";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { type AcceptEmailDeps, acceptEmail } from "./accept-email.js";
 import type { AccountMailKind } from "./account-mail.js";
+import {
+  INVITATION_MAIL_ACTOR,
+  type InvitationMailActor,
+  invitationMailRefusal,
+} from "./invitation-mail-actor.js";
 import { parseSingleSender } from "./sender-address.js";
+import { findSuppressed } from "./suppressions.js";
 import { SYSTEM_MAIL_ORIGIN } from "./system-mail-origin.js";
 
 /**
@@ -141,7 +147,19 @@ const warnedSenders = new Set<string>();
 export async function sendSystemMail(
   deps: SystemSendDeps,
   message: SystemMailMessage,
+  actor?: InvitationMailActor,
 ): Promise<"pipeline" | "raw"> {
+  const recheckActor = async () => {
+    if (message.kind !== "invitation") return;
+    const refusal = await invitationMailRefusal(
+      deps.db,
+      actor,
+      [message.to],
+      deps.isCloud ?? false,
+    );
+    if (refusal) throw new SystemMailRefused(refusal);
+  };
+  await recheckActor();
   const owner = await findSenderDomainOwner(deps.db, message.from);
   if (!owner) {
     // Explicit internal self-host opt-in is required for bootstrap raw compatibility.
@@ -152,6 +170,7 @@ export async function sendSystemMail(
         `system mail: no team holds a verified domain for ${message.from}; account emails are sent raw and not logged. Verify its domain in a team to log them there.`,
       );
     }
+    await recheckActor();
     await deps.raw(message, null);
     return "raw";
   }
@@ -164,6 +183,7 @@ export async function sendSystemMail(
         billing: "uncapped",
         apiKeyId: null,
         [SYSTEM_MAIL_ORIGIN]: message.kind,
+        ...(message.kind === "invitation" ? { [INVITATION_MAIL_ACTOR]: actor } : {}),
       },
       {
         from: message.from,
@@ -178,6 +198,13 @@ export async function sendSystemMail(
   } catch (err) {
     if (deps.isCloud !== false) throw new SystemMailUnavailable("pipeline_unavailable");
     console.error(`system mail: accept failed for ${message.kind}, sending raw`, err);
+    await recheckActor();
+    if (
+      message.kind === "invitation" &&
+      (await findSuppressed(deps.db, owner.teamId, [message.to])).size > 0
+    ) {
+      throw new SystemMailRefused("all_suppressed");
+    }
     await deps.raw(message, owner);
     return "raw";
   }

@@ -122,7 +122,11 @@ async function emailInvite(
       })
     : buildInvitationEmail(common);
   try {
-    await mail.send(message);
+    await mail.send(message, {
+      teamId,
+      userId: inviter.id,
+      invitationId: invite.id,
+    });
     return true;
   } catch (error) {
     // A suppressed invitee (bounced or complained on the instance's own

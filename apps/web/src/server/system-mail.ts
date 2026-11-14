@@ -21,6 +21,7 @@ import { createSesSendClient, sendSimpleEmail } from "@millionsend/ses";
 import { and, eq, gt, like, ne } from "drizzle-orm";
 import { appBaseUrl } from "@/lib/api-base-url";
 import { DOCS_URL } from "@/lib/docs-links";
+import type { InvitationMailActor } from "../../../../packages/core/src/invitation-mail-actor.js";
 import enInvite from "../../messages/en/invite-email.json";
 import en from "../../messages/en/reset-email.json";
 import enUpdates from "../../messages/en/updates.json";
@@ -389,7 +390,7 @@ export function sendAccountMail(
 
 /** Mail seam so tests capture sends instead of stubbing the pipeline or the AWS SDK. */
 export interface SystemMailDeps {
-  send(message: SystemMailMessage): Promise<void>;
+  send(message: SystemMailMessage, actor?: InvitationMailActor): Promise<void>;
 }
 
 /**
@@ -399,7 +400,7 @@ export interface SystemMailDeps {
  * rare, so there is nothing worth caching.
  */
 export const defaultSystemMailDeps: SystemMailDeps = {
-  send: async (message) => {
+  send: async (message, actor) => {
     await sendSystemMail(
       {
         db: getDb(),
@@ -417,6 +418,7 @@ export const defaultSystemMailDeps: SystemMailDeps = {
           ),
       },
       message,
+      actor,
     );
   },
 };

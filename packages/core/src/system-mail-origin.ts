@@ -1,3 +1,4 @@
+import type { InvitationMailActor } from "./invitation-mail-actor.js";
 import type { SystemMailKind } from "./system-mail.js";
 
 /** In-process producer capability; JSON payloads cannot supply this symbol. */
@@ -13,4 +14,5 @@ export type EmailBodyOrigin =
       from: string;
       to: string[];
       subject: string;
+      actor?: InvitationMailActor | undefined;
     };

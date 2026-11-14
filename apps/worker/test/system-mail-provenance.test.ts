@@ -102,6 +102,25 @@ async function accept(tags?: Record<string, string>) {
 }
 async function system(kind: SystemMailKind) {
   let id = "";
+  let actor: { teamId: string; userId: string; invitationId: string } | undefined;
+  if (kind === "invitation") {
+    const userId = randomUUID();
+    await db
+      .insert(schema.user)
+      .values({ id: userId, name: "issuer", email: `${userId}@example.com` });
+    await db.insert(schema.teamMembers).values({ teamId, userId, role: "owner" });
+    const [invite] = await db
+      .insert(schema.teamInvitations)
+      .values({
+        teamId,
+        email: message.to[0]!,
+        role: "member",
+        invitedByUserId: userId,
+        expiresAt: new Date(Date.now() + 86400000),
+      })
+      .returning();
+    actor = { teamId, userId, invitationId: invite!.id };
+  }
   expect(
     await sendSystemMail(
       {
@@ -116,6 +135,7 @@ async function system(kind: SystemMailKind) {
         },
       },
       { ...message, to: message.to[0]!, kind },
+      actor,
     ),
   ).toBe("pipeline");
   return id;
@@ -137,7 +157,14 @@ it("actual public POST with the canonical tag neither skips monitoring nor purge
       body: JSON.stringify({
         ...message,
         tags,
-        origin: { version: 1, source: "system", kind: "password_reset" },
+        origin: {
+          version: 1,
+          source: "system",
+          kind: "invitation",
+          actor: { teamId, userId: "forged", invitationId: randomUUID() },
+        },
+        actor: { teamId, userId: "forged", invitationId: randomUUID() },
+        apiKeyId: null,
       }),
     });
     expect(response.status).toBe(200);

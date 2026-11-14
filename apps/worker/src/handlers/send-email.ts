@@ -56,6 +56,7 @@ import {
 } from "../../../../packages/core/src/campaign-consent.js";
 import { campaignSendWindowOpen } from "../../../../packages/core/src/campaign-send-window.js";
 import { decryptEmailBodySnapshot } from "../../../../packages/core/src/crypto/envelope.js";
+import { invitationMailRefusal } from "../../../../packages/core/src/invitation-mail-actor.js";
 import {
   bindDispatchTracking,
   type DispatchContentDecision,
@@ -860,6 +861,27 @@ export async function sendEmail(
   const systemOrigin =
     bodyOrigin?.version === 1 && bodyOrigin.source === "system" ? bodyOrigin : null;
   const systemMail = systemOrigin !== null;
+  const invitationActorRefusal = async () =>
+    systemOrigin?.kind === "invitation"
+      ? invitationMailRefusal(db, systemOrigin.actor, email.to, deps.isCloud ?? false)
+      : null;
+  const actorRefusal =
+    (await invitationActorRefusal()) ??
+    (systemOrigin?.kind === "invitation" &&
+    (await findSuppressed(db, email.teamId, email.to)).size > 0
+      ? "all_suppressed"
+      : null);
+  if (actorRefusal) {
+    if (
+      actorRefusal === "invitation_actor_requires_reissue" ||
+      actorRefusal === "invitation_actor_revoked"
+    ) {
+      await failQueuedEmail(db, email.id, actorRefusal);
+      return "failed";
+    }
+    await parkQueued(db, email, actorRefusal);
+    return "parked";
+  }
   const customerMail = bodyOrigin?.version === 1 && bodyOrigin.source === "customer";
   if (
     (systemOrigin &&
@@ -1184,6 +1206,24 @@ export async function sendEmail(
     return "parked";
   }
   if (!campaignWindowOpen()) return "parked";
+  // Recheck the sealed requester after all asynchronous MIME/throttle work.
+  const latestActorRefusal =
+    (await invitationActorRefusal()) ??
+    (systemOrigin?.kind === "invitation" &&
+    (await findSuppressed(db, email.teamId, email.to)).size > 0
+      ? "all_suppressed"
+      : null);
+  if (latestActorRefusal) {
+    if (
+      latestActorRefusal === "invitation_actor_requires_reissue" ||
+      latestActorRefusal === "invitation_actor_revoked"
+    ) {
+      await failQueuedEmail(db, email.id, latestActorRefusal);
+      return "failed";
+    }
+    await parkQueued(db, email, latestActorRefusal);
+    return "parked";
+  }
 
   // Qualify the actual transformed body, identity, envelope and final MIME.
   // Skeleton samples, prior reviews and public tags grant no release authority.

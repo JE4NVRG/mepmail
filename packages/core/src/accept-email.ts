@@ -6,6 +6,11 @@ import { checkCampaignMessage } from "./campaign-consent.js";
 import { type EmailAttachment, encryptEmailBody, sealAttachments } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
 import type { FunnelEventTarget } from "./funnel-events.js";
+import {
+  INVITATION_MAIL_ACTOR,
+  type InvitationMailActor,
+  invitationMailRefusal,
+} from "./invitation-mail-actor.js";
 import { attachmentLimit, type QuotaTeamRow, type TeamQuota, teamQuota } from "./plans.js";
 import { reserveQuota } from "./quota.js";
 import {
@@ -198,6 +203,7 @@ const recipientDomainCache: DomainCache = new Map();
 export interface AcceptEmailAuth {
   /** Internal producer only; never derived from tags, billing or API key absence. */
   [SYSTEM_MAIL_ORIGIN]?: SystemMailKind;
+  [INVITATION_MAIL_ACTOR]?: InvitationMailActor | undefined;
   teamId: string;
   /**
    * The team's billing columns; the cap is derived here (teamQuota), never
@@ -347,6 +353,19 @@ export async function acceptEmail(
     quota?: "deferred" | undefined;
   } = {},
 ): Promise<AcceptEmailResult> {
+  if (auth[SYSTEM_MAIL_ORIGIN] === "invitation") {
+    const refusal = await invitationMailRefusal(
+      opts.tx ?? deps.db,
+      auth[INVITATION_MAIL_ACTOR],
+      payload.to,
+      deps.isCloud ?? false,
+    );
+    if (refusal)
+      return {
+        ok: false,
+        reason: refusal === "all_suppressed" ? "all_suppressed" : "team_restricted",
+      };
+  }
   const consent = await checkCampaignMessage(opts.tx ?? deps.db, {
     ...payload,
     teamId: auth.teamId,
@@ -486,6 +505,9 @@ export async function acceptEmail(
           from: payload.from,
           to,
           subject: payload.subject,
+          ...(auth[SYSTEM_MAIL_ORIGIN] === "invitation"
+            ? { actor: auth[INVITATION_MAIL_ACTOR] }
+            : {}),
         },
   );
   // Attachments are content like html/text: sealed at rest, purged with the body.
