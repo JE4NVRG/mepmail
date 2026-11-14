@@ -46,6 +46,7 @@ export type SystemMailKind =
   | "webhook.backlog"
   | "updates.confirm"
   | "signup.alert"
+  | "signup_risk.daily_digest"
   | AccountMailKind;
 
 export interface SystemMailMessage {

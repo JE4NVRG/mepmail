@@ -18,6 +18,7 @@ import {
   type SignupRiskReviewCandidate,
   signupReviewDomain,
 } from "../../../../packages/core/src/signup-risk-review-digest.js";
+import { SYSTEM_MAIL_ORIGIN } from "../../../../packages/core/src/system-mail-origin.js";
 
 export const SIGNUP_RISK_DIGEST_RECIPIENT = "alertas@je4ndev.com";
 export const SIGNUP_RISK_DIGEST_TIME_ZONE = "America/Sao_Paulo";
@@ -310,7 +311,12 @@ export async function sendSignupRiskDailyDigest(
       if (!currentWindowOpen(readNow())) return { status: "outside_window" } as const;
       const accepted = await acceptEmail(
         { db: tx, keyring: deps.keyring, isCloud: deps.isCloud, enqueueEmailSend: async () => {} },
-        { teamId: owner.teamId, billing: "uncapped", apiKeyId: null },
+        {
+          teamId: owner.teamId,
+          billing: "uncapped",
+          apiKeyId: null,
+          [SYSTEM_MAIL_ORIGIN]: SIGNUP_RISK_DIGEST_KIND,
+        },
         {
           from: deps.from,
           to: [SIGNUP_RISK_DIGEST_RECIPIENT],

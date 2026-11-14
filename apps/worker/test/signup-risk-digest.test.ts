@@ -4,6 +4,7 @@ import { type Db, schema } from "@millionsend/db";
 import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { decryptEmailBodySnapshot } from "../../../packages/core/src/crypto/envelope.js";
 import {
   listSignupRiskReviewCandidates,
   type SignupRiskReviewCandidate,
@@ -247,6 +248,24 @@ describe("daily digest transaction, without SMTP or provider calls", () => {
       latestStatus: "queued",
       sesMessageId: null,
       tags: { mepmail_system: SIGNUP_RISK_DIGEST_KIND },
+    });
+    const snapshot = await decryptEmailBodySnapshot(
+      {
+        ciphertext: required(email.bodyCiphertext),
+        iv: required(email.bodyIv),
+        wrappedDek: required(email.bodyWrappedDek),
+        keyVersion: required(email.bodyKeyVersion),
+      },
+      keyring,
+      { teamId: home, rowId: email.id },
+    );
+    expect(snapshot.origin).toEqual({
+      version: 1,
+      source: "system",
+      kind: SIGNUP_RISK_DIGEST_KIND,
+      from,
+      to: email.to,
+      subject: email.subject,
     });
     expect(email.cc).toBeNull();
     expect(email.bcc).toBeNull();
