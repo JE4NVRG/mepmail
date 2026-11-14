@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import { campaignDomainDnsReady } from "./campaign-consent.js";
 import { fetchDeliverabilityHealth } from "./deliverability.js";
 import { firstRow } from "./driver-result.js";
@@ -163,6 +163,26 @@ export async function approveProductionVolume(
       input.dailyCeiling > observed.team.dailySendCeiling
     )
       throw new Error("volume_current_safety_or_cap_required");
+    // Both ingestion and approval hold the team row. Capture reviewed equal-ms
+    // identities before writing the grant: a timestamp alone is not a witness.
+    const clock = firstRow<{ at: string }>(
+      await d.execute(sql`
+      select date_trunc('milliseconds', clock_timestamp())::text as at
+    `),
+    );
+    if (!clock) throw new Error("volume_arrival_boundary_missing");
+    const boundaryAt = new Date(clock.at);
+    const reviewedBoundary = await d
+      .select({ id: schema.emailEvents.id })
+      .from(schema.emailEvents)
+      .innerJoin(schema.emails, eq(schema.emails.id, schema.emailEvents.emailId))
+      .where(
+        and(
+          eq(schema.emails.teamId, input.teamId),
+          gte(schema.emailEvents.createdAt, boundaryAt),
+          inArray(schema.emailEvents.type, ["bounced", "complained"]),
+        ),
+      );
     const [proof] = await d
       .insert(schema.auditLog)
       .values({
@@ -172,7 +192,8 @@ export async function approveProductionVolume(
         action: "team.production_volume_approved",
         createdAt: sql`clock_timestamp()`,
         data: {
-          version: 1,
+          version: 2,
+          arrivalBoundary: { at: boundaryAt.toISOString(), ids: reviewedBoundary.map((v) => v.id) },
           teamId: input.teamId,
           principalId: observed.principal.id,
           ceiling: input.dailyCeiling,
@@ -211,8 +232,9 @@ export async function productionVolumeStatus(db: Db, teamId: string, now = new D
   const o = await observeProductionVolume(db, teamId, now);
   const g = p.data;
   if (
+    o.record?.id !== p.id ||
     !g ||
-    g.version !== 1 ||
+    (g.version !== 1 && g.version !== 2) ||
     g.teamId !== teamId ||
     g.principalId !== o.principal?.id ||
     g.state !== o.state ||
@@ -228,9 +250,23 @@ export async function productionVolumeStatus(db: Db, teamId: string, now = new D
     !o.safe
   )
     return { ceiling: null, reason: "safety_or_state_changed" } as const;
+  // Version 1 keeps its conservative behavior; never infer a missing witness.
+  const boundary = g.arrivalBoundary as { at?: unknown; ids?: unknown } | undefined;
+  if (
+    g.version === 2 &&
+    (!boundary ||
+      typeof boundary.at !== "string" ||
+      !Number.isFinite(new Date(boundary.at).getTime()) ||
+      new Date(boundary.at) > p.createdAt ||
+      !Array.isArray(boundary.ids) ||
+      !boundary.ids.every((id) => typeof id === "string"))
+  )
+    return { ceiling: null, reason: "new_adverse_evidence" } as const;
+  const reviewedIds = new Set<string>(g.version === 2 ? (boundary!.ids as string[]) : []);
   // Arrival time, never an occurrence-only cutoff. Unknown/backdated writes fail closed.
-  const fresh = await db
+  const arrivals = await db
     .select({
+      id: schema.emailEvents.id,
       type: schema.emailEvents.type,
       bounce: schema.emailEvents.bounceType,
       at: schema.emailEvents.occurredAt,
@@ -241,10 +277,13 @@ export async function productionVolumeStatus(db: Db, teamId: string, now = new D
     .where(
       and(
         eq(schema.emails.teamId, teamId),
-        gt(schema.emailEvents.createdAt, p.createdAt),
+        g.version === 2
+          ? gte(schema.emailEvents.createdAt, new Date(boundary!.at as string))
+          : gt(schema.emailEvents.createdAt, p.createdAt),
         inArray(schema.emailEvents.type, ["bounced", "complained"]),
       ),
     );
+  const fresh = arrivals.filter((v) => !reviewedIds.has(v.id));
   const reviewedCount = (g.evidence as { count?: string } | undefined)?.count;
   const changed = hash(g.evidence) !== hash(o.evidence);
   if (

@@ -593,6 +593,16 @@ async function releaseParked(
           // Same ordering as claimAzureSend: global advisory fence, then row lock.
           // A racing lifetime attempt cannot slip between admission and reservation.
           await txDb.execute(sql`select pg_advisory_xact_lock(18475923, 1)`);
+        }
+        // Global restoration fence, then team, then email/usage: one order.
+        if (deps.isCloud) {
+          await txDb
+            .select({ id: schema.teams.id })
+            .from(schema.teams)
+            .where(eq(schema.teams.id, email.teamId))
+            .for("update");
+        }
+        if (deps.queueAdmission?.policy?.restoration) {
           const [current] = await txDb
             .select()
             .from(schema.emails)

@@ -145,13 +145,25 @@ export function withMailboxProbation(
         throw new MailboxSendDeferredError(
           !team ? "preflight_unavailable" : team.suspendedAt ? "sending_paused" : "review_required",
         );
-      const quota = await applySenderProbationQuota(db, input.teamId, { kind: "none" }, true);
       const count = new Set([...input.to, ...input.cc, ...input.bcc].map((s) => s.toLowerCase()))
         .size;
       const at = new Date();
       const day = utcDay(at);
-      if (!(await reserveQuota(db, { teamId: input.teamId, count, quota, at, day })).reserved)
-        throw new MailboxSendDeferredError("quota_exceeded");
+      const quota = await db.transaction(async (tx) => {
+        const txDb = tx as unknown as Db;
+        await txDb
+          .select({ id: schema.teams.id })
+          .from(schema.teams)
+          .where(eq(schema.teams.id, input.teamId))
+          .for("update");
+        const current = await applySenderProbationQuota(txDb, input.teamId, { kind: "none" }, true);
+        if (
+          !(await reserveQuota(txDb, { teamId: input.teamId, count, quota: current, at, day }))
+            .reserved
+        )
+          throw new MailboxSendDeferredError("quota_exceeded");
+        return current;
+      });
       probationReserved.add(input);
       try {
         await checkMailboxContent(db, input);

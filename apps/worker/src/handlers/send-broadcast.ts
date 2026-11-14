@@ -581,6 +581,21 @@ export async function sendBroadcast(
         // contract), same as the API accept path — a broadcast must not
         // bypass the plan's cap.
         const accepted = await db.transaction(async (tx) => {
+          const txDb = tx as unknown as Db;
+          if (deps.isCloud) {
+            await txDb
+              .select({ id: schema.teams.id })
+              .from(schema.teams)
+              .where(eq(schema.teams.id, broadcast.teamId))
+              .for("update");
+            // The page's observation is not authority for this reservation.
+            quota = await applySenderProbationQuota(
+              txDb,
+              broadcast.teamId,
+              (await fetchTeamQuota(txDb, broadcast.teamId, deps.isCloud)) ?? quota,
+              deps.isCloud,
+            );
+          }
           // Insert before reserving: a conflict means a previous run already
           // fanned this contact out (and reserved quota for it), so a re-run
           // must not burn quota again.

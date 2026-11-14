@@ -505,6 +505,14 @@ export async function acceptEmail(
   const deliveryAt = payload.scheduledAt ?? new Date();
   const day = utcDay(deliveryAt);
   const runAccept = async (txDb: Db) => {
+    // Serialize approval/ingestion and quota reservation under their team lock.
+    if (deps.isCloud) {
+      await txDb
+        .select({ id: schema.teams.id })
+        .from(schema.teams)
+        .where(eq(schema.teams.id, auth.teamId))
+        .for("update");
+    }
     quota = await applySenderProbationQuota(txDb, auth.teamId, quota, deps.isCloud);
     const reservation =
       opts.quota === "deferred"

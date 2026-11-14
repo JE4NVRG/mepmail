@@ -12,9 +12,9 @@ import {
   teamQuota,
   utcDay,
 } from "@millionsend/core";
-import { schema } from "@millionsend/db";
+import { type Db, schema } from "@millionsend/db";
 import { createTeam, createTestDb, verifiedMonthlyBilling } from "@millionsend/test-utils";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import {
   campaignMessage,
@@ -791,4 +791,203 @@ it("explicit young volume lifts only the unreviewed 200 recipient screen", async
   expect(
     await screenNewSender(fixture.db, { teamId: f.teamId, from: f.from, recipients: 201 }),
   ).toBe(false);
+});
+
+/** Observe real SQL and schedule a real competing operator write; never fake rows. */
+function observeVolumeDb(
+  db: Db,
+  onQuery: (text: string) => void,
+  afterRead?: (text: string, params: unknown[]) => Promise<void>,
+): Db {
+  function wrap<T extends object>(query: T): T {
+    return new Proxy(query, {
+      get(target, key) {
+        const value = Reflect.get(target, key, target);
+        if (key === "then" && typeof value === "function") {
+          return (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) => {
+            const info = (target as { toSQL?: () => { sql: string; params: unknown[] } }).toSQL?.();
+            if (info) onQuery(info.sql);
+            return Promise.resolve(target)
+              .then(async (rows) => {
+                if (info && afterRead) await afterRead(info.sql, info.params);
+                return rows;
+              })
+              .then(resolve, reject);
+          };
+        }
+        if (
+          typeof value === "function" &&
+          ["from", "where", "orderBy", "limit", "for"].includes(String(key))
+        )
+          return (...args: unknown[]) => wrap(Reflect.apply(value, target, args) as object);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  }
+  return new Proxy(db, {
+    get(target, key) {
+      const value = Reflect.get(target, key, target);
+      if (key === "select" && typeof value === "function")
+        return (...args: unknown[]) => wrap(Reflect.apply(value, target, args) as object);
+      if (key === "execute" && typeof value === "function")
+        return (...args: unknown[]) => {
+          const dialect = Reflect.get(target, "dialect") as {
+            sqlToQuery: (input: unknown) => { sql: string };
+          };
+          onQuery(dialect.sqlToQuery(args[0]).sql);
+          return Reflect.apply(value, target, args);
+        };
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
+it("volume P2: superseded proof between real reads never supplies the old ceiling", async () => {
+  const f = await volumeFixture();
+  await f.decision();
+  let replaced = false;
+  const observed = observeVolumeDb(
+    fixture.db,
+    () => {},
+    async (text, params) => {
+      if (
+        !replaced &&
+        text.includes('"audit_log"') &&
+        params.includes(`production-volume:${f.teamId}`)
+      ) {
+        replaced = true;
+        await f.decision({ dailyCeiling: 100 });
+      }
+    },
+  );
+  expect((await productionVolumeStatus(observed, f.teamId)).ceiling).toBeNull();
+  expect(replaced).toBe(true);
+  expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBe(100);
+});
+
+it("volume P2: real API locks team before its final approval observation and UTC reservation", async () => {
+  const f = await volumeFixture();
+  await f.decision({ dailyCeiling: 100 });
+  await fixture.db
+    .insert(schema.usageCounters)
+    .values({ teamId: f.teamId, day: utcDay(), accepted: 99 });
+  const queries: string[] = [];
+  const results = await fixture.db.transaction(async (tx) => {
+    const db = observeVolumeDb(tx as unknown as Db, (text) => queries.push(text));
+    return acceptEmail(
+      { db, keyring, isCloud: true, enqueueEmailSend: vi.fn() },
+      { teamId: f.teamId, billing: f.team, apiKeyId: null },
+      {
+        from: f.from,
+        to: ["recipient@example.test"],
+        subject: "Requested reset",
+        text: "You requested a password reset.",
+        domainId: f.domain.id,
+      },
+      { tx: db },
+    );
+  });
+  expect(results).toMatchObject({ ok: true, parked: false });
+  const lock = queries.findIndex((q) => /from "teams"/.test(q) && /for update/i.test(q));
+  const reservation = queries.findIndex((q) => /insert into "usage_counters"/.test(q));
+  const approval = queries.findIndex((q, i) => i > lock && /from "audit_log"/.test(q));
+  expect(lock).toBeGreaterThanOrEqual(0);
+  expect(approval).toBeGreaterThan(lock);
+  expect(reservation).toBeGreaterThan(approval);
+  expect(await accept(f, "You requested a password reset.")).toMatchObject({
+    ok: true,
+    parked: true,
+  });
+  const [counter] = await fixture.db
+    .select()
+    .from(schema.usageCounters)
+    .where(eq(schema.usageCounters.teamId, f.teamId));
+  expect(counter?.accepted).toBe(100);
+});
+
+it("volume P2: same-ms reviewed and new benign identities retain volume; real complaint still revokes", async () => {
+  const f = await volumeFixture();
+  const fixed = new Date(Date.now() - 100);
+  await fixture.db.execute(
+    sql.raw(
+      `CREATE FUNCTION public.clock_timestamp() RETURNS timestamptz LANGUAGE sql AS $$ SELECT '${fixed.toISOString()}'::timestamptz $$`,
+    ),
+  );
+  await fixture.db.execute(sql.raw("SET search_path TO public, pg_catalog"));
+  try {
+    const insertOutcome = async (suffix: string) => {
+      const sesMessageId = `same-ms-${suffix}-${f.teamId}`;
+      const [row] = await fixture.db
+        .insert(schema.emails)
+        .values({
+          teamId: f.teamId,
+          from: f.from,
+          to: [`${suffix}@example.test`],
+          subject: "Requested outcome",
+          sentAt: fixed,
+          sesMessageId,
+        })
+        .returning();
+      if (!row) throw new Error("missing equal-time fixture");
+      return { row, sesMessageId };
+    };
+    const before = await insertOutcome("reviewed");
+    const [old] = await fixture.db
+      .insert(schema.emailEvents)
+      .values({
+        emailId: before.row.id,
+        type: "bounced",
+        bounceType: "Permanent",
+        occurredAt: fixed,
+        createdAt: fixed,
+        data: {},
+      })
+      .returning();
+    if (!old) throw new Error("missing reviewed event");
+    await f.decision();
+    const observation = await observeProductionVolume(fixture.db, f.teamId);
+    expect(observation.record?.data?.version).toBe(2);
+    expect(observation.record?.data?.arrivalBoundary).toMatchObject({
+      at: fixed.toISOString(),
+      ids: expect.arrayContaining([old.id]),
+    });
+    const incoming = await insertOutcome("new");
+    await processProviderEvent(
+      fixture.db,
+      {
+        eventType: "Bounce",
+        sesMessageId: incoming.sesMessageId,
+        occurredAt: fixed.toISOString(),
+        data: {},
+        bounce: { bounceType: "Permanent", recipients: ["new@example.test"] },
+      },
+      { snsMessageId: randomUUID() },
+    );
+    const arrivals = await fixture.db
+      .select()
+      .from(schema.emailEvents)
+      .where(eq(schema.emailEvents.emailId, incoming.row.id));
+    expect(arrivals[0]?.createdAt.getTime()).toBe(fixed.getTime());
+    expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBe(4000);
+    await processProviderEvent(
+      fixture.db,
+      {
+        eventType: "Complaint",
+        sesMessageId: incoming.sesMessageId,
+        occurredAt: fixed.toISOString(),
+        data: {},
+        complaint: { recipients: ["new@example.test"] },
+      },
+      { snsMessageId: randomUUID() },
+    );
+    expect((await productionVolumeStatus(fixture.db, f.teamId)).ceiling).toBeNull();
+    const history = await fixture.db
+      .select()
+      .from(schema.emailEvents)
+      .where(eq(schema.emailEvents.emailId, incoming.row.id));
+    expect(history.map((v) => v.type).sort()).toEqual(["bounced", "complained"]);
+  } finally {
+    await fixture.db.execute(sql.raw("RESET search_path"));
+    await fixture.db.execute(sql.raw("DROP FUNCTION public.clock_timestamp()"));
+  }
 });
