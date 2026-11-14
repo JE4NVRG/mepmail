@@ -21,11 +21,11 @@ import {
 import type { InvitationMailActor } from "../../../packages/core/src/invitation-mail-actor.js";
 import { type SendDeps, sendEmail } from "../../worker/src/handlers/send-email.js";
 
-// PREPARED, NOT EXECUTED. Synthetic DB only; no network transport or model.
+// Synthetic migrated DB only; network transport and model are injected.
 let db: Db, close: () => Promise<void>, platform: string, a: string, b: string;
 const keyring = EnvKeyring.fromBase64(randomBytes(32).toString("base64"));
 let enqueued: string[];
-let raw: ReturnType<typeof vi.fn>;
+let raw: ReturnType<typeof vi.fn<() => Promise<void>>>;
 let capturedActor: InvitationMailActor | undefined;
 let capturedMessage: Parameters<typeof sendSystemMail>[1];
 const row = async (id: string) =>
