@@ -225,7 +225,7 @@ it.each([false, true])(
     expect(d.sendRaw).not.toHaveBeenCalled();
     expect(d.enqueueJudge).not.toHaveBeenCalled();
     expect((await rowFor(id)).sentAt).toBeNull();
-    expect((await rowFor(id)).bodyCiphertext).toEqual(legacy.ciphertext);
+    expect(Buffer.from((await rowFor(id)).bodyCiphertext!)).toEqual(legacy.ciphertext);
   },
 );
 it("row/team replay and ciphertext tampering fail authentication before any transport or monitor", async () => {
