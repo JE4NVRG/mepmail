@@ -1,6 +1,7 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { productionVolumeStatus } from "./production-volume.js";
 import { parseMailbox } from "./sender-address.js";
 import { DAY_MS, utcDay } from "./utc-day.js";
 
@@ -633,7 +634,14 @@ export async function screenNewSender(
   if (team.sendReviewClearedAt) return false;
   const ageMs = now.getTime() - team.createdAt.getTime();
   if (ageMs > SEND_REVIEW_NEW_TEAM_DAYS * DAY_MS) return false;
-  const note = await newSenderFinding(db, { ...input, ageMs, now });
+  const approvedVolume = await productionVolumeStatus(db, input.teamId, now);
+  // The explicit volume decision lifts only the calendar volume screen, not
+  // sender rotation, abuse-prone TLDs, impersonation or message-body gates.
+  const note = await newSenderFinding(db, {
+    ...input,
+    ageMs: approvedVolume.ceiling !== null ? Math.max(ageMs, (PROBATION_DAYS + 1) * DAY_MS) : ageMs,
+    now,
+  });
   if (!note) return false;
   await holdTeamForReview(db, { teamId: input.teamId, reason: "new_sender", note, now });
   return true;

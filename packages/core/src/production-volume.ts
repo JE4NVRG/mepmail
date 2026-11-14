@@ -6,7 +6,6 @@ import { campaignDomainDnsReady } from "./campaign-consent.js";
 import { fetchDeliverabilityHealth } from "./deliverability.js";
 import { firstRow } from "./driver-result.js";
 import { isInstanceOperator } from "./instance-operator.js";
-import { isSendReviewHeld } from "./send-review.js";
 
 export const VOLUME_ACTIONS = [
   "team.production_volume_approved",
@@ -107,7 +106,10 @@ export async function observeProductionVolume(db: Db, teamId: string, now = new 
     principal.verified === true &&
     (principal.level === "good" || !!principal.cleared) &&
     !team.suspendedAt &&
-    !isSendReviewHeld(team) &&
+    !(
+      team.sendReviewAt &&
+      (!team.sendReviewClearedAt || team.sendReviewAt > team.sendReviewClearedAt)
+    ) &&
     !team.broadcastsPausedByOperatorAt &&
     !monitor?.paused &&
     !flags.some((f) => f.status === "open") &&

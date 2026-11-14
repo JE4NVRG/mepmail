@@ -1,4 +1,5 @@
 import { env } from "@millionsend/config";
+import { revokeProductionVolume } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import {
   createSesv2Client,
@@ -83,6 +84,12 @@ export async function cutTeamSendingAccess(
   const now = options.now ?? new Date();
   const ses = override ?? defaultDeps;
   const result = await db.transaction(async (tx) => {
+    await tx
+      .select({ id: schema.teams.id })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, team.id))
+      .for("update");
+    await revokeProductionVolume(tx as unknown as Db, team.id, "suspension_access_cut");
     const apiKeys = await tx
       .update(schema.apiKeys)
       .set({ revokedAt: now })

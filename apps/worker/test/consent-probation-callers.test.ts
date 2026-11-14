@@ -779,3 +779,16 @@ it("real ingestion preserves benign bounce eligibility and permanently revokes l
     .where(eq(schema.emails.sesMessageId, sesMessageId));
   expect(email?.latestStatus).toBe("complained");
 });
+
+it("explicit young volume lifts only the unreviewed 200 recipient screen", async () => {
+  const f = await volumeFixture();
+  await fixture.db
+    .update(schema.teams)
+    .set({ sendReviewClearedAt: null })
+    .where(eq(schema.teams.id, f.teamId));
+  await f.decision();
+  const { screenNewSender } = await import("@millionsend/core");
+  expect(
+    await screenNewSender(fixture.db, { teamId: f.teamId, from: f.from, recipients: 201 }),
+  ).toBe(false);
+});
