@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import {
   buildJudgeBlock,
-  JUDGE_LINK_ROWS_MAX,
   JUDGE_TEXT_MAX_CHARS,
   type JudgeBlockInput,
-  stripHiddenElements,
 } from "./abuse-judge/block.js";
 import { JUDGE_VERDICT_NOUL } from "./abuse-judge/questions.js";
 import { type AbuseJudge, type JudgeVerdict, judgeErrorClass } from "./abuse-judge/types.js";
+import { hasUnsafeDispatchCharacters, projectDispatchHtml } from "./dispatch-html-projection.js";
+import { type RewriteOptions, rewriteForTracking } from "./link-tracking.js";
 
 export const PRE_DISPATCH_TIMEOUT_MS = 20_000;
 export interface DispatchContentSnapshot {
@@ -38,68 +38,65 @@ export function dispatchContentFingerprint(s: DispatchContentSnapshot): string {
     .digest("hex");
 }
 
-function inspectable(s: DispatchContentSnapshot): boolean {
-  // The existing text/domain judge is not a vision, attachment or MIME scanner.
-  // Refuse inputs its unchanged projection would omit/truncate, not fake CLEAN.
-  if (s.attachments || (!s.html && !s.text)) return false;
+// Capability custody is module-private and snapshot-object-bound. Public tags,
+// serialized fields, source image sizes or tracking-looking URLs grant nothing.
+const trackingProjections = new WeakMap<
+  DispatchContentSnapshot,
+  {
+    fingerprint: string;
+    before: string;
+    finalWithoutPixel: string;
+  }
+>();
+
+/** Internal worker boundary: use ONLY the exact server-owned rewrite options. */
+export function bindDispatchTracking(
+  snapshot: DispatchContentSnapshot,
+  before: string,
+  options: RewriteOptions,
+): void {
+  trackingProjections.delete(snapshot);
   if (
-    [s.html ?? "", s.text ?? "", s.subject, s.from, ...(s.replyTo ?? [])].some(
-      (v) => v.length > JUDGE_TEXT_MAX_CHARS,
+    options.emailId !== snapshot.emailId ||
+    !options.open ||
+    projectDispatchHtml(before) === null ||
+    rewriteForTracking(before, options) !== snapshot.html
+  )
+    return;
+  // Regenerate from the inspected preimage, never remove an img by pattern.
+  // Source images remain unsupported, even a copied valid signed 1x1 pixel.
+  const finalWithoutPixel = rewriteForTracking(before, { ...options, open: false });
+  if (projectDispatchHtml(finalWithoutPixel) === null) return;
+  trackingProjections.set(snapshot, {
+    fingerprint: dispatchContentFingerprint(snapshot),
+    before,
+    finalWithoutPixel,
+  });
+}
+
+function projectionBlocks(s: DispatchContentSnapshot): string[] | null {
+  if (s.attachments || (!s.html && !s.text)) return null;
+  if (
+    [s.text ?? "", s.sourceText ?? "", s.subject, s.from, ...(s.replyTo ?? [])].some(
+      (value) => value.length > JUDGE_TEXT_MAX_CHARS || hasUnsafeDispatchCharacters(value),
     )
   )
-    return false;
-  if (s.html) {
-    if (
-      /<(?:img|svg|canvas|video|audio|iframe|object|embed|script|style|form|input|meta|link|base)\b|<!--|\bhidden\b|url\s*\(/i.test(
-        s.html,
-      )
-    )
-      return false;
-    if (
-      stripHiddenElements(s.html).html !== s.html ||
-      /\s(?:style|src|srcset|background|poster|on[a-z]+)\s*=/i.test(s.html)
-    )
-      return false;
-    if (
-      [...s.html.matchAll(/<\/?([a-z][a-z0-9-]*)\b/gi)].some(
-        (t) =>
-          !/^(?:p|div|span|br|b|strong|em|i|u|ul|ol|li|table|tbody|thead|tr|td|th|h[1-6]|a|hr)$/i.test(
-            t[1]!,
-          ),
-      )
-    )
-      return false;
-    const tags = [...s.html.matchAll(/<\/?([a-z][a-z0-9]*)\b[^<>]*>/gi)];
-    if (/[<>]/.test(s.html.replace(/<\/?([a-z][a-z0-9]*)\b[^<>]*>/gi, ""))) return false;
-    const stack: string[] = [];
-    for (const tag of tags) {
-      const name = tag[1]!.toLowerCase();
-      if (name === "br" || name === "hr") continue;
-      if (tag[0].startsWith("</")) {
-        if (stack.pop() !== name) return false;
-      } else {
-        if (name === "a" && stack.includes("a")) return false;
-        stack.push(name);
-      }
-    }
-    if (stack.length) return false;
-    const anchors = [
-      ...s.html.matchAll(
-        /<a\b[^>]*href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a\s*>/gi,
-      ),
-    ];
-    if (
-      anchors.length !== tags.filter((t) => /^<a\b/i.test(t[0])).length ||
-      anchors.length > JUDGE_LINK_ROWS_MAX ||
-      anchors.some(
-        (a) =>
-          a[4]!.replace(/<[^>]*>/g, "").length > 80 ||
-          !/^https?:\/\//i.test(a[1] ?? a[2] ?? a[3] ?? ""),
-      )
-    )
-      return false;
+    return null;
+  const proof = trackingProjections.get(s);
+  if (proof && dispatchContentFingerprint(s) !== proof.fingerprint) return null;
+  const blocks: string[] = [];
+  for (const html of [
+    s.sourceHtml,
+    ...(proof ? [proof.before] : []),
+    proof?.finalWithoutPixel ?? s.html,
+  ]) {
+    if (!html) continue;
+    const text = projectDispatchHtml(html);
+    if (text === null) return null;
+    blocks.push(text);
   }
-  return true;
+  for (const text of [s.sourceText, s.text]) if (text) blocks.push(text);
+  return blocks.length ? blocks : null;
 }
 
 function validVerdict(v: unknown): v is JudgeVerdict {
@@ -128,11 +125,8 @@ export async function qualifyDispatchContent(
   signal: AbortSignal = AbortSignal.timeout(PRE_DISPATCH_TIMEOUT_MS),
 ): Promise<DispatchContentDecision> {
   if (!judge) return { allowed: false, reason: "off" };
-  if (
-    !inspectable(snapshot) ||
-    !inspectable({ ...snapshot, html: snapshot.sourceHtml, text: snapshot.sourceText })
-  )
-    return { allowed: false, reason: "uninspectable" };
+  const projections = projectionBlocks(snapshot);
+  if (!projections) return { allowed: false, reason: "uninspectable" };
   const fingerprint = dispatchContentFingerprint(snapshot);
   const blocks = new Set<string>();
   const base = {
@@ -142,15 +136,9 @@ export async function qualifyDispatchContent(
     subject: snapshot.subject,
     attachments: [],
   };
-  // Multipart alternatives are independent author-controlled content. Neither
-  // an innocuous HTML alternative nor skeleton approval clears hostile text.
-  // Tracking must not hide original destinations behind the platform redirect.
-  if (snapshot.sourceHtml)
-    blocks.add(buildJudgeBlock({ ...base, html: snapshot.sourceHtml, text: null }));
-  if (snapshot.sourceText)
-    blocks.add(buildJudgeBlock({ ...base, html: null, text: snapshot.sourceText }));
-  if (snapshot.html) blocks.add(buildJudgeBlock({ ...base, html: snapshot.html, text: null }));
-  if (snapshot.text) blocks.add(buildJudgeBlock({ ...base, html: null, text: snapshot.text }));
+  // Same judge/prompt/rubric. The bounded text projection retains every text
+  // node, every alternative, and complete original AND final href bytes.
+  for (const text of projections) blocks.add(buildJudgeBlock({ ...base, html: null, text }));
   let last: JudgeVerdict | undefined;
   try {
     for (const block of blocks) {

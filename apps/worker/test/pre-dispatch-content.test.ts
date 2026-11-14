@@ -13,7 +13,10 @@ import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { projectDispatchHtml } from "../../../packages/core/src/dispatch-html-projection.js";
+import { rewriteForTracking } from "../../../packages/core/src/link-tracking.js";
 import {
+  bindDispatchTracking,
   PRE_DISPATCH_TIMEOUT_MS,
   qualifyDispatchContent,
 } from "../../../packages/core/src/pre-dispatch-content.js";
@@ -512,3 +515,193 @@ it.each(["recipient", "body"])(
     expect((await row(f.id)).bodyPurgedAt).toBeNull();
   },
 );
+
+// Additive oracle for the finite-language compatibility change. All existing
+// 34 tests remain unchanged, including the fragment <style> refusal oracle.
+const compatibleDocument = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Receipt</title><style>
+.receipt { background-color: #ffffff; padding: 16px; }
+td { color: #333333; font-family: Arial, sans-serif; }
+</style></head><body><div class="receipt"><h1>Requested receipt</h1><table cellpadding="0" cellspacing="0"><tbody><tr><td>Payment received</td><td>USD 24.00</td></tr></tbody></table><a href="https://sender.example/receipt?id=1&amp;view=full">View receipt</a></div></body></html>`;
+const compatibleInline =
+  '<table style="border-collapse:collapse;width:100%"><tbody><tr><td style="padding:16px;color:#333333;font-family:Arial,sans-serif">Requested receipt</td></tr></tbody></table>';
+const baselineDocument =
+  "<!DOCTYPE html><html><head><style>body{font-family:Arial}td{padding:12px}</style></head><body><table><tbody><tr><td>Recibo do pagamento solicitado: EUR 24,90.</td></tr></tbody></table></body></html>";
+const baselineInline =
+  '<table><tbody><tr><td style="padding:12px;color:#333">Recibo solicitado EUR 24,90</td></tr></tbody></table>';
+it.each([compatibleDocument, compatibleInline, baselineDocument, baselineInline])(
+  "finite safe document/inline CSS CLEAN captures exactly once (not a renderer proof)",
+  async (html) => {
+    const f = await seed({ html });
+    const judge = {
+      ...syntheticCleanContentJudge,
+      judge: vi.fn(async (_block: string) => syntheticCleanVerdict),
+    };
+    const d = deps(judge);
+    expect(await sendEmail(fixture.db, d.value, { emailId: f.id })).toBe("sent");
+    expect(judge.judge).toHaveBeenCalledTimes(1);
+    expect(judge.judge.mock.calls[0]![0]).toContain(
+      html === baselineDocument || html === baselineInline ? "Recibo" : "Requested receipt",
+    );
+    expect(d.sendRaw).toHaveBeenCalledTimes(1);
+    expect((await row(f.id)).sentAt).toBeInstanceOf(Date);
+  },
+);
+it.each([
+  { openTracking: true, clickTracking: false },
+  { openTracking: false, clickTracking: true },
+  { openTracking: true, clickTracking: true },
+])("fresh domain explicit tracking %j, default email opts", async (flags) => {
+  const f = await seed({ html: compatibleDocument });
+  await fixture.db.update(schema.domains).set(flags).where(eq(schema.domains.id, f.domainId));
+  const judge = {
+    ...syntheticCleanContentJudge,
+    judge: vi.fn(async (_block: string) => syntheticCleanVerdict),
+  };
+  const d = deps(judge);
+  d.value.tracking = { secretKey: Buffer.alloc(32, 9), defaultBaseUrl: "https://track.example" };
+  expect(await sendEmail(fixture.db, d.value, { emailId: f.id })).toBe("sent");
+  expect(d.sendRaw).toHaveBeenCalledTimes(1);
+  expect((await row(f.id)).sentAt).toBeInstanceOf(Date);
+  const blocks = judge.judge.mock.calls.map((call) => call[0]).join("\n");
+  expect(blocks).toContain("https://sender.example/receipt?id=1&view=full");
+  if (flags.clickTracking) expect(blocks).toContain("https://track.example/t/c/");
+  const mime = d.sendRaw.mock.calls[0]![0].raw.toString().replace(/=\r?\n/g, "");
+  if (flags.openTracking) expect(mime).toContain("/t/o/");
+});
+it("hidden inline lure is retained in the projection and ABUSE prevents transport", async () => {
+  const f = await seed({ html: `<div style="display:none">${bank}</div><p>Requested receipt</p>` });
+  const judge = {
+    ...syntheticCleanContentJudge,
+    judge: vi.fn(async (block: string) =>
+      block.includes("Banco CTT") ? abuse : syntheticCleanVerdict,
+    ),
+  };
+  await held(f.id, deps(judge));
+  expect(judge.judge).toHaveBeenCalledTimes(1);
+  expect(judge.judge.mock.calls[0]![0]).toContain("Banco CTT");
+});
+it.each([
+  '<div style="content:secret">Requested receipt</div>',
+  '<div style="background-image:url(https://audit.invalid)">Receipt</div>',
+  '<div style="width:expression(alert(1))">Receipt</div>',
+  '<!doctype html><html><head><style>@import "https://audit.invalid";</style></head><body>Receipt</body></html>',
+  '<!doctype html><html><head><style>p::before{content:"Banco CTT"}</style></head><body>Receipt</body></html>',
+  "<p><div>invalid browser recovery</div></p>",
+  "<table><p>foster-parented text</p></table>",
+  '<div style="color:red" style="display:none">duplicate attribute</div>',
+  '<div title="unclosed>Receipt</div>',
+  "<div>truncated",
+  "<div>&notAQualifiedEntity;</div>",
+  "<div>Ban&#x200b;co CTT</div>",
+  "<svg><text>receipt</text></svg>",
+  '<meta http-equiv="refresh" content="0;url=https://audit.invalid">',
+  '<form><input value="receipt"></form>',
+  "<p>" + "x".repeat(6001) + "</p>",
+  '<img src="https://track.example/t/o/copied" width="1" height="1" alt="Requested receipt" style="display:none">',
+  '<p>Requested receipt</p><img src="https://sender.example/logo.png" alt="Legitimate receipt">',
+])("unsupported author content stays HOLD even with explicit tracking: %s", async (html) => {
+  const f = await seed({ html });
+  await fixture.db
+    .update(schema.domains)
+    .set({ openTracking: true, clickTracking: true })
+    .where(eq(schema.domains.id, f.domainId));
+  const judge = {
+    ...syntheticCleanContentJudge,
+    judge: vi.fn(async (_block: string) => syntheticCleanVerdict),
+  };
+  const d = deps(judge);
+  d.value.tracking = { secretKey: Buffer.alloc(32, 9), defaultBaseUrl: "https://track.example" };
+  await held(f.id, d);
+  expect(judge.judge).not.toHaveBeenCalled();
+});
+it("safe styled HTML never clears an ABUSE MIME text alternative", async () => {
+  const f = await seed(
+    { html: compatibleInline, text: bank },
+    { tags: { [SYSTEM_MAIL_TAG]: "password_reset" } },
+  );
+  const judge = {
+    ...syntheticCleanContentJudge,
+    judge: vi.fn(async (block: string) =>
+      block.includes("Banco CTT") ? abuse : syntheticCleanVerdict,
+    ),
+  };
+  await held(f.id, deps(judge));
+  expect(judge.judge.mock.calls.some((call) => call[0].includes("Banco CTT"))).toBe(true);
+});
+
+it("finite projection retains title, inline splits, decoded labels and full href", () => {
+  const text = projectDispatchHtml(
+    '<!doctype html><html><head><title>Receipt title</title></head><body><p>Ban<span>co</span> CTT</p><a href="https://sender.example/path?a=1&amp;b=2">R&#101;ceipt</a></body></html>',
+  );
+  expect(text).toContain("Receipt title");
+  expect(text).toContain("Banco CTT");
+  expect(text).toContain("Receipt");
+  expect(text).toContain("https://sender.example/path?a=1&b=2");
+});
+it("tracking exemption is private, exact-regeneration-bound and source-image refusing", async () => {
+  const before = '<p>Requested receipt</p><a href="https://sender.example/receipt">Receipt</a>';
+  const options = {
+    emailId: "fixture-email",
+    trackingBaseUrl: "https://track.example",
+    secretKey: Buffer.alloc(32, 9),
+    click: true,
+    open: true,
+  };
+  const snapshot = {
+    teamId: "fixture-team",
+    emailId: options.emailId,
+    from: "a@sender.example",
+    to: ["r@example.com"],
+    cc: null,
+    bcc: null,
+    replyTo: null,
+    subject: "Requested receipt",
+    sourceHtml: before,
+    sourceText: null,
+    html: rewriteForTracking(before, options),
+    text: null,
+    headers: {},
+    attachments: false,
+    mime: Buffer.from("exact final MIME fixture"),
+  };
+  const context = {
+    name: "fixture",
+    plan: "free",
+    ageDays: 1,
+    verifiedDomains: ["sender.example"],
+  };
+  const judge = {
+    ...syntheticCleanContentJudge,
+    judge: vi.fn(async (_block: string) => syntheticCleanVerdict),
+  };
+  // A source-looking URL, signed pixel, JSON field, or clone is not capability.
+  expect(
+    await qualifyDispatchContent(
+      { ...snapshot, trackingTrusted: true } as typeof snapshot,
+      context,
+      judge,
+    ),
+  ).toMatchObject({ allowed: false, reason: "uninspectable" });
+  expect(judge.judge).not.toHaveBeenCalled();
+  bindDispatchTracking(snapshot, before, options);
+  expect(await qualifyDispatchContent(snapshot, context, judge)).toMatchObject({ allowed: true });
+  const blocks = judge.judge.mock.calls.map((call) => call[0]).join("\n");
+  expect(blocks).toContain("https://sender.example/receipt");
+  expect(blocks).toContain("https://track.example/t/c/");
+  judge.judge.mockClear();
+  const clone = { ...snapshot };
+  expect(await qualifyDispatchContent(clone, context, judge)).toMatchObject({ allowed: false });
+  bindDispatchTracking(clone, "<p>different preimage</p>", options);
+  expect(await qualifyDispatchContent(clone, context, judge)).toMatchObject({ allowed: false });
+  snapshot.mime = Buffer.from("modified MIME");
+  expect(await qualifyDispatchContent(snapshot, context, judge)).toMatchObject({ allowed: false });
+  const authorImage = {
+    ...clone,
+    sourceHtml: before + '<img src="https://track.example/t/o/copied" width="1" height="1" alt="">',
+  };
+  bindDispatchTracking(authorImage, before, options);
+  expect(await qualifyDispatchContent(authorImage, context, judge)).toMatchObject({
+    allowed: false,
+  });
+  expect(judge.judge).not.toHaveBeenCalled();
+});

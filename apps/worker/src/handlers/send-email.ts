@@ -57,6 +57,7 @@ import {
 import { campaignSendWindowOpen } from "../../../../packages/core/src/campaign-send-window.js";
 import { decryptEmailBodySnapshot } from "../../../../packages/core/src/crypto/envelope.js";
 import {
+  bindDispatchTracking,
   type DispatchContentDecision,
   type DispatchContentSnapshot,
   dispatchContentFingerprint,
@@ -932,6 +933,7 @@ export async function sendEmail(
   let sharedFallbackUsed = false;
   let shippedUntracked = false;
   let trackingPending = false;
+  let dispatchTrackingOptions: Parameters<typeof rewriteForTracking>[1] | undefined;
   // deps.tracking is always present in the running worker (the master key is
   // always available to derive the signing key); it is optional only so tests
   // that don't exercise tracking need not wire it, and its absence simply
@@ -971,14 +973,15 @@ export async function sendEmail(
         (azureRecipientOptoutUrl || email.contactId || email.topicId) && deps.unsubscribe
           ? buildUnsubscribeUrl(deps.unsubscribe.baseUrl, "")
           : undefined;
-      html = rewriteForTracking(html, {
+      dispatchTrackingOptions = {
         emailId: email.id,
         trackingBaseUrl,
         click,
         open,
         secretKey: deps.tracking.secretKey,
         ...(skipHrefPrefix ? { skipHrefPrefix } : {}),
-      });
+      };
+      html = rewriteForTracking(html, dispatchTrackingOptions);
     }
   }
 
@@ -1205,6 +1208,8 @@ export async function sendEmail(
       attachments: !!attachments?.length,
       mime: Buffer.from(mime),
     };
+    if (preTrackingHtml && dispatchTrackingOptions)
+      bindDispatchTracking(contentSnapshot, preTrackingHtml, dispatchTrackingOptions);
     const [team] = await db
       .select({
         name: schema.teams.name,
