@@ -1,6 +1,7 @@
 import type { JudgeTelemetry } from "@millionsend/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createOpenAiJudge } from "../src/abuse-judge/openai.js";
+import { syntheticCompleteCleanAnswers } from "./fixtures/complete-judge-answers.js";
 
 const SECRET = "SECRET_CONTENT_SENTINEL";
 const valid = () =>
@@ -8,7 +9,7 @@ const valid = () =>
     JSON.stringify({
       choices: [
         {
-          message: { content: JSON.stringify({ is_abuse: 0, category: "clean", language: "en" }) },
+          message: { content: JSON.stringify(syntheticCompleteCleanAnswers) },
         },
       ],
     }),

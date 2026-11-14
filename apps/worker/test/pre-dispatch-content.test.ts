@@ -28,6 +28,7 @@ import {
   syntheticCleanContentJudge,
   syntheticCleanVerdict,
 } from "./fixtures/clean-content-judge.js";
+import { syntheticCompleteCleanAnswers } from "./fixtures/complete-judge-answers.js";
 
 let fixture: Awaited<ReturnType<typeof createTestDb>>;
 const keyring = EnvKeyring.fromBase64(randomBytes(32).toString("base64"));
@@ -704,4 +705,42 @@ it("tracking exemption is private, exact-regeneration-bound and source-image ref
     allowed: false,
   });
   expect(judge.judge).not.toHaveBeenCalled();
+});
+
+it.each([
+  { is_abuse: 0 },
+  { ...syntheticCompleteCleanAnswers, category: "unknown-category" },
+  { ...syntheticCompleteCleanAnswers, impersonation: -1 },
+])("actual HTTP adapter cannot clear incomplete/invalid provider answer %j", async (answers) => {
+  const f = await seed();
+  const judge = createOpenAiJudge({
+    model: "deepseek/deepseek-v4.1-flash",
+    baseUrl: "https://api.commandcode.ai/provider/v1",
+    apiKey: "fixture-only",
+    fetch: async () =>
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: JSON.stringify(answers) } }] }),
+        { status: 200 },
+      ),
+  });
+  await held(f.id, deps(judge));
+});
+it("actual HTTP adapter complete clean control reaches only the capturing transport", async () => {
+  const f = await seed({ text: "You requested a receipt from our verified sender." });
+  const judge = createOpenAiJudge({
+    model: "deepseek/deepseek-v4.1-flash",
+    baseUrl: "https://api.commandcode.ai/provider/v1",
+    apiKey: "fixture-only",
+    fetch: async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: JSON.stringify(syntheticCompleteCleanAnswers) } }],
+        }),
+        { status: 200 },
+      ),
+  });
+  const d = deps(judge);
+  expect(await sendEmail(fixture.db, d.value, { emailId: f.id })).toBe("sent");
+  expect(d.sendRaw).toHaveBeenCalledTimes(1);
+  expect((await row(f.id)).sentAt).toBeInstanceOf(Date);
 });

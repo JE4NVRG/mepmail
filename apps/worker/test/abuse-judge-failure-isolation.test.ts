@@ -12,6 +12,7 @@ import { asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { createOpenAiJudge } from "../src/abuse-judge/openai.js";
 import { JUDGE_THROTTLE_RETRIES, judgeSample } from "../src/handlers/abuse-judge.js";
+import { syntheticCompleteCleanAnswers } from "./fixtures/complete-judge-answers.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -234,7 +235,7 @@ it("observes complete telemetry through the actual worker consumer, without cont
             choices: [
               {
                 message: {
-                  content: JSON.stringify({ is_abuse: 0, category: "clean", language: "en" }),
+                  content: JSON.stringify(syntheticCompleteCleanAnswers),
                 },
               },
             ],

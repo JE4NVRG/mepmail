@@ -7,6 +7,7 @@ import {
   OPENAI_JUDGE_SYSTEM_PROMPT,
   parseJudgeContent,
 } from "../src/abuse-judge/openai.js";
+import { syntheticCompleteCleanAnswers } from "./fixtures/complete-judge-answers.js";
 
 const reply = (content: string, status = 200) =>
   new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
@@ -31,6 +32,7 @@ describe("OpenAI-compatible judge", () => {
         return reply(
           "```json\n" +
             JSON.stringify({
+              ...syntheticCompleteCleanAnswers,
               is_abuse: 0.97,
               impersonation: 0.9,
               off_domain_lure: 0.8,
@@ -138,7 +140,7 @@ describe("OpenAI-compatible judge", () => {
       const fetchMock = vi
         .spyOn(globalThis, "fetch")
         .mockResolvedValue(
-          reply(JSON.stringify({ is_abuse: 0.02, category: "clean", language: "en" })),
+          reply(JSON.stringify({ ...syntheticCompleteCleanAnswers, is_abuse: 0.02 })),
         );
       try {
         const judge = createAbuseJudge({
@@ -289,5 +291,59 @@ describe("OpenAI-compatible judge", () => {
       timeoutMs: 20_000,
     });
     expect(judge).toMatchObject({ provider: "openai", model: "deepseek/deepseek-v4.1-flash" });
+  });
+});
+
+it.each(Object.keys(ABUSE_JUDGE_QUESTIONS))(
+  "missing answer %s is parse_error, not a clean default",
+  async (key) => {
+    const raw: Record<string, unknown> = { ...syntheticCompleteCleanAnswers };
+    delete raw[key];
+    const judge = createOpenAiJudge({
+      model: "fixture",
+      baseUrl: "https://judge.example.test",
+      apiKey: "fixture-only",
+      fetch: async () => reply(JSON.stringify(raw)),
+    });
+    await expect(judge.judge("fixture", { signal: signal() })).rejects.toMatchObject({
+      class: "parse_error",
+    });
+  },
+);
+it.each([
+  { is_abuse: -1 },
+  { is_abuse: 1.01 },
+  { is_abuse: null },
+  { is_abuse: "0" },
+  { impersonation: { noul: 2 } },
+  { category: "phishing" },
+  { category: "" },
+  { language: "unknown-choice" },
+  { extra_answer: 0 },
+])("invalid complete answer %j fails closed", async (patch) => {
+  const raw = { ...syntheticCompleteCleanAnswers, ...patch };
+  const judge = createOpenAiJudge({
+    model: "fixture",
+    baseUrl: "https://judge.example.test",
+    apiKey: "fixture-only",
+    fetch: async () => reply(JSON.stringify(raw)),
+  });
+  await expect(judge.judge("fixture", { signal: signal() })).rejects.toMatchObject({
+    class: "parse_error",
+  });
+});
+it("complete valid typed answers still resolve without changing scoring", async () => {
+  const judge = createOpenAiJudge({
+    model: "fixture",
+    baseUrl: "https://judge.example.test",
+    apiKey: "fixture-only",
+    fetch: async () => reply(JSON.stringify(syntheticCompleteCleanAnswers)),
+  });
+  await expect(judge.judge("fixture", { signal: signal() })).resolves.toMatchObject({
+    score: 0,
+    verdict: "clean",
+    categories: [],
+    reasons: [],
+    language: "en",
   });
 });

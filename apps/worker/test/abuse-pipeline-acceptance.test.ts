@@ -17,6 +17,7 @@ import { createOpenAiJudge } from "../src/abuse-judge/openai.js";
 import { judgeSample } from "../src/handlers/abuse-judge.js";
 import { flushMonitorAlerts } from "../src/handlers/monitor-alerts.js";
 import { runMonitorHealth } from "../src/handlers/monitor-health.js";
+import { syntheticCompleteCleanAnswers } from "./fixtures/complete-judge-answers.js";
 
 // Source-bound acceptance: actual sampling, crypto, Drizzle/PGlite, adapters,
 // verdict fold, holds and audit. Only queue delivery and external HTTP are fake.
@@ -88,9 +89,10 @@ function adapter(score: number, blocks: string[], response?: () => Promise<Respo
                 {
                   message: {
                     content: JSON.stringify({
+                      ...syntheticCompleteCleanAnswers,
                       is_abuse: score / 100,
                       impersonation: score / 100,
-                      category: "phishing",
+                      category: "phishing_credentials",
                       language: "en",
                     }),
                   },

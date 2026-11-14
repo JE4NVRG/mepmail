@@ -84,6 +84,47 @@ export function foldOpenAiAnswers(raw: Record<string, unknown>): Record<string, 
   return answers;
 }
 
+/** A partial or out-of-schema provider answer is uncertainty, never CLEAN. */
+export function validateOpenAiAnswers(raw: Record<string, unknown>): void {
+  if (Object.keys(raw).length !== QUESTION_KEYS.length)
+    throw new JudgeError("parse_error", "judge answer keys are incomplete or unknown");
+  for (const key of QUESTION_KEYS) {
+    if (!Object.hasOwn(raw, key)) throw new JudgeError("parse_error", "judge answer missing");
+    const q = ABUSE_JUDGE_QUESTIONS[key] as {
+      type: string;
+      criteria?: Record<string, string>;
+    };
+    const value = raw[key];
+    if (q.type === "choice") {
+      const choice =
+        typeof value === "string"
+          ? value
+          : value && typeof value === "object"
+            ? (value as { choice?: unknown }).choice
+            : undefined;
+      if (typeof choice !== "string" || !Object.hasOwn(q.criteria ?? {}, choice))
+        throw new JudgeError("parse_error", "judge choice outside schema");
+      continue;
+    }
+    const probability =
+      typeof value === "number"
+        ? value
+        : typeof value === "boolean"
+          ? Number(value)
+          : value && typeof value === "object"
+            ? ((value as { noul?: unknown; probability?: unknown }).noul ??
+              (value as { probability?: unknown }).probability)
+            : undefined;
+    if (
+      typeof probability !== "number" ||
+      !Number.isFinite(probability) ||
+      probability < 0 ||
+      probability > 1
+    )
+      throw new JudgeError("parse_error", "judge probability outside schema");
+  }
+}
+
 /** The first JSON object in a reply, tolerating a ```json fence around it. */
 export function parseJudgeContent(content: string): Record<string, unknown> {
   const unfenced = content.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
@@ -219,7 +260,9 @@ export function createOpenAiJudge(opts: {
         phase = "content";
         const content = json.choices?.[0]?.message?.content;
         if (typeof content !== "string") throw new JudgeError("parse_error", "no message content");
-        const verdict = composeJudgeVerdict(foldOpenAiAnswers(parseJudgeContent(content)));
+        const rawAnswers = parseJudgeContent(content);
+        validateOpenAiAnswers(rawAnswers);
+        const verdict = composeJudgeVerdict(foldOpenAiAnswers(rawAnswers));
         phase = "complete";
         observe();
         return verdict;
