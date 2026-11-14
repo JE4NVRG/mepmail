@@ -87,7 +87,8 @@ export function buildResetEmail(input: {
   locale: MailLocale;
 }): SystemMailMessage {
   const m = MESSAGES[input.locale];
-  const greeting = fill(m.greeting, { name: input.name });
+  // Free-form account names are not mail content authority.
+  const greeting = input.locale === "pt-BR" ? "Olá!" : "Hello!";
   const expiry = fill(m.expiry, { minutes: String(RESET_TOKEN_TTL_MINUTES) });
   return {
     from: env.AUTH_EMAIL_FROM ?? "",
@@ -112,7 +113,8 @@ export function buildVerificationEmail(input: {
   locale: MailLocale;
 }): SystemMailMessage {
   const m = VERIFY_MESSAGES[input.locale];
-  const greeting = fill(m.greeting, { name: input.name });
+  // Free-form account names are not mail content authority.
+  const greeting = input.locale === "pt-BR" ? "Olá!" : "Hello!";
   const expiry = fill(m.expiry, { minutes: String(VERIFY_TOKEN_TTL_MINUTES) });
   return {
     from: env.AUTH_EMAIL_FROM ?? "",
@@ -168,14 +170,20 @@ export function buildInvitationEmail(input: {
 }): SystemMailMessage {
   const m = INVITE_MESSAGES[input.locale];
   const values = {
-    inviter: input.inviterName,
-    team: input.teamName,
+    inviter: "",
+    team: "",
     role: m.roles[input.role],
     days: String(input.expiresInDays),
     email: input.to,
   };
-  const subject = fill(m.subject, values);
-  const body = fill(m.body, values);
+  const subject =
+    input.locale === "pt-BR"
+      ? "Convite para participar de uma equipe no MepMail"
+      : "Invitation to join a team on MepMail";
+  const body =
+    input.locale === "pt-BR"
+      ? "Você recebeu um convite para participar de uma equipe no MepMail. Abra o link abaixo para revisar e aceitar o convite."
+      : "You received an invitation to join a team on MepMail. Open the link below to review and accept the invitation.";
   const expiry = fill(m.expiry, values);
   const noAccount = fill(m.noAccount, values);
   return {
@@ -209,20 +217,19 @@ export function buildOperationsInvitationEmail(input: {
   const list = (values: string[]) =>
     [...new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean))].join(", ");
   const values = {
-    inviter: input.inviterName,
-    team: input.teamName,
+    inviter: "",
+    team: "",
     email: input.to,
     days: String(input.expiresInDays),
   };
-  const name = input.name?.trim();
   const domains = list(input.domains);
   const mailboxes = list(input.mailboxes);
   const paragraphs =
     input.locale === "pt-BR"
       ? [
-          `${name ? `Olá, ${name}!` : "Olá!"} Seja bem-vindo ao MepMail.`,
+          "Olá! Seja bem-vindo ao MepMail.",
           fill(
-            "{inviter} convidou você para {team} com o perfil Administrador operacional.",
+            "Você recebeu um convite no MepMail com o perfil Administrador operacional.",
             values,
           ),
           "Após concluir a ativação, você poderá ver a lista de usuários, sem editar contas.",
@@ -240,9 +247,9 @@ export function buildOperationsInvitationEmail(input: {
           "O acesso ainda não está ativo. Sua senha é escolhida por você no MepMail e não deve ser compartilhada.",
         ]
       : [
-          `${name ? `Hi ${name}!` : "Hi!"} Welcome to MepMail.`,
+          "Hi! Welcome to MepMail.",
           fill(
-            "{inviter} invited you to {team} with the Operational administrator profile.",
+            "You received a MepMail invitation with the Operational administrator profile.",
             values,
           ),
           "After activation, you will be able to view the user directory, without editing accounts.",
@@ -264,8 +271,8 @@ export function buildOperationsInvitationEmail(input: {
     to: input.to,
     subject:
       input.locale === "pt-BR"
-        ? fill("Boas-vindas ao MepMail — convite para {team}", values)
-        : fill("Welcome to MepMail — invitation to {team}", values),
+        ? "Boas-vindas ao MepMail — convite de acesso operacional"
+        : "Welcome to MepMail — operational access invitation",
     ...accountMailCard({
       paragraphs,
       button: input.locale === "pt-BR" ? "Abrir convite" : "Open invitation",
@@ -318,7 +325,7 @@ export function buildWelcomeEmail(input: {
     kind: "welcome",
     locale: input.locale,
     path: "/domains",
-    values: { name: input.name, docsUrl: DOCS_URL },
+    values: { name: input.locale === "pt-BR" ? "pessoa usuária" : "there", docsUrl: DOCS_URL },
   });
 }
 
@@ -347,13 +354,22 @@ export function buildMcpConnectedEmail(input: {
   const team =
     input.team === "*"
       ? accountMailPhrase({ locale: input.locale, kind: "mcp.connected", key: "allTeams" })
-      : input.team;
+      : input.locale === "pt-BR"
+        ? "uma equipe autorizada"
+        : "an authorized team";
   return buildAccountEmail({
     to: input.to,
     kind: "mcp.connected",
     locale: input.locale,
     path: "/settings/connected-apps",
-    values: { app: input.app, team, scopes: input.scopes.join(", ") },
+    values: {
+      app: input.locale === "pt-BR" ? "um aplicativo autorizado" : "an authorized application",
+      team,
+      scopes:
+        input.locale === "pt-BR"
+          ? "consulte as permissões em Aplicativos conectados"
+          : "view permissions in Connected apps",
+    },
   });
 }
 

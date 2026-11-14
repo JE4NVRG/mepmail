@@ -1006,6 +1006,7 @@ export {
   type SystemMailKind,
   type SystemMailMessage,
   SystemMailRefused,
+  SystemMailUnavailable,
   type SystemSendDeps,
   sendSystemMail,
 } from "./system-mail.js";

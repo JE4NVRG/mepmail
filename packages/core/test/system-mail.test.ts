@@ -12,6 +12,8 @@ import {
   SYSTEM_MAIL_TAG,
   type SystemMailMessage,
   SystemMailRefused,
+  SystemMailUnavailable,
+  type SystemSendDeps,
   sendSystemMail,
 } from "../src/system-mail.js";
 
@@ -142,10 +144,10 @@ describe("sendSystemMail", () => {
     expect(usage?.accepted).toBe(1);
   });
 
-  it("falls back to raw when no team owns the sender's domain", async () => {
+  it("explicit self-host falls back to raw when no team owns the sender's domain", async () => {
     const d = deps();
     const m = message({ from: "no-reply@unowned.example.com" });
-    expect(await sendSystemMail(d.deps, m)).toBe("raw");
+    expect(await sendSystemMail({ ...d.deps, isCloud: false }, m)).toBe("raw");
     expect(d.raw).toEqual([m]);
     // No owner: the raw send has no region of its own (the caller's default).
     expect(d.rawOwners).toEqual([null]);
@@ -180,10 +182,11 @@ describe("sendSystemMail", () => {
     );
   });
 
-  it("an accept failure falls back to raw so account mail outlives the pipeline", async () => {
+  it("explicit self-host retains raw recovery after an accept failure", async () => {
     const d = deps();
     const broken = {
       ...d.deps,
+      isCloud: false,
       keyring: {
         wrapDek: async () => {
           throw new Error("kms down");
@@ -202,3 +205,35 @@ describe("sendSystemMail", () => {
     expect(d.enqueued).toHaveLength(0);
   });
 });
+
+it.each([true, undefined])(
+  "Cloud/default %s refuses unowned sender and reached crypto failure without raw",
+  async (isCloud) => {
+    for (const unowned of [true, false]) {
+      const d = deps();
+      let wrapAttempts = 0;
+      const { isCloud: _deployment, ...base } = d.deps;
+      const unavailable = {
+        ...base,
+        ...(isCloud === undefined ? {} : { isCloud }),
+        keyring: {
+          wrapDek: async () => {
+            wrapAttempts++;
+            throw new Error("synthetic crypto unavailable");
+          },
+          unwrapDek: keyring.unwrapDek.bind(keyring),
+        },
+      } as SystemSendDeps;
+      const request = message(unowned ? { from: "notice@unowned.example.com" } : {});
+      await expect(sendSystemMail(unavailable, request)).rejects.toMatchObject({
+        name: "SystemMailUnavailable",
+        reason: unowned ? "sender_unowned" : "pipeline_unavailable",
+        retryable: true,
+      });
+      expect(d.raw).toHaveLength(0);
+      expect(d.enqueued).toHaveLength(0);
+      expect(wrapAttempts).toBe(unowned ? 0 : 1);
+    }
+    expect(SystemMailUnavailable.prototype).toBeInstanceOf(Error);
+  },
+);

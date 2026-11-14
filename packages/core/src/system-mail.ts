@@ -102,6 +102,15 @@ export class SystemMailRefused extends Error {
   }
 }
 
+/** Retryable refusal: Cloud account mail never bypasses a failed accept pipeline. */
+export class SystemMailUnavailable extends Error {
+  readonly retryable = true;
+  constructor(readonly reason: "sender_unowned" | "pipeline_unavailable") {
+    super("system mail temporarily unavailable; retry after pipeline recovery");
+    this.name = "SystemMailUnavailable";
+  }
+}
+
 export interface SystemSendDeps extends AcceptEmailDeps {
   /**
    * SESv2 Simple send outside the pipeline: for senders no team owns (owner
@@ -125,9 +134,9 @@ const warnedSenders = new Set<string>();
  *
  * No owner: the raw SES path, byte for byte what every instance did before
  * a team verified the domain. A refusal (all suppressed) throws and never
- * falls back — the suppression list is the point. A failure inside accept
- * (keyring, database, queue) falls back to raw so account mail outlives an
- * outage of the pipeline it normally rides.
+ * falls back — the suppression list is the point. A failure inside accept is retryable and fail-closed in Cloud. Only an
+ * explicitly self-hosted caller retains the legacy raw fallback. Cloud senders
+ * without an owner are held until the sender/pipeline is configured.
  */
 export async function sendSystemMail(
   deps: SystemSendDeps,
@@ -135,6 +144,8 @@ export async function sendSystemMail(
 ): Promise<"pipeline" | "raw"> {
   const owner = await findSenderDomainOwner(deps.db, message.from);
   if (!owner) {
+    // Explicit internal self-host opt-in is required for bootstrap raw compatibility.
+    if (deps.isCloud !== false) throw new SystemMailUnavailable("sender_unowned");
     if (!warnedSenders.has(message.from)) {
       warnedSenders.add(message.from);
       console.warn(
@@ -165,6 +176,7 @@ export async function sendSystemMail(
       },
     );
   } catch (err) {
+    if (deps.isCloud !== false) throw new SystemMailUnavailable("pipeline_unavailable");
     console.error(`system mail: accept failed for ${message.kind}, sending raw`, err);
     await deps.raw(message, owner);
     return "raw";
