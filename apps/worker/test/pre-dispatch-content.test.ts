@@ -398,15 +398,13 @@ it.each(["cc", "bcc", "replyTo", "headers"] as const)(
   async (field) => {
     const f = await seed({ text: "setup only" });
     const name = `account-${randomUUID()}.sender.example`;
-    await fixture.db
-      .insert(schema.domains)
-      .values({
-        teamId: f.teamId,
-        name,
-        region: "us-east-1",
-        status: "verified",
-        verifiedAt: new Date(),
-      });
+    await fixture.db.insert(schema.domains).values({
+      teamId: f.teamId,
+      name,
+      region: "us-east-1",
+      status: "verified",
+      verifiedAt: new Date(),
+    });
     let id = "";
     await sendSystemMail(
       {
