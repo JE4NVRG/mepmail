@@ -7,7 +7,7 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { EnvKeyring } from "../src/crypto/keyring.js";
 import type { InvitationMailActor } from "../src/invitation-mail-actor.js";
 import { hashRecipient } from "../src/suppressions.js";
-import { type SystemMailMessage, sendSystemMail } from "../src/system-mail.js";
+import { type SystemMailMessage, type SystemSendDeps, sendSystemMail } from "../src/system-mail.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -70,7 +70,8 @@ it.each([true, undefined])(
     const { isCloud: _mode, ...base } = f.deps;
     await expect(
       sendSystemMail(
-        { ...base, ...(isCloud === undefined ? {} : { isCloud }) },
+        // Runtime-omission negative control; production still requires isCloud.
+        { ...base, ...(isCloud === undefined ? {} : { isCloud }) } as SystemSendDeps,
         f.message,
         f.actor,
       ),
