@@ -916,6 +916,7 @@ await queue.work(
         enqueueWebhookDelivery: enqueueWebhook,
         tracking,
         monitor,
+        contentJudge: judge,
         ...(unsubscribe ? { unsubscribe } : {}),
       },
       payload,

@@ -1,5 +1,7 @@
 import { appHostname, umamiFunnel } from "@millionsend/config";
 import {
+  type AbuseJudge,
+  applyJudgedSample,
   applyStatusCas,
   buildUnsubscribeHeaders,
   buildUnsubscribeUrl,
@@ -19,6 +21,7 @@ import {
   findSuppressed,
   getSignupSendingRestriction,
   hashRecipient,
+  holdOnContentVerdict,
   isOnboardingSender,
   isSubscribedToTopic,
   type Keyring,
@@ -53,6 +56,12 @@ import {
 } from "../../../../packages/core/src/campaign-consent.js";
 import { campaignSendWindowOpen } from "../../../../packages/core/src/campaign-send-window.js";
 import { decryptEmailBodySnapshot } from "../../../../packages/core/src/crypto/envelope.js";
+import {
+  type DispatchContentDecision,
+  type DispatchContentSnapshot,
+  dispatchContentFingerprint,
+  qualifyDispatchContent,
+} from "../../../../packages/core/src/pre-dispatch-content.js";
 import { screenPreSendContent } from "../../../../packages/core/src/pre-send-content-policy.js";
 import type { EmailBodyOrigin } from "../../../../packages/core/src/system-mail-origin.js";
 import { appendAzureApiOptoutBody } from "../azure-api-optout.js";
@@ -92,6 +101,9 @@ export interface SesSender {
 }
 
 export interface SendDeps {
+  /** Mandatory semantic pre-dispatch judge for Cloud customer mail; null/off denies. */
+  contentJudge?: AbuseJudge | null;
+
   now?: (() => Date) | undefined;
   sendingProviderPolicy?: SendingProviderPolicy | null;
   /** Optional fixture transport; deployment configuration is used when absent. */
@@ -299,6 +311,28 @@ async function stripRecipients(
  * the row to "failed" and records why. Returns false when the row already
  * left "queued" (sent, canceled, suppressed) — nothing to fail then.
  */
+function dispatchRowVersion(email: typeof schema.emails.$inferSelect): string {
+  return JSON.stringify({
+    teamId: email.teamId,
+    domainId: email.domainId,
+    from: email.from,
+    to: email.to,
+    cc: email.cc,
+    bcc: email.bcc,
+    replyTo: email.replyTo,
+    subject: email.subject,
+    headers: email.headers,
+    attachments: email.attachments,
+    broadcastId: email.broadcastId,
+    contactId: email.contactId,
+    topicId: email.topicId,
+    ciphertext: email.bodyCiphertext ? Buffer.from(email.bodyCiphertext).toString("base64") : null,
+    iv: email.bodyIv ? Buffer.from(email.bodyIv).toString("base64") : null,
+    dek: email.bodyWrappedDek ? Buffer.from(email.bodyWrappedDek).toString("base64") : null,
+    version: email.bodyKeyVersion,
+  });
+}
+
 export async function failQueuedEmail(db: Db, emailId: string, reason: string): Promise<boolean> {
   const [updated] = await db
     .update(schema.emails)
@@ -1144,6 +1178,80 @@ export async function sendEmail(
   }
   if (!campaignWindowOpen()) return "parked";
 
+  // Qualify the actual transformed body, identity, envelope and final MIME.
+  // Skeleton samples, prior reviews and public tags grant no release authority.
+  let contentApproval: Extract<DispatchContentDecision, { allowed: true }> | undefined;
+  let contentSnapshot: DispatchContentSnapshot | undefined;
+  if (deps.isCloud && !systemMail) {
+    const version = dispatchRowVersion(email);
+    contentSnapshot = {
+      teamId: email.teamId,
+      emailId: email.id,
+      from: email.from,
+      to: [...email.to],
+      cc: email.cc ? [...email.cc] : null,
+      bcc: email.bcc ? [...email.bcc] : null,
+      replyTo: email.replyTo ? [...email.replyTo] : null,
+      subject: email.subject,
+      html,
+      text,
+      headers: { ...headers },
+      attachments: !!attachments?.length,
+      mime: Buffer.from(mime),
+    };
+    const [team] = await db
+      .select({
+        name: schema.teams.name,
+        plan: schema.teams.plan,
+        createdAt: schema.teams.createdAt,
+      })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, email.teamId));
+    const domains = await db
+      .select({ name: schema.domains.name })
+      .from(schema.domains)
+      .where(and(eq(schema.domains.teamId, email.teamId), eq(schema.domains.status, "verified")));
+    const decision = team
+      ? await qualifyDispatchContent(
+          contentSnapshot,
+          {
+            name: team.name,
+            plan: team.plan,
+            ageDays: Math.floor((Date.now() - team.createdAt.getTime()) / 86_400_000),
+            verifiedDomains: domains.map((d) => d.name),
+          },
+          deps.contentJudge,
+        )
+      : { allowed: false as const, reason: "team_missing" };
+    const [current] = await db.select().from(schema.emails).where(eq(schema.emails.id, email.id));
+    const changed = !current || dispatchRowVersion(current) !== version;
+    await db.insert(schema.auditLog).values({
+      teamId: email.teamId,
+      actorId: "system",
+      action: "sending.content_pre_dispatch",
+      data: {
+        emailId: email.id,
+        result: changed ? "snapshot_changed" : decision.allowed ? "clean" : decision.reason,
+        fingerprint: dispatchContentFingerprint(contentSnapshot),
+        model: deps.contentJudge?.model ?? null,
+        ...("verdict" in decision && decision.verdict
+          ? { score: decision.verdict.score, verdict: decision.verdict.verdict }
+          : {}),
+      },
+    });
+    if (!decision.allowed || changed) {
+      if (!decision.allowed && decision.verdict)
+        await holdOnContentVerdict(db, {
+          teamId: email.teamId,
+          score: decision.verdict.score,
+          categories: decision.verdict.categories,
+        });
+      await parkQueued(db, email, "pre-dispatch content review required");
+      return "parked";
+    }
+    contentApproval = decision;
+  }
+
   // Atomic claim (sentAt doubles as the claim marker): closes the
   // double-send windows — a concurrent worker on the same job, and a retry
   // after SES accepted but the post-send bookkeeping failed. Claimed rows
@@ -1237,6 +1345,23 @@ export async function sendEmail(
   // Final fresh sample, after every awaited guard and immediately before SMTP.
   // Expiry never resets a durable claim, quota reservation or lifetime audit.
   if (!campaignWindowOpen()) return "parked";
+  if (contentApproval && contentSnapshot) {
+    const [current] = await db.select().from(schema.emails).where(eq(schema.emails.id, email.id));
+    if (
+      !current ||
+      dispatchRowVersion(current) !== dispatchRowVersion(email) ||
+      dispatchContentFingerprint(contentSnapshot) !== contentApproval.fingerprint
+    ) {
+      // Proven non-dispatch only: never clear a durable ACS receipt/claim.
+      if (!azureRoute)
+        await db
+          .update(schema.emails)
+          .set({ sentAt: null })
+          .where(and(eq(schema.emails.id, email.id), isNull(schema.emails.sesMessageId)));
+      await parkQueued(db, email, "pre-dispatch snapshot changed");
+      return "parked";
+    }
+  }
   let messageId: string;
   try {
     ({ messageId } = await sender.sendRaw({
@@ -1465,16 +1590,57 @@ export async function sendEmail(
   // mail is never customer content, so it is never drawn.
   if (deps.monitor && !systemMail) {
     try {
-      await sampleAcceptedEmail(db, deps.monitor, {
-        teamId: email.teamId,
-        emailId: email.id,
-        broadcast: email.broadcastId !== null,
-        anomalies:
-          insights?.checks.filter(
-            (c) =>
-              c.status === "fail" && (MONITOR_ANOMALY_CHECKS as readonly string[]).includes(c.id),
-          ).length ?? 0,
-      });
+      const monitor = deps.monitor;
+      const qualified = contentApproval;
+      await sampleAcceptedEmail(
+        db,
+        qualified
+          ? {
+              ...monitor,
+              enqueueJudge: async (sampleId) => {
+                await db.transaction(async (tx) => {
+                  const t = tx as unknown as Db;
+                  const [sample] = await t
+                    .update(schema.monitorSamples)
+                    .set({
+                      status: "judged",
+                      score: qualified.verdict.score,
+                      verdict: qualified.verdict.verdict,
+                      categories: qualified.verdict.categories,
+                      reasons: qualified.verdict.reasons,
+                      impersonatedBrand: qualified.verdict.impersonatedBrand,
+                      language: qualified.verdict.language,
+                      model: deps.contentJudge!.model,
+                      judgedAt: new Date(),
+                    })
+                    .where(
+                      and(
+                        eq(schema.monitorSamples.id, sampleId),
+                        eq(schema.monitorSamples.emailId, email.id),
+                        eq(schema.monitorSamples.status, "pending"),
+                      ),
+                    )
+                    .returning({ id: schema.monitorSamples.id });
+                  if (sample)
+                    await applyJudgedSample(t, await monitor.settings(), {
+                      teamId: email.teamId,
+                      score: qualified.verdict.score,
+                    });
+                });
+              },
+            }
+          : monitor,
+        {
+          teamId: email.teamId,
+          emailId: email.id,
+          broadcast: email.broadcastId !== null,
+          anomalies:
+            insights?.checks.filter(
+              (c) =>
+                c.status === "fail" && (MONITOR_ANOMALY_CHECKS as readonly string[]).includes(c.id),
+            ).length ?? 0,
+        },
+      );
     } catch (err) {
       console.error(`email.send: monitor draw failed for ${email.id}`, err);
     }

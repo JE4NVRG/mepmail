@@ -14,6 +14,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { type SendDeps, type SesSender, sendEmail } from "../src/handlers/send-email.js";
 import { createMailboxSesSender } from "../src/mailbox-sender.js";
+import { syntheticCleanContentJudge } from "./fixtures/clean-content-judge.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -81,7 +82,12 @@ async function fixture(level: "sandbox" | "good" | "hold" | "legacy" = "sandbox"
   const sendRaw = vi.fn(async (_input: Parameters<SesSender["sendRaw"]>[0]) => ({
     messageId: `synthetic-${randomUUID()}`,
   }));
-  const deps: SendDeps = { keyring, ses: { sendRaw }, isCloud: true };
+  const deps: SendDeps = {
+    keyring,
+    ses: { sendRaw },
+    isCloud: true,
+    contentJudge: syntheticCleanContentJudge,
+  };
   const insert = async (
     to = ["external@example.test"],
     overrides: Partial<typeof schema.emails.$inferInsert> = {},

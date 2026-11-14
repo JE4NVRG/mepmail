@@ -17,6 +17,7 @@ import {
 } from "../../../packages/core/src/sender-probation.js";
 import { sendEmail } from "../src/handlers/send-email.js";
 import { createMailboxContentPolicySender, createMailboxSesSender } from "../src/mailbox-sender.js";
+import { syntheticCleanContentJudge } from "./fixtures/clean-content-judge.js";
 
 let fixture: Awaited<ReturnType<typeof createTestDb>>;
 const keyring = EnvKeyring.fromBase64(randomBytes(32).toString("base64"));
@@ -176,7 +177,7 @@ it("approved admission reserves once; revocation after admission blocks SES and 
   expect(
     await sendEmail(
       fixture.db,
-      { keyring, isCloud: true, ses: { sendRaw } },
+      { keyring, isCloud: true, contentJudge: syntheticCleanContentJudge, ses: { sendRaw } },
       { emailId: result.id },
     ),
   ).toBe("parked");
@@ -246,7 +247,7 @@ it("password reset passes and atomic existing quota parks the 26th admission", a
   expect(
     await sendEmail(
       fixture.db,
-      { keyring, isCloud: true, ses: { sendRaw } },
+      { keyring, isCloud: true, contentJudge: syntheticCleanContentJudge, ses: { sendRaw } },
       { emailId: first.id },
     ),
   ).toBe("sent");
@@ -358,7 +359,12 @@ it("ambiguous worker acceptance retains claim and cannot retry transport", async
   const sendRaw = vi
     .fn()
     .mockRejectedValue(Object.assign(new Error("synthetic timeout"), { name: "TimeoutError" }));
-  const deps = { keyring, isCloud: true, ses: { sendRaw } };
+  const deps = {
+    keyring,
+    isCloud: true,
+    contentJudge: syntheticCleanContentJudge,
+    ses: { sendRaw },
+  };
   await expect(sendEmail(fixture.db, deps, { emailId: result.id })).rejects.toThrow(
     "synthetic timeout",
   );
@@ -373,7 +379,7 @@ it("approved campaign reaches fake transport without a second reservation", asyn
   expect(
     await sendEmail(
       fixture.db,
-      { keyring, isCloud: true, ses: { sendRaw } },
+      { keyring, isCloud: true, contentJudge: syntheticCleanContentJudge, ses: { sendRaw } },
       { emailId: result.id },
     ),
   ).toBe("sent");

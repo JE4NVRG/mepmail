@@ -395,6 +395,8 @@ export async function sendBroadcast(
   const admitted =
     deps.sesQuota?.take(domain.region, broadcast.id, audienceCount) ?? Number.POSITIVE_INFINITY;
 
+  // Sampling is observation only, never dispatch approval. Each personalized
+  // copy must pass sendEmail's mandatory Cloud content gate against its final MIME.
   // The monitor judges the broadcast's own HTML once and a few rendered
   // copies: the expected count is `copies`, so the draw needs the audience
   // size. Every step is best-effort.
