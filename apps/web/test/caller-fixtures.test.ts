@@ -409,6 +409,7 @@ test("worker provider success only, retry/race/history suppression; no real emai
             ses: { sendRaw: async () => ({ messageId: `mock-${emailId}` }) },
             funnel: collector,
             isCloud: true,
+            contentJudge: syntheticCleanContentJudge,
           },
           { emailId },
         ),
