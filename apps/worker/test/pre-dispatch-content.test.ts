@@ -458,6 +458,8 @@ it.each(["recipient", "body"])(
           return (table: unknown) => {
             const builder = Reflect.apply(value, target, [table]);
             if (table !== schema.auditLog) return builder;
+            if (!builder || typeof builder !== "object")
+              throw new Error("fixture insert builder missing");
             return new Proxy(builder, {
               get(query, method) {
                 const fn = Reflect.get(query, method);
