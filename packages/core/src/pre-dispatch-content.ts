@@ -19,6 +19,8 @@ export interface DispatchContentSnapshot {
   bcc: string[] | null;
   replyTo: string[] | null;
   subject: string;
+  sourceHtml: string | null;
+  sourceText: string | null;
   html: string | null;
   text: string | null;
   headers: Record<string, string>;
@@ -126,7 +128,11 @@ export async function qualifyDispatchContent(
   signal: AbortSignal = AbortSignal.timeout(PRE_DISPATCH_TIMEOUT_MS),
 ): Promise<DispatchContentDecision> {
   if (!judge) return { allowed: false, reason: "off" };
-  if (!inspectable(snapshot)) return { allowed: false, reason: "uninspectable" };
+  if (
+    !inspectable(snapshot) ||
+    !inspectable({ ...snapshot, html: snapshot.sourceHtml, text: snapshot.sourceText })
+  )
+    return { allowed: false, reason: "uninspectable" };
   const fingerprint = dispatchContentFingerprint(snapshot);
   const blocks = new Set<string>();
   const base = {
@@ -138,6 +144,11 @@ export async function qualifyDispatchContent(
   };
   // Multipart alternatives are independent author-controlled content. Neither
   // an innocuous HTML alternative nor skeleton approval clears hostile text.
+  // Tracking must not hide original destinations behind the platform redirect.
+  if (snapshot.sourceHtml)
+    blocks.add(buildJudgeBlock({ ...base, html: snapshot.sourceHtml, text: null }));
+  if (snapshot.sourceText)
+    blocks.add(buildJudgeBlock({ ...base, html: null, text: snapshot.sourceText }));
   if (snapshot.html) blocks.add(buildJudgeBlock({ ...base, html: snapshot.html, text: null }));
   if (snapshot.text) blocks.add(buildJudgeBlock({ ...base, html: null, text: snapshot.text }));
   let last: JudgeVerdict | undefined;

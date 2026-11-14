@@ -6,6 +6,7 @@ import {
   JudgeError,
   MONITOR_SETTING_DEFAULTS,
   SYSTEM_MAIL_TAG,
+  sealAttachments,
   sendSystemMail,
 } from "@millionsend/core";
 import { schema } from "@millionsend/db";
@@ -332,6 +333,8 @@ it("hard deadline refuses even a dependency ignoring cancellation", async () => 
     bcc: null,
     replyTo: null,
     subject: "Notice",
+    sourceHtml: null,
+    sourceText: "receipt",
     html: null,
     text: "receipt",
     headers: {},
@@ -345,4 +348,43 @@ it("hard deadline refuses even a dependency ignoring cancellation", async () => 
     AbortSignal.timeout(10),
   );
   expect(result).toMatchObject({ allowed: false, reason: "timeout" });
+});
+
+it("tracking cannot conceal the original hostile destination from the judge", async () => {
+  const f = await seed({
+    html: '<p>Banco CTT: introduza a senha</p><a href="https://audit.invalid">Continuar</a>',
+  });
+  await fixture.db
+    .update(schema.domains)
+    .set({ clickTracking: true })
+    .where(eq(schema.domains.id, f.domainId));
+  const judge = {
+    ...syntheticCleanContentJudge,
+    judge: vi.fn(async (block: string) =>
+      block.includes("audit.invalid") ? abuse : syntheticCleanVerdict,
+    ),
+  };
+  const d = deps(judge);
+  d.value.tracking = { secretKey: Buffer.alloc(32, 9), defaultBaseUrl: "https://track.example" };
+  await held(f.id, d);
+  expect(judge.judge).toHaveBeenCalledTimes(1);
+  expect(judge.judge.mock.calls[0]![0]).toContain("audit.invalid");
+});
+it("real sealed attachments are held rather than represented as a clean filename", async () => {
+  const f = await seed({ text: "Requested receipt" });
+  const attachments = await sealAttachments(
+    [
+      {
+        filename: "invoice.pdf",
+        content: Buffer.from("synthetic fixture").toString("base64"),
+        contentType: "application/pdf",
+      },
+    ],
+    keyring,
+    { teamId: f.teamId, rowId: f.id },
+  );
+  await fixture.db.update(schema.emails).set({ attachments }).where(eq(schema.emails.id, f.id));
+  const judge = { ...syntheticCleanContentJudge, judge: vi.fn(async () => syntheticCleanVerdict) };
+  await held(f.id, deps(judge));
+  expect(judge.judge).not.toHaveBeenCalled();
 });

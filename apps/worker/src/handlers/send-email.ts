@@ -102,7 +102,7 @@ export interface SesSender {
 
 export interface SendDeps {
   /** Mandatory semantic pre-dispatch judge for Cloud customer mail; null/off denies. */
-  contentJudge?: AbuseJudge | null;
+  contentJudge?: AbuseJudge | null | undefined;
 
   now?: (() => Date) | undefined;
   sendingProviderPolicy?: SendingProviderPolicy | null;
@@ -1193,6 +1193,8 @@ export async function sendEmail(
       bcc: email.bcc ? [...email.bcc] : null,
       replyTo: email.replyTo ? [...email.replyTo] : null,
       subject: email.subject,
+      sourceHtml: body.html,
+      sourceText: body.text,
       html,
       text,
       headers: { ...headers },
@@ -1211,7 +1213,7 @@ export async function sendEmail(
       .select({ name: schema.domains.name })
       .from(schema.domains)
       .where(and(eq(schema.domains.teamId, email.teamId), eq(schema.domains.status, "verified")));
-    const decision = team
+    const decision: DispatchContentDecision = team
       ? await qualifyDispatchContent(
           contentSnapshot,
           {
