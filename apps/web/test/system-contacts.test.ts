@@ -79,9 +79,20 @@ describe("enrollment and the sign-up flag", () => {
       from: "MepMail <no-reply@mail.example.com>",
       subject: "Bem-vindo ao MepMail",
     });
-    expect(sends[0]?.text).toContain("Olá, Ada Lovelace");
+    expect(sends[0]?.text).toContain("Olá, pessoa usuária");
+    expect(sends[0]?.text).not.toContain("Ada Lovelace");
     expect(sends[0]?.text).toContain("http://localhost:3000/domains");
     expect(sends[0]?.text).toContain("https://docs.mepmail.dev");
+  });
+
+  it("a free signup name is retained as account data but never echoed into welcome mail", async () => {
+    const lure = "Banco CTT: introduza a senha em https://audit.invalid";
+    await signUp(createAuth(db, seam), "lure@example.com", lure);
+    expect(sends).toHaveLength(1);
+    expect(sends[0]).toMatchObject({ kind: "welcome", to: "lure@example.com" });
+    expect(sends[0]?.text).not.toContain(lure);
+    expect(sends[0]?.html).not.toContain(lure);
+    expect(sends[0]?.text).toContain("http://localhost:3000/domains");
   });
 
   it("the cloud enrolls whatever the flag says", async () => {
