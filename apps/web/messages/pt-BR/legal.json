@@ -17,16 +17,20 @@
         "title": "2. Sua conta",
         "body": [
           "Você deve fornecer informações corretas, manter credenciais e chaves de API em sigilo, e ter pelo menos 18 anos (ou a maioridade legal onde você mora). Você é responsável por toda atividade na sua conta e pelo conteúdo que envia.",
-          "Você precisa ter base legal para enviar e-mail aos destinatários que cadastra — em regra, o consentimento deles ou uma relação de cliente existente."
+          "Você precisa ter base legal e finalidade legítima para cada destinatário, com opt-in adequado para marketing e comprovação da permissão quando exigida. Respeite pedidos de descadastro e não volte a enviar a destinatários suprimidos. Uma relação de cliente existente, por si só, não autoriza prospecção não solicitada. A análise do conteúdo não comprova consentimento nem finalidade legítima; a responsabilidade por ambos continua sendo sua."
         ]
       },
       {
         "title": "3. Uso aceitável",
         "body": [
+          "A liberação do envio depende das verificações e dos limites descritos nesta política.",
+          "No modo teste, os envios ficam restritos ao endereço verificado do titular da conta, com até 10 envios por dia. Outra mensagem para o mesmo titular consome a cota novamente; uma repetição idempotente da mesma mensagem não.",
+          "Após o MepMail autorizar e registrar a liberação do envio no servidor, os limites iniciais são de 3 novos destinatários distintos na primeira 1 hora, 5 nas primeiras 24 horas e 10 nas primeiras 168 horas. Todas as janelas começam nessa mesma liberação, não na criação da conta nem no registro do domínio. São tetos cumulativos, não cotas adicionais: os primeiros 3 destinatários contam nos 5, e esses 5 contam nos 10. Voltar a enviar a um destinatário já contado não acrescenta outro destinatário distinto, mas as demais cotas de envio continuam valendo.",
+          "A liberação e qualquer ampliação posterior dependem da avaliação de risco. Podem ser aplicados limites mais restritos ou uma revisão. Pagamento, plano pago, decisão de permissão ou nova chave de API não removem essas proteções nem se sobrepõem a supressões ou suspensões. Respostas e mensagens recebidas não liberam o envio automaticamente.",
           "O MepMail é para e-mail transacional e de marketing com permissão e para caixas de e-mail de uso legítimo. Você não pode usar o serviço para:"
         ],
         "list": [
-          "Enviar e-mail em massa não solicitado (spam) ou para listas compradas, alugadas ou raspadas.",
+          "Enviar e-mail ou prospecção não solicitados (cold outreach), inclusive spam em massa, ou enviar para listas compradas, alugadas ou raspadas.",
           "Enviar phishing, malware, mensagens fraudulentas ou enganosas, ou falsificar identidade de remetente.",
           "Se passar por outra pessoa, marca ou instituição (bancos, órgãos públicos, transportadoras, seguradoras, avisos de segurança de conta), inclusive com domínios parecidos com os de outra marca.",
           "Cadastrar ou enviar a partir de domínios que você não controla, como domínios de e-mail público ou descartável.",
@@ -68,7 +72,7 @@
         "title": "8. Suspensão e encerramento",
         "body": [
           "Podemos suspender ou encerrar a sua conta em caso de violação destes termos, por exigência legal, ou para proteger o serviço, os destinatários e os demais clientes. Você pode excluir a sua conta a qualquer momento.",
-          "Se houver sinais de phishing, fraude, falsificação de identidade ou outro uso proibido na seção 3, podemos suspender a conta na hora, sem aviso prévio, mesmo antes do primeiro envio. A suspensão revoga todas as chaves de API e SMTP e os acessos de integrações, retira os domínios da conta da nossa infraestrutura de envio e cancela os e-mails que ainda estiverem na fila.",
+          "Se houver sinais de phishing, fraude, falsificação de identidade ou outro uso proibido na seção 3, podemos suspender a conta na hora, sem aviso prévio, mesmo antes do primeiro envio. Restrições e suspensões de envio podem abranger o Envio e o Correio, inclusive mensagens na fila e envios pelo site, apps, API, SMTP, MCP e integrações. Trocar remetente, domínio, conta, chave, plano ou decisão de permissão não pode contorná-las. Quando aplicável e seguro, o recebimento e a leitura permanecem disponíveis durante uma restrição de envio; isso não garante acesso durante uma suspensão da conta.",
           "Contas suspensas por esses motivos não têm direito a reembolso de nenhum valor pago, inclusive dentro da garantia de 7 dias, e contestações de cobrança (chargeback) serão contestadas com as evidências do caso. Podemos compartilhar essas evidências com os nossos provedores de infraestrutura e com autoridades, quando exigido ou para conter o abuso.",
           "As cláusulas que por natureza devem sobreviver ao encerramento (cobrança, responsabilidade, lei aplicável) permanecem válidas."
         ]

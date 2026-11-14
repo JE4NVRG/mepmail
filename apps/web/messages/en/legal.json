@@ -17,16 +17,20 @@
         "title": "2. Your account",
         "body": [
           "You must provide accurate account information, keep your credentials and API keys secret, and be at least 18 years old (or the age of majority where you live). You are responsible for all activity under your account and for the content you send.",
-          "You must have a lawful basis to email the recipients you upload or send to — typically their consent or an existing customer relationship."
+          "You must have a lawful basis and a legitimate purpose for each recipient, with appropriate opt-in for marketing and evidence of permission where required. Honor opt-outs and do not send again to suppressed recipients. An existing customer relationship alone does not authorize unsolicited prospecting. A content check does not establish consent or a lawful purpose; you remain responsible for both."
         ]
       },
       {
         "title": "3. Acceptable use",
         "body": [
+          "Access to sending is subject to the verification and limits described in this policy.",
+          "In test mode, sending is restricted to the account holder’s verified email address, with up to 10 sends per day. Sending another message to the same holder consumes the allowance again; an idempotent retry of the same message does not.",
+          "After MepMail authorizes and records sending activation on the server, the initial limits are 3 new, distinct recipients within the first 1 hour, 5 within the first 24 hours and 10 within the first 168 hours. All windows start at that same activation, not at account creation or domain registration. These are cumulative caps, not additional allowances: the first 3 recipients count toward the 5, and those 5 count toward the 10. Sending again to an already counted recipient does not add a new distinct recipient, but other sending quotas still apply.",
+          "Activation and any further expansion depend on risk assessment. Stricter limits or a review may apply. Payment, a paid plan, an allow decision or a new API key does not remove these protections or override suppressions or suspensions. Replies and received messages do not automatically unlock sending.",
           "MepMail is for transactional and permission-based marketing email and for mailboxes in legitimate use. You may not use the service to:"
         ],
         "list": [
-          "Send unsolicited bulk email (spam) or email to purchased, rented or scraped lists.",
+          "Send unsolicited email or unsolicited prospecting (cold outreach), including bulk spam, or email to purchased, rented or scraped lists.",
           "Send phishing, malware, fraudulent or deceptive messages, or spoof sender identity.",
           "Impersonate another person, brand or institution (banks, government agencies, carriers, insurers, account-security notices), including with domains that look like another brand's.",
           "Register or send from domains you do not control, such as public or disposable email domains.",
@@ -68,7 +72,7 @@
         "title": "8. Suspension and termination",
         "body": [
           "We may suspend or terminate your account if you violate these terms, if required by law, or to protect the service, recipients or other customers. You may delete your account at any time.",
-          "When there are signs of phishing, fraud, impersonation or any other use prohibited in section 3, we may suspend the account immediately and without notice, even before its first send. A suspension revokes every API and SMTP key and every integration's access, removes the account's domains from our sending infrastructure and cancels any email still queued.",
+          "When there are signs of phishing, fraud, impersonation or any other use prohibited in section 3, we may suspend the account immediately and without notice, even before its first send. Sending restrictions and suspensions may apply across Send and Mail, including queued messages and sends through the website, apps, API, SMTP, MCP and integrations. Changing the sender, domain, account, key, plan or an allow decision must not bypass them. Where applicable and safe, receiving and reading remain available during a sending restriction; this is not a guarantee of access during an account suspension.",
           "Accounts suspended for these reasons are not eligible for a refund of any amount paid, including within the 7-day guarantee, and chargebacks will be disputed with the evidence of the case. We may share that evidence with our infrastructure providers and with authorities when required or to stop the abuse.",
           "Sections that by their nature should survive termination (billing, liability, governing law) survive."
         ]
