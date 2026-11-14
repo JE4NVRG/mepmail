@@ -822,13 +822,15 @@ export async function sendEmail(
   // grants account-mail handling. Legacy tagged rows are ambiguous: park for
   // reissue by the legitimate producer, never sample live credentials or purge
   // customer evidence on a forged claim. Fresh customer snapshots send normally.
-  const systemMail = bodyOrigin?.version === 1 && bodyOrigin.source === "system";
+  const systemOrigin =
+    bodyOrigin?.version === 1 && bodyOrigin.source === "system" ? bodyOrigin : null;
+  const systemMail = systemOrigin !== null;
   const customerMail = bodyOrigin?.version === 1 && bodyOrigin.source === "customer";
   if (
-    (systemMail &&
-      (bodyOrigin.from !== email.from ||
-        bodyOrigin.subject !== email.subject ||
-        JSON.stringify(bodyOrigin.to) !== JSON.stringify(email.to))) ||
+    (systemOrigin &&
+      (systemOrigin.from !== email.from ||
+        systemOrigin.subject !== email.subject ||
+        JSON.stringify(systemOrigin.to) !== JSON.stringify(email.to))) ||
     (!systemMail && !customerMail && email.tags?.[SYSTEM_MAIL_TAG] !== undefined)
   ) {
     await parkQueued(db, email, "message provenance requires reissue");
@@ -1386,7 +1388,7 @@ export async function sendEmail(
   // events and counters stay; insights below evaluate the in-memory body.
   // Other system kinds carry only dashboard links and keep their body for the
   // normal retention window.
-  if (systemMail && CREDENTIAL_MAIL_KINDS.has(bodyOrigin.kind)) {
+  if (systemOrigin && CREDENTIAL_MAIL_KINDS.has(systemOrigin.kind)) {
     await db
       .update(schema.emails)
       .set(purgedEmailBodyColumns(new Date()))
