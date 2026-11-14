@@ -7,7 +7,6 @@ import {
   CREDENTIAL_MAIL_KINDS,
   checkSignupSend,
   countDistinctRecipients,
-  decryptEmailBody,
   type EmailAttachment,
   type EmailBody,
   emitFunnelEvent,
@@ -53,7 +52,9 @@ import {
   checkCampaignMessage,
 } from "../../../../packages/core/src/campaign-consent.js";
 import { campaignSendWindowOpen } from "../../../../packages/core/src/campaign-send-window.js";
+import { decryptEmailBodySnapshot } from "../../../../packages/core/src/crypto/envelope.js";
 import { screenPreSendContent } from "../../../../packages/core/src/pre-send-content-policy.js";
+import type { EmailBodyOrigin } from "../../../../packages/core/src/system-mail-origin.js";
 import { appendAzureApiOptoutBody } from "../azure-api-optout.js";
 import {
   isSesEnforcementRefusal,
@@ -745,10 +746,11 @@ export async function sendEmail(
     return "failed";
   }
   let body: EmailBody;
+  let bodyOrigin: EmailBodyOrigin | null;
   let attachments: EmailAttachment[] | null;
   const owner = { teamId: email.teamId, rowId: email.id };
   try {
-    body = await decryptEmailBody(
+    const snapshot = await decryptEmailBodySnapshot(
       {
         ciphertext: bodyCiphertext,
         iv: bodyIv,
@@ -758,6 +760,8 @@ export async function sendEmail(
       deps.keyring,
       owner,
     );
+    body = snapshot.body;
+    bodyOrigin = snapshot.origin;
     // Sealed alongside the body columns, on the same terminal/transient split.
     attachments = email.attachments
       ? await openAttachments(email.attachments, deps.keyring, owner)
@@ -814,7 +818,22 @@ export async function sendEmail(
   // Account mail (core sendSystemMail) carries live credentials — reset and
   // verification links — so its anchors are never rewritten through the
   // redirect and no pixel rides along, whatever the domain's toggles say.
-  const systemMail = email.tags?.[SYSTEM_MAIL_TAG] !== undefined;
+  // Tags are public labels. Only a producer-authenticated, row-bound snapshot
+  // grants account-mail handling. Legacy tagged rows are ambiguous: park for
+  // reissue by the legitimate producer, never sample live credentials or purge
+  // customer evidence on a forged claim. Fresh customer snapshots send normally.
+  const systemMail = bodyOrigin?.version === 1 && bodyOrigin.source === "system";
+  const customerMail = bodyOrigin?.version === 1 && bodyOrigin.source === "customer";
+  if (
+    (systemMail &&
+      (bodyOrigin.from !== email.from ||
+        bodyOrigin.subject !== email.subject ||
+        JSON.stringify(bodyOrigin.to) !== JSON.stringify(email.to))) ||
+    (!systemMail && !customerMail && email.tags?.[SYSTEM_MAIL_TAG] !== undefined)
+  ) {
+    await parkQueued(db, email, "message provenance requires reissue");
+    return "parked";
+  }
   const click = (domain?.clickTracking ?? false) && !systemMail;
   const open = (domain?.openTracking ?? false) && !systemMail;
   let html = body.html;
@@ -1367,7 +1386,7 @@ export async function sendEmail(
   // events and counters stay; insights below evaluate the in-memory body.
   // Other system kinds carry only dashboard links and keep their body for the
   // normal retention window.
-  if (systemMail && CREDENTIAL_MAIL_KINDS.has(email.tags?.[SYSTEM_MAIL_TAG] ?? "")) {
+  if (systemMail && CREDENTIAL_MAIL_KINDS.has(bodyOrigin.kind)) {
     await db
       .update(schema.emails)
       .set(purgedEmailBodyColumns(new Date()))

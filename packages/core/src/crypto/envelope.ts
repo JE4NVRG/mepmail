@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
+import type { EmailBodyOrigin } from "../system-mail-origin.js";
 import { GCM_IV_LENGTH, GCM_TAG_LENGTH } from "./constants.js";
 import type { DekContext, Keyring } from "./keyring.js";
 
@@ -137,9 +138,17 @@ export async function encryptEmailBody(
   body: EmailBody,
   keyring: Keyring,
   owner?: EnvelopeOwner,
+  origin?: Extract<EmailBodyOrigin, { source: "system" }>,
 ): Promise<EncryptedBody> {
+  if (origin && !owner) throw new Error("system mail requires a row-bound envelope");
+  // Project content explicitly: caller-controlled extra properties cannot mint origin.
+  const snapshot = {
+    html: body.html,
+    text: body.text,
+    origin: origin ?? { version: 1, source: "customer" },
+  };
   return encryptPayload(
-    gzipSync(Buffer.from(JSON.stringify(body), "utf8")),
+    gzipSync(Buffer.from(JSON.stringify(snapshot), "utf8")),
     keyring,
     owner && { ...owner, kind: "email_body" },
   );
@@ -199,16 +208,39 @@ export async function openAttachments(
   return JSON.parse(plaintext.toString("utf8")) as EmailAttachment[];
 }
 
+/** Worker-only snapshot reader. Public content consumers use decryptEmailBody. */
+export async function decryptEmailBodySnapshot(
+  encrypted: EncryptedBody,
+  keyring: Keyring,
+  owner: EnvelopeOwner,
+): Promise<{ body: EmailBody; origin: EmailBodyOrigin | null }> {
+  const snapshot = await openEmailBody(encrypted, keyring, owner);
+  // Legacy/unbound envelopes can contain arbitrary JSON: never elevate them.
+  const origin =
+    encrypted.keyVersion >= BOUND_ENVELOPE_VERSION_OFFSET ? (snapshot.origin ?? null) : null;
+  return { body: { html: snapshot.html, text: snapshot.text }, origin };
+}
+
+/** Public projection deliberately excludes all internal authority metadata. */
 export async function decryptEmailBody(
   encrypted: EncryptedBody,
   keyring: Keyring,
   owner?: EnvelopeOwner,
 ): Promise<EmailBody> {
+  const snapshot = await openEmailBody(encrypted, keyring, owner);
+  return { html: snapshot.html, text: snapshot.text };
+}
+
+async function openEmailBody(
+  encrypted: EncryptedBody,
+  keyring: Keyring,
+  owner?: EnvelopeOwner,
+): Promise<EmailBody & { origin?: EmailBodyOrigin }> {
   const plaintext = await decryptPayload(
     encrypted,
     keyring,
     owner && { ...owner, kind: "email_body" },
   );
   const json = plaintext.subarray(0, 2).equals(GZIP_MAGIC) ? gunzipSync(plaintext) : plaintext;
-  return JSON.parse(json.toString("utf8")) as EmailBody;
+  return JSON.parse(json.toString("utf8")) as EmailBody & { origin?: EmailBodyOrigin };
 }

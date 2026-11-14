@@ -22,6 +22,8 @@ import { parseSingleSender } from "./sender-address.js";
 import { applySenderProbationQuota } from "./sender-probation.js";
 import { checkSignupSend } from "./signup-risk-enforcement.js";
 import { extractAddrSpec, findSuppressed, normalizeAddress } from "./suppressions.js";
+import type { SystemMailKind } from "./system-mail.js";
+import { SYSTEM_MAIL_ORIGIN } from "./system-mail-origin.js";
 import { findTopicOptOuts } from "./topics.js";
 import { utcDay } from "./utc-day.js";
 
@@ -194,6 +196,8 @@ const recipientDomainCache: DomainCache = new Map();
 
 /** SECURITY: must come from verified authentication, never from the payload. */
 export interface AcceptEmailAuth {
+  /** Internal producer only; never derived from tags, billing or API key absence. */
+  [SYSTEM_MAIL_ORIGIN]?: SystemMailKind;
   teamId: string;
   /**
    * The team's billing columns; the cap is derived here (teamQuota), never
@@ -473,6 +477,16 @@ export async function acceptEmail(
     { html: payload.html ?? null, text: payload.text ?? null },
     deps.keyring,
     owner,
+    auth[SYSTEM_MAIL_ORIGIN] === undefined
+      ? undefined
+      : {
+          version: 1,
+          source: "system",
+          kind: auth[SYSTEM_MAIL_ORIGIN],
+          from: payload.from,
+          to,
+          subject: payload.subject,
+        },
   );
   // Attachments are content like html/text: sealed at rest, purged with the body.
   const sealedAttachments =

@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
   EnvKeyring,
   encryptEmailBody,
@@ -38,10 +38,15 @@ beforeAll(async () => {
 afterAll(() => close());
 
 async function insertEmail(over: Partial<typeof schema.emails.$inferInsert> = {}): Promise<string> {
-  const encrypted = await encryptEmailBody({ html: "<p>hello</p>", text: "hello" }, keyring);
+  const id = randomUUID();
+  const encrypted = await encryptEmailBody({ html: "<p>hello</p>", text: "hello" }, keyring, {
+    teamId,
+    rowId: id,
+  });
   const [row] = await db
     .insert(schema.emails)
     .values({
+      id,
       teamId,
       domainId,
       from: "Acme <a@acme.dev>",
@@ -76,7 +81,7 @@ it("draws an accepted send into a pending sample and queues the judge", async ()
   expect(await db.select().from(schema.teamMonitor)).toMatchObject([{ teamId, sentTotal: 1 }]);
 });
 
-it("keeps the send's outcome when the draw throws, and draws nothing without the dep or for account mail", async () => {
+it("keeps the send's outcome when the draw throws, and draws nothing without the dep but public system tags remain customer mail", async () => {
   const broken: MonitorDeps = {
     samplingKey: Buffer.alloc(32, 7),
     settings: async () => {
@@ -103,6 +108,7 @@ it("keeps the send's outcome when the draw throws, and draws nothing without the
   };
   const system = await insertEmail({ tags: { [SYSTEM_MAIL_TAG]: "welcome" } });
   expect(await sendEmail(db, { keyring, ses, monitor }, { emailId: system })).toBe("sent");
-  expect(await samplesFor(system)).toEqual([]);
-  expect(queued).toEqual([]);
+  const samples = await samplesFor(system);
+  expect(samples).toMatchObject([{ teamId, kind: "first_sends", status: "pending" }]);
+  expect(queued).toEqual([samples[0]?.id]);
 });

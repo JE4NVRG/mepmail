@@ -1,7 +1,12 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { EnvKeyring, encryptEmailBody, MailboxSendDeferredError } from "@millionsend/core";
+import {
+  EnvKeyring,
+  encryptEmailBody,
+  MailboxSendDeferredError,
+  SYSTEM_MAIL_TAG,
+} from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
@@ -69,7 +74,7 @@ it("worker holds original HTML before SES/SMTP, claim or body purge, including f
       from: "News <news@worker-policy.example>",
       to: ["r@example.com"],
       subject: "Notice",
-      tags: { system_mail: "password_reset" },
+      tags: { [SYSTEM_MAIL_TAG]: "password_reset" },
       bodyCiphertext: body.ciphertext,
       bodyIv: body.iv,
       bodyWrappedDek: body.wrappedDek,

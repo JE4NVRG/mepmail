@@ -3,7 +3,9 @@ import {
   EnvKeyring,
   encryptEmailBody,
   hashRecipient,
+  type SystemMailKind,
   sealAttachments,
+  sendSystemMail,
   utcDay,
   verifyClickToken,
   verifyOpenToken,
@@ -103,6 +105,32 @@ async function insertEmail(
     .returning({ id: schema.emails.id });
   if (!row) throw new Error("email insert failed");
   return row.id;
+}
+
+async function insertSystemEmail(kind: SystemMailKind, html: string): Promise<string> {
+  let emailId = "";
+  await sendSystemMail(
+    {
+      db,
+      keyring,
+      isCloud: false,
+      enqueueEmailSend: async (id) => {
+        emailId = id;
+      },
+      raw: async () => {
+        throw new Error("unexpected raw fallback");
+      },
+    },
+    {
+      from: "Acme <a@acme.dev>",
+      to: "r@example.com",
+      subject: "Account notice",
+      html,
+      text: "Account notice",
+      kind,
+    },
+  );
+  return emailId;
 }
 
 async function insertContact(email: string): Promise<string> {
@@ -640,10 +668,7 @@ it("clickTracking on routes <a href> through /t/c and the token verifies to the 
 it("account mail ships untracked on a tracking domain and loses its body once SES holds it", async () => {
   const { ses, sends } = fakeSes("mid-system");
   const url = "https://app.example.com/reset-password?token=secret";
-  const emailId = await insertEmail(
-    { tags: { mepmail_system: "password_reset" } },
-    `<a href="${url}">reset</a>`,
-  );
+  const emailId = await insertSystemEmail("password_reset", `<a href="${url}">reset</a>`);
   const deps: SendDeps = {
     keyring,
     ses,
@@ -665,10 +690,7 @@ it("account mail ships untracked on a tracking domain and loses its body once SE
 it("account mail without a credential ships untracked and keeps its body", async () => {
   const { ses, sends } = fakeSes("mid-system-notice");
   const url = "https://app.example.com/domains";
-  const emailId = await insertEmail(
-    { tags: { mepmail_system: "domain.verified" } },
-    `<a href="${url}">domains</a>`,
-  );
+  const emailId = await insertSystemEmail("domain.verified", `<a href="${url}">domains</a>`);
   const deps: SendDeps = {
     keyring,
     ses,

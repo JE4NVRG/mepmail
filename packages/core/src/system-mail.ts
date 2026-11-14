@@ -4,13 +4,13 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { type AcceptEmailDeps, acceptEmail } from "./accept-email.js";
 import type { AccountMailKind } from "./account-mail.js";
 import { parseSingleSender } from "./sender-address.js";
+import { SYSTEM_MAIL_ORIGIN } from "./system-mail-origin.js";
 
 /**
  * Tag every system email carries; the value names the kind. A label only:
  * the public API accepts any tag name, so nothing may grant quota, bypass a
- * suppression or gate a send on its presence. The worker reads it to ship
- * the links untracked and, for the kinds in CREDENTIAL_MAIL_KINDS, to purge
- * the body after SES accepts the message.
+ * suppression or gate a send on its presence. Dispatch authority comes only
+ * from the internal producer's row-bound encrypted body origin, never this tag.
  */
 export const SYSTEM_MAIL_TAG = "mepmail_system";
 
@@ -147,7 +147,12 @@ export async function sendSystemMail(
   try {
     result = await acceptEmail(
       deps,
-      { teamId: owner.teamId, billing: "uncapped", apiKeyId: null },
+      {
+        teamId: owner.teamId,
+        billing: "uncapped",
+        apiKeyId: null,
+        [SYSTEM_MAIL_ORIGIN]: message.kind,
+      },
       {
         from: message.from,
         to: [message.to],
