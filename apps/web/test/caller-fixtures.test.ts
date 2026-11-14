@@ -17,6 +17,7 @@ import type { BillingStripe } from "../../../packages/billing/src/stripe.js";
 import { handleWebhook } from "../../../packages/billing/src/webhook.js";
 import { fakeStripe, subscription, webhooks } from "../../../packages/billing/test/helpers.js";
 import { type SesSender, sendEmail } from "../../worker/src/handlers/send-email.js";
+import { syntheticCleanContentJudge } from "../../worker/test/fixtures/clean-content-judge.js";
 import { createAuth } from "../src/server/auth.js";
 import * as webBillingModule from "../src/server/billing.js";
 import { emitFunnel, requestedFunnelIntent, trackTeamSignup } from "../src/server/funnel.js";
@@ -285,7 +286,12 @@ test("worker provider success only, retry/race/history suppression; no real emai
       _t: { teamId: string; domainId: string },
       id: string,
       ses: SesSender = { sendRaw: async () => ({ messageId: `mock-${id}` }) },
-    ) => sendEmail(db, { keyring, ses, funnel: target, isCloud: true }, { emailId: id });
+    ) =>
+      sendEmail(
+        db,
+        { keyring, ses, funnel: target, isCloud: true, contentJudge: syntheticCleanContentJudge },
+        { emailId: id },
+      );
     const queued = await setup();
     const queuedIds: string[] = [];
     const accepted = await acceptEmail(

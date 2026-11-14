@@ -17,7 +17,7 @@ import {
   PRE_DISPATCH_TIMEOUT_MS,
   qualifyDispatchContent,
 } from "../../../packages/core/src/pre-dispatch-content.js";
-import { approveCampaignFixture } from "../../api/test/approved-campaign-fixture.js";
+import { approveCampaignFixture, campaignDns } from "../../api/test/approved-campaign-fixture.js";
 import { createOpenAiJudge } from "../src/abuse-judge/openai.js";
 import { sendBroadcast } from "../src/handlers/send-broadcast.js";
 import { type SendDeps, sendEmail } from "../src/handlers/send-email.js";
@@ -84,7 +84,7 @@ async function seed(
 const row = async (id: string) =>
   (await fixture.db.select().from(schema.emails).where(eq(schema.emails.id, id)))[0]!;
 function deps(judge?: AbuseJudge | null) {
-  const sendRaw = vi.fn(async (_p: { raw: Buffer }) => ({ messageId: "synthetic" }));
+  const sendRaw = vi.fn(async (_p: { raw: Buffer }) => ({ messageId: randomUUID() }));
   const value: SendDeps = { keyring, isCloud: true, ses: { sendRaw }, contentJudge: judge };
   return { value, sendRaw };
 }
@@ -291,6 +291,10 @@ it("personalized broadcast copy is not authorized by a clean skeleton", async ()
     })
     .returning();
   await approveCampaignFixture(fixture.db, f.teamId);
+  await fixture.db
+    .update(schema.domains)
+    .set(campaignDns("sender.example"))
+    .where(eq(schema.domains.id, f.domainId));
   const enqueued: string[] = [];
   await sendBroadcast(
     fixture.db,
