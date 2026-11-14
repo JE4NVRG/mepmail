@@ -65,7 +65,8 @@ describe("buildResetEmail", () => {
     });
     expect(en.subject).toBe("Reset your MepMail password");
     expect(en.from).toBe("MepMail <no-reply@mail.example.com>");
-    expect(en.text).toContain("Hi Ada,");
+    expect(en.text).toContain("Hello!");
+    expect(en.text).not.toContain("Ada");
     expect(en.text).toContain("https://app.example.com/api/auth/reset-password/tok");
     expect(en.text).toContain("30");
     expect(en.html).toContain("reset-password/tok");
@@ -79,7 +80,7 @@ describe("buildResetEmail", () => {
     expect(pt.subject).toBe("Redefina sua senha do MepMail");
   });
 
-  it("escapes the user-controlled name in the html body", () => {
+  it("omits user-controlled names rather than echoing escaped lure text", () => {
     const mail = buildResetEmail({
       to: "a@b.com",
       name: '<img src="x">',
@@ -87,7 +88,9 @@ describe("buildResetEmail", () => {
       locale: "en",
     });
     expect(mail.html).not.toContain('<img src="x">');
-    expect(mail.html).toContain("&lt;img");
+    expect(mail.html).not.toContain("&lt;img");
+    expect(mail.text).not.toContain('<img src="x">');
+    expect(mail.text).toContain("https://x.com/r");
   });
 });
 

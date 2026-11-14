@@ -393,11 +393,10 @@ export interface SystemMailDeps {
 }
 
 /**
- * Account mail rides the team pipeline when a team holds the sender's
- * verified domain (core sendSystemMail), else SESv2 Simple content as
- * before — in that domain's region when a team holds it, else the default
- * served region. Clients are built per send: system mail is rare, so there
- * is nothing worth caching.
+ * Account mail uses the authenticated team pipeline (core sendSystemMail).
+ * Cloud failures stay closed; only explicit self-host mode may use the
+ * legacy SESv2 Simple fallback. Clients are built per send: system mail is
+ * rare, so there is nothing worth caching.
  */
 export const defaultSystemMailDeps: SystemMailDeps = {
   send: async (message) => {

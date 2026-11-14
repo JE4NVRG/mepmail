@@ -113,7 +113,7 @@ describe("email verification", () => {
     expect(sent[0]?.kind).toBe("email_verification");
   });
 
-  it("the template escapes the name and carries the link in html and text", () => {
+  it("the template omits the free name and carries the link in html and text", () => {
     stubSender();
     const mail = buildVerificationEmail({
       to: "a@b.com",
@@ -123,7 +123,8 @@ describe("email verification", () => {
     });
     expect(mail.subject).toBe("Verify your MepMail email");
     expect(mail.html).not.toContain('<img src="x">');
-    expect(mail.html).toContain("&lt;img");
+    expect(mail.html).not.toContain("&lt;img");
+    expect(mail.text).not.toContain('<img src="x">');
     expect(mail.html).toContain("https://x.com/v?token=t");
     expect(mail.text).toContain("https://x.com/v?token=t");
     expect(mail.text).toContain("60");

@@ -683,7 +683,7 @@ describe("OAuth authorization server", () => {
 });
 
 describe("connected-app receipt", () => {
-  it("mails the granting user once per fresh consent, naming the app, the team and the scopes", async () => {
+  it("mails the granting user once per fresh consent without echoing app or scope labels", async () => {
     vi.stubEnv("AUTH_EMAIL_FROM", "MepMail <no-reply@mail.example.com>");
     const { userId, cookie } = await signUp("ada@example.com");
     const teamId = await createTeam(db, "acme");
@@ -693,8 +693,10 @@ describe("connected-app receipt", () => {
     await authorize(clientId, cookie);
     expect(sent.map((m) => m.kind)).toEqual(["mcp.connected"]);
     expect(sent[0]).toMatchObject({ to: "ada@example.com" });
-    expect(sent[0]?.subject).toContain("Claude Code");
-    expect(sent[0]?.text).toContain("emails:send");
+    expect(sent[0]?.subject).toBe("an authorized application is connected to your MepMail account");
+    expect(sent[0]?.subject).not.toContain("Claude Code");
+    expect(sent[0]?.text).not.toContain("emails:send");
+    expect(sent[0]?.text).toContain("view permissions in Connected apps");
     expect(sent[0]?.text).toContain("/settings/connected-apps");
     // Granting the same app again later (prompt=consent brings the screen
     // back) updates the stored consent: a repeat, not news. The provider

@@ -243,7 +243,7 @@ describe("settings.invitations list/revoke isolation", () => {
 });
 
 describe("settings.invitations email + resend", () => {
-  it("emails the invitee at create, naming the team and carrying the accept link", async () => {
+  it("emails a generic invitation at create carrying the original accept link", async () => {
     stubSender();
     const teamId = await createTeam(db, "acme");
     await addMember(teamId, "owner1", "owner");
@@ -253,7 +253,8 @@ describe("settings.invitations email + resend", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]?.to).toBe("new@example.com");
     expect(sent[0]?.from).toContain("no-reply@mail.example.com");
-    expect(sent[0]?.subject).toContain("acme");
+    expect(sent[0]?.subject).toBe("Invitation to join a team on MepMail");
+    expect(sent[0]?.subject).not.toContain("acme");
     expect(sent[0]?.html).toContain(created.acceptUrl);
     expect(sent[0]?.text).toContain(created.acceptUrl);
     const [row] = await db
@@ -407,7 +408,7 @@ describe("settings.invitations send accounting", () => {
     expect(row?.lastSentAt?.getTime()).toBe(stale.getTime());
   });
 
-  it("names with $ sequences render verbatim and every placeholder is filled", () => {
+  it("free names including replacement sequences are omitted and every placeholder is filled", () => {
     const mail = buildInvitationEmail({
       to: "new@example.com",
       inviterName: "Bob $'",
@@ -417,10 +418,11 @@ describe("settings.invitations send accounting", () => {
       expiresInDays: 3,
       locale: "en",
     });
-    expect(mail.text).toContain("Bob $'");
-    expect(mail.text).toContain("Acme $$ Co");
+    expect(mail.text).not.toContain("Bob $'");
+    expect(mail.text).not.toContain("Acme $$ Co");
+    expect(mail.text).toContain("https://app.example.com/invite/tok");
     expect(mail.text).not.toMatch(/\{(inviter|team|role|days|email)\}/);
-    expect(mail.subject).toContain("Acme $$ Co");
+    expect(mail.subject).not.toContain("Acme $$ Co");
   });
 });
 
@@ -442,9 +444,12 @@ describe("buildOperationsInvitationEmail", () => {
       from: "MepMail <notices@example.com>",
       to: input.to,
       kind: "invitation",
-      subject: "Boas-vindas ao MepMail — convite para FullCommerce360",
+      subject: "Boas-vindas ao MepMail — convite de acesso operacional",
     });
-    expect(mail.text).toContain("Olá, Yuri! Seja bem-vindo ao MepMail.");
+    expect(mail.text).toContain("Olá! Seja bem-vindo ao MepMail.");
+    expect(mail.text).not.toContain("Yuri");
+    expect(mail.text).not.toContain("Jean");
+    expect(mail.subject).not.toContain("FullCommerce360");
     expect(mail.text).toContain("Administrador operacional");
     expect(mail.text).toContain("ver a lista de usuários, sem editar contas");
     expect(mail.text).toContain("somente nestes domínios: fullcommerce360.com, mepmail.dev");
@@ -467,7 +472,7 @@ describe("buildOperationsInvitationEmail", () => {
 
   it("provides the same scope and safe signup instructions in English without requiring a name", () => {
     const mail = buildOperationsInvitationEmail({ ...input, locale: "en" });
-    expect(mail.subject).toBe("Welcome to MepMail — invitation to FullCommerce360");
+    expect(mail.subject).toBe("Welcome to MepMail — operational access invitation");
     expect(mail.text).toContain("Hi! Welcome to MepMail.");
     expect(mail.text).toContain("Operational administrator");
     expect(mail.text).toContain("view the user directory, without editing accounts");
@@ -485,7 +490,7 @@ describe("buildOperationsInvitationEmail", () => {
     expect(mail.text).not.toMatch(/\{(?:inviter|team|email|days)\}/);
   });
 
-  it("escapes all dynamic text in HTML and preserves literal replacement sequences", () => {
+  it("omits free names but still escapes explicit scope and action URLs", () => {
     const mail = buildOperationsInvitationEmail({
       ...input,
       locale: "en",
@@ -499,10 +504,12 @@ describe("buildOperationsInvitationEmail", () => {
     expect(mail.html).not.toContain("<script>");
     expect(mail.html).not.toContain("<img src=x");
     expect(mail.html).not.toContain(' onclick="run()');
-    expect(mail.html).toContain("&lt;script&gt;run()&lt;/script&gt;");
-    expect(mail.html).toContain("Acme $$ &amp; Co");
-    expect(mail.text).toContain("Jean $' <script>run()</script>");
-    expect(mail.text).toContain("Acme $$ & Co");
+    expect(mail.html).not.toContain("&lt;script&gt;run()&lt;/script&gt;");
+    expect(mail.html).toContain("&lt;script&gt;mailbox()&lt;/script&gt;");
+    expect(mail.html).toContain("&lt;img src=x onerror=&quot;domain()&quot;&gt;");
+    expect(mail.html).not.toContain("Acme $$ &amp; Co");
+    expect(mail.text).not.toContain("Jean $' <script>run()</script>");
+    expect(mail.text).not.toContain("Acme $$ & Co");
   });
 
   it("does not duplicate listed scope entries and never implies an empty scope means unrestricted access", () => {
