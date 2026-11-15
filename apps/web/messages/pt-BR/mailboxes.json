@@ -1316,6 +1316,7 @@
       "recipient_check_unavailable": "A verificação dos destinatários está temporariamente indisponível.",
       "configuration_unavailable": "Não foi possível verificar a configuração de envio.",
       "content_review": "Esta mensagem aguarda uma análise de conteúdo.",
+      "semantic_content_review": "Aguardando análise de segurança",
       "preflight_unavailable": "As verificações anteriores ao envio estão temporariamente indisponíveis."
     },
     "actions": {

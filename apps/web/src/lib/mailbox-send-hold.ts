@@ -1,28 +1,7 @@
+import type { MailboxSendHold, MailboxSendHoldReason } from "@millionsend/core";
 import { createElement } from "react";
 
-/** Public, sanitized reasons only. Never display provider errors or internal policy. */
-export type MailboxSendHoldReason =
-  | "review_required"
-  | "campaign_consent_required"
-  | "campaign_sending_disabled"
-  | "sending_paused"
-  | "provider_unavailable"
-  | "quota_exceeded"
-  | "rate_limited"
-  | "domain_not_ready"
-  | "recipient_check_unavailable"
-  | "configuration_unavailable"
-  | "content_review"
-  | "preflight_unavailable";
-
-export type MailboxSendHold = {
-  reason: MailboxSendHoldReason;
-  automaticRetry: boolean;
-  actionRequired: "none" | "review" | "verify_domain" | "contact_support";
-  queuedSince: Date;
-  lastCheckedAt: Date;
-  nextRetryAt: Date | null;
-};
+export type { MailboxSendHold, MailboxSendHoldReason } from "@millionsend/core";
 
 type HoldSource = {
   sendStatus?: string | null | undefined;
@@ -43,6 +22,7 @@ const REASONS: Record<MailboxSendHoldReason, string> = {
   recipient_check_unavailable: "sendHold.reasons.recipient_check_unavailable",
   configuration_unavailable: "sendHold.reasons.configuration_unavailable",
   content_review: "sendHold.reasons.content_review",
+  semantic_content_review: "sendHold.reasons.semantic_content_review",
   preflight_unavailable: "sendHold.reasons.preflight_unavailable",
 };
 const ACTIONS: Record<MailboxSendHold["actionRequired"], string> = {

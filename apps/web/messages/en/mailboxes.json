@@ -1316,6 +1316,7 @@
       "recipient_check_unavailable": "Recipient checks are temporarily unavailable.",
       "configuration_unavailable": "Sending setup could not be checked.",
       "content_review": "This message is awaiting a content review.",
+      "semantic_content_review": "Awaiting security review",
       "preflight_unavailable": "Pre-send checks are temporarily unavailable."
     },
     "actions": {

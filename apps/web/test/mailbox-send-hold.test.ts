@@ -1,6 +1,11 @@
+import type { MailboxSendHold as CoreMailboxSendHold } from "@millionsend/core";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import {
+  MAILBOX_SEND_HOLD_REASONS,
+  mailboxSendHold as serverHold,
+} from "../../../packages/core/src/mailbox-send-hold";
 import en from "../messages/en/mailboxes.json";
 import pt from "../messages/pt-BR/mailboxes.json";
 import {
@@ -105,4 +110,41 @@ it("has identical EN/PT hold keys", () => {
   expect(Object.keys(en.sendHold).sort()).toEqual(Object.keys(pt.sendHold).sort());
   expect(Object.keys(en.sendHold.reasons).sort()).toEqual(Object.keys(pt.sendHold.reasons).sort());
   expect(Object.keys(en.sendHold.actions).sort()).toEqual(Object.keys(pt.sendHold.actions).sort());
+});
+
+it("matches every canonical server reason in both client locales", () => {
+  expect(Object.keys(en.sendHold.reasons).sort()).toEqual([...MAILBOX_SEND_HOLD_REASONS].sort());
+  expect(Object.keys(pt.sendHold.reasons).sort()).toEqual([...MAILBOX_SEND_HOLD_REASONS].sort());
+});
+it("accepts a typed Core hold and presents semantic security review without a send action", () => {
+  const canonical: CoreMailboxSendHold = { ...hold, reason: "semantic_content_review" };
+  for (const messages of [en, pt]) {
+    const t = translator(messages);
+    const view = mailboxSendHoldPresentation(t, { sendStatus: "queued", sendHold: canonical });
+    expect(view).not.toBeNull();
+    expect(view?.detail).toContain(t("sendHold.reasons.semantic_content_review"));
+    expect(view?.detail).toContain(messages.sendHold.noResend);
+    expect(view?.detail).not.toMatch(
+      /AWS|SES|OpenAI|2026|automatically sent|enviado automaticamente/i,
+    );
+  }
+});
+it("renders every server-projected queued hold and suppresses the same stale hold after acceptance", () => {
+  for (const reason of MAILBOX_SEND_HOLD_REASONS) {
+    const canonical = serverHold({
+      status: "queued",
+      errorCode: `mailbox_deferred:${reason}`,
+      createdAt: hold.queuedSince,
+      updatedAt: hold.lastCheckedAt,
+    });
+    expect(canonical).not.toBeNull();
+    for (const messages of [en, pt]) {
+      const t = translator(messages);
+      expect(
+        mailboxSendHoldPresentation(t, { sendStatus: "queued", sendHold: canonical })?.badge,
+      ).toContain(t(`sendHold.reasons.${reason}`));
+      for (const sendStatus of ["accepted", "failed", "unknown", "waiting", "sending"])
+        expect(mailboxSendHoldPresentation(t, { sendStatus, sendHold: canonical })).toBeNull();
+    }
+  }
 });
