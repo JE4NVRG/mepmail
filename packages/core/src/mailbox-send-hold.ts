@@ -11,6 +11,7 @@ export const MAILBOX_SEND_HOLD_REASONS = [
   "recipient_check_unavailable",
   "configuration_unavailable",
   "content_review",
+  "semantic_content_review",
   "preflight_unavailable",
 ] as const;
 export type MailboxSendHoldReason = (typeof MAILBOX_SEND_HOLD_REASONS)[number];
@@ -43,7 +44,12 @@ export function mailboxSendHold(row: {
     actionRequired:
       reason === "domain_not_ready"
         ? "verify_domain"
-        : ["review_required", "content_review", "campaign_consent_required"].includes(reason)
+        : [
+              "review_required",
+              "content_review",
+              "semantic_content_review",
+              "campaign_consent_required",
+            ].includes(reason)
           ? "review"
           : ["configuration_unavailable", "campaign_sending_disabled"].includes(reason)
             ? "contact_support"

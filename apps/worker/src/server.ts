@@ -858,16 +858,24 @@ await queue.workDeadLetter("abuse.judge", async ({ sampleId }) => {
 // worker runs with the Correio registry even where SES sending is off.
 const mailboxAzure =
   mailboxTransportEnabled && relay?.name === "azure" && sendingProviderPolicy
-    ? createMailboxAzureSender(db, { policy: sendingProviderPolicy, relay, isCloud: env.IS_CLOUD })
+    ? createMailboxAzureSender(db, {
+        policy: sendingProviderPolicy,
+        relay,
+        isCloud: env.IS_CLOUD,
+        contentJudge: judge,
+      })
     : null;
 const mailboxSender =
   mailboxSes || mailboxRegistryEnabled || mailboxAzure
     ? createMailboxContentPolicySender(
         db,
-        createMailboxExternalAwareSender(db, keyring, mailboxSes ?? null),
+        createMailboxExternalAwareSender(db, keyring, mailboxSes ?? null, undefined, {
+          isCloud: env.IS_CLOUD,
+        }),
         env.IS_CLOUD,
         sendingProviderPolicy,
         mailboxAzure,
+        judge,
       )
     : null;
 if (mailboxSender) {

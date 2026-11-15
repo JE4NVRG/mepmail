@@ -1028,6 +1028,8 @@ export interface MailboxDraftInput {
   expectedRevision: number;
   sourceItemId?: string | undefined;
   mode?: "reply" | "forward" | undefined;
+  /** Explicit new text-only message; omission preserves the existing formatted MIME. */
+  messageFormat?: "plain_text" | undefined;
   to: string[];
   cc?: string[] | undefined;
   bcc?: string[] | undefined;
@@ -1165,6 +1167,19 @@ async function composeMailboxContentDraft(
     retainedAttachments: [...input.retainedAttachments],
     uploads: input.uploads.map((upload) => ({ ...upload })),
   };
+  // This is a new revision chosen by its author, never a conversion of saved MIME.
+  if (input.messageFormat !== undefined && input.messageFormat !== "plain_text")
+    throw new MailboxContentError("invalid");
+  const plainText = input.messageFormat === "plain_text";
+  if (
+    plainText &&
+    (input.id !== undefined ||
+      input.expectedRevision !== 0 ||
+      input.html !== undefined ||
+      input.retainedAttachments.length > 0 ||
+      input.uploads.length > 0)
+  )
+    throw new MailboxContentError("invalid");
   const registry = await listMailboxRegistry(db, actor);
   const box = registry.mailboxes.find(
     (b) => b.id === input.mailboxId && b.canDraft && b.status === "planned",
@@ -1178,11 +1193,22 @@ async function composeMailboxContentDraft(
     throw new MailboxContentError("invalid");
   const rich = input.html ? sanitizeMailboxComposeHtml(input.html) || null : null;
   const signature = { profile: box.signatureProfile, text: box.signatureText };
-  const footer = mailboxSignature(mailboxSignatureText(signature));
+  // Keep the exact website target (including scheme/query) visible to the final
+  // content qualifier. The default display signature and logo template stay intact.
+  const footer = mailboxSignature(
+    mailboxSignatureText(
+      plainText
+        ? {
+            profile: signature.profile ? { ...signature.profile, website: "" } : null,
+            text: [signature.profile?.website, signature.text].filter(Boolean).join("\n"),
+          }
+        : signature,
+    ),
+  );
   // Agents write plain text through the API; their mailbox's signature is
   // added the way the composer adds it for people, once.
   const text =
-    actor.agentAccess && footer && !input.text.includes(footer)
+    (actor.agentAccess || plainText) && footer && !input.text.includes(footer)
       ? `${input.text.replace(/\s+$/, "")}${footer}`
       : input.text;
   const mode = input.mode ?? "reply";
@@ -1213,6 +1239,7 @@ async function composeMailboxContentDraft(
         },
       )
     : null;
+  if (plainText && source?.kind === "draft") throw new MailboxContentError("invalid");
   if (input.id && source?.kind !== "draft") throw new MailboxContentError("conflict");
   if (mode === "forward" && source?.kind === "draft") throw new MailboxContentError("invalid");
   if (
@@ -1348,7 +1375,13 @@ async function composeMailboxContentDraft(
     text: composeText + (optout?.text ?? ""),
     // The person's own formatting, sanitized; otherwise the same words as HTML, with
     // the mailbox's signature formatted where the composer placed it.
-    html: (composeHtml ?? mailboxDraftHtml(composeText, signature)) + (optout?.html ?? ""),
+    // Opt-in means a single text/plain MIME part: no HTML, logo or attachments.
+    // This is not an approval; the final sealed bytes still require qualification.
+    ...(plainText
+      ? {}
+      : {
+          html: (composeHtml ?? mailboxDraftHtml(composeText, signature)) + (optout?.html ?? ""),
+        }),
     headers: { ...(rich ? { [MAILBOX_RICH_FORMAT_HEADER]: "rich" } : {}), ...optout?.headers },
     messageId: input.id ? originalId : `<${randomUUID()}@${box.address.split("@")[1]}>`,
     inReplyTo:
@@ -1374,6 +1407,7 @@ async function composeMailboxContentDraft(
 function supportedComposition(actor: MailboxContentActor, input: MailboxDraftInput) {
   return (
     !!actor.agentAccess &&
+    input.messageFormat === undefined &&
     !input.id &&
     !!input.sourceItemId &&
     (input.mode ?? "reply") === "reply" &&

@@ -1,25 +1,12 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { sql } from "drizzle-orm";
-
+import { MAILBOX_SEND_HOLD_REASONS as REASONS } from "./mailbox-send-hold.js";
 import { OPERATOR_ALERT_ACTION, operatorAlertText } from "./operator-alerts.js";
 
 export const MAILBOX_SEND_HOLD_ALERT_AFTER_MS = 15 * 60 * 1000;
 export const MAILBOX_SEND_HOLD_ALERT_COOLDOWN_MS = 60 * 60 * 1000;
-const REASONS = [
-  "review_required",
-  "campaign_consent_required",
-  "campaign_sending_disabled",
-  "sending_paused",
-  "provider_unavailable",
-  "quota_exceeded",
-  "rate_limited",
-  "domain_not_ready",
-  "recipient_check_unavailable",
-  "configuration_unavailable",
-  "content_review",
-  "preflight_unavailable",
-] as const;
+
 export interface MailboxSendHoldSnapshot {
   count: number;
   oldestAt: Date;
@@ -61,7 +48,7 @@ export function mailboxSendHoldAlertDecision(
  * The relay consumes the same operator.alert row that commits the dedupe state.
  * Try-lock serializes concurrent reconcilers; transaction rollback keeps failed
  * writes retryable. Only the exact allowlisted mailbox_deferred codes qualify.
- * At most 12 aggregates, 12 ledger rows and 3 sample IDs per emitted alert leave
+ * At most one aggregate/ledger row per allowlisted reason and 3 sample IDs per alert leave
  * PostgreSQL. Counts cover all queued retained rows, not a truncated page.
  */
 export async function alertRetainedMailboxSends(db: Db, now = new Date()) {
@@ -78,7 +65,7 @@ export async function alertRetainedMailboxSends(db: Db, now = new Date()) {
         select error_code as code, count(*)::text as count, min(created_at)::text as oldest
         from mailbox_outbox
         where status = 'queued' and error_code in (${sql.join(codes, sql`, `)})
-        group by error_code limit 12
+        group by error_code limit ${REASONS.length}
       `);
       const [attempt] = await tx.execute<{ pending: boolean }>(sql`
         select exists (

@@ -503,6 +503,8 @@ describe("Correio SES account enforcement", () => {
         throw Object.assign(new Error("Sending suspended for this account."), { name });
       });
       const sender = createMailboxSesSender(db, {
+        // This legacy transport contract is OSS; Cloud semantic admission is tested separately.
+        isCloud: false,
         configurationSets: { "us-east-1": "private_fixture" },
         clientFactory: () => ({ send }),
         sesQuota: {
@@ -542,6 +544,8 @@ describe("Correio SES account enforcement", () => {
       await db.select().from(schema.domains).where(eq(schema.domains.teamId, f.teamId))
     )[0]!;
     const sender = createMailboxSesSender(db, {
+      // This legacy transport contract is OSS; Cloud semantic admission is tested separately.
+      isCloud: false,
       configurationSets: { "us-east-1": "private_fixture", "eu-west-1": "alternate_fixture" },
       paused: (region) => region === "us-east-1",
       failover: { region: "eu-west-1", domains: new Set([domain.name]) },
@@ -558,6 +562,8 @@ describe("Correio SES account enforcement", () => {
     let paused = false;
     const send = vi.fn();
     const sender = createMailboxSesSender(db, {
+      // This legacy transport contract is OSS; Cloud semantic admission is tested separately.
+      isCloud: false,
       configurationSets: { "us-east-1": "private_fixture" },
       paused: () => paused,
       throttle: async () => {
@@ -575,6 +581,8 @@ describe("Correio SES account enforcement", () => {
       throw Object.assign(new Error("identity not verified"), { name: "MessageRejected" });
     });
     const sender = createMailboxSesSender(db, {
+      // This legacy transport contract is OSS; Cloud semantic admission is tested separately.
+      isCloud: false,
       configurationSets: { "us-east-1": "private_fixture" },
       sesQuota: { exhausted: () => false, refresh: async () => true, accountPaused: () => false },
       clientFactory: () => ({ send }),
@@ -588,6 +596,8 @@ describe("Correio SES account enforcement", () => {
       throw Object.assign(new Error("lost acknowledgement"), { name: "TimeoutError" });
     });
     const sender = createMailboxSesSender(db, {
+      // This legacy transport contract is OSS; Cloud semantic admission is tested separately.
+      isCloud: false,
       configurationSets: { "us-east-1": "private_fixture" },
       clientFactory: () => ({ send }),
     });
@@ -632,9 +642,16 @@ it("independently configured customer external mail still sends while platform S
     },
     secret: "synthetic-fixture-password",
   });
-  const ses = vi.fn(createMailboxSesSender(db, { paused: () => true }).send);
+  const ses = vi.fn(
+    createMailboxSesSender(db, {
+      // This legacy transport contract is OSS; Cloud semantic admission is tested separately.
+      isCloud: false,
+      paused: () => true,
+    }).send,
+  );
   const smtp = vi.fn(async () => ({ messageId: "independent-fixture" }));
   const sender = createMailboxExternalAwareSender(db, keys, { send: ses }, undefined, {
+    isCloud: false,
     lookup: (async () => [{ address: "142.250.0.109", family: 4 }]) as never,
     createTransport: (() => ({ sendMail: smtp, close() {} })) as never,
   });
@@ -805,6 +822,8 @@ describe("truthful Native send holds", () => {
     const q = await f.queued();
     const send = vi.fn();
     const sender = createMailboxSesSender(db, {
+      // This legacy transport contract is OSS; Cloud semantic admission is tested separately.
+      isCloud: false,
       configurationSets: { "us-east-1": "private_fixture" },
       ...options,
       clientFactory: () => ({ send }),

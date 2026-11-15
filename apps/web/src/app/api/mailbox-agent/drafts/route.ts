@@ -9,6 +9,7 @@ const input = z
     expectedRevision: z.number().int().min(0).max(2147483646),
     sourceItemId: z.uuid().optional(),
     mode: z.enum(["reply", "forward"]).optional(),
+    messageFormat: z.enum(["plain_text"]).optional(),
     to: z.array(z.email().max(254)).min(1).max(20),
     cc: z.array(z.email().max(254)).max(19).optional(),
     bcc: z.array(z.email().max(254)).max(19).optional(),
@@ -53,6 +54,20 @@ export async function POST(request: Request) {
   const parsed = input.safeParse(body);
   if (!parsed.success)
     return Response.json({ error: "invalid" }, { status: 400, headers: MAILBOX_AGENT_HEADERS });
+  if (
+    parsed.data.messageFormat === "plain_text" &&
+    (parsed.data.id !== undefined ||
+      parsed.data.expectedRevision !== 0 ||
+      parsed.data.retainedAttachments.length > 0 ||
+      parsed.data.uploads.length > 0)
+  )
+    return Response.json(
+      {
+        error: "invalid",
+        hint: "plain_text requires a new draft without HTML or attachments; the existing draft is unchanged.",
+      },
+      { status: 400, headers: MAILBOX_AGENT_HEADERS },
+    );
   return mailboxAgentRequest(request, "draft", async ({ db, actor, mailboxId, keyId }) => {
     const result = await saveMailboxContentDraft(db, actor, { ...parsed.data, mailboxId });
     await appendMailboxActivity(

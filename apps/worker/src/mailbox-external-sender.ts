@@ -16,6 +16,7 @@ import {
 import { type Db, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import nodemailer from "nodemailer";
+import { assertMailboxDispatchContent } from "./mailbox-dispatch-content.js";
 
 /**
  * Contas externas: a send from an external mailbox leaves through the provider's own
@@ -37,6 +38,7 @@ export function createMailboxExternalAwareSender(
   deps: {
     createTransport?: typeof nodemailer.createTransport;
     lookup?: typeof lookup;
+    isCloud?: boolean;
   } = {},
 ): MailboxOutboxSender {
   return {
@@ -115,10 +117,12 @@ export function createMailboxExternalAwareSender(
           );
         if (!(await checkSignupSend(db, input.teamId, recipients)).allowed)
           throw new MailboxSendDeferredError("review_required");
+        const raw = stripMailboxPrivateHeaders(Buffer.from(input.raw));
+        assertMailboxDispatchContent(input, raw, deps.isCloud);
         const info = await transport.sendMail({
           envelope: { from: input.from, to: [...input.to, ...input.cc, ...input.bcc] },
           // Bcc and the format marker stay on the sealed copies and never leave.
-          raw: stripMailboxPrivateHeaders(Buffer.from(input.raw)),
+          raw,
         });
         return { messageId: String(info.messageId ?? input.outboxId) };
       } catch (error) {

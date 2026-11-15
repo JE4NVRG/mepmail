@@ -9,9 +9,11 @@ import {
   stripMailboxPrivateHeaders,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
+import type { AbuseJudge } from "../../../packages/core/src/abuse-judge/types.js";
 import { reserveMailboxAzureBudget } from "../../../packages/core/src/mailbox-azure-budget.js";
 import { assertMailboxOutboxSendAccess } from "../../../packages/core/src/mailbox-transport.js";
 import type { SesSender } from "./handlers/send-email.js";
+import { assertMailboxDispatchContent } from "./mailbox-dispatch-content.js";
 import { mailboxAzureCompliance } from "./mailbox-optout.js";
 import { createMailboxContentPolicySender, withMailboxProbation } from "./mailbox-sender.js";
 
@@ -26,6 +28,7 @@ export function createMailboxAzureSender(
     policy: SendingProviderPolicy;
     relay: { name: string; sender: SesSender };
     isCloud: boolean;
+    contentJudge?: AbuseJudge | null;
   },
 ): MailboxOutboxSender {
   const unavailable: MailboxOutboxSender = {
@@ -62,6 +65,8 @@ export function createMailboxAzureSender(
         if (error instanceof MailboxSendDeferredError) throw error;
         throw new MailboxSendDeferredError("preflight_unavailable");
       }
+      const raw = stripMailboxPrivateHeaders(Buffer.from(input.raw));
+      assertMailboxDispatchContent(input, raw, options.isCloud);
       const reserved = await reserveMailboxAzureBudget(db, {
         ...input,
         recipients: recipients.length,
@@ -71,6 +76,7 @@ export function createMailboxAzureSender(
       if (reserved !== "reserved") throw new Error("mailbox_azure_attempt_fenced");
       try {
         await authorize();
+        assertMailboxDispatchContent(input, raw, options.isCloud);
       } catch {
         // The lifetime receipt is already durable. Preserve it and the probation
         // charge; never return to a retryable queue or refund after this fence.
@@ -79,7 +85,7 @@ export function createMailboxAzureSender(
       let result: { messageId: string };
       try {
         result = await options.relay.sender.sendRaw({
-          raw: stripMailboxPrivateHeaders(Buffer.from(input.raw)),
+          raw,
           emailId: input.outboxId,
           envelopeFrom: input.from,
           to: [...input.to],
@@ -114,10 +120,17 @@ export function createMailboxAzureSender(
   // before quota + SMTP, including when this adapter is accidentally invoked alone.
   // Only the final adapter reserves probation. Routers may clone the input, so
   // relying on an outer WeakSet identity across those clones would double charge.
-  return createMailboxContentPolicySender(db, unavailable, options.isCloud, options.policy, {
-    async send(input) {
-      await mailboxAzureCompliance(db, input);
-      return withMailboxProbation(db, attempt, options.isCloud).send(input);
+  return createMailboxContentPolicySender(
+    db,
+    unavailable,
+    options.isCloud,
+    options.policy,
+    {
+      async send(input) {
+        await mailboxAzureCompliance(db, input);
+        return withMailboxProbation(db, attempt, options.isCloud).send(input);
+      },
     },
-  });
+    options.contentJudge,
+  );
 }

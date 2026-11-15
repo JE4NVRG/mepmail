@@ -21,6 +21,7 @@ import {
 } from "@millionsend/ses";
 import { and, eq } from "drizzle-orm";
 import { simpleParser } from "mailparser";
+import type { AbuseJudge } from "../../../packages/core/src/abuse-judge/types.js";
 import { checkCampaignMessage } from "../../../packages/core/src/campaign-consent.js";
 import { screenPreSendContent } from "../../../packages/core/src/pre-send-content-policy.js";
 import { releaseQuota, reserveQuota } from "../../../packages/core/src/quota.js";
@@ -34,6 +35,11 @@ import {
   assertMailboxCorrespondenceRecipients,
   mailboxCorrespondenceCampaign,
 } from "./mailbox-correspondence.js";
+import {
+  assertMailboxDispatchContent,
+  copyMailboxDispatchInput,
+  withMailboxDispatchContent,
+} from "./mailbox-dispatch-content.js";
 import { mailboxAzureCompliance } from "./mailbox-optout.js";
 import {
   copyMailboxSesOutboundRegions,
@@ -149,6 +155,11 @@ export function withMailboxProbation(
         .size;
       const at = new Date();
       const day = utcDay(at);
+      assertMailboxDispatchContent(
+        input,
+        stripMailboxPrivateHeaders(Buffer.from(input.raw)),
+        isCloud,
+      );
       const quota = await db.transaction(async (tx) => {
         const txDb = tx as unknown as Db;
         await txDb
@@ -157,6 +168,11 @@ export function withMailboxProbation(
           .where(eq(schema.teams.id, input.teamId))
           .for("update");
         const current = await applySenderProbationQuota(txDb, input.teamId, { kind: "none" }, true);
+        assertMailboxDispatchContent(
+          input,
+          stripMailboxPrivateHeaders(Buffer.from(input.raw)),
+          isCloud,
+        );
         if (
           !(await reserveQuota(txDb, { teamId: input.teamId, count, quota: current, at, day }))
             .reserved
@@ -184,142 +200,139 @@ export function withMailboxProbation(
 export function createMailboxContentPolicySender(
   db: Db,
   sender: MailboxOutboxSender,
-  isCloud: boolean,
+  isCloud: boolean = true,
   policy: SendingProviderPolicy | null = null,
   azure: MailboxOutboxSender | null = null,
+  contentJudge?: AbuseJudge | null,
 ): MailboxOutboxSender {
   return {
     async send(input) {
-      input = {
-        ...input,
-        raw: Buffer.from(input.raw),
-        to: [...input.to],
-        cc: [...input.cc],
-        bcc: [...input.bcc],
-      };
+      input = copyMailboxDispatchInput(input);
       assertMailboxCorrespondenceRecipients(input);
-      if (isCloud) await checkMailboxContent(db, input);
-      if (policy) {
-        const parsed = await simpleParser(input.raw, {
-          skipImageLinks: true,
-          skipTextToHtml: true,
-        });
-        const from = parsed.from?.text ?? input.from;
-        const authored = parsed.headerLines.some((h) => h.key === "list-unsubscribe")
-          ? await mailboxAzureCompliance(db, input)
-          : null;
-        const html = authored
-          ? authored.html
-          : typeof parsed.html === "string"
-            ? parsed.html
+      if (isCloud !== false) await checkMailboxContent(db, input);
+      return withMailboxDispatchContent(db, input, contentJudge, isCloud, async () => {
+        if (policy) {
+          const parsed = await simpleParser(input.raw, {
+            skipImageLinks: true,
+            skipTextToHtml: true,
+          });
+          const from = parsed.from?.text ?? input.from;
+          const authored = parsed.headerLines.some((h) => h.key === "list-unsubscribe")
+            ? await mailboxAzureCompliance(db, input)
             : null;
-        const insight = evaluateEmailInsights({
-          html,
-          preTrackingHtml: html,
-          text: authored ? authored.text : (parsed.text ?? null),
-          from,
-          senderDomain: parseSingleSender(from)?.domain ?? "",
-          subject: parsed.subject ?? "",
-          finalHeaders: {},
-          hasAttachments: parsed.attachments.length > 0,
-          replyTo: null,
-          isBroadcast: false,
-          hasTopic: false,
-          tracking: {
-            clickEnabled: false,
-            openEnabled: false,
-            brandedHostUsed: false,
-            sharedFallbackUsed: false,
-            shippedUntracked: true,
-          },
-          domainSnapshot: null,
-          now: new Date(),
-        });
-        const [box] = await db
-          .select({
-            origin: schema.mailboxes.origin,
-            domainStatus: schema.domains.status,
-            relayEnabledAt: schema.domains.relayEnabledAt,
-            address: schema.mailboxes.address,
-          })
-          .from(schema.mailboxes)
-          .leftJoin(
-            schema.domains,
-            and(
-              eq(schema.domains.id, schema.mailboxes.domainId),
-              eq(schema.domains.teamId, schema.mailboxes.teamId),
-            ),
-          )
-          .where(
-            and(
-              eq(schema.mailboxes.id, input.mailboxId),
-              eq(schema.mailboxes.teamId, input.teamId),
-            ),
-          );
-        const [outbox] = await db
-          .select({ createdAt: mailboxOutbox.createdAt })
-          .from(mailboxOutbox)
-          .where(
-            and(
-              eq(mailboxOutbox.id, input.outboxId),
-              eq(mailboxOutbox.teamId, input.teamId),
-              eq(mailboxOutbox.mailboxId, input.mailboxId),
-              eq(mailboxOutbox.attemptId, input.attemptId),
-              eq(mailboxOutbox.status, "sending"),
-            ),
-          );
-        // Origin alone grants no Azure route. Only an explicit closed operator policy,
-        // verified same-team linked domain, relay attestation and live outbox can expose it.
-        const azureAllowed =
-          !!azure &&
-          !!policy.restoration?.teams[input.teamId] &&
-          !!outbox &&
-          box?.origin !== "external" &&
-          box?.domainStatus === "verified" &&
-          !!box.relayEnabledAt &&
-          box.address === input.from;
-        const provider = box?.origin === "external" ? "customer_smtp" : "ses";
-        const messageClass =
-          insight.marketing ||
-          mailboxCorrespondenceCampaign({
-            to: input.to,
-            cc: input.cc,
-            bcc: input.bcc,
-            subject: parsed.subject,
+          const html = authored
+            ? authored.html
+            : typeof parsed.html === "string"
+              ? parsed.html
+              : null;
+          const insight = evaluateEmailInsights({
             html,
-            text: authored ? authored.text : parsed.text,
-            headers: authored
-              ? authored.headers
-              : Object.fromEntries(parsed.headerLines.map((line) => [line.key, line.line])),
-          })
-            ? "campaign"
-            : "transactional";
-        const route = resolveSendingProvider(policy, {
-          teamId: input.teamId,
-          ...(outbox ? { createdAt: outbox.createdAt } : {}),
-          fromAddress: input.from,
-          messageClass,
-          legacyProvider: provider,
-          availableProviders: new Set(
-            box ? [provider, ...(azureAllowed ? ["azure_smtp"] : [])] : [],
-          ),
-        });
-        if (route.kind === "held") {
-          const selected =
-            policy.teams?.[input.teamId]?.[messageClass] ?? policy.defaults?.[messageClass];
-          throw new MailboxSendDeferredError(
-            route.reason === "operator_paused" || route.reason === "provider_paused"
-              ? "sending_paused"
-              : route.reason === "provider_unavailable" &&
-                  messageClass === "campaign" &&
-                  selected === "disabled"
-                ? "campaign_sending_disabled"
-                : "provider_unavailable",
-          );
+            preTrackingHtml: html,
+            text: authored ? authored.text : (parsed.text ?? null),
+            from,
+            senderDomain: parseSingleSender(from)?.domain ?? "",
+            subject: parsed.subject ?? "",
+            finalHeaders: {},
+            hasAttachments: parsed.attachments.length > 0,
+            replyTo: null,
+            isBroadcast: false,
+            hasTopic: false,
+            tracking: {
+              clickEnabled: false,
+              openEnabled: false,
+              brandedHostUsed: false,
+              sharedFallbackUsed: false,
+              shippedUntracked: true,
+            },
+            domainSnapshot: null,
+            now: new Date(),
+          });
+          const [box] = await db
+            .select({
+              origin: schema.mailboxes.origin,
+              domainStatus: schema.domains.status,
+              relayEnabledAt: schema.domains.relayEnabledAt,
+              address: schema.mailboxes.address,
+            })
+            .from(schema.mailboxes)
+            .leftJoin(
+              schema.domains,
+              and(
+                eq(schema.domains.id, schema.mailboxes.domainId),
+                eq(schema.domains.teamId, schema.mailboxes.teamId),
+              ),
+            )
+            .where(
+              and(
+                eq(schema.mailboxes.id, input.mailboxId),
+                eq(schema.mailboxes.teamId, input.teamId),
+              ),
+            );
+          const [outbox] = await db
+            .select({ createdAt: mailboxOutbox.createdAt })
+            .from(mailboxOutbox)
+            .where(
+              and(
+                eq(mailboxOutbox.id, input.outboxId),
+                eq(mailboxOutbox.teamId, input.teamId),
+                eq(mailboxOutbox.mailboxId, input.mailboxId),
+                eq(mailboxOutbox.attemptId, input.attemptId),
+                eq(mailboxOutbox.status, "sending"),
+              ),
+            );
+          // Origin alone grants no Azure route. Only an explicit closed operator policy,
+          // verified same-team linked domain, relay attestation and live outbox can expose it.
+          const azureAllowed =
+            !!azure &&
+            !!policy.restoration?.teams[input.teamId] &&
+            !!outbox &&
+            box?.origin !== "external" &&
+            box?.domainStatus === "verified" &&
+            !!box.relayEnabledAt &&
+            box.address === input.from;
+          const provider = box?.origin === "external" ? "customer_smtp" : "ses";
+          const messageClass =
+            insight.marketing ||
+            mailboxCorrespondenceCampaign({
+              to: input.to,
+              cc: input.cc,
+              bcc: input.bcc,
+              subject: parsed.subject,
+              html,
+              text: authored ? authored.text : parsed.text,
+              headers: authored
+                ? authored.headers
+                : Object.fromEntries(parsed.headerLines.map((line) => [line.key, line.line])),
+            })
+              ? "campaign"
+              : "transactional";
+          const route = resolveSendingProvider(policy, {
+            teamId: input.teamId,
+            ...(outbox ? { createdAt: outbox.createdAt } : {}),
+            fromAddress: input.from,
+            messageClass,
+            legacyProvider: provider,
+            availableProviders: new Set(
+              box ? [provider, ...(azureAllowed ? ["azure_smtp"] : [])] : [],
+            ),
+          });
+          if (route.kind === "held") {
+            const selected =
+              policy.teams?.[input.teamId]?.[messageClass] ?? policy.defaults?.[messageClass];
+            throw new MailboxSendDeferredError(
+              route.reason === "operator_paused" || route.reason === "provider_paused"
+                ? "sending_paused"
+                : route.reason === "provider_unavailable" &&
+                    messageClass === "campaign" &&
+                    selected === "disabled"
+                  ? "campaign_sending_disabled"
+                  : "provider_unavailable",
+            );
+          }
+          if (route.provider === "azure_smtp") return azure!.send(input);
         }
-        if (route.provider === "azure_smtp") return azure!.send(input);
-      }
-      return withMailboxProbation(db, sender, isCloud).send(input);
+        return withMailboxProbation(db, sender, isCloud).send(input);
+      });
     },
   };
 }
@@ -384,6 +397,7 @@ export function createMailboxSesSender(
   opts: {
     /** Cloud-only abuse policy; self-hosted transport contract stays unchanged. */
     isCloud?: boolean;
+    contentJudge?: AbuseJudge | null;
     configurationSets?: MailboxSesConfigurationSets | null | undefined;
     outboundRegions?: MailboxSesOutboundRegions | undefined;
     exhausted?: (region: string) => boolean;
@@ -498,19 +512,13 @@ export function createMailboxSesSender(
     }
     if (allowed !== true) throw new MailboxSendRejectedError();
   }
-  return withMailboxProbation(
+  const sender = withMailboxProbation(
     db,
     {
       async send(input) {
         // Capture the same MIME/envelope whose recipient permits are reserved below. Bcc
         // and the format marker stay on the sealed copies and never leave (SES or relay).
-        input = {
-          ...input,
-          raw: stripMailboxPrivateHeaders(Buffer.from(input.raw)),
-          to: [...input.to],
-          cc: [...input.cc],
-          bcc: [...input.bcc],
-        };
+        input = copyMailboxDispatchInput(input, true);
         const recipients = [...new Set([...input.to, ...input.cc, ...input.bcc])];
         const recipientCount = recipients.length;
         if (!input.to.length || recipientCount < 1 || recipientCount > 20)
@@ -556,7 +564,7 @@ export function createMailboxSesSender(
         // A send-review hold keeps the message for the operator's release, as
         // it keeps the team's API mail.
         if (isSendReviewHeld(domain)) throw new MailboxSendDeferredError("review_required");
-        if (opts.isCloud) await checkMailboxContent(db, input);
+        if (opts.isCloud !== false) await checkMailboxContent(db, input);
         let region: string;
         try {
           region = resolveMailboxSesOutboundRegion(outboundRegions, {
@@ -611,7 +619,8 @@ export function createMailboxSesSender(
         await allowedRecipients(input.teamId, recipients);
         if (accountPaused() || opts.exhausted?.(region) || opts.sesQuota?.exhausted(region))
           throw new MailboxSendDeferredError(accountPaused() ? "sending_paused" : "quota_exceeded");
-        if (opts.isCloud) await checkMailboxContent(db, input);
+        if (opts.isCloud !== false) await checkMailboxContent(db, input);
+        assertMailboxDispatchContent(input, input.raw, opts.isCloud);
         let response: Awaited<ReturnType<MailboxSesClient["send"]>>;
         try {
           response = await client.send(
@@ -651,6 +660,13 @@ export function createMailboxSesSender(
         return { messageId: response.MessageId };
       },
     },
-    opts.isCloud ?? false,
+    opts.isCloud !== false,
   );
+  return {
+    async send(input) {
+      return withMailboxDispatchContent(db, input, opts.contentJudge, opts.isCloud, () =>
+        sender.send(input),
+      );
+    },
+  };
 }
