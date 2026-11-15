@@ -1,4 +1,15 @@
 {
+  "nativeCompose": {
+    "format": "Message format",
+    "formatted": "Formatted (default)",
+    "plain": "Plain text — no HTML, logo or attachments",
+    "choiceHint": "Plain text is available for a new message without rich formatting or files. Existing messages are never converted.",
+    "hint": "Write the complete message, then save to review the final body and recipients. Your textual signature and website are kept. This mode has no autosave; after saving, changes require a new message. Sending still uses the normal checks.",
+    "saveReview": "Save to review",
+    "sealed": "This saved draft is read-only because its format cannot be safely edited here. Review the saved body and all recipients before sending this exact revision. To make changes, compose a new message; the original is kept.",
+    "newMessage": "Compose a new message",
+    "uncertain": "Saving could not be confirmed. Your text remains here. Check Drafts before doing anything else; do not save or send another copy. Close this composer only after checking."
+  },
   "title": "Mail",
   "subtitle": "Inboxes for you, your team and your agents.",
   "all": "All mailboxes",

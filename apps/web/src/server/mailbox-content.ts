@@ -51,6 +51,7 @@ import { mailboxDraftHtml, mailboxSignatureText } from "../lib/mailbox-signature
 import { getKeyring } from "./keyring";
 import { MAILBOX_COMPOSE_HTML_MAX, sanitizeMailboxComposeHtml } from "./mailbox-compose-html";
 import { mailboxCompositionReceipt, mailboxCompositionSemantics } from "./mailbox-composition";
+import { mailboxDraftMessageFormat } from "./mailbox-draft-message-format";
 import { projectMailboxHtml } from "./mailbox-html";
 import { mailboxSenderHmacKey } from "./mailbox-sender-key";
 import { senderPictureToken } from "./mailbox-sender-picture";
@@ -306,6 +307,7 @@ export async function getMailboxContent(
               from: metadata.from,
               inboundAssessment: item.inboundAssessment,
             }),
+        draftMessageFormat: item.kind === "draft" ? mailboxDraftMessageFormat(raw, mime) : null,
         // The formatting the person wrote, to reopen in the editor (null: plain text).
         draftHtml:
           item.kind === "draft" &&

@@ -1185,6 +1185,7 @@ export const mailboxesRouter = router({
         expectedRevision: z.number().int().min(0).max(2147483646),
         sourceItemId: z.uuid().optional(),
         mode: z.enum(["reply", "forward"]).optional(),
+        messageFormat: z.literal("plain_text").optional(),
         to: z.array(z.email().max(254)).max(20),
         cc: z.array(z.email().max(254)).max(20).optional(),
         bcc: z.array(z.email().max(254)).max(20).optional(),

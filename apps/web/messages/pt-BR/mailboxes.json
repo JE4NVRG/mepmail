@@ -1,4 +1,15 @@
 {
+  "nativeCompose": {
+    "format": "Formato da mensagem",
+    "formatted": "Formatado (padrão)",
+    "plain": "Texto simples — sem HTML, logo ou anexos",
+    "choiceHint": "Texto simples está disponível para uma nova mensagem sem formatação rica ou arquivos. Mensagens existentes nunca são convertidas.",
+    "hint": "Escreva a mensagem completa e salve para revisar o corpo final e os destinatários. A assinatura textual e o site são mantidos. Este modo não salva automaticamente; após salvar, alterações exigem uma nova mensagem. O envio mantém as verificações normais.",
+    "saveReview": "Salvar para revisar",
+    "sealed": "Este rascunho salvo é somente leitura porque seu formato não pode ser editado com segurança aqui. Revise o corpo salvo e todos os destinatários antes de enviar esta revisão exata. Para alterar, escreva uma nova mensagem; a original é mantida.",
+    "newMessage": "Escrever nova mensagem",
+    "uncertain": "Não foi possível confirmar o salvamento. Seu texto continua aqui. Confira Rascunhos antes de qualquer outra ação; não salve nem envie outra cópia. Feche este editor somente depois de conferir."
+  },
   "title": "Correio",
   "subtitle": "Caixas para você, sua equipe e seus agentes.",
   "all": "Todas as caixas",

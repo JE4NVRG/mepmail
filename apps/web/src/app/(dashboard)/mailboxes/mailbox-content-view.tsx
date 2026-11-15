@@ -51,6 +51,11 @@ import {
   useMailboxLiveConnected,
 } from "@/lib/mailbox-live";
 import { MAILTO_PARAM, type MailtoPrefill, parseMailto } from "@/lib/mailbox-mailto";
+import {
+  canChooseNativePlainText,
+  nativeDraftIsReadOnly,
+  nativePlainTextSaveFields,
+} from "@/lib/mailbox-native-compose";
 import type { NewMailNotice } from "@/lib/mailbox-new-mail";
 import {
   newUnreadArrivals,
@@ -379,6 +384,8 @@ function DraftDialog({
   const [richHtml, setRichHtml] = useState<string | null>(
     source?.kind === "draft" ? (source.draftHtml ?? null) : null,
   );
+  const [plainText, setPlainText] = useState(false);
+  const [plainSaveUncertain, setPlainSaveUncertain] = useState(false);
   const [formatted, setFormatted] = useState(source?.kind === "draft" && !!source.draftHtml);
   const boxId = mailboxId;
   const sender = boxes.find((box) => box.id === boxId);
@@ -557,7 +564,7 @@ function DraftDialog({
       handle.current = null;
     };
   });
-  const mutation = useMutation(trpc.mailboxes.saveDraft.mutationOptions());
+  const mutation = useMutation(trpc.mailboxes.saveDraft.mutationOptions({ retry: false }));
   const busy = saving !== null || mutation.isPending || loadingFiles;
   // Mail that arrives while writing: one line under the title (mailboxes-view
   // announces it), until dismissed or replaced by the next one.
@@ -673,7 +680,8 @@ function DraftDialog({
     if (!allowed) lost();
   }, [allowed, lost]);
   async function addFiles(files: FileList | null) {
-    if (!files?.length || submitting.current || !current()) return;
+    if (!files?.length || submitting.current || plainText || plainSaveUncertain || !current())
+      return;
     setError("");
     if (
       retained.length + uploads.length + files.length > 10 ||
@@ -866,9 +874,16 @@ function DraftDialog({
         }}
         onSubmit={async (e) => {
           e.preventDefault();
-          if (submitting.current || loadingFiles || !allowed || !current()) return;
+          if (submitting.current || loadingFiles || plainSaveUncertain || !allowed || !current())
+            return;
+          if (source && nativeDraftIsReadOnly(source)) {
+            setError(t("nativeCompose.sealed"));
+            return;
+          }
           const sendNow =
-            canSend && (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "send";
+            !plainText &&
+            canSend &&
+            (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "send";
           const copies = showCc ? cc : [];
           const hidden = showBcc ? bcc : [];
           const invalid = [...to, ...copies, ...hidden].find(
@@ -893,6 +908,14 @@ function DraftDialog({
           setError("");
           try {
             const result = await mutation.mutateAsync({
+              ...(plainText
+                ? nativePlainTextSaveFields({
+                    source,
+                    html: richHtml,
+                    uploads: uploads.length,
+                    retained: retained.length,
+                  })
+                : {}),
               mailboxId: boxId,
               id: source?.kind === "draft" ? source.id : undefined,
               expectedRevision: source?.kind === "draft" ? source.revision : 0,
@@ -925,6 +948,14 @@ function DraftDialog({
               lost();
               return;
             }
+            if (
+              plainText &&
+              !["CONFLICT", "BAD_REQUEST", "PRECONDITION_FAILED"].includes(code ?? "")
+            ) {
+              setPlainSaveUncertain(true);
+              setError(t("nativeCompose.uncertain"));
+              return;
+            }
             setError(
               t(
                 code === "CONFLICT"
@@ -947,6 +978,39 @@ function DraftDialog({
             className={`${styles.fields} ${styles.composerFields}`}
             disabled={busy || !allowed}
           >
+            {!source ? (
+              <label>
+                {t("nativeCompose.format")}
+                <select
+                  className="ms-input"
+                  value={plainText ? "plain_text" : "formatted"}
+                  disabled={busy || plainSaveUncertain}
+                  aria-describedby="native-compose-format-hint"
+                  onChange={(event) => {
+                    setPlainText(event.target.value === "plain_text");
+                    typed.current = true;
+                  }}
+                >
+                  <option value="formatted">{t("nativeCompose.formatted")}</option>
+                  <option
+                    value="plain_text"
+                    disabled={
+                      !canChooseNativePlainText({
+                        source,
+                        html: richHtml,
+                        uploads: uploads.length,
+                        retained: retained.length,
+                      })
+                    }
+                  >
+                    {t("nativeCompose.plain")}
+                  </option>
+                </select>
+                <small id="native-compose-format-hint" className={styles.hint}>
+                  {t(plainText ? "nativeCompose.hint" : "nativeCompose.choiceHint")}
+                </small>
+              </label>
+            ) : null}
             <div className={styles.composerAddressFields}>
               <label>
                 {t("from")}
@@ -1050,38 +1114,52 @@ function DraftDialog({
             </label>
             <div className={styles.composerBodyField}>
               <span className={styles.composerBodyLabel}>{t("message")}</span>
-              <MailboxRichEditor
-                ref={messageInput}
-                initialText={text}
-                initialHtml={richHtml}
-                onChange={(value) => {
-                  setText(value.text);
-                  setRichHtml(value.html);
-                  setFormatted(value.formatted);
-                }}
-                disabled={busy || !allowed}
-                placeholder={t("composeBodyPlaceholder")}
-                ariaLabel={t("message")}
-                labels={{
-                  toolbar: t("format.toolbar"),
-                  bold: t("format.bold"),
-                  italic: t("format.italic"),
-                  link: t("format.link"),
-                  linkAddress: t("format.linkAddress"),
-                  linkApply: t("format.linkApply"),
-                  linkRemove: t("format.linkRemove"),
-                  bulletList: t("format.bulletList"),
-                  orderedList: t("format.orderedList"),
-                  quote: t("format.quote"),
-                }}
-                autoFocus={
-                  source && mode !== "forward"
-                    ? source.kind !== "draft" && quickReply?.trim()
-                      ? "firstLineEnd"
-                      : "start"
-                    : undefined
-                }
-              />
+              {plainText ? (
+                <textarea
+                  className="ms-input"
+                  style={{ height: "auto", minHeight: "12rem", resize: "vertical" }}
+                  rows={10}
+                  value={text}
+                  maxLength={262144}
+                  aria-label={t("message")}
+                  aria-describedby="native-compose-format-hint"
+                  onChange={(event) => setText(event.target.value)}
+                  disabled={busy || !allowed}
+                />
+              ) : (
+                <MailboxRichEditor
+                  ref={messageInput}
+                  initialText={text}
+                  initialHtml={richHtml}
+                  onChange={(value) => {
+                    setText(value.text);
+                    setRichHtml(value.html);
+                    setFormatted(value.formatted);
+                  }}
+                  disabled={busy || !allowed}
+                  placeholder={t("composeBodyPlaceholder")}
+                  ariaLabel={t("message")}
+                  labels={{
+                    toolbar: t("format.toolbar"),
+                    bold: t("format.bold"),
+                    italic: t("format.italic"),
+                    link: t("format.link"),
+                    linkAddress: t("format.linkAddress"),
+                    linkApply: t("format.linkApply"),
+                    linkRemove: t("format.linkRemove"),
+                    bulletList: t("format.bulletList"),
+                    orderedList: t("format.orderedList"),
+                    quote: t("format.quote"),
+                  }}
+                  autoFocus={
+                    source && mode !== "forward"
+                      ? source.kind !== "draft" && quickReply?.trim()
+                        ? "firstLineEnd"
+                        : "start"
+                      : undefined
+                  }
+                />
+              )}
             </div>
             <div className={styles.composerUpload}>
               <input
@@ -1159,7 +1237,7 @@ function DraftDialog({
             <button
               type="button"
               className={`ms-btn ms-btn-ghost ${styles.composerAttachButton} ${styles.composerAttachAction}`}
-              disabled={busy || !allowed}
+              disabled={busy || !allowed || plainText || plainSaveUncertain}
               onClick={() => fileInput.current?.click()}
               aria-label={
                 retained.length + uploads.length
@@ -1188,12 +1266,18 @@ function DraftDialog({
               type="submit"
               value="draft"
               className={canSend ? "ms-btn" : "ms-btn ms-btn-primary"}
-              disabled={busy}
+              disabled={busy || plainSaveUncertain}
               aria-busy={saving === "draft"}
             >
-              {t(saving === "draft" ? "saving" : "saveDraft")}
+              {t(
+                saving === "draft"
+                  ? "saving"
+                  : plainText
+                    ? "nativeCompose.saveReview"
+                    : "saveDraft",
+              )}
             </button>
-            {canSend ? (
+            {canSend && !plainText && !plainSaveUncertain ? (
               <button
                 type="submit"
                 value="send"
@@ -1878,6 +1962,10 @@ export function MailboxContentView({
     quickReply?: string,
     prefill?: MailtoPrefill,
   ) {
+    if (source && nativeDraftIsReadOnly(source)) {
+      setNotice(t("nativeCompose.sealed"));
+      return;
+    }
     // Writing something already: that message comes back instead of being replaced.
     if (composerSession.current !== null && composerHandle.current?.dirty()) {
       composerHandle.current.restore();
@@ -4228,6 +4316,11 @@ export function MailboxContentView({
               className={`${styles.detail} ${styles.contentDetail}`}
               data-reading={!!visibleItem || !!blockedRow}
             >
+              {item && nativeDraftIsReadOnly(item) ? (
+                <p className={styles.hint} role="status">
+                  {t("nativeCompose.sealed")}
+                </p>
+              ) : null}
               <div className={styles.detailTop}>
                 <button
                   type="button"
@@ -4252,10 +4345,20 @@ export function MailboxContentView({
                         !!(item.kind === "draft" && sendState && sendState !== "failed")
                       }
                       aria-describedby={pendingSentReply ? "mailbox-sent-reply-pending" : undefined}
-                      onClick={() => openComposer(item.mailboxId, item)}
+                      onClick={() =>
+                        nativeDraftIsReadOnly(item)
+                          ? newDraft()
+                          : openComposer(item.mailboxId, item)
+                      }
                     >
                       <MailboxFolderIcon name={item.kind === "draft" ? "drafts" : "reply"} />
-                      {t(item.kind === "draft" ? "editDraft" : "replyDraft")}
+                      {t(
+                        nativeDraftIsReadOnly(item)
+                          ? "nativeCompose.newMessage"
+                          : item.kind === "draft"
+                            ? "editDraft"
+                            : "replyDraft",
+                      )}
                     </button>
                     {item.kind !== "draft" && item.to.length + item.cc.length > 1 ? (
                       <button
