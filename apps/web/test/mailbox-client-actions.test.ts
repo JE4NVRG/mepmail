@@ -12,6 +12,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { nativeDraftIsReadOnly, nativePlainTextSaveFields } from "@/lib/mailbox-native-compose";
 
 /*
  * Execute the production closures, rather than reproduce their algorithm in a
@@ -234,10 +235,13 @@ type Saved = { mailboxId: string; id: string; revision: number };
 const result: Saved = { mailboxId: "box-a", id: "draft-a", revision: 8 };
 function dialogFixture(
   options: {
-    save?: () => Promise<Saved>;
+    save?: (input: unknown) => Promise<Saved>;
     refresh?: () => Promise<void>;
     navigateOnSave?: boolean;
     undoSendSeconds?: number;
+    plainSaveUncertain?: boolean;
+    plainText?: boolean;
+    source?: { kind: "draft"; id: string; revision: number; draftMessageFormat?: string } | null;
   } = {},
 ) {
   const active = { current: true };
@@ -245,11 +249,12 @@ function dialogFixture(
   const submitting = { current: false };
   const setError = vi.fn();
   const setSaving = vi.fn();
+  const setPlainSaveUncertain = vi.fn();
   const close = vi.fn();
   const lost = vi.fn();
   const setSearch = vi.fn();
   const events: string[] = [];
-  const mutation = { mutateAsync: vi.fn(options.save ?? (async () => result)) };
+  const mutation = { mutateAsync: vi.fn(options.save ?? (async (_input: unknown) => result)) };
   const draftSaved = vi.fn(() => {
     events.push("navigate");
     // Selecting Rascunhos changes the parent's key and cleans up DraftDialog.
@@ -273,6 +278,11 @@ function dialogFixture(
   const submit = production<(event: unknown) => Promise<void>>("submit", {
     submitting,
     loadingFiles: false,
+    plainSaveUncertain: options.plainSaveUncertain ?? false,
+    plainText: options.plainText ?? false,
+    setPlainSaveUncertain,
+    nativeDraftIsReadOnly,
+    nativePlainTextSaveFields,
     allowed: true,
     current: () => session.current === "session-a",
     canSend: true,
@@ -289,12 +299,16 @@ function dialogFixture(
     setSaving,
     mutation,
     boxId: "box-a",
-    source: { kind: "draft", id: "draft-a", revision: 7 },
+    source:
+      options.source === undefined
+        ? { kind: "draft", id: "draft-a", revision: 7, draftMessageFormat: "formatted" }
+        : options.source,
     mode: "reply",
     subject: "Synthetic draft",
     text: "Keep this exact body",
-    formatted: false,
-    richHtml: null,
+    // The legacy default is genuinely rich, matching its authoritative MIME classification.
+    formatted: !options.plainText,
+    richHtml: options.plainText ? null : "<p>Keep this exact body</p>",
     retained: [],
     uploads: [],
     contacts: [],
@@ -327,6 +341,7 @@ function dialogFixture(
     setSearch,
     setError,
     setSaving,
+    setPlainSaveUncertain,
     close,
     lost,
   };
@@ -493,4 +508,64 @@ describe("mailbox client actions — production closures", () => {
       expect(fixture.setSaving).toHaveBeenLastCalledWith(null);
     },
   );
+  it.each(["draft", "send"] as const)(
+    "uncertain plain save blocks a new %s write before mutation or queue",
+    async (intent) => {
+      const fixture = dialogFixture({ plainSaveUncertain: true, plainText: true, source: null });
+      await fixture.submit(fixture.event(intent));
+      expect(fixture.mutation.mutateAsync).not.toHaveBeenCalled();
+      expect(fixture.submitRevision).not.toHaveBeenCalled();
+      expect(fixture.saved).not.toHaveBeenCalled();
+      expect(fixture.setSaving).not.toHaveBeenCalled();
+      expect(fixture.close).not.toHaveBeenCalled();
+      expect(fixture.submitting.current).toBe(false);
+    },
+  );
+
+  it.each(["draft", "send"] as const)(
+    "a confirmed writable rich draft with uncertainty false keeps the normal %s path",
+    async (intent) => {
+      const fixture = dialogFixture({ plainSaveUncertain: false });
+      await fixture.submit(fixture.event(intent));
+      expect(fixture.mutation.mutateAsync).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          id: "draft-a",
+          expectedRevision: 7,
+          html: "<p>Keep this exact body</p>",
+        }),
+      );
+      expect(fixture.submitRevision).toHaveBeenCalledTimes(intent === "send" ? 1 : 0);
+      expect(fixture.saved).toHaveBeenCalledExactlyOnceWith(result, intent === "send");
+    },
+  );
+
+  it.each([undefined, "unknown", "plain_text"])(
+    "never rewrites a saved draft with format %s or treats missing metadata as formatted",
+    async (draftMessageFormat) => {
+      const fixture = dialogFixture({
+        source: {
+          kind: "draft",
+          id: "draft-a",
+          revision: 7,
+          ...(draftMessageFormat === undefined ? {} : { draftMessageFormat }),
+        },
+      });
+      await fixture.submit(fixture.event("send"));
+      expect(fixture.mutation.mutateAsync).not.toHaveBeenCalled();
+      expect(fixture.submitRevision).not.toHaveBeenCalled();
+      expect(fixture.saved).not.toHaveBeenCalled();
+      expect(fixture.setError).toHaveBeenLastCalledWith("nativeCompose.sealed");
+    },
+  );
+
+  it("uses the real plain-text payload helper for an explicit new message and saves for review only", async () => {
+    const fixture = dialogFixture({ plainText: true, source: null });
+    await fixture.submit(fixture.event("send"));
+    expect(fixture.mutation.mutateAsync).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ messageFormat: "plain_text", id: undefined, expectedRevision: 0 }),
+    );
+    expect(fixture.mutation.mutateAsync.mock.calls[0]?.[0]).not.toHaveProperty("html");
+    expect(fixture.submitRevision).not.toHaveBeenCalled();
+    expect(fixture.saved).toHaveBeenCalledExactlyOnceWith(result, false);
+  });
 });
