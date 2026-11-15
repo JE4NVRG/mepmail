@@ -27,7 +27,10 @@ import {
   probationCeiling,
 } from "../../../packages/core/src/sender-probation.js";
 import { sendEmail } from "../src/handlers/send-email.js";
-import { createMailboxContentPolicySender, createMailboxSesSender } from "../src/mailbox-sender.js";
+import {
+  createMailboxContentPolicySender as configuredMailboxContentPolicySender,
+  createMailboxSesSender,
+} from "../src/mailbox-sender.js";
 import { syntheticCleanContentJudge } from "./fixtures/clean-content-judge.js";
 
 let fixture: Awaited<ReturnType<typeof createTestDb>>;
@@ -330,6 +333,7 @@ it("outer Correio SMTP and direct SES reject campaign with no consent", async ()
   ).rejects.toBeInstanceOf(MailboxSendDeferredError);
   await expect(
     createMailboxSesSender(fixture.db, {
+      contentJudge: syntheticCleanContentJudge,
       isCloud: true,
       configurationSets: { "us-east-1": "private_mail" },
       clientFactory,
@@ -347,6 +351,7 @@ it("Correio outer/direct SES share one quota reservation; the 26th never invokes
   const id = await box(f);
   const send = vi.fn().mockResolvedValue({ MessageId: "synthetic-mail" });
   const direct = createMailboxSesSender(fixture.db, {
+    contentJudge: syntheticCleanContentJudge,
     isCloud: true,
     configurationSets: { "us-east-1": "private_mail" },
     clientFactory: () => ({ send }),
@@ -426,6 +431,7 @@ it("direct SES rechecks revocation after throttle; explicit deferral refunds onc
   if (!f.dossier) throw new Error("fixture dossier missing");
   const send = vi.fn();
   const sender = createMailboxSesSender(fixture.db, {
+    contentJudge: syntheticCleanContentJudge,
     isCloud: true,
     configurationSets: { "us-east-1": "private_mail" },
     clientFactory: () => ({ send }),
@@ -991,3 +997,16 @@ it("volume P2: same-ms reviewed and new benign identities retain volume; real co
     await fixture.db.execute(sql.raw("DROP FUNCTION public.clock_timestamp()"));
   }
 });
+
+function createMailboxContentPolicySender(
+  ...args: Parameters<typeof configuredMailboxContentPolicySender>
+) {
+  return configuredMailboxContentPolicySender(
+    args[0],
+    args[1],
+    args[2],
+    args[3],
+    args[4],
+    syntheticCleanContentJudge,
+  );
+}

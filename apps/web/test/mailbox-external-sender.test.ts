@@ -6,7 +6,7 @@ import { type Db, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EnvKeyring, type Keyring } from "../../../packages/core/src/crypto/keyring.js";
 import {
   createMailboxExternalAccount,
@@ -76,6 +76,10 @@ beforeEach(async () => {
   ));
 });
 
+afterEach(async () => {
+  await client?.close();
+});
+
 const account = async () =>
   (
     await db
@@ -91,6 +95,8 @@ type Answer = { code?: string; responseCode?: number } | "accepted";
 function senderAnswering(answer: Answer, during?: () => Promise<void>) {
   const sent: unknown[] = [];
   const sender = createMailboxExternalAwareSender(db, keys, null, undefined, {
+    // Provider-response unit contract is OSS; Cloud dispatch has separate parity coverage.
+    isCloud: false,
     lookup: (async () => [{ address: "142.250.0.109", family: 4 }]) as never,
     createTransport: (() => ({
       async sendMail(message: unknown) {
@@ -192,7 +198,7 @@ describe("Contas externas: the provider's SMTP answers", () => {
         );
         throw new MailboxExternalOAuthError("invalid_grant");
       },
-      { lookup: (async () => [{ address: "142.250.0.109", family: 4 }]) as never },
+      { isCloud: false, lookup: (async () => [{ address: "142.250.0.109", family: 4 }]) as never },
     );
     await expect(send(sender)).rejects.toBeInstanceOf(MailboxSendDeferredError);
     expect(await account()).toMatchObject({
@@ -210,7 +216,7 @@ describe("Contas externas: the provider's SMTP answers", () => {
       async () => {
         throw new MailboxExternalOAuthError("invalid_grant");
       },
-      { lookup: (async () => [{ address: "142.250.0.109", family: 4 }]) as never },
+      { isCloud: false, lookup: (async () => [{ address: "142.250.0.109", family: 4 }]) as never },
     );
     await expect(send(sender)).rejects.toBeInstanceOf(MailboxSendRejectedError);
     expect(await account()).toMatchObject({ status: "auth_failed", lastError: "oauth_refused" });
@@ -224,7 +230,7 @@ describe("Contas externas: the provider's SMTP answers", () => {
       async () => {
         throw new MailboxExternalOAuthError("unconfigured");
       },
-      { lookup: (async () => [{ address: "142.250.0.109", family: 4 }]) as never },
+      { isCloud: false, lookup: (async () => [{ address: "142.250.0.109", family: 4 }]) as never },
     );
     await expect(send(sender)).rejects.toBeInstanceOf(MailboxSendDeferredError);
     expect(await account()).toMatchObject({ status: "active", lastError: null });

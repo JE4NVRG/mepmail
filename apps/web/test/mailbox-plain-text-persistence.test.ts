@@ -62,14 +62,12 @@ beforeAll(async () => {
     .returning();
   teamId = team!.id;
   await seedMailboxTestService(db, [teamId]);
-  await db
-    .insert(schema.user)
-    .values({
-      id: actor().userId,
-      name: "Synthetic owner",
-      email: "owner@example.invalid",
-      emailVerified: true,
-    });
+  await db.insert(schema.user).values({
+    id: actor().userId,
+    name: "Synthetic owner",
+    email: "owner@example.invalid",
+    emailVerified: true,
+  });
   await db.insert(schema.teamMembers).values({ teamId, userId: actor().userId, role: "owner" });
   const [domain] = await db
     .insert(schema.domains)

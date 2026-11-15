@@ -277,6 +277,7 @@ it.each(["hold", "sandbox"] as const)(
       },
     );
     const sender = createMailboxSesSender(db, {
+      contentJudge: syntheticCleanContentJudge,
       configurationSets: { "us-east-1": "private_mail_fixture" },
       tenants: true,
       clientFactory: () => ({ send }),

@@ -12,7 +12,11 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { sendEmail } from "../src/handlers/send-email.js";
-import { createMailboxContentPolicySender, createMailboxSesSender } from "../src/mailbox-sender.js";
+import {
+  createMailboxContentPolicySender as configuredMailboxContentPolicySender,
+  createMailboxSesSender,
+} from "../src/mailbox-sender.js";
+import { syntheticCleanContentJudge } from "./fixtures/clean-content-judge.js";
 
 let fixture: Awaited<ReturnType<typeof createTestDb>>;
 const keyring = EnvKeyring.fromBase64(randomBytes(32).toString("base64"));
@@ -131,6 +135,7 @@ it("direct Correio SES sender blocks forged content before constructing a client
     .returning();
   const clientFactory = vi.fn();
   const sender = createMailboxSesSender(db, {
+    contentJudge: syntheticCleanContentJudge,
     isCloud: true,
     configurationSets: { "us-east-1": "private_mail" },
     clientFactory,
@@ -203,3 +208,16 @@ it("legitimate account mail traverses Correio policy without leaking its token",
     messageId: "fixture-own-mail",
   });
 });
+
+function createMailboxContentPolicySender(
+  ...args: Parameters<typeof configuredMailboxContentPolicySender>
+) {
+  return configuredMailboxContentPolicySender(
+    args[0],
+    args[1],
+    args[2],
+    args[3],
+    args[4],
+    syntheticCleanContentJudge,
+  );
+}

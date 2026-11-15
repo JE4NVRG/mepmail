@@ -25,20 +25,38 @@ const optoutConfig = { baseUrl: "https://optout.example.invalid", masterKey: syn
 
 import type { SesSender } from "../../../apps/worker/src/handlers/send-email.js";
 import { createMailboxContentPolicySender } from "../../../apps/worker/src/mailbox-sender.js";
+import type { AbuseJudge } from "../src/abuse-judge/types.js";
 import { createMailboxAgentKey } from "../src/mailbox-agent-access.js";
 import * as azureBudget from "../src/mailbox-azure-budget.js";
 import { utcDay } from "../src/utc-day.js";
 
-afterEach(() => vi.restoreAllMocks());
+const cleanJudge = {
+  provider: "openai" as const,
+  model: "synthetic",
+  judge: vi.fn(async () => ({
+    score: 0,
+    verdict: "clean" as const,
+    categories: [] as string[],
+    reasons: [] as string[],
+    impersonatedBrand: null,
+    language: "en",
+  })),
+};
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
 async function cloud(
   f: Awaited<ReturnType<typeof setup>>,
   queued?: { id: string },
   sendRaw = vi.fn(async (_input: Parameters<SesSender["sendRaw"]>[0]) => ({ messageId: receipt })),
+  contentJudge: AbuseJudge | null = cleanJudge,
 ) {
   const p = policy(f);
   const azure = createMailboxAzureSender(db, {
     policy: p,
     isCloud: true,
+    contentJudge,
     relay: { name: "azure", sender: { sendRaw } },
   });
   // Real outer router + real factory wrapper both clone their input. Neither may
@@ -53,6 +71,7 @@ async function cloud(
     true,
     p,
     azure,
+    contentJudge,
   );
   const outbox = queued ?? (await f.queued());
   const result = await sendMailboxOutbox(db, keys, outbox.id, sender, mime);
@@ -71,6 +90,45 @@ async function receipts(teamId: string) {
   );
 }
 describe("NativeR2 cloud and blocking-boundary regressions", () => {
+  it.each(["missing", "abuse", "unsupported-attachment"])(
+    "Cloud semantic %s holds without SMTP, quota, or lifetime claim",
+    async (kind) => {
+      const f = await setup(false, kind !== "unsupported-attachment");
+      const q = await f.queued();
+      const [before] = await db
+        .select()
+        .from(schema.mailboxOutbox)
+        .where(eq(schema.mailboxOutbox.id, q.id));
+      const judge =
+        kind === "missing"
+          ? null
+          : kind === "abuse"
+            ? {
+                ...cleanJudge,
+                judge: vi.fn(async () => ({
+                  score: 100,
+                  verdict: "abuse" as const,
+                  categories: ["phishing"],
+                  reasons: ["synthetic"],
+                  impersonatedBrand: null,
+                  language: "en",
+                })),
+              }
+            : cleanJudge;
+      const sent = await cloud(f, q, undefined, judge);
+      expect(sent.result.status).toBe("queued");
+      expect(sent.sendRaw).not.toHaveBeenCalled();
+      expect(await daily(f.teamId)).toBe(0);
+      expect(await receipts(f.teamId)).toHaveLength(0);
+      const [after] = await db
+        .select()
+        .from(schema.mailboxOutbox)
+        .where(eq(schema.mailboxOutbox.id, q.id));
+      expect(after?.errorCode).toBe("mailbox_deferred:semantic_content_review");
+      expect(after?.ciphertext).toEqual(before?.ciphertext);
+    },
+  );
+
   it("cloud nested routers reserve probation exactly once, preserving Sent and replay fence", async () => {
     const f = await setup();
     const sent = await cloud(f);
@@ -90,6 +148,7 @@ describe("NativeR2 cloud and blocking-boundary regressions", () => {
       mailboxId: f.box.id,
       label: "fixture",
       scopes: ["send"],
+      expiresAt: new Date(Date.now() + 3600000),
     });
     const draft = await saveMailboxDraft(db, keys, f.actor, {
       mailboxId: f.box.id,
@@ -152,6 +211,7 @@ describe("NativeR2 cloud and blocking-boundary regressions", () => {
           mailboxId: f.box.id,
           label: "synthetic approval",
           scopes: ["send"],
+          expiresAt: new Date(Date.now() + 3600000),
         });
         keyId = key.id;
         const draft = await saveMailboxDraft(db, keys, f.actor, {
@@ -202,11 +262,11 @@ describe("NativeR2 cloud and blocking-boundary regressions", () => {
             .update(schema.mailboxAgentKeys)
             .set({ revokedAt: new Date() })
             .where(eq(schema.mailboxAgentKeys.id, keyId!));
-        if (kind === "agent-expired")
-          await db
-            .update(schema.mailboxAgentKeys)
-            .set({ expiresAt: new Date(Date.now() - 1) })
-            .where(eq(schema.mailboxAgentKeys.id, keyId!));
+        if (kind === "agent-expired") {
+          // Expiry/provenance is immutable; advance only this fixture's Date clock.
+          vi.useFakeTimers({ toFake: ["Date"] });
+          vi.setSystemTime(Date.now() + 3601000);
+        }
         if (kind === "optout")
           await recordAzureRecipientOptout(db, {
             teamId: f.teamId,
@@ -375,7 +435,7 @@ afterEach(async () => {
   await client.close();
 });
 
-async function setup(multi = false) {
+async function setup(multi = false, inspectable = true) {
   const userId = randomUUID();
   const [team] = await db
     .insert(schema.teams)
@@ -429,9 +489,18 @@ async function setup(multi = false) {
     ? ["one@example.invalid", "two@example.invalid"]
     : ["one@example.invalid"];
   const compliance = await prepareMailboxOptout(db, teamId, [recipients[0]!], optoutConfig);
-  const raw = Buffer.from(
+  let raw = Buffer.from(
     `From: ${from}\r\nTo: ${recipients.join(", ")}\r\n${multi ? "Bcc: hidden@example.invalid\r\n" : ""}${"List-Unsubscribe: " + compliance.headers["List-Unsubscribe"]}\r\nSubject: A direct reply\r\nMessage-ID: <original@fixture.invalid>\r\nIn-Reply-To: <prior@fixture.invalid>\r\nReferences: <prior@fixture.invalid>\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=fixture\r\n\r\n--fixture\r\nContent-Type: text/plain\r\n\r\nPersonal reply${compliance.text}\r\n--fixture\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=fixture.txt\r\nContent-Transfer-Encoding: base64\r\n\r\nZml4dHVyZQ==\r\n--fixture--\r\n`,
   );
+  // Construct a NEW text-only fixture revision before capture. Keep authentic opt-out
+  // headers/footer intact; never reformat a queued/legacy outbox to gain approval.
+  if (inspectable)
+    raw = Buffer.from(
+      raw.toString().split("MIME-Version: 1.0\r\n")[0] +
+        "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nPersonal reply" +
+        compliance.text +
+        "\r\n",
+    );
   const actor = { teamId, userId };
   const draft = () =>
     saveMailboxDraft(db, keys, actor, { mailboxId: box!.id, expectedRevision: 0, raw });
@@ -487,7 +556,7 @@ async function run(
 
 describe("native Azure Correio through the real outbox", () => {
   it("sends one-recipient reply once, preserving encrypted Sent history and attachment", async () => {
-    const f = await setup();
+    const f = await setup(false, false);
     const sent = await run(f);
     expect(sent.result.status).toBe("accepted");
     expect(sent.sendRaw).toHaveBeenCalledTimes(1);

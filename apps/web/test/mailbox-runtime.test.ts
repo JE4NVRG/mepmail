@@ -3,7 +3,8 @@ import { type Db, schema } from "@millionsend/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseMailboxSesOutboundRegions } from "../../worker/src/mailbox-outbound-region.js";
 import {
-  createMailboxSesSender,
+  createMailboxContentPolicySender,
+  createMailboxSesSender as createRawMailboxSesSender,
   mailboxWorkerMime,
   parseMailboxSesConfigurationSets,
 } from "../../worker/src/mailbox-sender.js";
@@ -25,6 +26,12 @@ const clientFactory = (options: unknown) => {
 };
 function database(extra = {}) {
   const row = {
+    name: "Synthetic runtime",
+    plan: "free",
+    createdAt: new Date("2025-01-01"),
+    reviewedAt: null,
+    heldAt: null,
+    ceiling: null,
     region: "us-east-1",
     domainName: "example.invalid",
     domainId: "22222222-2222-4222-8222-222222222222",
@@ -37,7 +44,9 @@ function database(extra = {}) {
     tenantConfigSet: "private_mail_fixture",
     ...extra,
   };
-  return {
+  const db = {
+    transaction: async (run: (tx: Db) => Promise<unknown>) => run(db as unknown as Db),
+    execute: async () => [{ accepted: 1 }],
     select: () => {
       let source: unknown;
       const query = {
@@ -48,11 +57,50 @@ function database(extra = {}) {
         innerJoin: () => query,
         leftJoin: () => query,
         // This fixture represents a legacy team without a signup assessment.
-        where: async () => (source === schema.teamSignupRisk ? [] : [row]),
+        where: () => query,
+        for: () => query,
+        limit: () => query,
+        orderBy: () => query,
+        // biome-ignore lint/suspicious/noThenProperty: Drizzle queries are intentionally awaitable chains in this synthetic database.
+        then: (resolve: (rows: unknown[]) => unknown) =>
+          resolve(
+            [schema.teamSignupRisk, schema.emails, schema.emailEvents, schema.auditLog].includes(
+              source as never,
+            )
+              ? []
+              : [row],
+          ),
       };
       return query;
     },
-  } as unknown as Db;
+  };
+  return db as unknown as Db;
+}
+const contentJudge = {
+  provider: "openai" as const,
+  model: "synthetic",
+  judge: async () => ({
+    score: 0,
+    verdict: "clean" as const,
+    categories: [],
+    reasons: [],
+    impersonatedBrand: null,
+    language: "en",
+  }),
+};
+// Real outer router captures caller-owned buffers, then qualifies through the configured Cloud contract.
+function createMailboxSesSender(
+  db: Db,
+  options: NonNullable<Parameters<typeof createRawMailboxSesSender>[1]> = {},
+) {
+  return createMailboxContentPolicySender(
+    db,
+    createRawMailboxSesSender(db, { ...options, isCloud: true, contentJudge }),
+    true,
+    null,
+    null,
+    contentJudge,
+  );
 }
 const input = {
   idempotencyKey: "outbox_fixture",
@@ -425,11 +473,32 @@ describe("private Mail runtime adapters", () => {
       }).send(input),
     ).rejects.toBeInstanceOf(MailboxSendDeferredError);
     await expect(
-      createMailboxSesSender(database({ suspendedAt: new Date() }), {
+      // Preserve the original direct OSS domain-refusal assertion; Cloud holds are checked below.
+      createRawMailboxSesSender(database({ suspendedAt: new Date() }), {
+        isCloud: false,
         configurationSets,
         clientFactory,
       }).send(input),
     ).rejects.toBeInstanceOf(MailboxSendRejectedError);
+    expect(provider.send).not.toHaveBeenCalled();
+  });
+  it("Cloud suspended teams retain the explicit sending_paused hold before provider admission", async () => {
+    await expect(
+      createMailboxSesSender(database({ suspendedAt: new Date() }), {
+        configurationSets,
+        clientFactory,
+      }).send(input),
+    ).rejects.toMatchObject({ reason: "sending_paused" });
+    expect(provider.send).not.toHaveBeenCalled();
+  });
+  it("Cloud without a configured judge still holds instead of borrowing fixture approval", async () => {
+    await expect(
+      createRawMailboxSesSender(database(), {
+        isCloud: true,
+        configurationSets,
+        clientFactory,
+      }).send(input),
+    ).rejects.toMatchObject({ reason: "semantic_content_review" });
     expect(provider.send).not.toHaveBeenCalled();
   });
   it("an account pause blocks the configured customer relay before any send", async () => {
