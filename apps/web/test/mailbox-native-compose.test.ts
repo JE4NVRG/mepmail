@@ -47,3 +47,49 @@ describe("Native composition representation boundary", () => {
     );
   });
 });
+
+describe("fresh Native editor canonical empty paragraph", () => {
+  it("allows only the exact empty onCreate serialization for both choice and manual save", () => {
+    const mounted = { ...fresh, html: "<p></p>" };
+    expect(canChooseNativePlainText(mounted)).toBe(true);
+    expect(nativePlainTextSaveFields(mounted)).toEqual({ messageFormat: "plain_text" });
+  });
+  it.each([
+    " ",
+    "\n",
+    "<p> </p>",
+    "<p>\n</p>",
+    "<p><br></p>",
+    "<p>&nbsp;</p>",
+    "<p></p><p></p>",
+    "<p><strong></strong></p>",
+    "<p>body</p>",
+    '<p><a href="https://example.invalid">link</a></p>',
+    '<img src="cid:logo">',
+    "<script></script>",
+    "<unknown></unknown>",
+  ])("never strips or normalizes other HTML: %s", (html) => {
+    const input = { ...fresh, html };
+    expect(canChooseNativePlainText(input)).toBe(false);
+    expect(() => nativePlainTextSaveFields(input)).toThrow(
+      "plain_text_requires_new_unformatted_message",
+    );
+    expect(input.html).toBe(html);
+  });
+  it.each(["formatted", "unknown", "plain_text", undefined, "future"])(
+    "never converts an existing %s source even with the empty sentinel",
+    (draftMessageFormat) => {
+      const source = { kind: "draft", revision: 7, draftMessageFormat };
+      const before = JSON.stringify(source);
+      const input = { ...fresh, source, html: "<p></p>" };
+      expect(canChooseNativePlainText(input)).toBe(false);
+      expect(() => nativePlainTextSaveFields(input)).toThrow();
+      expect(JSON.stringify(source)).toBe(before);
+    },
+  );
+  it.each([{ uploads: 1 }, { retained: 1 }])("never discards attachments: %j", (extra) => {
+    const input = { ...fresh, html: "<p></p>", ...extra };
+    expect(canChooseNativePlainText(input)).toBe(false);
+    expect(() => nativePlainTextSaveFields(input)).toThrow();
+  });
+});

@@ -9,7 +9,10 @@ export function canChooseNativePlainText(input: {
   uploads: number;
   retained: number;
 }) {
-  return input.source == null && !input.html && input.uploads === 0 && input.retained === 0;
+  // TipTap reports this exact empty paragraph on a fresh editor's onCreate.
+  // Do not normalize/strip HTML: whitespace, marks, links and unknown shapes stay rich.
+  const emptyEditor = !input.html || input.html === "<p></p>";
+  return input.source == null && emptyEditor && input.uploads === 0 && input.retained === 0;
 }
 export function nativePlainTextSaveFields(input: {
   source: unknown;
