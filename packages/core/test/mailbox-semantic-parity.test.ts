@@ -80,11 +80,12 @@ beforeAll(async () => {
   db = drizzle(client, { schema }) as unknown as Db;
 });
 afterAll(async () => {
-  writeFileSync(
-    process.env.OBSERVATIONS_PATH ?? "/proof/observations.json",
-    JSON.stringify(observations, null, 2),
-  );
-  await client?.close();
+  try {
+    const outputPath = process.env.OBSERVATIONS_PATH;
+    if (outputPath?.trim()) writeFileSync(outputPath, JSON.stringify(observations, null, 2));
+  } finally {
+    await client?.close();
+  }
 });
 afterEach(() => {
   vi.restoreAllMocks();
