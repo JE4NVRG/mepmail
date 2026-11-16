@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   reviewAllowed: true,
   reviewEnabled: [] as boolean[],
   contractPrice: 2000,
+  currentRung: "pro_100k",
 }));
 // These cases exercise prices, maintenance, onboarding and review return intent. Safety admission
 // has its own denied/loading/approved coverage in purchase-review-ui.test.ts.
@@ -80,13 +81,21 @@ vi.mock("@tanstack/react-query", () => ({
           effectiveRung:
             h.subscribed && h.subscriptionState === "confirmed"
               ? {
-                  key: "pro_100k",
+                  key: h.currentRung,
                   priceCents: h.billingInterval === "year" ? 29000 : h.contractPrice,
                 }
               : null,
-          plan: h.system ? "system" : h.subscribed ? "pro" : "free",
-          planQuota: h.subscribed ? 110000 : null,
-          rung: h.subscribed ? "pro_100k" : "free",
+          plan: h.system
+            ? "system"
+            : h.subscribed
+              ? h.currentRung === "starter"
+                ? "starter"
+                : "pro"
+              : "free",
+          planQuota: h.subscribed
+            ? (PLAN_RUNGS.find((rung) => rung.key === h.currentRung)?.included ?? null)
+            : null,
+          rung: h.subscribed ? h.currentRung : "free",
           pendingRung: h.pendingRung,
           planStatus: "active",
           currentPeriodEnd: h.pendingRung || h.subscribed ? new Date("2027-10-01") : null,
@@ -148,6 +157,7 @@ beforeEach(() => {
   h.reviewAllowed = true;
   h.reviewEnabled = [];
   h.contractPrice = 2000;
+  h.currentRung = "pro_100k";
 });
 
 describe("billing selection synthetic UI contract, not paid E2E", () => {
@@ -292,7 +302,7 @@ describe("billing selection synthetic UI contract, not paid E2E", () => {
       if (guard === "annual") h.billingInterval = "year";
       else h.subscriptionState = "pending_confirmation";
       h.pendingRung = "starter";
-      const tree = BillingView({ checkout: null, requestedRung: "pro_200k" });
+      const tree = BillingView({ checkout: null, requestedRung: "starter" });
       const planAction = nodes(tree).find(
         (n) => n.type === "button" && n.props.className === "ms-btn ms-btn-primary",
       );
@@ -359,21 +369,25 @@ describe("billing selection synthetic UI contract, not paid E2E", () => {
     );
   }
   it("only an explicit owner click changes the selected plan", () => {
-    const tree = BillingView({ checkout: null, requestedRung: "pro_200k" });
+    h.currentRung = "starter";
+    h.contractPrice = PLAN_RUNGS.find((rung) => rung.key === "starter")!.priceCents;
+    const tree = BillingView({ checkout: null, requestedRung: "pro_100k" });
     const button = nodes(tree).find(
       (n) => n.type === "button" && n.props.className === "ms-btn ms-btn-primary",
     );
     expect(h.mutate).not.toHaveBeenCalled();
     if (!button) throw new Error("Expected owner action");
     (button.props.onClick as () => void)();
-    expect(h.mutate).toHaveBeenCalledWith({ rung: "pro_200k" });
+    expect(h.mutate).toHaveBeenCalledWith({ rung: "pro_100k" });
   });
   it("checks an existing paid subscription and blocks a billable upgrade while keeping reductions, pending reversal and the portal usable", () => {
     h.reviewAllowed = false;
+    h.currentRung = "starter";
+    h.contractPrice = PLAN_RUNGS.find((rung) => rung.key === "starter")!.priceCents;
     h.pendingRung = "starter";
-    const tree = BillingView({ checkout: null, requestedRung: "pro_200k" });
+    const tree = BillingView({ checkout: null, requestedRung: "pro_100k" });
     expect(h.reviewEnabled).toEqual([true]);
-    const all = nodes(tree);
+    let all = nodes(tree);
     const upgrade = all.find(
       (node) => node.type === "button" && node.props.className === "ms-btn ms-btn-primary",
     );
@@ -381,6 +395,9 @@ describe("billing selection synthetic UI contract, not paid E2E", () => {
     expect(upgrade.props.disabled).toBe(true);
     (upgrade.props.onClick as () => void)();
     expect(h.mutate).not.toHaveBeenCalled();
+    h.currentRung = "pro_100k";
+    h.contractPrice = 2000;
+    all = nodes(BillingView({ checkout: null, requestedRung: "starter" }));
     const reduction = all.find(
       (node) =>
         node.type === "button" &&
@@ -413,23 +430,24 @@ describe("billing selection synthetic UI contract, not paid E2E", () => {
   });
   it("uses contracted price and treats a different equal-price rung as billable", () => {
     h.reviewAllowed = false;
-    const targetPrice = PLAN_RUNGS.find((rung) => rung.key === "pro_200k")?.priceCents;
+    h.currentRung = "pro_200k";
+    const targetPrice = PLAN_RUNGS.find((rung) => rung.key === "pro_100k")?.priceCents;
     if (!targetPrice) throw new Error("Missing selected rung");
     h.contractPrice = targetPrice;
-    let tree = BillingView({ checkout: null, requestedRung: "pro_200k" });
+    let tree = BillingView({ checkout: null, requestedRung: "pro_100k" });
     let action = nodes(tree).find(
       (node) => node.type === "button" && node.props.className === "ms-btn ms-btn-primary",
     );
     expect(action?.props.disabled).toBe(true);
     h.contractPrice = targetPrice + 1;
-    tree = BillingView({ checkout: null, requestedRung: "pro_200k" });
+    tree = BillingView({ checkout: null, requestedRung: "pro_100k" });
     action = nodes(tree).find(
       (node) => node.type === "button" && node.props.className === "ms-btn ms-btn-primary",
     );
     if (!action) throw new Error("Missing contracted-price reduction");
     expect(action.props.disabled).toBeFalsy();
     (action.props.onClick as () => void)();
-    expect(h.mutate).toHaveBeenCalledExactlyOnceWith({ rung: "pro_200k" });
+    expect(h.mutate).toHaveBeenCalledExactlyOnceWith({ rung: "pro_100k" });
   });
   it("member cannot choose or change subscription", () => {
     h.role = "member";
@@ -504,4 +522,19 @@ describe("billing inside the Android app (Google Play: nothing sold there)", () 
     const tree = BillingView({ checkout: null });
     expect(nodes(tree).some((n) => n.type === "button")).toBe(true);
   });
+});
+
+it("shows no executable200K purchase action even for an approved owner", () => {
+  const tree = BillingView({ checkout: null, requestedRung: "pro_200k" });
+  expect(
+    nodes(tree).some(
+      (node) => node.type === "button" && node.props.className === "ms-btn ms-btn-primary",
+    ),
+  ).toBe(false);
+  expect(
+    nodes(tree).some(
+      (node) => node.type === "a" && node.props.href === "mailto:suporte@mepmail.dev",
+    ),
+  ).toBe(true);
+  expect(h.mutate).not.toHaveBeenCalled();
 });

@@ -1,4 +1,4 @@
-import { schema } from "@millionsend/db";
+import { type Db, schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { expect, it } from "vitest";
@@ -161,7 +161,7 @@ it("rolls back dedupe and never restores stale terms when authority changes on e
             await tx
               .insert(schema.stripeEvents)
               .values({ id: "evt_stale", type: "customer.subscription.updated" });
-            await applyPreparedSubscription(tx, prepared, () => {}, stripe);
+            await applyPreparedSubscription(tx as unknown as Db, prepared, () => {}, stripe);
           });
         },
       ),

@@ -578,7 +578,8 @@ describe("Send paid by Pix", () => {
     pix.sessions[sessionId]!.amount_total = 14_900;
     pix.pay(sessionId);
     const payment = await readPixPayment(pix.client, sessionId, false);
-    if (!payment) throw new Error("fixture requires provider-verified Pix payment");
+    if (payment === "invalid" || payment === "pending")
+      throw new Error("fixture requires provider-verified Pix payment");
     expect(payment.amount).toBe(14_900);
     expect(await fulfill(payment)).toBe("refunded");
     expect(pix.calls.subscriptions).toEqual([]);

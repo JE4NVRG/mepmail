@@ -85,7 +85,11 @@ const period = async (teamId: string) =>
 const audit = (teamId: string) =>
   db.select().from(schema.auditLog).where(eq(schema.auditLog.teamId, teamId));
 
-async function seedHold(teamId: string, data: Record<string, unknown>, target = randomUUID()) {
+async function seedHold(
+  teamId: string,
+  data: Record<string, unknown>,
+  target: string = randomUUID(),
+) {
   await db.insert(schema.auditLog).values({
     teamId,
     action: "sending.sale_reserved",
@@ -116,7 +120,11 @@ describe("durable upgrade settlement fence", () => {
       capability.id as unknown as SaleReservation,
     ]) {
       expect(
-        await reportOverage(deps(), { teamId, now: NOW(), upgradeReservation: scope }),
+        await reportOverage(deps(), {
+          teamId,
+          now: NOW(),
+          ...(scope === undefined ? {} : { upgradeReservation: scope }),
+        }),
       ).toEqual({ reported: 0, failed: 0 });
       expect(await period(teamId)).toEqual(beforePeriod);
     }
@@ -206,7 +214,11 @@ describe("durable upgrade settlement fence", () => {
     const beforePeriod = await period(teamId);
     for (const scope of [undefined, capability]) {
       expect(
-        await reportOverage(deps(), { teamId, now: NOW(), upgradeReservation: scope }),
+        await reportOverage(deps(), {
+          teamId,
+          now: NOW(),
+          ...(scope === undefined ? {} : { upgradeReservation: scope }),
+        }),
       ).toEqual({ reported: 0, failed: 0 });
       expect(await period(teamId)).toEqual(beforePeriod);
     }
