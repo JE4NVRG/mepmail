@@ -928,7 +928,7 @@ describe("source-bound upgrade admission (no capacity assertion mock)", () => {
       .from(schema.usagePeriods)
       .where(eq(schema.usagePeriods.teamId, teamId));
     await expect(changeRung(deps(), { teamId, rung: "pro_200k" })).rejects.toThrow(
-      "capacity_insufficient",
+      "enterprise_required",
     );
     expect(await team(teamId)).toEqual(before);
     expect(
@@ -967,4 +967,54 @@ describe("source-bound upgrade admission (no capacity assertion mock)", () => {
       audit.filter((row) => row.action === "sending.sale_released").map((row) => row.target),
     ).toContain(holds[0]?.target);
   });
+});
+
+it("refuses a supported real-gate upgrade when the selected region has insufficient fresh capacity", async () => {
+  const teamId = await subscribedTeam(
+    subscription("sub_region", "cus_region", "active", "millionsend_starter_monthly"),
+  );
+  const before = await team(teamId);
+  const usageBefore = await db
+    .select()
+    .from(schema.usagePeriods)
+    .where(eq(schema.usagePeriods.teamId, teamId));
+  await expect(
+    changeRung(
+      {
+        ...deps(),
+        capacitySource: async () => {
+          const observed = await fundedSaleCapacity();
+          const current = observed.capacityReceipt;
+          if (!current) throw new Error("fixture requires a complete fresh regional receipt");
+          const receipt = {
+            ...current,
+            observations: { ...current.observations, sesSentLast24Hours: 999000 },
+            buffers: { ...current.buffers, sesRemaining24Hours: (1000000 - 999000) * 0.98 },
+          };
+          return {
+            ...observed,
+            capacityReceipt: receipt,
+            regionalCapacity: {
+              "us-east-1": receipt,
+              "eu-west-1": observed.regionalCapacity?.["eu-west-1"] ?? null,
+            },
+          };
+        },
+      },
+      { teamId, rung: "pro_100k" },
+    ),
+  ).rejects.toThrow("capacity_insufficient");
+  expect(await team(teamId)).toEqual(before);
+  expect(
+    await db.select().from(schema.usagePeriods).where(eq(schema.usagePeriods.teamId, teamId)),
+  ).toEqual(usageBefore);
+  expect(state.meterEvents).toEqual([]);
+  expect(state.updates).toEqual([]);
+  expect(state.scheduleCreates).toEqual([]);
+  expect(state.scheduleUpdates).toEqual([]);
+  expect(
+    (await db.select().from(schema.auditLog)).filter(
+      (row) => row.action === "sending.sale_reserved",
+    ),
+  ).toEqual([]);
 });
