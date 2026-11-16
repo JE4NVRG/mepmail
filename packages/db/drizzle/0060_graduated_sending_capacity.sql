@@ -2,6 +2,7 @@ CREATE TABLE sending_judge_account_debt (
  account_key text PRIMARY KEY, debt_units bigint NOT NULL DEFAULT 0 CHECK(debt_units>=0),
  last_meter_id text NOT NULL,last_meter_at timestamptz NOT NULL,last_remaining_units bigint NOT NULL CHECK(last_remaining_units>0)
 );
+--> statement-breakpoint
 -- Additive bounded judge ledger; audit_log is append-only and cannot index mutable pending status.
 CREATE TABLE sending_judge_attempts (
  account_key text NOT NULL, attempt_id uuid NOT NULL, team_id uuid NOT NULL REFERENCES teams(id),
@@ -14,13 +15,21 @@ CREATE TABLE sending_judge_attempts (
  actual_units bigint CHECK(actual_units>=0 AND actual_units<=reserved_units), created_at timestamptz NOT NULL DEFAULT clock_timestamp(), reconciled_at timestamptz,
  PRIMARY KEY(account_key,attempt_id), CHECK((state='settled')=(reconciled_at IS NOT NULL AND actual_units IS NOT NULL AND outcome IS NOT NULL))
 );
+--> statement-breakpoint
 CREATE INDEX sending_judge_email_source_idx ON sending_judge_attempts(email_id) WHERE email_id IS NOT NULL;
+--> statement-breakpoint
 CREATE INDEX sending_judge_native_source_idx ON sending_judge_attempts(mailbox_outbox_id) WHERE mailbox_outbox_id IS NOT NULL;
+--> statement-breakpoint
 CREATE INDEX sending_judge_recent_idx ON sending_judge_attempts(account_key,created_at);
+--> statement-breakpoint
 CREATE INDEX sending_judge_pending_idx ON sending_judge_attempts(account_key) WHERE state<>'settled';
+--> statement-breakpoint
 CREATE INDEX sending_judge_settled_idx ON sending_judge_attempts(account_key,reconciled_at) WHERE state='settled';
+--> statement-breakpoint
 CREATE UNIQUE INDEX audit_graduated_seen_idx ON audit_log(team_id,target) WHERE action='sending.graduated_recipient_seen';
+--> statement-breakpoint
 CREATE INDEX audit_graduated_target_idx ON audit_log(action,team_id,target);
+--> statement-breakpoint
 -- Reversal: retain ledger/audit business evidence. Disable callers first. Do not DROP a nonempty ledger.
 
 -- Persistent identity survives source deletion; only nullable FK pointers clear.
@@ -36,8 +45,10 @@ BEGIN
  END IF;
  RETURN NEW;
 END $$;
+--> statement-breakpoint
 CREATE TRIGGER sending_judge_subject_guard BEFORE INSERT OR UPDATE ON sending_judge_attempts
  FOR EACH ROW EXECUTE FUNCTION sending_judge_subject_guard();
+--> statement-breakpoint
 -- Native table lives in the private migration set. Existing installations can bind now;
 -- fresh installations bind after mailbox DDL through private migration0037.
 DO $$ BEGIN
@@ -46,10 +57,12 @@ DO $$ BEGIN
    FOREIGN KEY(mailbox_outbox_id) REFERENCES mailbox_outbox(id) ON DELETE SET NULL;
  END IF;
 END $$;
+--> statement-breakpoint
 
 -- Retained participation checks must not scan all historical email attempts or
 -- MAIN audit activity on every base-only health projection.
 CREATE INDEX sending_judge_native_participation_idx ON sending_judge_attempts(team_id)
  WHERE message_kind='mailbox';
+--> statement-breakpoint
 CREATE INDEX audit_native_participation_idx ON audit_log(team_id)
  WHERE action LIKE 'mailbox.%';

@@ -63,6 +63,9 @@ export async function verifySendIntroCoupon(
 export function sendNewPurchaseAvailability(
   rung: string,
 ): "self_serve" | "availability_review" | "enterprise" {
-  if (rung === "scale_1_5m" || rung === "scale_2_5m") return "enterprise";
-  return rung === "scale_1m" ? "availability_review" : "self_serve";
+  // At 3 RPM even Pro220K exceeds the maximum daily admission envelope.
+  // This gates acquisitions, never existing contract allowances or renewal.
+  if (["pro_200k", "scale_500k", "scale_1m", "scale_1_5m", "scale_2_5m"].includes(rung))
+    return "enterprise";
+  return "self_serve";
 }

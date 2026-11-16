@@ -15,6 +15,7 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { type SendDeps, type SesSender, sendEmail } from "../src/handlers/send-email.js";
 import { createMailboxSesSender } from "../src/mailbox-sender.js";
 import { syntheticCleanContentJudge } from "./fixtures/clean-content-judge.js";
+import { authorizeWorkerDispatch } from "./worker-dispatch-fixture.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -283,20 +284,22 @@ it.each(["hold", "sandbox"] as const)(
       clientFactory: () => ({ send }),
     });
     await expect(
-      sender.send({
-        idempotencyKey: randomUUID(),
-        outboxId: randomUUID(),
-        attemptId: randomUUID(),
-        teamId: f.teamId,
-        mailboxId: box.id,
-        from,
-        to: ["external@example.test"],
-        cc: [],
-        bcc: [],
-        raw: Buffer.from(
-          `From: ${from}\r\nTo: external@example.test\r\nSubject: Synthetic only\r\n\r\nSynthetic body`,
-        ),
-      }),
+      sender.send(
+        await authorizeWorkerDispatch(db, {
+          idempotencyKey: randomUUID(),
+          outboxId: randomUUID(),
+          attemptId: randomUUID(),
+          teamId: f.teamId,
+          mailboxId: box.id,
+          from,
+          to: ["external@example.test"],
+          cc: [],
+          bcc: [],
+          raw: Buffer.from(
+            `From: ${from}\r\nTo: external@example.test\r\nSubject: Synthetic only\r\n\r\nSynthetic body`,
+          ),
+        }),
+      ),
     ).rejects.toBeInstanceOf(MailboxSendDeferredError);
     expect(commands).toContain("CreateTenantCommand");
     expect(commands).toContain("CreateTenantResourceAssociationCommand");

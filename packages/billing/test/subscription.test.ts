@@ -4,8 +4,9 @@ import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type OverageReport, reportOverage } from "../src/overage.js";
+import * as saleCapacityAssertion from "../src/send-sale-capacity.js";
 import type { BillingStripe } from "../src/stripe.js";
 import {
   applySubscription,
@@ -13,6 +14,7 @@ import {
   lockCustomer,
   setOverage,
 } from "../src/subscription.js";
+import { fundedSaleCapacity, installBillingControls } from "./financial-controls-fixture.js";
 import {
   fakeStripe,
   legacyProduct,
@@ -32,12 +34,16 @@ let state: ReturnType<typeof fakeStripe>["state"];
 
 beforeEach(async () => {
   ({ db, close } = await createTestDb());
+  await installBillingControls(db);
   ({ stripe, state } = fakeStripe());
 });
 
-afterEach(() => close());
+afterEach(async () => {
+  vi.restoreAllMocks();
+  await close();
+});
 
-const deps = () => ({ db, stripe, log: () => {} });
+const deps = () => ({ db, stripe, log: () => {}, capacitySource: fundedSaleCapacity });
 const team = (teamId: string) => teamRow(db, teamId);
 const OWNER = "subscription-fixture-owner";
 const changeRung = (
@@ -212,7 +218,12 @@ describe("grandfathering during reconciliation", () => {
   });
 });
 
-describe("changeRung up", () => {
+describe("post-admission financial mechanics: changeRung up (capacity assertion mocked)", () => {
+  // Only the capacity assertion is mocked. Real ROOT reservation, actor/hold checks,
+  // settlement pins and release lifecycle remain production callers. No sale/volume claim.
+  beforeEach(() => {
+    vi.spyOn(saleCapacityAssertion, "assertSendSaleCapacity").mockResolvedValue();
+  });
   it("settles usage under the old rung, then re-prices both items at once and re-reads Stripe", async () => {
     const teamId = await subscribedTeam(withOverage(), 110_500);
     expect(await changeRung(deps(), { teamId, rung: "pro_200k" })).toEqual({ applied: "now" });
@@ -262,7 +273,7 @@ describe("changeRung up", () => {
     expect(await reportedOverage(teamId)).toBe(500);
   });
 
-  it("serializes a reporter started during the price POST until readback persists the new binding", async () => {
+  it("fences a reporter across unlocked price POST until the new binding commits", async () => {
     const teamId = await subscribedTeam(withOverage(), 110_500);
     const originalTransaction = db.transaction.bind(db);
     const observedDb = Object.create(db) as Db;
@@ -278,35 +289,37 @@ describe("changeRung up", () => {
         }
       }, config);
     }) as Db["transaction"];
-    const race: { report?: Promise<OverageReport> } = {};
     const originalUpdate = stripe.subscriptions.update;
+    let reporter: OverageReport | undefined;
     stripe.subscriptions.update = async (...args) => {
-      const tx = activeTransaction;
-      if (!tx) throw new Error("price POST escaped the shared transaction");
-      await tx
+      expect(activeTransaction).toBeNull();
+      await db
         .update(schema.usagePeriods)
         .set({ accepted: 111_000 })
         .where(eq(schema.usagePeriods.teamId, teamId));
-      race.report = reportOverage(deps(), { now: new Date((PERIOD_START + 1000) * 1000) });
+      reporter = await reportOverage(deps(), { now: new Date((PERIOD_START + 1000) * 1000) });
+      expect(reporter).toEqual({ reported: 0, failed: 0 });
       return originalUpdate(...args);
     };
     const originalRetrieve = stripe.subscriptions.retrieve;
-    let readbackUnderLock = false;
+    let readbackWithoutLock = false;
     stripe.subscriptions.retrieve = async (...args) => {
       if (state.updates.length) {
-        if (!activeTransaction) throw new Error("readback escaped the shared transaction");
-        readbackUnderLock = true;
+        expect(activeTransaction).toBeNull();
+        readbackWithoutLock = true;
       }
       return originalRetrieve(...args);
     };
     expect(await changeRung({ ...deps(), db: observedDb }, { teamId, rung: "pro_200k" })).toEqual({
       applied: "now",
     });
-    if (!race.report) throw new Error("reporter was not started");
-    expect(await race.report).toEqual({ reported: 0, failed: 0 });
-    expect(readbackUnderLock).toBe(true);
+    expect(reporter).toEqual({ reported: 0, failed: 0 });
+    expect(readbackWithoutLock).toBe(true);
     expect(state.meterEvents.map((event) => event.payload.value)).toEqual(["500"]);
     expect(await team(teamId)).toMatchObject({ planQuota: 220_000, stripeSubscriptionId: "sub_1" });
+    expect(
+      await reportOverage(deps(), { teamId, now: new Date((PERIOD_START + 1000) * 1000) }),
+    ).toEqual({ reported: 0, failed: 0 });
   });
 
   it("rejects a price changed before the locked POST and keeps the prior meter step durable", async () => {
@@ -622,7 +635,12 @@ describe("verified Send projection and event ordering", () => {
   });
 });
 
-describe("changeRung purchase review", () => {
+describe("post-admission financial mechanics: purchase review (capacity assertion mocked)", () => {
+  // Only the capacity assertion is mocked. Real ROOT reservation, actor/hold checks,
+  // settlement pins and release lifecycle remain production callers. No sale/volume claim.
+  beforeEach(() => {
+    vi.spyOn(saleCapacityAssertion, "assertSendSaleCapacity").mockResolvedValue();
+  });
   const pendingDowngrade = () =>
     withOverage("millionsend_pro_100k_monthly", "millionsend_pro_100k_overage", {
       schedule: schedule([price("millionsend_starter_monthly")]),
@@ -898,5 +916,55 @@ describe("setOverage", () => {
     );
     expect(state.itemCreates).toEqual([]);
     expect((await team(teamId))?.overageEnabled).toBe(true);
+  });
+});
+
+describe("source-bound upgrade admission (no capacity assertion mock)", () => {
+  it("refuses 200k before meter, schedule or price mutations and retains the prior contract", async () => {
+    const teamId = await subscribedTeam(withOverage(), 110_500);
+    const before = await team(teamId);
+    const usageBefore = await db
+      .select()
+      .from(schema.usagePeriods)
+      .where(eq(schema.usagePeriods.teamId, teamId));
+    await expect(changeRung(deps(), { teamId, rung: "pro_200k" })).rejects.toThrow(
+      "capacity_insufficient",
+    );
+    expect(await team(teamId)).toEqual(before);
+    expect(
+      await db.select().from(schema.usagePeriods).where(eq(schema.usagePeriods.teamId, teamId)),
+    ).toEqual(usageBefore);
+    expect(state.meterEvents).toEqual([]);
+    expect(state.updates).toEqual([]);
+    expect(state.scheduleCreates).toEqual([]);
+    expect(state.scheduleUpdates).toEqual([]);
+    expect(state.scheduleReleases).toEqual([]);
+    const holds = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "sending.sale_reserved"));
+    expect(holds).toEqual([]);
+  });
+  it("admits supported Starter to100k through the real gate and releases its durable reservation after contract projection", async () => {
+    const teamId = await subscribedTeam(
+      subscription("sub_supported", "cus_supported", "active", "millionsend_starter_monthly"),
+    );
+    expect(await changeRung(deps(), { teamId, rung: "pro_100k" })).toEqual({ applied: "now" });
+    expect(await team(teamId)).toMatchObject({
+      planQuota: 110_000,
+      stripeSubscriptionId: "sub_supported",
+    });
+    expect(state.updates).toHaveLength(1);
+    const audit = await db.select().from(schema.auditLog).where(eq(schema.auditLog.teamId, teamId));
+    const holds = audit.filter((row) => row.action === "sending.sale_reserved");
+    expect(holds).toHaveLength(1);
+    expect(holds[0]?.data).toMatchObject({
+      kind: "upgrade",
+      rung: "pro_100k",
+      subscriptionId: "sub_supported",
+    });
+    expect(
+      audit.filter((row) => row.action === "sending.sale_released").map((row) => row.target),
+    ).toContain(holds[0]?.target);
   });
 });

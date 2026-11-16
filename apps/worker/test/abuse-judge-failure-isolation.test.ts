@@ -13,6 +13,7 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { createOpenAiJudge } from "../src/abuse-judge/openai.js";
 import { JUDGE_THROTTLE_RETRIES, judgeSample } from "../src/handlers/abuse-judge.js";
 import { syntheticCompleteCleanAnswers } from "./fixtures/complete-judge-answers.js";
+import { workerMonitorJudgeFrame } from "./worker-monitor-fixture.js";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -230,17 +231,7 @@ it("observes complete telemetry through the actual worker consumer, without cont
       baseUrl: "https://offline.example.test",
       apiKey: "SECRET_CONTENT_SENTINEL",
       fetch: async () =>
-        new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify(syntheticCompleteCleanAnswers),
-                },
-              },
-            ],
-          }),
-        ),
+        new Response(JSON.stringify(workerMonitorJudgeFrame(syntheticCompleteCleanAnswers))),
     });
     expect(
       await judgeSample(
@@ -263,3 +254,45 @@ it("observes complete telemetry through the actual worker consumer, without cont
     telemetry.mockRestore();
   }
 });
+
+it.each(["length", "content_filter", null, undefined])(
+  "an incomplete completion (%s) stays unjudged through the worker consumer",
+  async (finishReason) => {
+    const { teamId, sampleId } = await seed(false);
+    const before = await protectedState(teamId);
+    const fetch = vi.fn(async () => {
+      const frame = workerMonitorJudgeFrame(syntheticCompleteCleanAnswers);
+      return new Response(
+        JSON.stringify({
+          ...frame,
+          choices: [{ ...frame.choices[0], finish_reason: finishReason }],
+        }),
+      );
+    });
+    const judge = createOpenAiJudge({
+      model: "offline-fixture",
+      baseUrl: "https://never-network.example.test",
+      apiKey: "synthetic-only",
+      fetch,
+    });
+    const settings = vi.fn(async () => MONITOR_SETTING_DEFAULTS);
+    const mailer = { send: vi.fn(async () => {}) };
+    expect(
+      await judgeSample(db, { judge, keyring, settings, mailer, now: () => NOW }, { sampleId }),
+    ).toBe("unjudged");
+    const after = await protectedState(teamId);
+    expect(after.votes.find((vote) => vote.id === sampleId)).toMatchObject({
+      status: "unjudged",
+      errorClass: "parse_error",
+      score: null,
+      verdict: null,
+    });
+    expect({ ...after, votes: after.votes.filter((vote) => vote.id !== sampleId) }).toEqual({
+      ...before,
+      votes: before.votes.filter((vote) => vote.id !== sampleId),
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(settings).not.toHaveBeenCalled();
+    expect(mailer.send).not.toHaveBeenCalled();
+  },
+);

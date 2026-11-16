@@ -39,6 +39,7 @@ const BRL: Record<string, number> = {
   price_millionsend_pro_200k_monthly: 27_900,
 };
 const COUPON_BRL = 5_000;
+const OTHER_TEAM = "00000000-0000-4000-8000-000000000000";
 
 let f: Awaited<ReturnType<typeof checkoutFixture>>;
 let launchPrices: Stripe.Price[];
@@ -61,6 +62,9 @@ function pixFake() {
   };
   /** Overrides what the first invoice bills (a stale fixture), instead of price − coupon. */
   let firstInvoiceAmount: number | null = null;
+  /** What the provider returns for every refund; production re-reads every field exactly. */
+  let refundOverrides: Partial<Stripe.Refund> = {};
+  const refundsById = new Map<string, Stripe.Refund>();
   const invoice = (id: string) => {
     const found = invoices[id];
     if (!found) throw new Error(`No such invoice: ${id}`);
@@ -249,8 +253,29 @@ function pixFake() {
     },
     refunds: {
       create: async (params) => {
+        const payment = Object.values(sessions).find(
+          (session) => session.payment_intent === params.payment_intent,
+        );
+        if (!payment) throw new Error(`No such payment_intent: ${params.payment_intent}`);
         calls.refunds.push(String((params.metadata as Stripe.Metadata)?.mepmail_pix_refund));
-        return { id: `re_${calls.refunds.length}`, object: "refund" } as Stripe.Refund;
+        const refund = {
+          id: `re_${calls.refunds.length}`,
+          object: "refund",
+          livemode: false,
+          status: "succeeded",
+          payment_intent: params.payment_intent,
+          amount: payment.amount_total,
+          currency: payment.currency ?? "brl",
+          ...refundOverrides,
+        } as unknown as Stripe.Refund;
+        refundsById.set(refund.id, refund);
+        return refund;
+      },
+      // The webhook re-reads a recorded refund on a redelivery instead of creating another one.
+      retrieve: async (id) => {
+        const found = refundsById.get(id);
+        if (!found) throw new Error(`No such refund: ${id}`);
+        return found;
       },
     },
   };
@@ -270,6 +295,9 @@ function pixFake() {
     paymentIntentOverrides,
     billFirstInvoice: (amount: number) => {
       firstInvoiceAmount = amount;
+    },
+    overrideRefund: (patch: Partial<Stripe.Refund>) => {
+      refundOverrides = patch;
     },
   };
 }
@@ -493,21 +521,32 @@ describe("Send paid by Pix", () => {
     expect(pix.calls.refunds).toEqual(["occupied"]);
   });
 
-  it("refunds a Pix when the card Checkout of the same team was paid first", async () => {
+  it("refuses to open a Pix once the card Checkout of the team was paid", async () => {
     await beginSendCheckout(deps(), f.input);
-    const payment = await paid();
-    for (const session of f.sessions.values()) session.status = "complete";
-    expect(await fulfill(payment)).toBe("refunded");
-    expect(pix.calls.refunds).toEqual(["occupied"]);
-    const attempts = (await f.db.select().from(schema.sendCheckoutAttempts)).filter(
+    const session = f.sessions.values().next().value!;
+    session.status = "complete";
+    session.payment_status = "paid";
+    session.subscription = "sub_card";
+    f.state.subscriptions.sub_card = {
+      ...subscription("sub_card", "cus_1", "active"),
+      livemode: false,
+    } as Stripe.Subscription;
+    f.stripe.subscriptions.retrieve = async (id) => {
+      expect(id).toBe("sub_card");
+      return f.state.subscriptions.sub_card!;
+    };
+    // A paid card is the purchase: no Pix may start a second plan beside it.
+    await expect(begin()).rejects.toMatchObject({ code: "subscription_exists" });
+    expect(pix.calls.sessions).toEqual([]);
+    // Its attempt and payment custody stay exactly as the card left them.
+    const card = (await f.db.select().from(schema.sendCheckoutAttempts)).filter(
       (a) => a.parameters.method !== "pix",
     );
-    expect(attempts.map((a) => a.status)).toEqual(["resolved"]);
+    expect(card.map((a) => a.status)).toEqual(["created"]);
   });
 
   it("closes an open card Checkout of the team before starting the Pix plan", async () => {
     await beginSendCheckout(deps(), f.input);
-    const payment = await paid();
     const sessions = f.stripe.checkout.sessions as typeof f.stripe.checkout.sessions & {
       expire?: (id: string) => Promise<Stripe.Checkout.Session>;
     };
@@ -518,17 +557,30 @@ describe("Send paid by Pix", () => {
       session.status = "expired";
       return session;
     };
-    expect(await fulfill(payment)).toBe("fulfilled");
+    // The switch itself must prove the card Session terminal and release its ROOT hold, so the
+    // Pix reserves a fresh intent instead of inheriting the card's kind.
+    const payment = await paid();
     expect(expired).toEqual(["cs_1"]);
-    const attempts = (await f.db.select().from(schema.sendCheckoutAttempts)).filter(
+    const card = (await f.db.select().from(schema.sendCheckoutAttempts)).filter(
       (a) => a.parameters.method !== "pix",
     );
-    expect(attempts.map((a) => a.status)).toEqual(["resolved"]);
+    expect(card.map((a) => a.status)).toEqual(["resolved"]);
+    expect(await fulfill(payment)).toBe("fulfilled");
+    // Already proven terminal: fulfilment never expires the same Session twice.
+    expect(expired).toEqual(["cs_1"]);
+    expect(pix.invoices.in_send_pix_1?.status).toBe("paid");
   });
 
   it("refunds a Pix whose amount is not the price in reais anymore", async () => {
-    const payment = await paid();
-    expect(await fulfill({ ...payment, amount: 14_900 })).toBe("refunded");
+    await begin();
+    const sessionId = Object.keys(pix.sessions).at(-1)!;
+    // The authoritative Session/PI reports the different amount, not a forged caller DTO.
+    pix.sessions[sessionId]!.amount_total = 14_900;
+    pix.pay(sessionId);
+    const payment = await readPixPayment(pix.client, sessionId, false);
+    if (!payment) throw new Error("fixture requires provider-verified Pix payment");
+    expect(payment.amount).toBe(14_900);
+    expect(await fulfill(payment)).toBe("refunded");
     expect(pix.calls.subscriptions).toEqual([]);
     expect(pix.calls.refunds).toEqual(["amount"]);
   });
@@ -548,6 +600,37 @@ describe("Send paid by Pix", () => {
     expect(await fulfill({ ...payment, teamId: "00000000-0000-4000-8000-000000000000" })).toBe(
       "refunded",
     );
+    expect(pix.calls.refunds).toEqual(["team"]);
+  });
+
+  it("keeps a refund pending until the provider frame is exactly this payment", async () => {
+    const payment = await paid();
+    pix.overrideRefund({ amount: payment.amount - 1 });
+    expect(await fulfill({ ...payment, teamId: OTHER_TEAM })).toBe("refund_pending");
+    expect(pix.calls.refunds).toEqual(["team"]);
+    expect(logs.some((line) => line.includes("refund_pending (team)"))).toBe(true);
+  });
+
+  it("keeps a refund pending while the provider has not succeeded", async () => {
+    const payment = await paid();
+    pix.overrideRefund({ status: "pending" });
+    expect(await fulfill({ ...payment, teamId: OTHER_TEAM })).toBe("refund_pending");
+    expect(pix.calls.refunds).toEqual(["team"]);
+    expect(logs.some((line) => line.includes("refund_pending (team)"))).toBe(true);
+  });
+
+  it("keeps a refund pending when the provider refunds another payment intent", async () => {
+    const payment = await paid();
+    pix.overrideRefund({ payment_intent: "pi_someone_else" });
+    expect(await fulfill({ ...payment, teamId: OTHER_TEAM })).toBe("refund_pending");
+    expect(pix.calls.refunds).toEqual(["team"]);
+  });
+
+  it("re-reads the recorded refund instead of creating a second one", async () => {
+    const payment = await paid();
+    expect(await fulfill({ ...payment, teamId: OTHER_TEAM })).toBe("refunded");
+    expect(pix.calls.refunds).toEqual(["team"]);
+    expect(await fulfill({ ...payment, teamId: OTHER_TEAM })).toBe("refunded");
     expect(pix.calls.refunds).toEqual(["team"]);
   });
 
@@ -831,5 +914,90 @@ describe("the first Send purchase paid by Pix, for advertising", () => {
       meta,
     );
     expect(await metaRows()).toEqual([]);
+  });
+});
+
+describe("Card to Pix original-custody terminal proof", () => {
+  it.each([
+    ["session identity", { id: "cs_foreign" }],
+    ["customer", { customer: "cus_foreign" }],
+    ["mode", { mode: "payment" }],
+    ["live mode", { livemode: true }],
+    ["team reference", { client_reference_id: "other_team" }],
+    ["attempt metadata", { metadata: { mepmail_send_checkout: "other_attempt" } }],
+  ])(
+    "retains the card promise and makes no Pix when %s readback disagrees",
+    async (_label, patch) => {
+      const card = await beginSendCheckout(deps(), f.input);
+      const sessions = f.stripe.checkout.sessions as typeof f.stripe.checkout.sessions & {
+        expire?: (id: string) => Promise<Stripe.Checkout.Session>;
+      };
+      const original = sessions.retrieve;
+      if (!original) throw new Error("fixture requires original-custody readback");
+      const expire = vi.fn(async () => {
+        throw new Error("must not expire a foreign Session");
+      });
+      sessions.expire = expire;
+      sessions.retrieve = async (id) => ({
+        ...(await original(id)),
+        ...(patch as Partial<Stripe.Checkout.Session>),
+      });
+      await expect(begin()).rejects.toMatchObject({ code: "unknown" });
+      expect(expire).not.toHaveBeenCalled();
+      expect(pix.calls.sessions).toEqual([]);
+      const [attempt] = await f.db
+        .select()
+        .from(schema.sendCheckoutAttempts)
+        .where(eq(schema.sendCheckoutAttempts.id, card.attemptId));
+      expect(attempt?.status).toBe("created");
+      const audit = await f.db.select().from(schema.auditLog);
+      expect(
+        audit.some(
+          (row) => row.target === card.attemptId && row.action === "sending.sale_released",
+        ),
+      ).toBe(false);
+    },
+  );
+  it("retains the card promise when terminal readback changes custody after expiry", async () => {
+    const card = await beginSendCheckout(deps(), f.input);
+    const sessions = f.stripe.checkout.sessions as typeof f.stripe.checkout.sessions & {
+      expire?: (id: string) => Promise<Stripe.Checkout.Session>;
+    };
+    const original = sessions.retrieve;
+    if (!original) throw new Error("fixture requires readback");
+    let expired = false;
+    sessions.expire = async (id) => {
+      expired = true;
+      return { ...(await original(id)), status: "expired" };
+    };
+    sessions.retrieve = async (id) =>
+      expired
+        ? { ...(await original(id)), status: "expired", customer: "cus_foreign" }
+        : original(id);
+    await expect(begin()).rejects.toMatchObject({ code: "unknown" });
+    expect(expired).toBe(true);
+    expect(pix.calls.sessions).toEqual([]);
+    const audit = await f.db.select().from(schema.auditLog);
+    expect(
+      audit.some((row) => row.target === card.attemptId && row.action === "sending.sale_released"),
+    ).toBe(false);
+  });
+  it("does not resolve or release a requested card whose Session ID was lost", async () => {
+    const card = await beginSendCheckout(deps(), f.input);
+    await f.db
+      .update(schema.sendCheckoutAttempts)
+      .set({ status: "unknown", stripeSessionId: null, checkoutUrl: null })
+      .where(eq(schema.sendCheckoutAttempts.id, card.attemptId));
+    await expect(begin()).rejects.toMatchObject({ code: "pending" });
+    expect(pix.calls.sessions).toEqual([]);
+    const [attempt] = await f.db
+      .select()
+      .from(schema.sendCheckoutAttempts)
+      .where(eq(schema.sendCheckoutAttempts.id, card.attemptId));
+    expect(attempt).toMatchObject({ status: "unknown", stripeSessionId: null });
+    const audit = await f.db.select().from(schema.auditLog);
+    expect(
+      audit.some((row) => row.target === card.attemptId && row.action === "sending.sale_released"),
+    ).toBe(false);
   });
 });

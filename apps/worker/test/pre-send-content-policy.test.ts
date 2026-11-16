@@ -17,6 +17,7 @@ import {
   createMailboxSesSender,
 } from "../src/mailbox-sender.js";
 import { syntheticCleanContentJudge } from "./fixtures/clean-content-judge.js";
+import { authorizeWorkerDispatch } from "./worker-dispatch-fixture.js";
 
 let fixture: Awaited<ReturnType<typeof createTestDb>>;
 const keyring = EnvKeyring.fromBase64(randomBytes(32).toString("base64"));
@@ -204,6 +205,9 @@ it("legitimate account mail traverses Correio policy without leaking its token",
     randomUUID(),
     '<p>MepMail password reset: reset your password</p><a href="https://mepmail.app/reset?token=PRIVATE">Reset</a>',
   );
+  input.from = "news@legitimate-policy.example";
+  input.raw = Buffer.from(input.raw.toString().replaceAll("news@mail-policy.example", input.from));
+  await authorizeWorkerDispatch(db, input);
   await expect(createMailboxContentPolicySender(db, { send }, true).send(input)).resolves.toEqual({
     messageId: "fixture-own-mail",
   });

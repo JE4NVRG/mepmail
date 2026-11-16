@@ -28,7 +28,10 @@ import type { SendSaleCapacitySource } from "./send-sale-capacity.js";
 import { releaseSendSaleCapacity, reserveSendSaleCapacity } from "./send-sale-reservation.js";
 import type { BillingStripe } from "./stripe.js";
 import { canonicalProjectionKey } from "./subscription-projection-key.js";
-import { SubscriptionProjectionChangedError } from "./subscription-projection-retry.js";
+import {
+  SubscriptionProjectionChangedError,
+  withSubscriptionProjectionRetry,
+} from "./subscription-projection-retry.js";
 
 type Plan = (typeof schema.planEnum.enumValues)[number];
 type PlanStatus = (typeof schema.planStatusEnum.enumValues)[number];
@@ -484,7 +487,8 @@ export async function prepareSubscription(
   if (sub.id !== subscriptionId || idOf(sub.customer) !== customerId)
     throw new Error("Subscription identity changed");
   const key = team ? projectionKey(team) : null;
-  if (!team || isMailboxSubscription(sub)) return { sub, teamId: team?.id ?? null, key };
+  if (!team || team.plan === "system" || isMailboxSubscription(sub))
+    return { sub, teamId: team?.id ?? null, key };
   const { base, overage } = subscriptionItems(sub);
   const rung = rungFromSubscription(sub);
   const catalog = rung ? rungByKey(rung.key as PlanRungKey) : null;
@@ -597,9 +601,17 @@ export async function syncSubscription(
   customerId: string,
   subscriptionId: string,
 ) {
-  const prepared = await prepareSubscription(deps, customerId, subscriptionId);
-  await deps.db.transaction((tx) =>
-    applyPreparedSubscription(tx as unknown as Db, prepared, deps.log ?? console.warn, deps.stripe),
+  await withSubscriptionProjectionRetry(
+    () => prepareSubscription(deps, customerId, subscriptionId),
+    (prepared) =>
+      deps.db.transaction((tx) =>
+        applyPreparedSubscription(
+          tx as unknown as Db,
+          prepared,
+          deps.log ?? console.warn,
+          deps.stripe,
+        ),
+      ),
   );
 }
 async function applyLocked(deps: BillingDeps, customerId: string, subscriptionId: string) {
@@ -710,7 +722,7 @@ export async function changeRung(
       deps.capacitySource,
     );
     // Sends made under the old rung settle at its rate before the move.
-    if (overage) await reportOverage(deps, { teamId: input.teamId });
+    if (overage) await reportOverage(deps, { teamId: input.teamId, upgradeReservation: capacity });
     const items: Stripe.SubscriptionUpdateParams.Item[] = [
       { id: base.id, price: await resolvePriceId(deps.stripe, rungLookupKey(rung)) },
     ];

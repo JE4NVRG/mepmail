@@ -280,7 +280,7 @@ it("deliverability pause fires once per episode and again after recovery", async
   const [row] = await deliveries();
   expect(row?.type).toBe("deliverability.paused");
   expect(row?.payload).toMatchObject({
-    data: { metric: "complaint", limit: 0.0008, window_days: 1 },
+    data: { metric: "complaint", limit: 0.001, window_days: 1 },
   });
   expect(await sweepNotifications(db, deps())).toEqual({ sent: 0 });
 
@@ -351,7 +351,7 @@ it("a warning that escalates to a pause notifies both once", async () => {
   await counters({ sent: 1000, hardBounced: 18 });
   await sweepNotifications(db, deps());
   expect(sends[0]?.subject).toContain("at risk");
-  await counters({ sent: 1000, hardBounced: 21 });
+  await counters({ sent: 1000, hardBounced: 51 }); // strictly above 5%
   await sweepNotifications(db, deps());
   expect(sends.map((s) => s.subject)).toEqual([
     expect.stringContaining("at risk"),
@@ -805,3 +805,25 @@ it("an owner who turned a notice off is skipped for it, and still gets a securit
     ["owner@example.com", "New API key in notify-team: ci"],
   ]);
 });
+
+it.each([
+  { metric: "bounce", equal: { hardBounced: 50 }, above: { hardBounced: 51 }, limit: 0.05 },
+  { metric: "complaint", equal: { complained: 1 }, above: { complained: 2 }, limit: 0.001 },
+])(
+  "$metric pause is strictly above the threshold; equality only warns",
+  async ({ metric, equal, above, limit }) => {
+    await counters({ sent: 1000, ...equal });
+    expect(await sweepNotifications(db, deps())).toEqual({ sent: 1 });
+    expect(sends[0]?.subject).toContain("at risk");
+    expect((await deliveries()).map((d) => d.type)).toEqual(["deliverability.warning"]);
+    expect(await sweepNotifications(db, deps())).toEqual({ sent: 0 });
+    await counters({ sent: 1000, ...above });
+    expect(await sweepNotifications(db, deps())).toEqual({ sent: 1 });
+    expect(sends[1]?.subject).toContain("sending paused");
+    const rows = await deliveries();
+    expect(rows.map((d) => d.type)).toEqual(["deliverability.warning", "deliverability.paused"]);
+    expect(rows[1]?.payload).toMatchObject({ data: { metric, limit, window_days: 1 } });
+    expect(await sweepNotifications(db, deps())).toEqual({ sent: 0 });
+    expect(sends).toHaveLength(2);
+  },
+);

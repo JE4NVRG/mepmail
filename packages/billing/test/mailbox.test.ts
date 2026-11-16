@@ -856,7 +856,13 @@ describe("Mailbox isolation from Send billing, real handler and database", () =>
   });
 
   it("paginates past other products to recover an older recognized Send subscription", async () => {
-    const send = subscription("sub_send", OWNER.customerId, "active");
+    const send = subscription(
+      "sub_send",
+      OWNER.customerId,
+      "active",
+      "millionsend_pro_100k_monthly",
+      { overageKey: "millionsend_pro_100k_overage" },
+    );
     state.subscriptions[send.id] = send;
     const mail = mailSubscription();
     const other = subscription("sub_other", OWNER.customerId, "active", "other_product");

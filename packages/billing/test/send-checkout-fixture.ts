@@ -5,10 +5,12 @@ import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { sql } from "drizzle-orm";
 import type Stripe from "stripe";
 import type { SendCheckoutInput } from "../src/send-checkout.js";
+import { fundedSaleCapacity, installBillingControls } from "./financial-controls-fixture.js";
 import { fakeStripe } from "./helpers.js";
 
 export async function checkoutFixture() {
   const { db, close } = await createTestDb();
+  await installBillingControls(db);
   // Real pinned Mail0007 DDL: the Customer claim is shared; no duplicate test-only table contract.
   const ddl = readFileSync(
     new URL("../../db/mailbox-drizzle/0007_mailbox_customer_request.sql", import.meta.url),
@@ -44,7 +46,12 @@ export async function checkoutFixture() {
     close,
     ...provider,
     input,
-    deps: { db: db as Db, stripe: provider.stripe, livemode: false },
+    deps: {
+      db: db as Db,
+      stripe: provider.stripe,
+      livemode: false,
+      capacitySource: fundedSaleCapacity,
+    },
   };
 }
 

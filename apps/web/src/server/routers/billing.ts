@@ -522,8 +522,13 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         if (!hasLiveSubscription(team.planStatus)) {
           throw new TRPCError({ code: "PRECONDITION_FAILED" });
         }
+        const currentRung = teamRung(team.plan, team.planQuota);
+        const targetRung = rungByKey(input.rung);
+        // Reductions and keeping the current rung are management, not acquisitions.
+        // changeRung still verifies the authoritative Stripe price and actual capacity.
         if (
-          input.rung !== teamRung(team.plan, team.planQuota).key &&
+          targetRung.key !== currentRung.key &&
+          targetRung.priceCents >= currentRung.priceCents &&
           sendNewPurchaseAvailability(input.rung) === "enterprise"
         ) {
           throw new TRPCError({

@@ -267,17 +267,30 @@ describe("window-bounded deliverability query", () => {
       if (totalHistory === 5000) await seedHistory(4500);
       await db.execute(sql`analyze emails`);
       await db.execute(sql`analyze email_events`);
-      let captured: SQL | undefined;
+      const captured: SQL[] = [];
       const traced = {
         execute: async (query: SQL) => {
-          captured = query;
-          return db.execute(query);
+          const result = await db.execute(query);
+          const row = firstRow<Record<string, unknown>>(result);
+          // Capture the actual public-message health projection, not the last
+          // statement: Native schema/history probes now follow that projection.
+          // Select by its result contract, independent of query ordering/CTE text.
+          if (
+            row &&
+            ["sent", "hardBounced", "complained", "watermark"].every((key) =>
+              Object.prototype.hasOwnProperty.call(row, key),
+            )
+          )
+            captured.push(query);
+          return result;
         },
       } as unknown as Db;
       await fetchDeliverabilityHealth(traced, team, { now });
-      if (!captured) throw new Error("Health SQL was not captured");
+      expect(captured).toHaveLength(1);
+      const [healthQuery] = captured;
+      if (!healthQuery) throw new Error("Health SQL was not captured");
       await compare(team);
-      const optimized = await explain(captured);
+      const optimized = await explain(healthQuery);
       const legacy = await explain(legacyQuery(team));
       if (!optimized || !legacy) throw new Error("Missing plans");
       const optimizedConfirmed = nodes(optimized.Plan).find(

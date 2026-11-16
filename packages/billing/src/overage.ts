@@ -3,6 +3,7 @@ import { type Db, schema } from "@millionsend/db";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import type { BillingDeps } from "./checkout.js";
 import { METER_EVENT_NAME } from "./prices.js";
+import { canReportDuringSendSale, type SaleReservation } from "./send-sale-reservation.js";
 import { lockCustomer } from "./subscription.js";
 
 /** Stripe refuses meter events older than this; a row that stale is logged and left. */
@@ -97,7 +98,7 @@ function eventTime(terms: SendOverageTerms, now: Date): Date | null {
  */
 export async function reportOverage(
   deps: BillingDeps,
-  opts: { now?: Date; teamId?: string } = {},
+  opts: { now?: Date; teamId?: string; upgradeReservation?: SaleReservation } = {},
 ): Promise<OverageReport> {
   const now = opts.now ?? new Date();
   const log = deps.log ?? console.warn;
@@ -126,6 +127,15 @@ export async function reportOverage(
           await lockCustomer(tx, candidate.customerId as string);
           const row = await readLocked(tx, candidate);
           if (!row || row.team.plan === "system") return null;
+          if (
+            !(await canReportDuringSendSale(
+              tx,
+              candidate.teamId,
+              row.team.stripeSubscriptionId,
+              opts.upgradeReservation,
+            ))
+          )
+            return null;
           const terms = termsOf(row);
           if (!terms || row.team.stripeCustomerId !== candidate.customerId) {
             if (
@@ -176,6 +186,18 @@ export async function reportOverage(
           const tx = transaction as unknown as Db;
           await lockCustomer(tx, prepared.customerId);
           const row = await readLocked(tx, prepared);
+          // A sale may commit after pinning and before this transaction. Preserve
+          // even an older pending pin without sending against an unlocked repricing.
+          if (
+            row &&
+            !(await canReportDuringSendSale(
+              tx,
+              prepared.teamId,
+              row.team.stripeSubscriptionId,
+              opts.upgradeReservation,
+            ))
+          )
+            return null;
           // Another reporter may already have finished this exact pinned step.
           if (row && row.period.reportedOverage !== prepared.from) return null;
           const terms = row ? termsOf(row) : null;

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { PLAN_RUNGS } from "@millionsend/core/plans";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -140,7 +141,7 @@ describe("graduated commercial and customer reputation", () => {
               expect(html).toContain("/signup");
             }
             if (plan.rung === "scale_1m")
-              expect(html).toContain(sendingAvailabilityCopy(locale).review);
+              expect(html).toContain(sendingAvailabilityCopy(locale).enterprise);
           }
           expect(LAUNCH_OFFER.sending.monthlyCents).toBe(2900);
           expect(LAUNCH_OFFER.sending.brlMonthlyCents).toBe(14900);
@@ -181,7 +182,7 @@ describe("graduated commercial and customer reputation", () => {
     expect(a).toContain("0% · 0 / 100");
     expect(a).toContain("Unknown · 0 / 0");
   });
-  for (const rung of ["scale_1_5m", "scale_2_5m"] as const)
+  for (const rung of ["pro_200k", "scale_500k", "scale_1m", "scale_1_5m", "scale_2_5m"] as const)
     for (const method of ["card", "pix"])
       it(`${method} direct bypass ${rung} fails before DB/provider calls`, async () => {
         const touched: string[] = [];
@@ -219,5 +220,25 @@ describe("graduated commercial and customer reputation", () => {
       included: 2750000,
       priceCents: 54900,
     });
+  });
+  it("the current 3 RPM envelope closes every offer above Pro110K, by key and volume", () => {
+    for (const rung of PLAN_RUNGS) {
+      const expected =
+        rung.period === "month" && rung.included > 110_000 ? "enterprise" : "self_serve";
+      expect(sendNewPurchaseAvailability(rung.key)).toBe(expected);
+      expect(sendingOfferAvailability(rung.key)).toBe(expected);
+      expect(sendingOfferAvailability(rung.included)).toBe(expected);
+    }
+  });
+  it("billing source fences purchases, not reductions or existing-plan management", () => {
+    // Source contract only; rendered interaction coverage remains a separate Linux/browser gate.
+    const source = readFileSync(
+      new URL("../src/app/(dashboard)/settings/billing/billing-view.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain('(!needsPurchaseReview || availability !== "enterprise")');
+    expect(source.match(/\(needsPurchaseReview && salesPaused\)/g)).toHaveLength(2);
+    expect(source).toContain('!isCurrent && needsPurchaseReview && availability === "enterprise"');
+    expect(source).toContain("isCurrent || !needsPurchaseReview");
   });
 });

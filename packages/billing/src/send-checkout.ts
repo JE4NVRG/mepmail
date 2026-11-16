@@ -266,6 +266,21 @@ function result(attempt: Attempt): SendCheckoutResult {
     stripeSessionId: attempt.stripeSessionId,
   };
 }
+function rows<T>(result: unknown): T[] {
+  return (Array.isArray(result) ? result : (result as { rows: T[] }).rows) as T[];
+}
+/** Read-only: a live ROOT hold already froze this team's terms. Never creates or releases one. */
+async function hasActiveSaleHold(db: Db, teamId: string): Promise<boolean> {
+  const [hold] = rows<{ id: string }>(
+    await db.execute(sql`
+    select h.id::text from ${schema.auditLog} h
+    where h.team_id=${teamId} and h.action='sending.sale_reserved'
+      and not exists(select 1 from ${schema.auditLog} r
+        where r.action='sending.sale_released' and r.team_id=h.team_id and r.target=h.target)
+    limit 1`),
+  );
+  return !!hold;
+}
 async function noOtherSubscription(deps: SendCheckoutDeps, customer: string) {
   let after: string | undefined;
   for (;;) {
@@ -479,7 +494,7 @@ export async function beginSendCheckout(
       billing_address_collection: "auto",
       customer_update: { address: "auto", name: "auto" },
     };
-    const [attempt] = await tx
+    const [inserted] = await tx
       .insert(schema.sendCheckoutAttempts)
       .values({
         id,
@@ -492,8 +507,24 @@ export async function beginSendCheckout(
         idempotencyKey: `send-checkout:${id}`,
         parameters,
       })
+      .onConflictDoNothing({ target: schema.sendCheckoutAttempts.id })
       .returning();
-    if (!attempt) throw new SendCheckoutError("unknown");
+    let attempt = inserted ?? null;
+    if (!attempt) {
+      // This ROOT reservation ID is already bound to an attempt of this team: read it back exactly
+      // instead of swallowing 23505. Only a live compatible attempt continues; a resolved legacy
+      // intent fails closed and is never adopted as a new purchase.
+      const [prior] = await tx
+        .select()
+        .from(schema.sendCheckoutAttempts)
+        .where(eq(schema.sendCheckoutAttempts.id, id))
+        .for("update");
+      if (!prior || prior.teamId !== team.id || prior.status === "resolved")
+        throw new SendCheckoutError("pending");
+      if (!compatible(prior, input, deps) || prior.stripeCustomerId !== customer)
+        throw new SendCheckoutError("conflict");
+      attempt = prior;
+    }
     await prepareMetaCheckout(tx, attempt, deps.advertising, attempt.createdAt);
     await prepareGoogleCheckout(tx, attempt, deps.googleAdvertising, attempt.createdAt);
     return attempt;
@@ -718,11 +749,10 @@ async function introCouponBrl(stripe: BillingStripe, coupon: string): Promise<nu
     : null;
 }
 
-/** What a first Pix for this Send purchase is: prices, intro coupon and the amount in reais. */
-async function sendPixTerms(
+/** The catalog side of a Pix Send purchase: prices in reais, no customer, no POST. */
+async function sendPixPrices(
   deps: SendCheckoutDeps,
   pix: PixStripe,
-  customer: string,
   rungKey: PlanRungKey,
   interval: "month" | "year",
 ) {
@@ -742,6 +772,21 @@ async function sendPixTerms(
       : null;
   const priced = await pixAmountForPrice(pix, price, 1);
   if (!priced) throw new SendCheckoutError("invalid");
+  return { price, overage, amount: priced.amount, product: priced.product, launchPrice };
+}
+
+/** What a first Pix for this Send purchase is: prices, intro coupon and the amount in reais. */
+async function sendPixTerms(
+  deps: SendCheckoutDeps,
+  pix: PixStripe,
+  customer: string,
+  rungKey: PlanRungKey,
+  interval: "month" | "year",
+  prices?: Awaited<ReturnType<typeof sendPixPrices>>,
+) {
+  // A frozen hold's terms win: reuse the prices already resolved before the reservation.
+  const resolved = prices ?? (await sendPixPrices(deps, pix, rungKey, interval));
+  const launchPrice = resolved.launchPrice;
   let coupon: string | null = null;
   let discount = 0;
   if (launchPrice && interval === "month" && (await qualifiesForIntro(deps, customer))) {
@@ -754,9 +799,15 @@ async function sendPixTerms(
     if (brl === null) throw new SendCheckoutError("invalid");
     discount = brl;
   }
-  const amount = priced.amount - discount;
+  const amount = resolved.amount - discount;
   if (amount <= 0) throw new SendCheckoutError("invalid");
-  return { price, overage, coupon, amount, product: priced.product };
+  return {
+    price: resolved.price,
+    overage: resolved.overage,
+    coupon,
+    amount,
+    product: resolved.product,
+  };
 }
 
 /**
@@ -776,6 +827,16 @@ export async function beginSendPixCheckout(
   if (interval !== "month" && interval !== "year") throw new SendCheckoutError("invalid");
   await requirePurchaseEligibility(deps.db, { teamId: input.team.id, userId: input.userId });
   await deps.db.transaction((transaction) => currentTeam(transaction as unknown as Db, input));
+  // A card Checkout of this team must be proven terminal before a Pix takes the purchase over:
+  // its Session is expired and read back, then its card ROOT hold is released. A card already
+  // paid is the purchase itself, so no Pix opens and the card custody is left untouched.
+  if ((await closeOpenSendCheckout(deps.db, deps.stripe, input.team.id)) === "completed")
+    throw new SendCheckoutError("subscription_exists");
+  // Only a fresh intent re-reads the catalog; an unsellable rung must fail as invalid before any
+  // capacity is reserved. A live hold's frozen terms are never replaced by a rotated catalog.
+  const prices = (await hasActiveSaleHold(deps.db, input.team.id))
+    ? null
+    : await sendPixPrices(deps, pix, input.rung, interval);
   const capacity = await reserveCheckoutSale(
     deps.db,
     { teamId: input.team.id, userId: input.userId, rung: input.rung, kind: "pix" },
@@ -860,7 +921,14 @@ export async function beginSendPixCheckout(
       };
     }
     await noOtherSubscription(deps, customer);
-    const terms = await sendPixTerms(deps, pix, customer, input.rung, interval);
+    const terms = await sendPixTerms(
+      deps,
+      pix,
+      customer,
+      input.rung,
+      interval,
+      prices ?? undefined,
+    );
     // The durable intent of this Pix purchase: the anchor of its advertising context, like a
     // card attempt. Created resolved: a Pix never holds the card Checkout's lease, and the
     // card paths only ever read unresolved attempts.
@@ -896,6 +964,27 @@ export async function beginSendPixCheckout(
   });
   if ("expired" in terms && terms.expired) throw new SendCheckoutError("expired");
   if (terms.savedUrl) return { url: terms.savedUrl };
+  // Preserve the committed ROOT hold on refusal/ambiguity. A concurrent claimant
+  // may already be talking to Stripe; only original-custody terminal readback releases it.
+  // Pre-provider recheck: a review, suspension or membership change committed after the terms
+  // were priced must stop the Pix before any Session exists.
+  await deps.db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    const team = await currentTeam(tx, input);
+    if (team.stripeCustomerId !== customer) throw new SendCheckoutError("conflict");
+    const [owned] = await tx
+      .select()
+      .from(schema.sendCheckoutAttempts)
+      .where(eq(schema.sendCheckoutAttempts.id, attemptId))
+      .for("update");
+    if (
+      !owned ||
+      owned.teamId !== team.id ||
+      owned.parameters?.method !== "pix" ||
+      owned.checkoutUrl
+    )
+      throw new SendCheckoutError("pending");
+  });
   const url = await createPixCheckoutSession(pix, {
     kind: "send_start",
     teamId: input.team.id,
@@ -951,18 +1040,58 @@ async function closeOpenSendCheckout(
       };
       if (!sessions.retrieve) throw new SendCheckoutError("unknown");
       let session = await sessions.retrieve(attempt.stripeSessionId);
+      if (!matches(session, attempt)) throw new SendCheckoutError("unknown");
       if (session.status === "open" && sessions.expire) {
         // Stripe refuses to expire a session that was just paid; read it again then.
         await sessions.expire(session.id).catch(() => null);
         session = await sessions.retrieve(attempt.stripeSessionId);
+        if (!matches(session, attempt)) throw new SendCheckoutError("unknown");
       }
-      if (session.status === "complete") state = "completed";
-      else if (session.status !== "expired") throw new SendCheckoutError("pending");
+      if (session.status === "complete") {
+        const subscriptionId = idOf(session.subscription);
+        if (!subscriptionId) throw new SendCheckoutError("pending");
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        if (
+          subscription.id !== subscriptionId ||
+          idOf(subscription.customer) !== attempt.stripeCustomerId ||
+          subscription.livemode !== session.livemode ||
+          isMailboxSubscription(subscription)
+        )
+          throw new SendCheckoutError("unknown");
+        if (!["canceled", "incomplete_expired"].includes(subscription.status)) {
+          // Stripe already took this payment: the card is the purchase. Its attempt and ROOT hold
+          // stay untouched, and no other payment method starts a second plan beside it.
+          state = "completed";
+          continue;
+        }
+      } else if (session.status !== "expired") throw new SendCheckoutError("pending");
+      // Terminal provider proof above is tied to this exact immutable Session.
+    } else if (attempt.firstRequestedAt !== null) {
+      // A request without a recorded Session is ambiguous; never void it or release its promise.
+      throw new SendCheckoutError("pending");
     }
-    await db
-      .update(schema.sendCheckoutAttempts)
-      .set({ status: "resolved", resolvedAt: new Date(), leaseToken: null, leaseUntil: null })
-      .where(eq(schema.sendCheckoutAttempts.id, attempt.id));
+    await db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Db;
+      const [fresh] = await tx
+        .select()
+        .from(schema.sendCheckoutAttempts)
+        .where(eq(schema.sendCheckoutAttempts.id, attempt.id))
+        .for("update");
+      if (!fresh || fresh.teamId !== teamId || fresh.stripeSessionId !== attempt.stripeSessionId)
+        throw new SendCheckoutError("pending");
+      // Recheck the never-requested claim under the row lock, so a racing card
+      // handler cannot acquire a lease between our old snapshot and release.
+      if (
+        !attempt.stripeSessionId &&
+        (fresh.firstRequestedAt !== null || fresh.leaseToken !== null || fresh.leaseUntil !== null)
+      )
+        throw new SendCheckoutError("pending");
+      await releaseSendSaleCapacity(tx, teamId, attempt.id, "expired");
+      await tx
+        .update(schema.sendCheckoutAttempts)
+        .set({ status: "resolved", resolvedAt: new Date(), leaseToken: null, leaseUntil: null })
+        .where(eq(schema.sendCheckoutAttempts.id, attempt.id));
+    });
     if (state !== "completed") state = "closed";
   }
   return state;

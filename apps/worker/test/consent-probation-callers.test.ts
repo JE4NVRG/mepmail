@@ -32,6 +32,7 @@ import {
   createMailboxSesSender,
 } from "../src/mailbox-sender.js";
 import { syntheticCleanContentJudge } from "./fixtures/clean-content-judge.js";
+import { authorizeWorkerDispatch, seedWorkerConfirmedHistory } from "./worker-dispatch-fixture.js";
 
 let fixture: Awaited<ReturnType<typeof createTestDb>>;
 const keyring = EnvKeyring.fromBase64(randomBytes(32).toString("base64"));
@@ -121,8 +122,8 @@ async function accept(f: Awaited<ReturnType<typeof setup>>, text = promo, opts =
     opts,
   );
 }
-function mail(f: Awaited<ReturnType<typeof setup>>, mailboxId: string, text = promo) {
-  return {
+async function mail(f: Awaited<ReturnType<typeof setup>>, mailboxId: string, text = promo) {
+  return authorizeWorkerDispatch(fixture.db, {
     teamId: f.teamId,
     mailboxId,
     idempotencyKey: randomUUID(),
@@ -135,7 +136,7 @@ function mail(f: Awaited<ReturnType<typeof setup>>, mailboxId: string, text = pr
     raw: Buffer.from(
       `From: ${f.from}\r\nTo: recipient@example.test\r\nSubject: Message\r\nContent-Type: text/plain\r\n\r\n${text}`,
     ),
-  };
+  });
 }
 async function box(f: Awaited<ReturnType<typeof setup>>) {
   const [row] = await fixture.db
@@ -329,7 +330,7 @@ it("outer Correio SMTP and direct SES reject campaign with no consent", async ()
   const send = vi.fn();
   const clientFactory = vi.fn();
   await expect(
-    createMailboxContentPolicySender(fixture.db, { send }, true).send(mail(f, id)),
+    createMailboxContentPolicySender(fixture.db, { send }, true).send(await mail(f, id)),
   ).rejects.toBeInstanceOf(MailboxSendDeferredError);
   await expect(
     createMailboxSesSender(fixture.db, {
@@ -337,7 +338,7 @@ it("outer Correio SMTP and direct SES reject campaign with no consent", async ()
       isCloud: true,
       configurationSets: { "us-east-1": "private_mail" },
       clientFactory,
-    }).send(mail(f, id)),
+    }).send(await mail(f, id)),
   ).rejects.toBeInstanceOf(MailboxSendDeferredError);
   expect(send).not.toHaveBeenCalled();
   expect(clientFactory).not.toHaveBeenCalled();
@@ -357,10 +358,11 @@ it("Correio outer/direct SES share one quota reservation; the 26th never invokes
     clientFactory: () => ({ send }),
   });
   const outer = createMailboxContentPolicySender(fixture.db, direct, true);
-  for (let i = 0; i < 25; i++) await outer.send(mail(f, id, "You requested a password reset."));
-  await expect(outer.send(mail(f, id, "You requested a password reset."))).rejects.toBeInstanceOf(
-    MailboxSendDeferredError,
-  );
+  for (let i = 0; i < 25; i++)
+    await outer.send(await mail(f, id, "You requested a password reset."));
+  await expect(
+    outer.send(await mail(f, id, "You requested a password reset.")),
+  ).rejects.toBeInstanceOf(MailboxSendDeferredError);
   expect(send).toHaveBeenCalledTimes(25);
   const [counter] = await fixture.db
     .select()
@@ -415,13 +417,14 @@ it("external SMTP receives same 25/day cap; unknown acceptance keeps its charge"
   const id = await box(f);
   const send = vi.fn().mockResolvedValue({ messageId: "synthetic-external" });
   const sender = createMailboxContentPolicySender(fixture.db, { send }, true);
-  for (let i = 0; i < 24; i++) await sender.send(mail(f, id, "Your password reset was requested."));
+  for (let i = 0; i < 24; i++)
+    await sender.send(await mail(f, id, "Your password reset was requested."));
   send.mockRejectedValueOnce(new Error("synthetic unknown acceptance"));
-  await expect(sender.send(mail(f, id, "Your password reset was requested."))).rejects.toThrow(
-    "synthetic unknown acceptance",
-  );
   await expect(
-    sender.send(mail(f, id, "Your password reset was requested.")),
+    sender.send(await mail(f, id, "Your password reset was requested.")),
+  ).rejects.toThrow("synthetic unknown acceptance");
+  await expect(
+    sender.send(await mail(f, id, "Your password reset was requested.")),
   ).rejects.toBeInstanceOf(MailboxSendDeferredError);
   expect(send).toHaveBeenCalledTimes(25);
 });
@@ -445,7 +448,7 @@ it("direct SES rechecks revocation after throttle; explicit deferral refunds onc
       });
     },
   });
-  await expect(sender.send(mail(f, id))).rejects.toBeInstanceOf(MailboxSendDeferredError);
+  await expect(sender.send(await mail(f, id))).rejects.toBeInstanceOf(MailboxSendDeferredError);
   expect(send).not.toHaveBeenCalled();
   const [counter] = await fixture.db
     .select()
@@ -458,12 +461,13 @@ it("Native personal CC passes campaign-disabled policy and cloud consent, unlike
   const f = await setup();
   const id = await box(f);
   const input = {
-    ...mail(f, id, "Can we meet tomorrow to discuss the document?"),
+    ...(await mail(f, id, "Can we meet tomorrow to discuss the document?")),
     cc: ["colleague@example.test"],
   };
   input.raw = Buffer.from(
     input.raw.toString().replace("Subject:", "Cc: colleague@example.test\r\nSubject:"),
   );
+  await authorizeWorkerDispatch(fixture.db, input);
   const send = vi.fn().mockResolvedValue({ messageId: "synthetic-personal-cc" });
   const azure = { send: vi.fn() };
   await createMailboxContentPolicySender(
@@ -578,6 +582,7 @@ async function volumeFixture() {
     createdAt: oldAt,
     data: {},
   });
+  await seedWorkerConfirmedHistory(fixture.db, f.teamId, f.from);
   const decision = async (overrides = {}) =>
     approveProductionVolume(fixture.db, {
       teamId: f.teamId,

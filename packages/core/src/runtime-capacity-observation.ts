@@ -1,5 +1,8 @@
 import { GetAccountCommand, type GetAccountResponse, SESv2Client } from "@aws-sdk/client-sesv2";
-import type { CommandCodeMeter } from "./graduated-commandcode-meter.js";
+import {
+  type CommandCodeMeter,
+  hasCommandCodeWindowHeadroomProof,
+} from "./graduated-commandcode-meter.js";
 import type { CapacityReceipt } from "./graduated-sending-policy.js";
 
 export type CapacityRegion = "us-east-1" | "eu-west-1";
@@ -68,7 +71,9 @@ export function fundedCreditUnits(meter: CommandCodeMeter, now: number): number 
     meter.fetchedAtMs < meter.requestStartedAtMs ||
     meter.fetchedAtMs > now ||
     now - meter.requestStartedAtMs >= TTL_MS ||
-    meter.windowExceeded !== false ||
+    (meter.windowExceeded !== false &&
+      !(meter.windowExceeded === null && hasCommandCodeWindowHeadroomProof(meter))) ||
+    meter.credits.belowThreshold !== false ||
     !finite(meter.availableCredits)
   )
     throw new Error("capacity_unavailable");

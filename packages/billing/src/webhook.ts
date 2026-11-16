@@ -118,6 +118,13 @@ export async function handleWebhook(
     return 400;
   }
   if (event.livemode !== deps.livemode) return 400;
+  // Verified redeliveries must not depend on provider availability. This is only
+  // a fast path: the transactional insert below still arbitrates concurrent IDs.
+  const [seen] = await deps.db
+    .select({ id: schema.stripeEvents.id })
+    .from(schema.stripeEvents)
+    .where(eq(schema.stripeEvents.id, event.id));
+  if (seen) return 200;
   const log = deps.log ?? console.warn;
   let paidCandidate:
     | { event: Stripe.Event; sub: Stripe.Subscription; mailbox: boolean }
@@ -125,11 +132,6 @@ export async function handleWebhook(
   // PIX provider effects are idempotent per session and run outside DB locks. Record dedupe only after success.
   const pixSession = pixSessionOf(event);
   if (pixSession) {
-    const [seen] = await deps.db
-      .select()
-      .from(schema.stripeEvents)
-      .where(eq(schema.stripeEvents.id, event.id));
-    if (seen) return 200;
     if (!(await settlePixCheckout(deps.db, deps, pixSession, log))) return 200;
     await deps.db
       .insert(schema.stripeEvents)

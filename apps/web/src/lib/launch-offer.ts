@@ -189,12 +189,19 @@ export function describeLaunchPlan(
   };
 }
 /** Presentation only; new-purchase authorization belongs to the server. */
-export function sendingOfferAvailability(rungOrVolume: string | number) {
-  if (["scale_1_5m", "scale_2_5m", 1_650_000, 2_750_000].includes(rungOrVolume))
+export function sendingOfferAvailability(
+  rungOrVolume: string | number,
+): "self_serve" | "availability_review" | "enterprise" {
+  // The current 3 RPM ceiling cannot fulfill a new monthly offer above Pro110K.
+  // Catalog quotas and existing signed contracts are not changed by this purchase fence.
+  if (
+    ["pro_200k", "scale_500k", "scale_1m", "scale_1_5m", "scale_2_5m"].includes(
+      String(rungOrVolume),
+    ) ||
+    (typeof rungOrVolume === "number" && rungOrVolume > 110_000)
+  )
     return "enterprise";
-  return rungOrVolume === "scale_1m" || rungOrVolume === 1_100_000
-    ? "availability_review"
-    : "self_serve";
+  return "self_serve";
 }
 export const sendingAvailabilityCopy = (locale: string) =>
   locale === "pt-BR" ? ptAvailability : enAvailability;

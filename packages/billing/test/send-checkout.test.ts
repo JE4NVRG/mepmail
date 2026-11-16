@@ -26,7 +26,7 @@ describe("durable Send checkout", () => {
     expect((await attempt()).status).toBe("created");
   });
   it.each([
-    { rung: "pro_200k" as const },
+    { rung: "starter" as const },
     { successUrl: "https://app/different" },
     { cancelUrl: "https://app/different" },
     { automaticTax: true },
@@ -226,6 +226,11 @@ describe("durable Send checkout", () => {
     f.sessions.values().next().value!.metadata = {};
     await expect(beginSendCheckout(f.deps, f.input)).rejects.toMatchObject({ code: "pending" });
     expect(f.sessions.size).toBe(1);
+    // The live ROOT hold was bound to that resolved attempt: it is read back exactly, never
+    // adopted as this purchase, and no second row may inherit its reservation ID.
+    const rows = await f.db.select().from(schema.sendCheckoutAttempts);
+    expect(rows.map((r) => r.id)).toEqual([row.id]);
+    expect(rows[0]?.status).toBe("resolved");
   });
   it("rejects mismatched correlated readback instead of issuing another Session", async () => {
     f.loseSession();

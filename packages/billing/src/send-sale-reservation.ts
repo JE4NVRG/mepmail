@@ -25,6 +25,50 @@ export type SaleReservation = {
   rung: PlanRungKey;
   subscriptionId: string | null;
 };
+// Authority is the original server-issued object, never its serializable fields.
+// Mint only after the root reservation transaction has committed.
+const upgradeSettlements = new WeakMap<
+  SaleReservation,
+  Readonly<{
+    teamId: string;
+    subscriptionId: string;
+    id: string;
+  }>
+>();
+
+/** Caller must hold the customer/team locks. Recheck in BOTH reporting phases.
+ * Unknown or ambiguous durable holds remain fenced; this never releases a hold.
+ */
+export async function canReportDuringSendSale(
+  tx: Db,
+  teamId: string,
+  subscriptionId: string | null,
+  reservation?: SaleReservation,
+): Promise<boolean> {
+  const holds = rows<{ target: string; data: SaleReservation }>(
+    await tx.execute(sql`
+      select h.target, h.data from ${schema.auditLog} h
+      where h.team_id=${teamId} and h.action='sending.sale_reserved'
+        and coalesce(h.data->>'kind','') not in ('card','pix')
+        and not exists(select 1 from ${schema.auditLog} r
+          where r.action='sending.sale_released' and r.team_id=h.team_id and r.target=h.target)`),
+  );
+  if (!holds.length) return true;
+  const scope = reservation && upgradeSettlements.get(reservation);
+  const hold = holds[0];
+  return !!(
+    scope &&
+    holds.length === 1 &&
+    hold &&
+    scope.teamId === teamId &&
+    scope.subscriptionId === subscriptionId &&
+    hold.target === scope.id &&
+    hold.data?.id === scope.id &&
+    hold.data.kind === "upgrade" &&
+    hold.data.subscriptionId === subscriptionId
+  );
+}
+
 export function lockSendSalePool(tx: Db): Promise<unknown> {
   return tx.execute(
     sql`select pg_advisory_xact_lock(18475923,49), pg_advisory_xact_lock(hashtext(${SALE_POOL_LOCK})), pg_advisory_xact_lock(18475923,48)`,
@@ -47,7 +91,7 @@ export async function reserveSendSaleCapacity(
   source?: SendSaleCapacitySource,
 ): Promise<SaleReservation> {
   const observation = await captureSendSaleCapacity(source);
-  return db.transaction(async (transaction) => {
+  const committed = await db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
     // Pool always precedes customer/team/member locks. Lifecycle release never acquires the pool.
     await lockSendSalePool(tx);
@@ -120,6 +164,18 @@ export async function reserveSendSaleCapacity(
     await assertSendSaleObservationFresh(tx, observation);
     return reservation;
   });
+  const reservation: SaleReservation = Object.freeze({ ...committed });
+  if (reservation.kind === "upgrade" && reservation.subscriptionId) {
+    upgradeSettlements.set(
+      reservation,
+      Object.freeze({
+        teamId: input.teamId,
+        subscriptionId: reservation.subscriptionId,
+        id: reservation.id,
+      }),
+    );
+  }
+  return reservation;
 }
 
 /** Call only after an exact provider identity confirms terminal failure or after its contract is persisted.

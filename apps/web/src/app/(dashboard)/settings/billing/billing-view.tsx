@@ -1107,12 +1107,16 @@ export function BillingView({
               const isCurrent = r.key === current.key;
               const availability = sendingOfferAvailability(r.key);
               const availabilityCopy = sendingAvailabilityCopy(locale);
-              const forSale =
-                canManage && r.priceCents > 0 && !isCurrent && availability !== "enterprise";
+
               // Stripe charges a different rung at the same or a higher price now.
               // A reduction and keeping a pending downgrade's current rung are not purchases.
               const needsPurchaseReview =
                 !hasLiveSubscription || r.priceCents >= contractedRung.priceCents;
+              const forSale =
+                canManage &&
+                r.priceCents > 0 &&
+                !isCurrent &&
+                (!needsPurchaseReview || availability !== "enterprise");
               return (
                 <div key={p} className="ms-plan" data-open={active || undefined}>
                   <div className="ms-plan-name">{planName(p)}</div>
@@ -1142,13 +1146,12 @@ export function BillingView({
                       })}
                     </div>
                   ) : null}
-                  {!isCurrent && availability === "enterprise" ? (
+                  {!isCurrent && needsPurchaseReview && availability === "enterprise" ? (
                     <p>
                       <a href="mailto:suporte@mepmail.dev">{availabilityCopy.enterprise}</a>
                     </p>
                   ) : null}
-                  {availability === "availability_review" ? <p>{availabilityCopy.review}</p> : null}
-                  {isCurrent ? <p>{availabilityCopy.existing}</p> : null}
+                  {isCurrent || !needsPurchaseReview ? <p>{availabilityCopy.existing}</p> : null}
                   <div className="ms-plan-cap">
                     <span className="ms-digits">{fmt.format(r.included)}</span>
                     <span className="ms-plan-per">
@@ -1190,12 +1193,12 @@ export function BillingView({
                             disabled={
                               busy ||
                               subscriptionChangesUnavailable ||
-                              salesPaused ||
+                              (needsPurchaseReview && salesPaused) ||
                               (needsPurchaseReview && !purchaseReview.allowed)
                             }
                             onClick={() =>
                               subscriptionChangesUnavailable ||
-                              salesPaused ||
+                              (needsPurchaseReview && salesPaused) ||
                               (needsPurchaseReview && !purchaseReview.allowed)
                                 ? undefined
                                 : hasLiveSubscription

@@ -152,7 +152,11 @@ it("actual existing adapter rejects invalid JSON before worker provider", async 
       baseUrl: "https://api.commandcode.ai/provider/v1",
       apiKey: "synthetic-fixture",
       fetch: async () =>
-        new Response(JSON.stringify({ choices: [{ message: { content: "{invalid JSON}" } }] })),
+        new Response(
+          JSON.stringify({
+            choices: [{ finish_reason: "stop", message: { content: "{invalid JSON}" } }],
+          }),
+        ),
     }),
   );
   await held(f.id, d);
@@ -719,7 +723,9 @@ it.each([
     apiKey: "fixture-only",
     fetch: async () =>
       new Response(
-        JSON.stringify({ choices: [{ message: { content: JSON.stringify(answers) } }] }),
+        JSON.stringify({
+          choices: [{ finish_reason: "stop", message: { content: JSON.stringify(answers) } }],
+        }),
         { status: 200 },
       ),
   });
@@ -734,7 +740,12 @@ it("actual HTTP adapter complete clean control reaches only the capturing transp
     fetch: async () =>
       new Response(
         JSON.stringify({
-          choices: [{ message: { content: JSON.stringify(syntheticCompleteCleanAnswers) } }],
+          choices: [
+            {
+              finish_reason: "stop",
+              message: { content: JSON.stringify(syntheticCompleteCleanAnswers) },
+            },
+          ],
         }),
         { status: 200 },
       ),

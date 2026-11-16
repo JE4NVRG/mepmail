@@ -40,7 +40,7 @@ describe("createCheckoutSession", () => {
     ]);
   });
   it("automaticTax off leaves checkout untaxed", async () => {
-    await createCheckoutSession(fixture.deps, { ...fixture.input, rung: "pro_200k" });
+    await createCheckoutSession(fixture.deps, { ...fixture.input, rung: "pro_100k" });
     expect(fixture.state.checkouts[0]).toMatchObject({
       automatic_tax: { enabled: false },
       tax_id_collection: { enabled: false },

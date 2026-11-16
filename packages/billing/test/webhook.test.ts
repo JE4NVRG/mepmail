@@ -105,7 +105,13 @@ describe("handleWebhook", () => {
 
   it("rejects an event whose mode does not match the configured key", async () => {
     await customerTeam();
-    state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "active");
+    state.subscriptions.sub_1 = subscription(
+      "sub_1",
+      "cus_1",
+      "active",
+      "millionsend_pro_100k_monthly",
+      { overageKey: "millionsend_pro_100k_overage" },
+    );
     const payload = event(
       "customer.subscription.created",
       { id: "sub_1", object: "subscription", customer: "cus_1" },
@@ -119,7 +125,13 @@ describe("handleWebhook", () => {
 
   it("processes an event once; redeliveries are acknowledged without side effects", async () => {
     const teamId = await customerTeam();
-    state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "active");
+    state.subscriptions.sub_1 = subscription(
+      "sub_1",
+      "cus_1",
+      "active",
+      "millionsend_pro_100k_monthly",
+      { overageKey: "millionsend_pro_100k_overage" },
+    );
     const payload = subEvent("customer.subscription.created", state.subscriptions.sub_1);
     expect(await deliver(payload)).toBe(200);
     expect((await team(teamId))?.plan).toBe("pro");
@@ -272,6 +284,10 @@ describe("handleWebhook", () => {
 
   it("re-points a metered item priced for another rung", async () => {
     const teamId = await customerTeam();
+    await db
+      .update(schema.teams)
+      .set({ stripeSubscriptionId: "sub_1" })
+      .where(eq(schema.teams.id, teamId));
     state.subscriptions.sub_1 = subscription(
       "sub_1",
       "cus_1",
@@ -450,7 +466,13 @@ describe("handleWebhook", () => {
   it("checkout.session.completed applies the plan to the pre-created customer only", async () => {
     const linked = await customerTeam("cus_1");
     const other = await createTeam(db, "other");
-    state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "active");
+    state.subscriptions.sub_1 = subscription(
+      "sub_1",
+      "cus_1",
+      "active",
+      "millionsend_pro_100k_monthly",
+      { overageKey: "millionsend_pro_100k_overage" },
+    );
     state.subscriptions.sub_x = subscription("sub_x", "cus_unknown", "active");
     await deliver(
       event("checkout.session.completed", {
@@ -487,6 +509,7 @@ describe("handleWebhook", () => {
     const teamId = await customerTeam();
     state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "active", undefined, {
       cancelAt: 1_900_000_000,
+      overageKey: "millionsend_pro_100k_overage",
     });
     expect(
       await deliver(event("customer.subscription.updated", { id: "sub_1", customer: "cus_1" })),
@@ -499,7 +522,13 @@ describe("handleWebhook", () => {
           .where(eq(schema.teams.id, teamId))
       )[0]?.cancelAt;
     expect((await cancelAt())?.toISOString()).toBe(new Date(1_900_000_000 * 1000).toISOString());
-    state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "active");
+    state.subscriptions.sub_1 = subscription(
+      "sub_1",
+      "cus_1",
+      "active",
+      "millionsend_pro_100k_monthly",
+      { overageKey: "millionsend_pro_100k_overage" },
+    );
     expect(
       await deliver(event("customer.subscription.updated", { id: "sub_1", customer: "cus_1" })),
     ).toBe(200);
@@ -514,6 +543,7 @@ describe("handleWebhook", () => {
       "cus_1",
       "active",
       "millionsend_scale_500k_monthly",
+      { overageKey: "millionsend_scale_500k_overage" },
     );
     await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_new));
     await deliver(subEvent("customer.subscription.deleted", state.subscriptions.sub_old));
@@ -796,7 +826,13 @@ describe("handleWebhook", () => {
 
   it("rolls back the ledger row when Stripe cannot be reached, so the retry is processed", async () => {
     const teamId = await customerTeam();
-    const recoveredSubscription = subscription("sub_gone", "cus_1", "active");
+    const recoveredSubscription = subscription(
+      "sub_gone",
+      "cus_1",
+      "active",
+      "millionsend_pro_100k_monthly",
+      { overageKey: "millionsend_pro_100k_overage" },
+    );
     const payload = subEvent("customer.subscription.created", recoveredSubscription);
 
     await expect(deliver(payload)).rejects.toThrow("No such subscription");
@@ -854,6 +890,7 @@ describe("reconcileTeamPlan", () => {
       "cus_1",
       "active",
       "millionsend_scale_500k_monthly",
+      { overageKey: "millionsend_scale_500k_overage" },
     );
     await reconcileTeamPlan(deps(), teamId);
     // Expansions ride on the retrieve: a list nests them one level deeper than Stripe allows.
@@ -1051,7 +1088,13 @@ describe("the system plan", () => {
   it("is never written by Stripe: a webhook or a reconcile for its customer leaves the row alone", async () => {
     const teamId = await customerTeam();
     await db.update(schema.teams).set({ plan: "system" }).where(eq(schema.teams.id, teamId));
-    state.subscriptions.sub_1 = subscription("sub_1", "cus_1", "active");
+    state.subscriptions.sub_1 = subscription(
+      "sub_1",
+      "cus_1",
+      "active",
+      "millionsend_pro_100k_monthly",
+      { overageKey: "millionsend_pro_100k_overage" },
+    );
     expect(
       await deliver(subEvent("customer.subscription.created", state.subscriptions.sub_1)),
     ).toBe(200);
