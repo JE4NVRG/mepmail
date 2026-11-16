@@ -20,7 +20,7 @@ export function TeamReputation() {
     ...trpc.reputation.get.queryOptions({ domainId }),
     retry: false,
     enabled: domains.isSuccess && validScope,
-    placeholderData: undefined,
+    placeholderData: () => undefined,
   });
   const error = domains.isError ? domains.error : query.isError ? query.error : null;
   const status = error

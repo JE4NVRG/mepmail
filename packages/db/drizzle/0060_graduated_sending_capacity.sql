@@ -46,3 +46,10 @@ DO $$ BEGIN
    FOREIGN KEY(mailbox_outbox_id) REFERENCES mailbox_outbox(id) ON DELETE SET NULL;
  END IF;
 END $$;
+
+-- Retained participation checks must not scan all historical email attempts or
+-- MAIN audit activity on every base-only health projection.
+CREATE INDEX sending_judge_native_participation_idx ON sending_judge_attempts(team_id)
+ WHERE message_kind='mailbox';
+CREATE INDEX audit_native_participation_idx ON audit_log(team_id)
+ WHERE action LIKE 'mailbox.%';

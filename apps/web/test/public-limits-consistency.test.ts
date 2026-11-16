@@ -53,6 +53,14 @@ describe("one overage rule on every public page", () => {
   it.each(LOCALES)("takes every number of the rule from the code (%s)", (locale) => {
     const rule = messages(locale, "pricing").faq.items[0].a as string;
     expect(backlogDays).toBe(3);
+    expect(rule).toMatch(
+      locale === "en" ? /not guaranteed provider throughput/i : /não vazão garantida do provedor/i,
+    );
+    expect(rule).toMatch(
+      locale === "en"
+        ? /graduation stage, safety buffer and available regional resources/i
+        : /etapa de graduação, da margem de segurança e dos recursos regionais disponíveis/i,
+    );
     expect(rule).toContain(`${QUOTA_TOLERANCE * 100}%`);
     expect(rule).toContain(`${backlogDays}×`);
     expect(rule).toContain(`${OVERAGE_HARD_CAP}×`);
@@ -192,15 +200,12 @@ describe("terms and wording", () => {
         text.includes(pct(coreNumber("deliverability.ts", "PAUSE_COMPLAINT_RATE"))),
       );
       expect(answer, locale).toBeDefined();
-      for (const rate of ["PAUSE_BOUNCE_RATE", "WARN_BOUNCE_RATE", "WARN_COMPLAINT_RATE"])
-        expect(answer).toContain(pct(coreNumber("deliverability.ts", rate)));
-      for (const count of [
-        "MIN_PAUSE_HARD_BOUNCES",
-        "MIN_PAUSE_COMPLAINTS",
-        "MIN_GUARDRAIL_VOLUME",
-      ])
-        expect(answer).toContain(String(coreNumber("deliverability.ts", count)));
-      expect(answer).toContain(String(coreNumber("deliverability.ts", "GUARDRAIL_WINDOW_DAYS")));
+      expect(coreNumber("deliverability.ts", "PAUSE_COMPLAINT_RATE")).toBe(0.001);
+      expect(coreNumber("deliverability.ts", "PAUSE_BOUNCE_RATE")).toBe(0.05);
+      expect(answer).toContain(pct(0.05));
+      expect(answer).toMatch(
+        locale === "en" ? /no minimum sample/i : /Não há isenção por amostra mínima/i,
+      );
       // No SLA is promised; the status page is linked.
       const status = messages(locale, "support").faq.items.find(
         (item: { link: { href: string } }) => item.link.href === "/status",

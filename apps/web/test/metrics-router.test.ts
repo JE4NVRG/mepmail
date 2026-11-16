@@ -281,7 +281,7 @@ async function seedConfirmedWindow(teamId: string, sent: number, events: number)
 describe("metrics.health", () => {
   it("pauses when confirmed hard bounces cross the internal rolling 24-hour line", async () => {
     const teamId = await createTeam(db, "acme");
-    // 120/2000 = 6%, strictly above internal policy 2%.
+    // 120/2000 = 6%, strictly above internal policy 5%.
     await seedConfirmedWindow(teamId, 2000, 120);
 
     const result = await callerFor(teamId).metrics.health();
@@ -297,8 +297,8 @@ describe("metrics.health", () => {
     expect(result.thresholds).toEqual({
       warnBounce: 0.015,
       warnComplaint: 0.0005,
-      pauseBounce: 0.02,
-      pauseComplaint: 0.0008,
+      pauseBounce: 0.05,
+      pauseComplaint: 0.001,
     });
   });
 

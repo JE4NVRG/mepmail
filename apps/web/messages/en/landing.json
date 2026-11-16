@@ -239,7 +239,7 @@
         "cta": "Start with Scale 2.75M"
       }
     ],
-    "note": "Sending capacity grows with verification and clean activity. Payment does not bypass safety limits; a monthly allowance is not immediate daily capacity. Daily comparisons use a nominal 30-day month, not a guaranteed sending schedule. Plan billing allowances and overage terms remain unchanged. Current sending limits are shown in your team reputation panel.",
+    "note": "Sending capacity grows with verification and clean activity. The 50% billing tolerance, queue ceiling of 3× nominal daily quota and monthly ceiling of 5× included volume (up to 4× billed as overage) are billing and queue limits, not guaranteed provider throughput. Effective sending is limited by the current graduation stage, safety buffer and available regional resources; payment never bypasses those controls. With paid overage disabled, sending stops at the monthly allowance. Pro 110K annual is US$ 290 upfront; its 110,000 allowance renews monthly with no accumulated annual balance or metered overage. Current sending limits appear in your team reputation panel.",
     "founders": {
       "title": "Founders program",
       "items": [
@@ -291,7 +291,7 @@
       },
       {
         "q": "What happens when I go over the quota?",
-        "a": "Sending capacity grows with verification and clean activity. Payment does not bypass safety limits; a monthly allowance is not immediate daily capacity. Daily comparisons use a nominal 30-day month, not a guaranteed sending schedule. Plan billing allowances and overage terms remain unchanged. Current sending limits are shown in your team reputation panel."
+        "a": "Sending capacity grows with verification and clean activity. The 50% billing tolerance, queue ceiling of 3× nominal daily quota and monthly ceiling of 5× included volume (up to 4× billed as overage) are billing and queue limits, not guaranteed provider throughput. Effective sending is limited by the current graduation stage, safety buffer and available regional resources; payment never bypasses those controls. With paid overage disabled, sending stops at the monthly allowance. Pro 110K annual is US$ 290 upfront; its 110,000 allowance renews monthly with no accumulated annual balance or metered overage. Current sending limits appear in your team reputation panel."
       },
       {
         "q": "Do I need a credit card to start?",

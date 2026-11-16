@@ -50,6 +50,67 @@ vi.mock("@/server/billing", async (original) => {
   };
 });
 
+// Only resource observations and external transports are synthetic; admission and business rules stay real.
+
+vi.mock("@millionsend/core", async (original) => ({
+  ...(await original<typeof import("@millionsend/core")>()),
+  getGraduatedSendingContext: async () => {
+    const now = Date.now();
+    const issued = new Date(now - 100).toISOString();
+    const expires = new Date(now + 4900).toISOString();
+    const stock = 302457600 * 200000;
+    const receipt = {
+      version: 1 as const,
+      region: "us-east-1" as const,
+      issuedAt: issued,
+      expiresAt: expires,
+      dailySemantics: "nominal-flow-ceiling-not-resource-guarantee" as const,
+      globalDaily: 4320,
+      globalPerMinute: 3,
+      tenantPerMinute: 3,
+      judgePerMinute: 3,
+      observations: {
+        sesMax24HourSend: 54900,
+        sesSentLast24Hours: 0,
+        sesUsefulNominalDaily: 53802,
+        sesMaxSendRate: 14,
+        modelBudgetScope: "original-primary-shared-not-exclusive" as const,
+      },
+      buffers: {
+        sesRemaining24Hours: 53802,
+        modelCreditUnitsAfterSafetyFloor: stock,
+        modelFramesBeforeLocalCommitments: 200000,
+        localCommitments: "parent-ledger-required" as const,
+      },
+      commercial: {
+        judgeTokensPerMinute: 3006144,
+        nominalJudgeDailyTokens: 3006144 * 1440,
+        worstCaseTokensPerAdmission: 1002048,
+        worstCaseCostUsd: 0.3024576,
+      },
+    } satisfies import("../../../packages/core/src/runtime-capacity-observation").RuntimeCapacityReceipt;
+    return Object.freeze({
+      clock: () => new Date(now),
+      capacityReceipt: receipt,
+      regionalCapacity: { "us-east-1": receipt, "eu-west-1": null },
+      judgeEnvelope: Object.freeze({
+        accountKey: "commandcode-primary",
+        meterId: crypto.randomUUID(),
+        meterAt: issued,
+        meterExpiresAt: expires,
+        rpm: 3,
+        tenantRpm: 3,
+        tpm: 3006144,
+        concurrency: 1,
+        maxInputTokens: 1000000,
+        maxOutputTokens: 2048,
+        reservedCreditUnits: 302457600,
+        remainingCreditUnits: stock,
+      }),
+    });
+  },
+}));
+
 // Only the external queue transport is synthetic; authorization/release stay real.
 vi.mock("@/server/queue", async (original) => ({
   ...(await original<typeof import("@/server/queue")>()),

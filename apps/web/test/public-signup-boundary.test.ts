@@ -249,6 +249,20 @@ function ext(id: string): VmValue {
     };
   if (s === "lib/launch-offer")
     return {
+      ...compile(
+        source("apps/web/src/lib/launch-offer.ts").slice(
+          source("apps/web/src/lib/launch-offer.ts").indexOf(
+            "export function sendingOfferAvailability(",
+          ),
+          source("apps/web/src/lib/launch-offer.ts").indexOf(
+            "export const sendingAvailabilityCopy",
+          ),
+        ),
+        "sending-offer-availability.ts",
+        ext,
+      ),
+      sendingAvailabilityCopy: (locale: string) =>
+        JSON.parse(source(`apps/web/messages/${locale}/sending-availability.json`)),
       CORREIO_FROM_BRL_CENTS: 100,
       CORREIO_FROM_CENTS: 100,
       LAUNCH_OFFER: {

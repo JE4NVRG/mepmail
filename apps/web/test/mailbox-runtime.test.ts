@@ -1,6 +1,6 @@
 import { MailboxSendDeferredError, MailboxSendRejectedError } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseMailboxSesOutboundRegions } from "../../worker/src/mailbox-outbound-region.js";
 import {
   createMailboxContentPolicySender,
@@ -24,12 +24,28 @@ const clientFactory = (options: unknown) => {
     },
   };
 };
-function database(extra = {}) {
+// Table-specific synthetic authority, not caller-provided approval. This suite
+// exercises the legacy SES adapter; graduated SQL/metering has separate native coverage.
+function database(
+  extra: Record<string, unknown> = {},
+  authority: {
+    approvalKind?: string;
+    approvedMembershipId?: string;
+    ownerMembershipId?: string | null;
+  } = {},
+) {
+  const periodStart = new Date("2026-01-01T00:00:00Z");
+  const periodEnd = new Date("2030-01-01T00:00:00Z");
+  const membershipId = "member_fixture";
+  const userId = "user_fixture";
   const row = {
     name: "Synthetic runtime",
     plan: "free",
     createdAt: new Date("2025-01-01"),
     reviewedAt: null,
+    sendReviewAt: null,
+    sendReviewClearedAt: null,
+    suspended: null,
     heldAt: null,
     ceiling: null,
     region: "us-east-1",
@@ -42,34 +58,93 @@ function database(extra = {}) {
     tenantName: "tenant_fixture",
     tenantAssociatedAt: new Date(),
     tenantConfigSet: "private_mail_fixture",
+    relayEnabledAt: new Date(),
     ...extra,
   };
   const db = {
     transaction: async (run: (tx: Db) => Promise<unknown>) => run(db as unknown as Db),
     execute: async () => [{ accepted: 1 }],
-    select: () => {
+    select: (selection?: Record<string, unknown>) => {
       let source: unknown;
+      let joined = false;
       const query = {
         from: (table: unknown) => {
           source = table;
           return query;
         },
-        innerJoin: () => query,
+        innerJoin: () => {
+          joined = true;
+          return query;
+        },
         leftJoin: () => query,
         // This fixture represents a legacy team without a signup assessment.
         where: () => query,
         for: () => query,
         limit: () => query,
         orderBy: () => query,
-        // biome-ignore lint/suspicious/noThenProperty: Drizzle queries are intentionally awaitable chains in this synthetic database.
-        then: (resolve: (rows: unknown[]) => unknown) =>
-          resolve(
-            [schema.teamSignupRisk, schema.emails, schema.emailEvents, schema.auditLog].includes(
-              source as never,
-            )
-              ? []
-              : [row],
-          ),
+        // biome-ignore lint/suspicious/noThenProperty: Synthetic Drizzle awaitable.
+        then: (resolve: (rows: unknown[]) => unknown) => {
+          if (
+            [
+              schema.teamSignupRisk,
+              schema.emails,
+              schema.emailEvents,
+              schema.auditLog,
+              schema.mailboxGrants,
+            ].includes(source as never)
+          )
+            return resolve([]);
+          if (source === schema.mailboxOutbox)
+            return resolve([
+              {
+                id: input.outboxId,
+                teamId: input.teamId,
+                mailboxId: input.mailboxId,
+                attemptId: input.attemptId,
+                status: "sending",
+                approvalKind: authority.approvalKind ?? "human",
+                agentKeyId: null,
+                approvedBy: userId,
+                approvedMembershipId: authority.approvedMembershipId ?? membershipId,
+                periodStart,
+                periodEnd,
+              },
+            ]);
+          if (source === schema.teamMembers) return resolve([{ id: membershipId }]);
+          if (source === schema.mailboxSubscriptions)
+            return resolve([
+              {
+                teamId: input.teamId,
+                status: "active",
+                seats: 1,
+                periodStart,
+                periodEnd,
+                interval: "month",
+              },
+            ]);
+          if (source === schema.mailboxes)
+            return resolve([
+              joined
+                ? row
+                : {
+                    id: input.mailboxId,
+                    teamId: input.teamId,
+                    origin: "domain",
+                    status: "planned",
+                    domainId: "22222222-2222-4222-8222-222222222222",
+                    address: input.from,
+                    ownerUserId: userId,
+                    ownerMembershipId:
+                      authority.ownerMembershipId === undefined
+                        ? membershipId
+                        : authority.ownerMembershipId,
+                  },
+            ]);
+          if (source === schema.teams || source === schema.domains) return resolve([row]);
+          throw new Error(
+            `unconfigured_fixture_query:${String(source)}:${Object.keys(selection ?? {}).join(",")}`,
+          );
+        },
       };
       return query;
     },
@@ -117,7 +192,9 @@ const input = {
   ),
 };
 const configurationSets = { "us-east-1": "private_mail_fixture" };
+afterEach(() => vi.unstubAllEnvs());
 beforeEach(() => {
+  vi.stubEnv("SENDING_PROVIDER_POLICY_JSON", "{}");
   provider.options.length = 0;
   provider.inputs.length = 0;
   provider.send.mockReset().mockResolvedValue({ MessageId: "accepted_fixture" });
@@ -277,6 +354,13 @@ describe("private Mail runtime adapters", () => {
       }).send(input),
     ).rejects.toBeInstanceOf(MailboxSendDeferredError);
     expect(sends).not.toContain("SendEmailCommand");
+    if (failure === "no-name") expect(sends).toEqual([]);
+    else {
+      expect(sends).toContain("CreateTenantCommand");
+      if (failure === "association")
+        expect(sends).toContain("CreateTenantResourceAssociationCommand");
+      else expect(sends).toContain("GetTenantCommand");
+    }
   });
   it("rejects duplicated From headers even when the parser collapses them to one", async () => {
     const bad = Buffer.from("From: evil@example.invalid\r\n" + input.raw.toString());
@@ -363,7 +447,14 @@ describe("private Mail runtime adapters", () => {
       checkRecipients,
       clientFactory,
     }).send(mutable);
-    await started;
+    // Surface an early authorization rejection instead of waiting forever for a
+    // permit that was never reached (and leaking an unhandled rejection).
+    await Promise.race([
+      started,
+      pending.then(() => {
+        throw new Error("send_completed_before_permit");
+      }),
+    ]);
     expect(throttle).toHaveBeenCalledWith("us-east-1", 3);
     expect(provider.send).not.toHaveBeenCalled();
     mutable.raw.fill(0);
@@ -482,15 +573,44 @@ describe("private Mail runtime adapters", () => {
     ).rejects.toBeInstanceOf(MailboxSendRejectedError);
     expect(provider.send).not.toHaveBeenCalled();
   });
-  it("Cloud suspended teams retain the explicit sending_paused hold before provider admission", async () => {
+  it("Cloud suspended teams fail closed at live mailbox entitlement before adapter admission", async () => {
     await expect(
       createMailboxSesSender(database({ suspendedAt: new Date() }), {
         configurationSets,
         clientFactory,
       }).send(input),
-    ).rejects.toMatchObject({ reason: "sending_paused" });
+    ).rejects.toMatchObject({ reason: "preflight_unavailable" });
+    // Current mailbox entitlement denies before the inner SES sending_paused gate.
+    expect(provider.options).toHaveLength(0);
     expect(provider.send).not.toHaveBeenCalled();
   });
+  it.each([
+    { approvalKind: "caller_claimed" },
+    { approvedMembershipId: "stale_membership" },
+    { ownerMembershipId: null },
+  ])(
+    "denies invalid persisted mailbox authority %j before adapter admission",
+    async (authority) => {
+      const throttle = vi.fn();
+      const checkRecipients = vi.fn().mockResolvedValue(true);
+      await expect(
+        createMailboxSesSender(database({}, authority), {
+          configurationSets,
+          throttle,
+          checkRecipients,
+          clientFactory,
+        }).send({
+          ...input,
+          approvedBy: "caller",
+          approvedMembershipId: "member_fixture",
+        } as typeof input),
+      ).rejects.toMatchObject({ reason: "review_required" });
+      expect(throttle).not.toHaveBeenCalled();
+      expect(checkRecipients).not.toHaveBeenCalled();
+      expect(provider.options).toHaveLength(0);
+      expect(provider.send).not.toHaveBeenCalled();
+    },
+  );
   it("Cloud without a configured judge still holds instead of borrowing fixture approval", async () => {
     await expect(
       createRawMailboxSesSender(database(), {

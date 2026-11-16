@@ -30,6 +30,7 @@ import {
   lockCustomer,
   prepareSubscription,
 } from "./subscription.js";
+import { withSubscriptionProjectionRetry } from "./subscription-projection-retry.js";
 
 export interface WebhookDeps extends BillingDeps {
   webhookSecret: string;
@@ -180,121 +181,128 @@ export async function handleWebhook(
     return 200;
   }
   const earlyRef = subscriptionRef(event);
-  const prepared =
-    earlyRef?.subscriptionId && earlyRef.customerId
-      ? await prepareSubscription(deps, earlyRef.customerId, earlyRef.subscriptionId)
-      : null;
-  const applied = await deps.db.transaction(async (tx): Promise<AppliedWebhookEvent | null> => {
-    const inserted = await tx
-      .insert(schema.stripeEvents)
-      .values({ id: event.id, type: event.type })
-      .onConflictDoNothing()
-      .returning({ id: schema.stripeEvents.id });
-    if (inserted.length === 0) return null;
+  const applied = await withSubscriptionProjectionRetry(
+    () =>
+      earlyRef?.subscriptionId && earlyRef.customerId
+        ? prepareSubscription(deps, earlyRef.customerId, earlyRef.subscriptionId)
+        : Promise.resolve(null),
+    (prepared) =>
+      deps.db.transaction(async (tx): Promise<AppliedWebhookEvent | null> => {
+        const inserted = await tx
+          .insert(schema.stripeEvents)
+          .values({ id: event.id, type: event.type })
+          .onConflictDoNothing()
+          .returning({ id: schema.stripeEvents.id });
+        if (inserted.length === 0) return null;
 
-    const ref = subscriptionRef(event);
-    if (!ref?.subscriptionId) return null;
-    await lockCustomer(tx as unknown as Db, ref.customerId ?? ref.subscriptionId);
-    let sub =
-      prepared?.sub ??
-      (await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
-        expand: SUBSCRIPTION_EXPAND,
-      }));
-    const mail = isMailboxSubscription(sub);
-    if (mail)
-      sub = await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
-        expand: [...SUBSCRIPTION_EXPAND, "latest_invoice", "default_payment_method"],
-      });
-    let paymentInvoice: Stripe.Invoice | undefined;
-    if (mail && "mailboxCatalog" in deps && deps.stripe.invoices) {
-      const [attempt] = await tx
-        .select({ invoiceId: mailboxManagementRequests.stripeInvoiceId })
-        .from(mailboxManagementRequests)
-        .where(
-          and(
-            eq(mailboxManagementRequests.stripeSubscriptionId, sub.id),
-            eq(mailboxManagementRequests.stripeCustomerId, idOf(sub.customer) ?? ""),
-            eq(mailboxManagementRequests.livemode, deps.livemode),
-            eq(mailboxManagementRequests.action, "increase"),
-            inArray(mailboxManagementRequests.status, ["creating", "pending"]),
-          ),
-        );
-      if (attempt?.invoiceId && attempt.invoiceId !== idOf(sub.latest_invoice))
-        paymentInvoice = await deps.stripe.invoices.retrieve(attempt.invoiceId);
-    }
-    const projected =
-      "mailboxCatalog" in deps
-        ? await applyMailboxSubscription(
+        const ref = subscriptionRef(event);
+        if (!ref?.subscriptionId) return null;
+        await lockCustomer(tx as unknown as Db, ref.customerId ?? ref.subscriptionId);
+        let sub =
+          prepared?.sub ??
+          (await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
+            expand: SUBSCRIPTION_EXPAND,
+          }));
+        const mail = isMailboxSubscription(sub);
+        if (mail)
+          sub = await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
+            expand: [...SUBSCRIPTION_EXPAND, "latest_invoice", "default_payment_method"],
+          });
+        let paymentInvoice: Stripe.Invoice | undefined;
+        if (mail && "mailboxCatalog" in deps && deps.stripe.invoices) {
+          const [attempt] = await tx
+            .select({ invoiceId: mailboxManagementRequests.stripeInvoiceId })
+            .from(mailboxManagementRequests)
+            .where(
+              and(
+                eq(mailboxManagementRequests.stripeSubscriptionId, sub.id),
+                eq(mailboxManagementRequests.stripeCustomerId, idOf(sub.customer) ?? ""),
+                eq(mailboxManagementRequests.livemode, deps.livemode),
+                eq(mailboxManagementRequests.action, "increase"),
+                inArray(mailboxManagementRequests.status, ["creating", "pending"]),
+              ),
+            );
+          if (attempt?.invoiceId && attempt.invoiceId !== idOf(sub.latest_invoice))
+            paymentInvoice = await deps.stripe.invoices.retrieve(attempt.invoiceId);
+        }
+        const projected =
+          "mailboxCatalog" in deps
+            ? await applyMailboxSubscription(
+                tx as unknown as Db,
+                sub,
+                deps.mailboxCatalog ?? null,
+                event.created,
+                paymentInvoice,
+              )
+            : null;
+        // One free trial per card: a trial on a card that already had one ends now.
+        if (mail && projected?.applied && projected.teamId && sub.status === "trialing") {
+          const claim = await claimMailboxTrial(
             tx as unknown as Db,
+            deps.stripe,
             sub,
-            deps.mailboxCatalog ?? null,
-            event.created,
-            paymentInvoice,
-          )
-        : null;
-    // One free trial per card: a trial on a card that already had one ends now.
-    if (mail && projected?.applied && projected.teamId && sub.status === "trialing") {
-      const claim = await claimMailboxTrial(
-        tx as unknown as Db,
-        deps.stripe,
-        sub,
-        projected.teamId,
-      );
-      if (claim !== "claimed") log(`stripe webhook ${event.id}: Correio trial ended (${claim})`);
-    }
-    if (!mail) {
-      if (!prepared) throw new Error("Missing bounded Send projection preflight");
-      await applyPreparedSubscription(
-        tx as unknown as Db,
-        prepared,
-        (m) => log(`stripe webhook ${event.id}: ${m}`),
-        deps.stripe,
-      );
-    }
-    const customerId = idOf(sub.customer);
-    // Send and Mail alike: the fraud screen holds the team's sending (Correio
-    // outbound included) for review when Radar blocked one of its payments. Mail
-    // is sold without Envio too, so its buyers are screened on their own.
-    if (customerId) {
-      await screenPaymentRisk(tx as unknown as Db, deps.stripe, customerId, (m) =>
-        log(`stripe webhook ${event.id}: ${m}`),
-      );
-    }
-    const [sendTeam] =
-      customerId && !mail && !projected?.applied
-        ? await tx
-            .select({ subscriptionId: schema.teams.stripeSubscriptionId, plan: schema.teams.plan })
-            .from(schema.teams)
-            .where(eq(schema.teams.stripeCustomerId, customerId))
-        : [];
-    await recordMetaPurchase(
-      tx as unknown as Db,
-      event,
-      sub,
-      mail || !!projected?.applied,
-      deps.advertisingConfig,
-    );
-    await recordGooglePurchase(
-      tx as unknown as Db,
-      event,
-      sub,
-      mail || !!projected?.applied,
-      deps.googleConversionConfig,
-    );
-    paidCandidate = { event, sub, mailbox: mail || !!projected?.applied };
-    return {
-      id: event.id,
-      type: event.type,
-      customerId,
-      subscriptionId: sub.id,
-      service:
-        mail || projected?.applied
-          ? "mailbox"
-          : sendTeam?.plan !== "system" && sendTeam?.subscriptionId === sub.id
-            ? "send"
-            : "ignored",
-    };
-  });
+            projected.teamId,
+          );
+          if (claim !== "claimed")
+            log(`stripe webhook ${event.id}: Correio trial ended (${claim})`);
+        }
+        if (!mail) {
+          if (!prepared) throw new Error("Missing bounded Send projection preflight");
+          await applyPreparedSubscription(
+            tx as unknown as Db,
+            prepared,
+            (m) => log(`stripe webhook ${event.id}: ${m}`),
+            deps.stripe,
+          );
+        }
+        const customerId = idOf(sub.customer);
+        // Send and Mail alike: the fraud screen holds the team's sending (Correio
+        // outbound included) for review when Radar blocked one of its payments. Mail
+        // is sold without Envio too, so its buyers are screened on their own.
+        if (customerId) {
+          await screenPaymentRisk(tx as unknown as Db, deps.stripe, customerId, (m) =>
+            log(`stripe webhook ${event.id}: ${m}`),
+          );
+        }
+        const [sendTeam] =
+          customerId && !mail && !projected?.applied
+            ? await tx
+                .select({
+                  subscriptionId: schema.teams.stripeSubscriptionId,
+                  plan: schema.teams.plan,
+                })
+                .from(schema.teams)
+                .where(eq(schema.teams.stripeCustomerId, customerId))
+            : [];
+        await recordMetaPurchase(
+          tx as unknown as Db,
+          event,
+          sub,
+          mail || !!projected?.applied,
+          deps.advertisingConfig,
+        );
+        await recordGooglePurchase(
+          tx as unknown as Db,
+          event,
+          sub,
+          mail || !!projected?.applied,
+          deps.googleConversionConfig,
+        );
+        paidCandidate = { event, sub, mailbox: mail || !!projected?.applied };
+        return {
+          id: event.id,
+          type: event.type,
+          customerId,
+          subscriptionId: sub.id,
+          service:
+            mail || projected?.applied
+              ? "mailbox"
+              : sendTeam?.plan !== "system" && sendTeam?.subscriptionId === sub.id
+                ? "send"
+                : "ignored",
+        };
+      }),
+  );
   // After the commit, and never before it: the caller's hook reports on an
   // event that is durable. A throwing hook is logged, not propagated — the
   // event is applied, and Stripe must not be told to redeliver it.

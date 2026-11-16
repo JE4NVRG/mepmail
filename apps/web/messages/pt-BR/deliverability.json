@@ -16,14 +16,14 @@
       "paused": "Novos envios pausados",
       "warning": "Transmissões em ritmo reduzido"
     },
-    "pauseWindow": "A pausa considera o dia atual e o anterior no calendário UTC. Essa janela é diferente do período escolhido nos gráficos.",
+    "pauseWindow": "A pausa considera as últimas 24 horas móveis. Essa janela é diferente do período escolhido nos gráficos.",
     "warningWindow": "Aviso e pausa usam a mesma janela móvel de 24 horas, independente do período dos gráficos. Política interna MepMail, não limites da AWS.",
     "pauseEvidence": "{metric}: {count} eventos em {sent} envios ({rate}), nas últimas 24 horas móveis.",
     "warningEvidence": "{metric}: taxa de {rate} nas últimas 24 horas móveis em UTC, em nível de aviso.",
     "criteriaTitle": "Quando novos envios são pausados",
-    "criteriaVolume": "A pausa por rejeição exige amostra real: 20 ou mais envios confirmados e 3 rejeições permanentes nas últimas 24 horas móveis. Uma reclamação pausa a partir da primeira, em qualquer volume. O piso estatístico de aviso é de 100 envios. Política interna MepMail, não limites da AWS:",
-    "bounceCriteria": "Pelo menos {count} rejeições permanentes e taxa estritamente superior a {rate}.",
-    "complaintCriteria": "Pelo menos {count} reclamações e taxa estritamente superior a {rate}.",
+    "criteriaVolume": "A confiança estatística do aviso não isenta pequenos remetentes da proteção. As taxas de pausa usam envios confirmados nas últimas 24 horas móveis, sem amostra mínima. Denominador sem evidência é desconhecido, nunca taxa zero.",
+    "bounceCriteria": "Taxa de rejeição permanente estritamente superior a {rate}, sem amostra mínima.",
+    "complaintCriteria": "Taxa de reclamação estritamente superior a {rate}, sem amostra mínima.",
     "stepsTitle": "O que revisar agora",
     "steps": {
       "list": "Corrija a lista na origem: retire endereços inválidos e interrompa novas tentativas para destinatários com rejeição permanente.",

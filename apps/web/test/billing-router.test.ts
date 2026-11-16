@@ -1519,7 +1519,7 @@ describe("real server capacity closes NEW sales only", () => {
   it.each([
     ["scale_1m", "capacity_insufficient"],
     ["pro_100k", "capacity_insufficient"],
-  ])("refuses %s checkout with %s before provider writes", async (rung, reason) => {
+  ] as const)("refuses %s checkout with %s before provider writes", async (rung, reason) => {
     vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false");
     tiny();
     const teamId = await createTeam(db, "capacity-fixture");

@@ -27,6 +27,8 @@ import { resolveSendBillingContract, verifiedSendBillingContract } from "./send-
 import type { SendSaleCapacitySource } from "./send-sale-capacity.js";
 import { releaseSendSaleCapacity, reserveSendSaleCapacity } from "./send-sale-reservation.js";
 import type { BillingStripe } from "./stripe.js";
+import { canonicalProjectionKey } from "./subscription-projection-key.js";
+import { SubscriptionProjectionChangedError } from "./subscription-projection-retry.js";
 
 type Plan = (typeof schema.planEnum.enumValues)[number];
 type PlanStatus = (typeof schema.planStatusEnum.enumValues)[number];
@@ -455,7 +457,7 @@ async function boundedRead<T>(request: Promise<T>): Promise<T> {
   }
 }
 const projectionKey = (team: typeof schema.teams.$inferSelect) =>
-  JSON.stringify([
+  canonicalProjectionKey([
     team.stripeCustomerId,
     team.stripeSubscriptionId,
     team.stripeSubscriptionCreated,
@@ -563,8 +565,30 @@ export async function applyPreparedSubscription(
       .from(schema.teams)
       .where(eq(schema.teams.id, prepared.teamId))
       .for("update");
-    if (!team || projectionKey(team) !== prepared.key)
-      throw new Error("Projection changed after provider readback");
+    if (!team || projectionKey(team) !== prepared.key) {
+      // Report field identities only, never customer IDs, contract values or
+      // timestamps. Keep the exact projection CAS refusal unchanged.
+      const fields = [
+        "stripeCustomerId",
+        "stripeSubscriptionId",
+        "stripeSubscriptionCreated",
+        "plan",
+        "planQuota",
+        "planStatus",
+        "billingTerms",
+        "sendBillingContract",
+        "currentPeriodStart",
+        "currentPeriodEnd",
+      ];
+      const before: unknown[] = JSON.parse(prepared.key ?? "[]");
+      const after: unknown[] = team ? JSON.parse(projectionKey(team)) : [];
+      const changed = fields.filter(
+        (_, index) => JSON.stringify(before[index]) !== JSON.stringify(after[index]),
+      );
+      throw new SubscriptionProjectionChangedError(
+        `Projection changed after provider readback (${team ? changed.join(",") : "team_missing"})`,
+      );
+    }
   }
   await applySubscription(tx, prepared.sub, log, stripe);
 }

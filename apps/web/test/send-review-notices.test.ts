@@ -156,7 +156,7 @@ describe("send review release notices", () => {
       )
       .returning({ id: schema.emails.id });
     await db.insert(schema.emailEvents).values(
-      accepted.slice(0, 3).map((email) => ({
+      accepted.slice(0, 6).map((email) => ({
         emailId: email.id,
         type: "bounced" as const,
         bounceType: "Permanent",

@@ -78,7 +78,7 @@ vi.mock("@millionsend/core", async (importOriginal) => ({
 }));
 const caller = createCallerFactory(router({ reputation: reputationRouter }));
 describe("explicit owned-domain reputation with composed getter and PGlite SQL", () => {
-  it("anonymous 403 / cross-team domain 403 / own mature / own fresh", async () => {
+  it("anonymous 401 / cross-team domain 403 / own mature / own fresh", async () => {
     const { db, close } = await createTestDb();
     try {
       // test-utils owns the real main DDL; this getter now also reads only
@@ -179,7 +179,7 @@ describe("explicit owned-domain reputation with composed getter and PGlite SQL",
         caller({ db, teamId: a, role: "owner", session: null }).reputation.get({
           domainId: mature,
         }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
       await expect(
         caller({ db, teamId: a, role: "owner", session }).reputation.get({ domainId: foreign }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });

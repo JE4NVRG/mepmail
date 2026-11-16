@@ -3,7 +3,11 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq, sql } from "drizzle-orm";
 import { campaignDomainDnsReady } from "./campaign-consent.js";
-import { fetchDeliverabilityHealth, nativeReputationRows } from "./deliverability.js";
+import {
+  fetchDeliverabilityHealth,
+  nativeReputationRows,
+  nativeReputationSchemaReady,
+} from "./deliverability.js";
 import { firstRow } from "./driver-result.js";
 import {
   budgetBackedDailyCeiling,
@@ -89,6 +93,17 @@ async function sesHeadroom(
     ![remaining, observed].every((n) => Number.isSafeInteger(n) && n! >= 0)
   )
     throw new Error("capacity_accounting_unknown");
+  const nativeReady = await nativeReputationSchemaReady(db);
+  const nativeOutbox = nativeReady
+    ? sql`mailbox_outbox`
+    : sql`(
+    select null::uuid as id, null::uuid as team_id, null::uuid as mailbox_id,
+      null::text as provider_message_id, null::text as status,
+      null::timestamptz as accepted_at where false)`;
+  const nativeBoxes = nativeReady
+    ? sql`mailboxes`
+    : sql`(
+    select null::uuid as id, null::uuid as team_id, null::text as origin where false)`;
   const row = firstRow<{ held: string; covered: string }>(
     await db.execute(sql`
   with reservations as materialized (
@@ -108,8 +123,8 @@ async function sesHeadroom(
    left join lateral (select min(v.occurred_at) as accepted_at from ${schema.emailEvents} v
     where v.email_id=e.id and (v.type='sent' or v.sns_message_id is not null)
      and v.occurred_at>=a.created_at and v.occurred_at<=${now} and v.created_at<=${now}) event_proof on true
-   left join mailbox_outbox o on o.id=case when a.target ~ '^graduated:[a-fA-F0-9-]{36}$' then substring(a.target from 11)::uuid end and o.team_id=a.team_id
-   left join mailboxes b on b.id=o.mailbox_id and b.team_id=o.team_id
+   left join ${nativeOutbox} o on o.id=case when a.target ~ '^graduated:[a-fA-F0-9-]{36}$' then substring(a.target from 11)::uuid end and o.team_id=a.team_id
+   left join ${nativeBoxes} b on b.id=o.mailbox_id and b.team_id=o.team_id
   ) select coalesce(sum(units) filter(where accepted_at is null or accepted_at>${now}::timestamptz-interval '24 hours'),0)::text as held,
    coalesce(sum(units) filter(where accepted_at>${now}::timestamptz-interval '24 hours' and accepted_at<${new Date(origin)} and reservation_region=${region}),0)::text as covered
    from facts where origin is distinct from 'external'
@@ -172,6 +187,11 @@ async function loadTenant(
   );
   // Only actual provider success bound to a real admission is positive evidence.
   // Existing approvals, accepted counters, signup age and queued timestamps cannot age a sender.
+  const nativeReady = await nativeReputationSchemaReady(db);
+  const nativeHistory = nativeReady
+    ? nativeReputationRows(teamId, now, domains[0]?.verifiedAt ?? now, domainId)
+    : sql`select null::uuid as id, null::timestamptz as accepted_at,
+        false as hard, false as complaint, null::timestamptz as watermark where false`;
   const history = firstRow<{ days: string }>(
     await db.execute(sql`
     select count(distinct day)::text as days from (
@@ -186,11 +206,11 @@ async function loadTenant(
           and v.occurred_at >= e.sent_at)
     union
     select (n.accepted_at at time zone 'UTC')::date as day
-    from (${nativeReputationRows(teamId, now, domains[0]?.verifiedAt ?? now, domainId)}) n
+    from (${nativeHistory}) n
     where ${domainId ?? null}::uuid is not null and n.accepted_at >= ${domains[0]?.verifiedAt ?? now}
       and n.accepted_at < date_trunc('day', ${now}::timestamptz at time zone 'UTC') at time zone 'UTC'
       and exists(select 1 from ${schema.auditLog} a where a.team_id=${teamId} and a.action=${ACTION} and a.target='graduated:'||n.id::text and a.created_at <= n.accepted_at)
-      and not exists(select 1 from (${nativeReputationRows(teamId, now, domains[0]?.verifiedAt ?? now, domainId)}) adverse
+      and not exists(select 1 from (${nativeHistory}) adverse
         where (adverse.hard or adverse.complaint) and adverse.watermark >= n.accepted_at)
     ) clean_days
   `),

@@ -519,7 +519,7 @@ describe("broadcasts.send deliverability guard", () => {
     vi.stubEnv("IS_CLOUD", "true");
     const teamId = await createTeam(db, "team-a");
     const { id } = await preparedDraft(teamId);
-    // 3/2000 = 0.15%, strictly above internal policy 0.08%.
+    // 3/2000 = 0.15%, strictly above internal policy 0.1%.
     await seedConfirmedWindow(teamId, 2000, 3);
     const enqueued: string[] = [];
     const caller = callerFor(teamId, {
@@ -529,7 +529,7 @@ describe("broadcasts.send deliverability guard", () => {
     });
     await expect(caller.broadcasts.send({ id })).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
-      message: expect.stringContaining("0.08%"),
+      message: expect.stringContaining("0.1%"),
     });
     expect(enqueued).toEqual([]);
     expect((await broadcastRow(id))?.status).toBe("draft");
@@ -538,7 +538,7 @@ describe("broadcasts.send deliverability guard", () => {
     vi.stubEnv("IS_CLOUD", "true");
     const teamId = await createTeam(db, "team-a");
     const { id } = await preparedDraft(teamId);
-    await seedConfirmedWindow(teamId, 2500, 2); // Exactly 0.08%, not strictly above.
+    await seedConfirmedWindow(teamId, 2000, 2); // Exactly 0.1%, not strictly above.
     await callerFor(teamId).broadcasts.send({ id });
     expect((await broadcastRow(id))?.status).toBe("scheduled");
   });
@@ -552,7 +552,7 @@ describe("broadcasts.send deliverability guard", () => {
       callerFor(teamId, { enqueueBroadcastSend }).broadcasts.send({ id }),
     ).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
-      message: expect.stringContaining("0.08%"),
+      message: expect.stringContaining("0.1%"),
     });
     expect(enqueueBroadcastSend).not.toHaveBeenCalled();
     expect((await broadcastRow(id))?.status).toBe("draft");

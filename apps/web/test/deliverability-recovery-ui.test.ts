@@ -24,6 +24,8 @@ const fixture = vi.hoisted(() => ({
 
 vi.mock("@/lib/trpc", () => ({
   useTRPC: () => ({
+    reputation: { get: { queryOptions: () => ({ queryKey: ["reputation"] }) } },
+    domains: { list: { queryOptions: () => ({ queryKey: ["domains"] }) } },
     metrics: Object.fromEntries(
       ["health", "window", "accountScore"].map((key) => [
         key,
@@ -35,35 +37,39 @@ vi.mock("@/lib/trpc", () => ({
 vi.mock("@tanstack/react-query", () => ({
   useQuery: ({ queryKey: [key] }: { queryKey: [string] }) => ({
     data:
-      key === "health"
-        ? fixture.health
-        : key === "accountScore"
-          ? fixture.score
-          : {
-              today: "2026-10-05",
-              allTimeDelivered: 90,
-              days: [
-                {
-                  day: "2026-10-05",
-                  sent: 100,
-                  delivered: 90,
-                  hardBounced: 10,
-                  complained: 1,
-                  opened: 10,
-                  clicked: 5,
+      key === "domains"
+        ? []
+        : key === "reputation"
+          ? undefined
+          : key === "health"
+            ? fixture.health
+            : key === "accountScore"
+              ? fixture.score
+              : {
+                  today: "2026-10-05",
+                  allTimeDelivered: 90,
+                  days: [
+                    {
+                      day: "2026-10-05",
+                      sent: 100,
+                      delivered: 90,
+                      hardBounced: 10,
+                      complained: 1,
+                      opened: 10,
+                      clicked: 5,
+                    },
+                  ],
+                  totals: {
+                    accepted: 100,
+                    sent: 100,
+                    delivered: 90,
+                    hardBounced: 10,
+                    complained: 1,
+                    opened: 10,
+                    clicked: 5,
+                    prefetched: 0,
+                  },
                 },
-              ],
-              totals: {
-                accepted: 100,
-                sent: 100,
-                delivered: 90,
-                hardBounced: 10,
-                complained: 1,
-                opened: 10,
-                clicked: 5,
-                prefetched: 0,
-              },
-            },
     isError: key === "health" && fixture.healthFailed,
     isPending: key === "health" && fixture.healthPending,
   }),
@@ -94,13 +100,13 @@ function health(overrides: Partial<Health> = {}): Health {
     windowDays: 1,
     bounceRate: 0.02,
     complaintRate: 0.001,
-    pause: { sent: 200, hardBounced: 10, complained: 0, windowDays: 1 },
-    reasons: [{ metric: "bounce", rate: 0.05, tier: "paused", windowDays: 1 }],
+    pause: { sent: 200, hardBounced: 12, complained: 0, windowDays: 1 },
+    reasons: [{ metric: "bounce", rate: 0.06, tier: "paused", windowDays: 1 }],
     thresholds: {
       warnBounce: 0.015,
       warnComplaint: 0.0005,
-      pauseBounce: 0.02,
-      pauseComplaint: 0.0008,
+      pauseBounce: 0.05,
+      pauseComplaint: 0.001,
     },
     recovery: {
       evaluatedAt: instant,
@@ -170,9 +176,9 @@ describe.each(["en", "pt-BR"] as const)("deliverability recovery in %s", (locale
     const text = plain(html);
     expect(text).toContain(
       t("banner.paused.bounce", {
-        count: fmt.format(10),
+        count: fmt.format(12),
         sent: fmt.format(200),
-        rate: pct.format(0.05),
+        rate: pct.format(0.06),
       }),
     );
     expect(text).toContain(t("banner.action"));
@@ -191,11 +197,11 @@ describe.each(["en", "pt-BR"] as const)("deliverability recovery in %s", (locale
     },
   );
 
-  it("shows both pause causes, real counts, exact floors and safe recovery actions", () => {
+  it("shows both pause causes, real counts, no sample exemption and safe recovery actions", () => {
     const current = health({
-      pause: { sent: 200, hardBounced: 10, complained: 3, windowDays: 1 },
+      pause: { sent: 200, hardBounced: 12, complained: 3, windowDays: 1 },
       reasons: [
-        { metric: "bounce", rate: 0.05, tier: "paused", windowDays: 1 },
+        { metric: "bounce", rate: 0.06, tier: "paused", windowDays: 1 },
         { metric: "complaint", rate: 0.015, tier: "paused", windowDays: 1 },
       ],
     });
@@ -204,17 +210,17 @@ describe.each(["en", "pt-BR"] as const)("deliverability recovery in %s", (locale
     expect(text).toContain(t("recovery.pauseWindow"));
     expect(text).toContain(t("recovery.criteriaVolume", { sent: fmt.format(100) }));
     expect(text).toContain(
-      t("recovery.bounceCriteria", { count: fmt.format(3), rate: pct.format(0.02) }),
+      t("recovery.bounceCriteria", { count: fmt.format(1), rate: pct.format(0.05) }),
     );
     expect(text).toContain(
-      t("recovery.complaintCriteria", { count: fmt.format(1), rate: pct.format(0.0008) }),
+      t("recovery.complaintCriteria", { count: fmt.format(1), rate: pct.format(0.001) }),
     );
     for (const reason of current.reasons) {
       expect(text).toContain(
         t("recovery.pauseEvidence", {
           metric: t(`metric.${reason.metric}`),
           rate: pct.format(reason.rate),
-          count: fmt.format(reason.metric === "bounce" ? 10 : 3),
+          count: fmt.format(reason.metric === "bounce" ? 12 : 3),
           sent: fmt.format(200),
           days: 1,
         }),

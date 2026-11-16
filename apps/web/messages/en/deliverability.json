@@ -21,9 +21,9 @@
     "pauseEvidence": "{metric}: {count} events across {sent} sends ({rate}), in the rolling last 24 hours.",
     "warningEvidence": "{metric}: a rate of {rate} in the rolling last 24 hours in UTC, at warning level.",
     "criteriaTitle": "When new sends are paused",
-    "criteriaVolume": "A bounce pause needs a real sample: 20 or more confirmed sends and 3 hard bounces in the rolling last 24 hours. A complaint pauses from the first one, whatever the volume. The statistical warning floor is 100 sends. Internal MepMail policy, not AWS limits:",
-    "bounceCriteria": "At least {count} hard bounces and a rate strictly above {rate}.",
-    "complaintCriteria": "At least {count} complaints and a rate strictly above {rate}.",
+    "criteriaVolume": "Warning sample confidence does not exempt small senders from protection. Pause rates use confirmed sends in the rolling last 24 hours, with no minimum sample. Missing denominator evidence is unknown, never a zero rate.",
+    "bounceCriteria": "Hard-bounce rate strictly above {rate}, with no minimum sample.",
+    "complaintCriteria": "Complaint rate strictly above {rate}, with no minimum sample.",
     "stepsTitle": "What to review now",
     "steps": {
       "list": "Fix the list at its source: remove invalid addresses and stop retrying recipients with permanent rejections.",

@@ -34,7 +34,7 @@
     "items": [
       "Inbound email, dedicated IPs and SSO are not part of the compatibility promise.",
       "The management surface is smaller: we cover sending, domains, keys, webhooks, templates, suppressions and contacts, but not every endpoint Resend ships.",
-      "Free and Starter have a daily limit instead of overage billing: sends keep going up to 50% past it, then wait in a queue for the next day, never on your card; new sends are refused only when that queue reaches 3× the daily limit.",
+      "Free and Starter have nominal daily limits, not overage billing. The 50% tolerance and queue ceiling of 3× nominal daily quota do not guarantee delivery today or tomorrow: graduated sending, safety buffers and available regional resources can impose a lower effective limit. Payment does not bypass protection.",
       "Attachment limit per message: 1 MB on Free and Starter, 5 MB on Pro, 10 MB on Scale."
     ]
   },

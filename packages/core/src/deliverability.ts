@@ -244,19 +244,23 @@ export async function fetchDeliverabilityHealth(
     from confirmed c left join outcomes o on o.email_id = c.id
   `),
   );
-  const native = firstRow<{
-    sent: string;
-    hard: string;
-    complaint: string;
-    watermark: Date | null;
-  }>(
-    await db.execute(sql`
+  const nativeReady = await nativeReputationSchemaReady(db);
+  const native = nativeReady
+    ? firstRow<{
+        sent: string;
+        hard: string;
+        complaint: string;
+        watermark: Date | null;
+      }>(
+        await db.execute(sql`
     with facts as (${nativeReputationRows(teamId, now, start)})
     select count(*) filter(where accepted_at > ${start} and accepted_at <= ${now})::text as sent,
       count(*) filter(where hard)::text as hard,count(*) filter(where complaint)::text as complaint,
       max(watermark) as watermark from facts
   `),
-  );
+      )
+    : undefined;
+  if (nativeReady && !native) throw new Error("native_reputation_read_unknown");
   const counts: WindowCounts = {
     sent: Number(row?.sent ?? 0) + Number(native?.sent ?? 0),
     hardBounced: Number(row?.hardBounced ?? 0) + Number(native?.hard ?? 0),
@@ -280,6 +284,85 @@ export async function fetchDeliverabilityHealth(
           .sort((a, b) => b.getTime() - a.getTime())[0] ?? null,
     },
   };
+}
+
+/** An absent optional installation is different from a failed or partial one.
+ * Resolve the same search_path as the queries below. Never catch catalog/read
+ * errors or cache this across migrations/transactions: unknown must fail closed.
+ */
+export async function nativeReputationSchemaReady(db: Db): Promise<boolean> {
+  const row = firstRow<{
+    boxes: string | null;
+    outbox: string | null;
+    events: string | null;
+    outcomes: string | null;
+  }>(
+    await db.execute(sql`select to_regclass('mailboxes')::text as boxes,
+    to_regclass('mailbox_outbox')::text as outbox,
+    to_regclass('mailbox_outbound_events')::text as events,
+    to_regclass('mailbox_outbound_outcomes')::text as outcomes`),
+  );
+  if (!row) throw new Error("native_reputation_schema_unknown");
+  const relations = [row.boxes, row.outbox, row.events, row.outcomes];
+  if (relations.every((value) => typeof value === "string" && value.length > 0)) return true;
+  if (!relations.every((value) => value === null))
+    throw new Error("native_reputation_schema_partial");
+
+  // Same opt-ins as worker/server.ts and migrate-mailboxes.ts. Disabling an
+  // opt-in is NOT evidence that historical Native participation disappeared.
+  if (
+    ["1", "true"].includes(process.env.MAILBOX_REGISTRY_ENABLED ?? "") ||
+    process.env.MAILBOX_TRANSPORT_ENABLED === "1"
+  ) {
+    throw new Error("native_reputation_schema_required");
+  }
+  const footprint = firstRow<{
+    migrated: boolean;
+    remainingPrivate: boolean;
+    mainJudge: string | null;
+    audit: string | null;
+  }>(
+    await db.execute(sql`select
+    exists(select 1 from pg_catalog.pg_class c
+      where c.relname='__mailbox_migrations' and c.relkind in ('r','p')) as migrated,
+    exists(select 1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+      where n.nspname=any(current_schemas(false))
+        and c.relkind in ('r','p','v','m','f') and left(c.relname,8)='mailbox_') as "remainingPrivate",
+    to_regclass('sending_judge_attempts')::text as "mainJudge",
+    to_regclass('audit_log')::text as audit`),
+  );
+  if (
+    !footprint ||
+    typeof footprint.migrated !== "boolean" ||
+    typeof footprint.remainingPrivate !== "boolean" ||
+    !(footprint.mainJudge === null || typeof footprint.mainJudge === "string") ||
+    typeof footprint.audit !== "string"
+  )
+    throw new Error("native_reputation_schema_unknown");
+  if (footprint.migrated || footprint.remainingPrivate)
+    throw new Error("native_reputation_history_unavailable");
+  // MAIN identity is immutable and survives deletion of nullable FK pointers.
+  // No time window: disabling Native must not age participation out of safety.
+  if (footprint.mainJudge !== null) {
+    const judge = firstRow<{ seen: boolean }>(
+      await db.execute(sql`select exists(
+      select 1 from sending_judge_attempts where message_kind='mailbox') as seen`),
+    );
+    if (!judge || typeof judge.seen !== "boolean")
+      throw new Error("native_reputation_schema_unknown");
+    if (judge.seen) throw new Error("native_reputation_history_unavailable");
+  }
+  // Legacy activity was persisted in MAIN audit_log before the judge ledger.
+  // The optional private migration tracker and remaining relations above cover
+  // the standard install even if no outbound attempt was ever recorded.
+  const activity = firstRow<{ seen: boolean }>(
+    await db.execute(sql`select exists(
+    select 1 from audit_log where action like 'mailbox.%') as seen`),
+  );
+  if (!activity || typeof activity.seen !== "boolean")
+    throw new Error("native_reputation_schema_unknown");
+  if (activity.seen) throw new Error("native_reputation_history_unavailable");
+  return false;
 }
 
 /** Private confirmed-message projection. Never exports MIME, addresses or hashes.

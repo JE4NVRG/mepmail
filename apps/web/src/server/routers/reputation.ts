@@ -3,15 +3,10 @@ import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { publicProcedure, router, teamProcedure } from "../trpc";
+import { router, teamProcedure } from "../trpc";
 /** Session membership owns the team. A domain is explicit, never inferred from maturity. */
 export const reputationRouter = router({
-  get: publicProcedure
-    .use(({ ctx, next }) => {
-      if (!ctx.session) throw new TRPCError({ code: "FORBIDDEN" });
-      return next();
-    })
-    .concat(teamProcedure)
+  get: teamProcedure
     .input(z.object({ domainId: z.uuid().nullable().optional() }).strict().optional())
     .query(async ({ ctx, input }) => {
       if (ctx.supportView || !ctx.requestMembership) throw new TRPCError({ code: "FORBIDDEN" });
@@ -25,6 +20,9 @@ export const reputationRouter = router({
         if (!owned) throw new TRPCError({ code: "FORBIDDEN" });
       }
       const context = await getGraduatedSendingContext();
-      return getTenantReputation(ctx.db, ctx.teamId, { ...context, domainId });
+      return getTenantReputation(ctx.db, ctx.teamId, {
+        ...context,
+        ...(domainId ? { domainId } : {}),
+      });
     }),
 });
