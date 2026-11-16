@@ -229,7 +229,13 @@ it("each MIME alternative is reviewed; clean HTML does not clear hostile text", 
     ),
   };
   await held(f.id, deps(judge));
-  expect(judge.judge).toHaveBeenCalledTimes(2);
+  expect(judge.judge).toHaveBeenCalledTimes(1);
+  const block = vi.mocked(judge.judge).mock.calls[0]?.[0];
+  if (typeof block !== "string") throw new Error("Missing indivisible classifier input");
+  const representations = JSON.parse(block).dispatchRepresentations as string[];
+  expect(representations).toHaveLength(2);
+  expect(representations.some((part) => part.includes("Your receipt"))).toBe(true);
+  expect(representations.some((part) => part.includes("Banco CTT"))).toBe(true);
 });
 it.each([
   { html: '<img src="https://audit.invalid/payload">' },

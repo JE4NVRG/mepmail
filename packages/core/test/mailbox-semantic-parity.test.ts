@@ -398,7 +398,19 @@ it.each(["azure", "ses", "external"].flatMap((p) => [false, true].map((h) => [p,
     ).toBe(true);
     expect((await state(f, q.id)).charged).toBe(1);
     const calls = vi.mocked(j.judge).mock.calls.length;
-    expect(calls).toBe(html ? 2 : 1);
+    expect(calls).toBe(1);
+    const block = vi.mocked(j.judge).mock.calls[0]?.[0];
+    if (typeof block !== "string") throw new Error("Missing indivisible classifier input");
+    const representations = html
+      ? (JSON.parse(block).dispatchRepresentations as string[])
+      : [block];
+    expect(representations).toHaveLength(html ? 2 : 1);
+    expect(representations.some((part) => part.includes("https://example.invalid/contact"))).toBe(
+      true,
+    );
+    expect(representations.every((part) => part.includes(f.from))).toBe(true);
+    if (html)
+      expect(representations.some((part) => part.includes("Can we meet tomorrow?"))).toBe(true);
     await sendMailboxOutbox(db, keys, q.id, s.sender, mailboxWorkerMime);
     expect(s.send).toHaveBeenCalledTimes(1);
     expect(j.judge).toHaveBeenCalledTimes(calls);
