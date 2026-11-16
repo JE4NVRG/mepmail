@@ -7,6 +7,7 @@ import {
 import { JUDGE_VERDICT_NOUL } from "./abuse-judge/questions.js";
 import { type AbuseJudge, type JudgeVerdict, judgeErrorClass } from "./abuse-judge/types.js";
 import { hasUnsafeDispatchCharacters, projectDispatchHtml } from "./dispatch-html-projection.js";
+import { bundleDispatchProjectionBlocks } from "./dispatch-projection-bundle.js";
 import { type RewriteOptions, rewriteForTracking } from "./link-tracking.js";
 
 export const PRE_DISPATCH_TIMEOUT_MS = 20_000;
@@ -139,40 +140,38 @@ export async function qualifyDispatchContent(
   // Same judge/prompt/rubric. The bounded text projection retains every text
   // node, every alternative, and complete original AND final href bytes.
   for (const text of projections) blocks.add(buildJudgeBlock({ ...base, html: null, text }));
-  let last: JudgeVerdict | undefined;
+  // One indivisible evaluation of this snapshot, not independently paced calls.
+  const block = bundleDispatchProjectionBlocks([...blocks]);
+  let verdict: JudgeVerdict;
   try {
-    for (const block of blocks) {
-      signal.throwIfAborted();
-      let onAbort: (() => void) | undefined;
-      let verdict: JudgeVerdict;
-      try {
-        verdict = await Promise.race([
-          judge.judge(block, { signal }),
-          new Promise<never>((_, reject) => {
-            onAbort = () => reject(signal.reason);
-            signal.addEventListener("abort", onAbort, { once: true });
-            if (signal.aborted) onAbort();
-          }),
-        ]);
-      } finally {
-        if (onAbort) signal.removeEventListener("abort", onAbort);
-      }
-      if (!validVerdict(verdict)) return { allowed: false, reason: "parse_error" };
-      if (
-        verdict.verdict !== "clean" ||
-        verdict.score >= JUDGE_VERDICT_NOUL * 100 ||
-        verdict.categories.length > 0 ||
-        verdict.reasons.length > 0 ||
-        verdict.impersonatedBrand !== null
-      )
-        return { allowed: false, reason: "content", verdict };
-      if (!last || verdict.score > last.score) last = verdict;
+    signal.throwIfAborted();
+    let onAbort: (() => void) | undefined;
+    try {
+      verdict = await Promise.race([
+        judge.judge(block, { signal }),
+        new Promise<never>((_, reject) => {
+          onAbort = () => reject(signal.reason);
+          signal.addEventListener("abort", onAbort, { once: true });
+          if (signal.aborted) onAbort();
+        }),
+      ]);
+    } finally {
+      if (onAbort) signal.removeEventListener("abort", onAbort);
     }
+    if (!validVerdict(verdict)) return { allowed: false, reason: "parse_error" };
+    if (
+      verdict.verdict !== "clean" ||
+      verdict.score >= JUDGE_VERDICT_NOUL * 100 ||
+      verdict.categories.length > 0 ||
+      verdict.reasons.length > 0 ||
+      verdict.impersonatedBrand !== null
+    )
+      return { allowed: false, reason: "content", verdict };
   } catch (error) {
     return { allowed: false, reason: judgeErrorClass(error) };
   }
-  if (!last || signal.aborted) return { allowed: false, reason: "inconclusive" };
+  if (signal.aborted) return { allowed: false, reason: "inconclusive" };
   if (dispatchContentFingerprint(snapshot) !== fingerprint)
     return { allowed: false, reason: "snapshot_changed" };
-  return { allowed: true, fingerprint, verdict: last };
+  return { allowed: true, fingerprint, verdict };
 }
