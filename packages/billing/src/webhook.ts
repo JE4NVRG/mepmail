@@ -22,7 +22,14 @@ import {
 import { SUBSCRIPTION_EXPAND } from "./prices.js";
 import { fulfillSendPixStart } from "./send-checkout.js";
 import { type CanonicalInvoicePayment, initialSendInvoiceFacts } from "./send-purchase.js";
-import { applySubscription, idOf, lockCustomer } from "./subscription.js";
+import { releaseSendSaleCapacity } from "./send-sale-reservation.js";
+import {
+  applyPreparedSubscription,
+  applySubscription,
+  idOf,
+  lockCustomer,
+  prepareSubscription,
+} from "./subscription.js";
 
 export interface WebhookDeps extends BillingDeps {
   webhookSecret: string;
@@ -114,6 +121,69 @@ export async function handleWebhook(
   let paidCandidate:
     | { event: Stripe.Event; sub: Stripe.Subscription; mailbox: boolean }
     | undefined;
+  // PIX provider effects are idempotent per session and run outside DB locks. Record dedupe only after success.
+  const pixSession = pixSessionOf(event);
+  if (pixSession) {
+    const [seen] = await deps.db
+      .select()
+      .from(schema.stripeEvents)
+      .where(eq(schema.stripeEvents.id, event.id));
+    if (seen) return 200;
+    if (!(await settlePixCheckout(deps.db, deps, pixSession, log))) return 200;
+    await deps.db
+      .insert(schema.stripeEvents)
+      .values({ id: event.id, type: event.type })
+      .onConflictDoNothing();
+    return 200;
+  }
+  if (
+    event.type === "checkout.session.expired" ||
+    event.type === "checkout.session.async_payment_failed"
+  ) {
+    const sessions = deps.stripe.checkout.sessions;
+    if (!sessions.retrieve) throw new Error("Checkout readback unavailable");
+    const session = await sessions.retrieve(event.data.object.id);
+    const id = session.metadata?.mepmail_send_checkout ?? session.metadata?.mepmail_pix_attempt;
+    if (id && session.id === event.data.object.id && session.livemode === deps.livemode) {
+      const [attempt] = await deps.db
+        .select()
+        .from(schema.sendCheckoutAttempts)
+        .where(eq(schema.sendCheckoutAttempts.id, id));
+      const exact =
+        attempt &&
+        attempt.livemode === deps.livemode &&
+        attempt.teamId === session.client_reference_id &&
+        attempt.teamId === session.metadata?.team_id &&
+        attempt.stripeCustomerId === idOf(session.customer) &&
+        (!attempt.stripeSessionId || attempt.stripeSessionId === session.id) &&
+        (attempt.parameters?.method === "pix"
+          ? session.mode === "payment"
+          : session.mode === "subscription");
+      let terminal = session.status === "expired";
+      if (
+        !terminal &&
+        event.type === "checkout.session.async_payment_failed" &&
+        deps.pixStripe &&
+        session.mode === "payment" &&
+        session.payment_status === "unpaid" &&
+        idOf(session.payment_intent)
+      ) {
+        const pi = await deps.pixStripe.paymentIntents.retrieve(idOf(session.payment_intent)!);
+        terminal =
+          pi.id === idOf(session.payment_intent) &&
+          pi.livemode === deps.livemode &&
+          idOf(pi.customer) === attempt?.stripeCustomerId &&
+          pi.status === "canceled";
+      }
+      if (exact && terminal) await releaseSendSaleCapacity(deps.db, attempt.teamId, id, "expired");
+    }
+    return 200;
+  }
+  const earlyRef = subscriptionRef(event);
+  const prepared =
+    earlyRef?.subscriptionId && earlyRef.customerId
+      ? await prepareSubscription(deps, earlyRef.customerId, earlyRef.subscriptionId)
+      : null;
   const applied = await deps.db.transaction(async (tx): Promise<AppliedWebhookEvent | null> => {
     const inserted = await tx
       .insert(schema.stripeEvents)
@@ -122,22 +192,14 @@ export async function handleWebhook(
       .returning({ id: schema.stripeEvents.id });
     if (inserted.length === 0) return null;
 
-    // A Pix payment is a one-time Checkout: it settles an invoice or starts a plan, and the
-    // subscription events that follow are applied below like any other.
-    const pixSession = pixSessionOf(event);
-    if (pixSession) {
-      await settlePixCheckout(tx as unknown as Db, deps, pixSession, (m) =>
-        log(`stripe webhook ${event.id}: ${m}`),
-      );
-      return null;
-    }
-
     const ref = subscriptionRef(event);
     if (!ref?.subscriptionId) return null;
     await lockCustomer(tx as unknown as Db, ref.customerId ?? ref.subscriptionId);
-    let sub = await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
-      expand: SUBSCRIPTION_EXPAND,
-    });
+    let sub =
+      prepared?.sub ??
+      (await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
+        expand: SUBSCRIPTION_EXPAND,
+      }));
     const mail = isMailboxSubscription(sub);
     if (mail)
       sub = await deps.stripe.subscriptions.retrieve(ref.subscriptionId, {
@@ -180,13 +242,15 @@ export async function handleWebhook(
       );
       if (claim !== "claimed") log(`stripe webhook ${event.id}: Correio trial ended (${claim})`);
     }
-    if (!mail)
-      await applySubscription(
+    if (!mail) {
+      if (!prepared) throw new Error("Missing bounded Send projection preflight");
+      await applyPreparedSubscription(
         tx as unknown as Db,
-        sub,
+        prepared,
         (m) => log(`stripe webhook ${event.id}: ${m}`),
         deps.stripe,
       );
+    }
     const customerId = idOf(sub.customer);
     // Send and Mail alike: the fraud screen holds the team's sending (Correio
     // outbound included) for review when Radar blocked one of its payments. Mail
@@ -262,14 +326,24 @@ async function settlePixCheckout(
   deps: WebhookDeps,
   sessionId: string,
   log: (message: string) => void,
-): Promise<void> {
-  if (!deps.pixStripe) return log(`pix ${sessionId}: Pix is not configured`);
+): Promise<boolean> {
+  if (!deps.pixStripe) {
+    log(`pix ${sessionId}: Pix is not configured`);
+    return false;
+  }
   const payment = await readPixPayment(deps.pixStripe, sessionId, deps.livemode);
-  if (payment === "pending") return log(`pix ${sessionId}: not paid yet`);
-  if (payment === "invalid") return log(`pix ${sessionId}: not a MepMail Pix payment`);
+  if (payment === "pending") {
+    log(`pix ${sessionId}: not paid yet`);
+    return false;
+  }
+  if (payment === "invalid") {
+    log(`pix ${sessionId}: not a MepMail Pix payment`);
+    return true;
+  }
   if (payment.kind === "send_start") {
     const outcome = await fulfillSendPixStart(db, deps, deps.pixStripe, payment, log);
-    return log(`pix ${sessionId}: ${outcome}`);
+    log(`pix ${sessionId}: ${outcome}`);
+    return outcome !== "refund_pending";
   }
   if (payment.kind === "mailbox_start") {
     const outcome = await fulfillMailboxPixStart(
@@ -280,15 +354,20 @@ async function settlePixCheckout(
       payment,
       log,
     );
-    return log(`pix ${sessionId}: ${outcome}`);
+    log(`pix ${sessionId}: ${outcome}`);
+    return true;
   }
   await lockCustomer(db, payment.customerId);
   const settled = payment.invoiceId
     ? await settlePixInvoice(deps.pixStripe, payment.invoiceId, payment)
     : "mismatch";
-  if (settled === "paid") return log(`pix ${sessionId}: invoice ${payment.invoiceId} paid`);
+  if (settled === "paid") {
+    log(`pix ${sessionId}: invoice ${payment.invoiceId} paid`);
+    return true;
+  }
   await refundPixPayment(deps.pixStripe, payment, "invoice");
   log(`pix ${sessionId}: refunded (invoice ${payment.invoiceId} not payable)`);
+  return true;
 }
 
 /** Drops dedupe rows past the retention window; returns how many. */

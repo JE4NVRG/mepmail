@@ -2,6 +2,7 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { campaignDomainDnsReady } from "./campaign-consent.js";
+import { graduatedSendingEnabled } from "./graduated-sending.js";
 import { getTeamSignupRisk } from "./signup-risk.js";
 import { extractAddrSpec, normalizeAddress } from "./suppressions.js";
 
@@ -93,6 +94,7 @@ export async function checkSignupSend(
 ): Promise<
   { allowed: true } | { allowed: false; reason: "signup_sandbox" | "signup_review_required" }
 > {
+  if (isCloud && graduatedSendingEnabled()) return { allowed: true };
   const restriction = await getSignupSendingRestriction(db, teamId, isCloud);
   return signupRecipientsAllowed(restriction, recipients)
     ? { allowed: true }

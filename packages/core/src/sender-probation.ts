@@ -2,6 +2,7 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq, gte, inArray } from "drizzle-orm";
 import { campaignDomainDnsReady } from "./campaign-consent.js";
+import { getTenantReputation, graduatedSendingEnabled } from "./graduated-sending.js";
 import type { TeamQuota } from "./plans.js";
 import { productionVolumeStatus } from "./production-volume.js";
 
@@ -40,6 +41,17 @@ export async function applySenderProbationQuota(
   now = new Date(),
 ): Promise<TeamQuota> {
   if (!isCloud) return quota;
+  if (graduatedSendingEnabled()) {
+    const rep = await getTenantReputation(db, teamId);
+    if (quota.kind === "none") return quota; // trusted system billing, not customer bypass
+    return quota.kind === "month"
+      ? { ...quota, dailyCeiling: rep.effectiveDaily }
+      : {
+          ...quota,
+          limit: Math.min(quota.limit, rep.effectiveDaily),
+          dailyCeiling: rep.effectiveDaily,
+        };
+  }
   const [team] = await db
     .select({
       plan: schema.teams.plan,

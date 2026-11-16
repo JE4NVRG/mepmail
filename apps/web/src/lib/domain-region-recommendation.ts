@@ -11,6 +11,7 @@ export function recommendedDomainRegion(
   if (selected) return selected;
   return (
     (
+      regions.find((r) => r.code === "us-east-1" && r.sendingHealthy === true && r.production) ??
       regions.find((r) => r.sendingHealthy === true && r.production) ??
       regions.find((r) => r.production) ??
       regions[0]

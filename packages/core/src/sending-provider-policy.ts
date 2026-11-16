@@ -10,6 +10,7 @@ const routes = z
 const policySchema = z
   .object({
     version: z.literal(1),
+    graduated: z.boolean().optional(),
     paused: z.boolean().optional(),
     /** Present-but-empty deliberately admits no team. */
     allowedTeamIds: z.array(z.uuid()).max(10_000).optional(),
@@ -70,6 +71,7 @@ export type SendingProviderDecision =
 export function parseSendingProviderPolicy(raw: string | undefined): SendingProviderPolicy | null {
   if (raw === undefined || raw.trim() === "") return null;
   const policy = policySchema.parse(JSON.parse(raw) as unknown);
+  if (policy.graduated && policy.restoration) throw new Error("graduated_restoration_conflict");
   if (
     policy.allowedTeamIds &&
     new Set(policy.allowedTeamIds).size !== policy.allowedTeamIds.length
@@ -135,6 +137,8 @@ export function resolveSendingProvider(
   input: {
     /** Fresh clock sample; never the email creation/scheduling timestamp. */
     now?: Date | undefined;
+    /** Derived by common server admission, never request JSON. */
+    tenantEligible?: boolean;
     teamId: string;
     messageClass: SendingMessageClass;
     emailId?: string;
@@ -153,7 +157,13 @@ export function resolveSendingProvider(
   },
 ): SendingProviderDecision {
   if (policy?.paused) return { kind: "held", reason: "operator_paused" };
-  if (policy?.allowedTeamIds && !policy.allowedTeamIds.includes(input.teamId)) {
+  if (policy?.graduated && input.tenantEligible !== true)
+    return { kind: "held", reason: "team_not_allowed" };
+  if (
+    !policy?.graduated &&
+    policy?.allowedTeamIds &&
+    !policy.allowedTeamIds.includes(input.teamId)
+  ) {
     return { kind: "held", reason: "team_not_allowed" };
   }
   if (policy?.restoration) {

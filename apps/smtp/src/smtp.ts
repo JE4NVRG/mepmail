@@ -7,6 +7,7 @@ import {
   disguiseMessage,
   extractAddrSpec,
   formatMailbox,
+  GraduatedAdmissionError,
   isTeamSuspended,
   OVERAGE_HARD_CAP,
   parseMailbox,
@@ -49,6 +50,11 @@ function smtpError(responseCode: number, message: string): Error {
 
 /** Unexpected failures become a 451 so internals never leak to the client. */
 function toSmtpError(err: unknown): Error {
+  if (err instanceof GraduatedAdmissionError)
+    return smtpError(
+      err.status === 429 ? 452 : 550,
+      `${err.code}: ${err.message}${err.status === 429 ? ` Retry after ${err.safeRetryAfter}s.` : ""}`,
+    );
   if (err instanceof Error && "responseCode" in err) return err;
   console.error("smtp internal error", err);
   return smtpError(451, "Temporary local error, please retry");

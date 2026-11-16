@@ -20,6 +20,7 @@ import {
   fetchTeamStanding,
   findSuppressed,
   getSignupSendingRestriction,
+  graduatedSendingEnabled,
   hashRecipient,
   holdOnContentVerdict,
   isOnboardingSender,
@@ -66,6 +67,7 @@ import {
 } from "../../../../packages/core/src/pre-dispatch-content.js";
 import { screenPreSendContent } from "../../../../packages/core/src/pre-send-content-policy.js";
 import type { EmailBodyOrigin } from "../../../../packages/core/src/system-mail-origin.js";
+import { judgeForEmail } from "../abuse-judge/index.js";
 import { appendAzureApiOptoutBody } from "../azure-api-optout.js";
 import {
   isSesEnforcementRefusal,
@@ -1271,7 +1273,7 @@ export async function sendEmail(
             ageDays: Math.floor((Date.now() - team.createdAt.getTime()) / 86_400_000),
             verifiedDomains: domains.map((d) => d.name),
           },
-          deps.contentJudge,
+          deps.contentJudge ? judgeForEmail(deps.contentJudge, db, email.teamId, email.id) : null,
         )
       : { allowed: false as const, reason: "team_missing" };
     const [current] = await db.select().from(schema.emails).where(eq(schema.emails.id, email.id));
@@ -1291,7 +1293,7 @@ export async function sendEmail(
       },
     });
     if (!decision.allowed || changed) {
-      if (!decision.allowed && decision.verdict)
+      if (!graduatedSendingEnabled() && !decision.allowed && decision.verdict)
         await holdOnContentVerdict(db, {
           teamId: email.teamId,
           score: decision.verdict.score,
@@ -1672,7 +1674,7 @@ export async function sendEmail(
                       ),
                     )
                     .returning({ id: schema.monitorSamples.id });
-                  if (sample)
+                  if (sample && !graduatedSendingEnabled())
                     await applyJudgedSample(t, await monitor.settings(), {
                       teamId: email.teamId,
                       score: qualified.verdict.score,

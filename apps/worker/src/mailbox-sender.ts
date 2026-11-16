@@ -2,6 +2,7 @@ import { SESv2Client, type SESv2ClientConfig, SendEmailCommand } from "@aws-sdk/
 import {
   checkSignupSend,
   evaluateEmailInsights,
+  graduatedSendingEnabled,
   MailboxContentError,
   type MailboxOutboxSender,
   MailboxSendDeferredError,
@@ -38,6 +39,7 @@ import {
 import {
   assertMailboxDispatchContent,
   copyMailboxDispatchInput,
+  mailboxGraduatedEligible,
   withMailboxDispatchContent,
 } from "./mailbox-dispatch-content.js";
 import { mailboxAzureCompliance } from "./mailbox-optout.js";
@@ -131,6 +133,11 @@ export function withMailboxProbation(
 ): MailboxOutboxSender {
   return {
     async send(input) {
+      if (isCloud !== false && graduatedSendingEnabled()) {
+        if (!mailboxGraduatedEligible(input))
+          throw new MailboxSendDeferredError("preflight_unavailable");
+        return sender.send(input);
+      }
       assertMailboxCorrespondenceRecipients(input);
       if (!isCloud || probationReserved.has(input)) return sender.send(input);
       await checkMailboxContent(db, input);
@@ -207,6 +214,7 @@ export function createMailboxContentPolicySender(
 ): MailboxOutboxSender {
   return {
     async send(input) {
+      if (policy?.paused) throw new MailboxSendDeferredError("sending_paused");
       input = copyMailboxDispatchInput(input);
       assertMailboxCorrespondenceRecipients(input);
       if (isCloud !== false) await checkMailboxContent(db, input);
@@ -306,8 +314,35 @@ export function createMailboxContentPolicySender(
             })
               ? "campaign"
               : "transactional";
-          const route = resolveSendingProvider(policy, {
+          const externalPolicy =
+            provider === "customer_smtp" &&
+            mailboxGraduatedEligible(input) &&
+            messageClass === "transactional" &&
+            !policy.restoration
+              ? {
+                  ...policy,
+                  defaults: {
+                    ...policy.defaults,
+                    transactional:
+                      policy.defaults?.transactional === "disabled"
+                        ? ("disabled" as const)
+                        : "customer_smtp",
+                  },
+                  teams: {
+                    ...policy.teams,
+                    [input.teamId]: {
+                      ...policy.teams?.[input.teamId],
+                      transactional:
+                        policy.teams?.[input.teamId]?.transactional === "disabled"
+                          ? ("disabled" as const)
+                          : "customer_smtp",
+                    },
+                  },
+                }
+              : policy;
+          const route = resolveSendingProvider(externalPolicy, {
             teamId: input.teamId,
+            tenantEligible: mailboxGraduatedEligible(input),
             ...(outbox ? { createdAt: outbox.createdAt } : {}),
             fromAddress: input.from,
             messageClass,

@@ -9,6 +9,7 @@ const valid = () =>
     JSON.stringify({
       choices: [
         {
+          finish_reason: "stop",
           message: { content: JSON.stringify(syntheticCompleteCleanAnswers) },
         },
       ],
@@ -90,7 +91,10 @@ describe("judge phase telemetry", () => {
     const events: JudgeTelemetry[] = [];
     await expect(
       make(
-        async () => new Response(JSON.stringify({ choices: [{ message: { content: SECRET } }] })),
+        async () =>
+          new Response(
+            JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: SECRET } }] }),
+          ),
       ).judge(SECRET, {
         signal: signal(),
         onTelemetry: (event) => {

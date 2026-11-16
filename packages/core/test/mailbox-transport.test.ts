@@ -1,17 +1,22 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { SESv2Client } from "@aws-sdk/client-sesv2";
 import { PGlite } from "@electric-sql/pglite";
 import { type Db, schema } from "@millionsend/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { createAbuseJudge, judgeForEmail } from "../../../apps/worker/src/abuse-judge/index.js";
 import { createMailboxExternalAwareSender } from "../../../apps/worker/src/mailbox-external-sender.js";
 import {
   createMailboxContentPolicySender,
   createMailboxSesSender,
 } from "../../../apps/worker/src/mailbox-sender.js";
+import { ABUSE_JUDGE_QUESTIONS } from "../src/abuse-judge/questions.js";
 import { EnvKeyring } from "../src/crypto/keyring.js";
+import { reserveJudgeAttempt } from "../src/graduated-sending.js";
+import { getGraduatedSendingContext } from "../src/graduated-sending-context.js";
 import { createMailboxExternalAccount } from "../src/mailbox-external-accounts.js";
 import { saveMailboxDraft } from "../src/mailbox-private-store.js";
 import {
@@ -24,6 +29,7 @@ import {
   checkMailboxRecipientBlocks,
   getMailboxOutboundSummary,
   type MailboxOutboundEvidence,
+  type MailboxOutboxSender,
   MailboxSendDeferredError,
   type MailboxTransportMimeAdapter,
   mailboxBlockedRecipients,
@@ -48,7 +54,7 @@ const mime: MailboxTransportMimeAdapter = {
   },
 };
 
-beforeAll(async () => {
+async function resetNativeFixtureDatabase() {
   client = new PGlite();
   const base = fileURLToPath(new URL("../../db/drizzle/", import.meta.url));
   const mail = fileURLToPath(new URL("../../db/mailbox-drizzle/", import.meta.url));
@@ -64,7 +70,8 @@ beforeAll(async () => {
           await tx.exec(statement);
       });
   db = drizzle(client, { schema }) as unknown as Db;
-});
+}
+beforeAll(resetNativeFixtureDatabase);
 afterAll(async () => {
   await client.close();
 });
@@ -864,4 +871,592 @@ describe("truthful Native send holds", () => {
     await expect(router.send(input)).rejects.toMatchObject({ reason: "provider_unavailable" });
     expect(send).not.toHaveBeenCalled();
   });
+});
+
+describe("graduated Native admission uses the sealed original approval", () => {
+  beforeEach(async () => {
+    await client.close();
+    await resetNativeFixtureDatabase();
+    vi.spyOn(SESv2Client.prototype, "send").mockImplementation((async (command: object) => {
+      if (command.constructor.name !== "GetAccountCommand")
+        throw new Error("fixture forbids physical AWS effects");
+      return {
+        SendingEnabled: true,
+        ProductionAccessEnabled: true,
+        EnforcementStatus: "HEALTHY",
+        SendQuota: { Max24HourSend: 54900, MaxSendRate: 14, SentLast24Hours: 0 },
+      };
+    }) as never);
+  });
+  async function enable(
+    f: Awaited<ReturnType<typeof setup>>,
+    credits = 10,
+    beforeModel?: () => Promise<void>,
+  ) {
+    const [box] = await db
+      .select({ domainId: schema.mailboxes.domainId })
+      .from(schema.mailboxes)
+      .where(eq(schema.mailboxes.id, f.mailboxId));
+    const [domain] = await db
+      .select()
+      .from(schema.domains)
+      .where(eq(schema.domains.id, box!.domainId!));
+    const now = new Date();
+    await db
+      .update(schema.domains)
+      .set({
+        status: "verified",
+        verifiedAt: now,
+        lastCheckedAt: now,
+        dmarcCheckedAt: now,
+        dkimSelector: "test",
+        mailFromSubdomain: "send",
+        dmarcPolicy: "none",
+        dnsRecords: [
+          {
+            group: "verification",
+            name: `test._domainkey.${domain!.name}`,
+            type: "TXT",
+            status: "found",
+          },
+          { group: "sending", name: `send.${domain!.name}`, type: "TXT", status: "found" },
+          { group: "sending", name: `send.${domain!.name}`, type: "MX", status: "found" },
+          { group: "dmarc", name: `_dmarc.${domain!.name}`, type: "TXT", status: "found" },
+        ],
+      })
+      .where(eq(schema.domains.id, domain!.id));
+    vi.stubEnv(
+      "SENDING_PROVIDER_POLICY_JSON",
+      JSON.stringify({
+        version: 1,
+        graduated: true,
+        defaults: { transactional: "ses", campaign: "disabled" },
+      }),
+    );
+    vi.stubEnv(
+      "GRADUATED_SENDING_CAPACITY_JSON",
+      JSON.stringify({
+        version: 1,
+        expiresAt: new Date(now.getTime() + 60000).toISOString(),
+        globalPerMinute: 840,
+        globalDaily: 53802,
+        tenantPerMinute: 3,
+        judgePerMinute: 3,
+      }),
+    );
+    vi.stubEnv("ABUSE_JUDGE", "openai");
+    vi.stubEnv("ABUSE_JUDGE_BASE_URL", "https://api.commandcode.ai/provider/v1");
+    vi.stubEnv("ABUSE_JUDGE_MODEL", "deepseek/deepseek-v4.1-flash");
+    vi.stubEnv("ABUSE_JUDGE_API_KEY", "synthetic-fixture-only");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        if (String(url) === "https://api.commandcode.ai/alpha/billing/credits") {
+          expect(init?.method).toBe("GET");
+          return new Response(
+            JSON.stringify({
+              credits: {
+                monthlyCredits: credits,
+                purchasedCredits: 0,
+                freeCredits: 0,
+                belowThreshold: false,
+              },
+              windowLimits: {
+                fiveHour: { used: 0, cap: 100, resetAt: Date.now() + 3600000 },
+                weekly: { used: 0, cap: 100, resetAt: Date.now() + 3600000 },
+                exceeded: false,
+              },
+            }),
+            { status: 200 },
+          );
+        }
+        if (!beforeModel) throw new Error("MODEL_DISPATCH_NOT_AUTHORIZED_BY_NEGATIVE_FIXTURE");
+        expect(String(url)).toBe("https://api.commandcode.ai/provider/v1/chat/completions");
+        expect(JSON.parse(String(init?.body)).max_tokens).toBe(2048);
+        await beforeModel();
+        const clean = Object.fromEntries(
+          Object.entries(ABUSE_JUDGE_QUESTIONS).map(([k, q]) => [
+            k,
+            q.type === "choice" ? Object.keys(q.criteria)[0] : 0,
+          ]),
+        );
+        return new Response(
+          JSON.stringify({
+            choices: [{ finish_reason: "stop", message: { content: JSON.stringify(clean) } }],
+            usage: { prompt_tokens: 20, completion_tokens: 10 },
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+  }
+  it("admits the actual sealed human/domain/recipients once before the sender callback", async () => {
+    const f = await setup();
+    const queued = await f.queued();
+    try {
+      let physicalModelCalls = 0;
+      await enable(f, 10, async () => {
+        physicalModelCalls++;
+        const rows = await db.execute(
+          sql`select count(*)::int as n from sending_judge_attempts where team_id=${f.teamId} and message_kind='mailbox' and message_id=${queued.id} and mailbox_outbox_id=${queued.id} and email_id is null and state='pending'`,
+        );
+        const actual: unknown = rows;
+        const resultRows = Array.isArray(actual) ? actual : (actual as { rows: unknown[] }).rows;
+        expect(resultRows[0]).toEqual({ n: 1 });
+      });
+      const factory = createAbuseJudge({
+        provider: "openai",
+        baseUrl: "https://api.commandcode.ai/provider/v1",
+        model: "deepseek/deepseek-v4.1-flash",
+        apiKey: "synthetic-fixture-only",
+        timeoutMs: 20000,
+      })!;
+      let senderError: unknown;
+      const send = vi.fn(async (input: Parameters<MailboxOutboxSender["send"]>[0]) => {
+        try {
+          expect(input.to).toEqual(f.recipients);
+          expect(
+            (
+              await judgeForEmail(factory, db, input.teamId, input.outboxId, "mailbox").judge(
+                "<email>Synthetic Native fixture</email>",
+                { signal: AbortSignal.timeout(20000) },
+              )
+            ).verdict,
+          ).toBe("clean");
+          const rows = await db
+            .select()
+            .from(schema.auditLog)
+            .where(eq(schema.auditLog.target, `graduated:${queued.id}`));
+          expect(rows.filter((r) => r.action === "sending.graduated_reserved")).toHaveLength(1);
+          return { messageId: "synthetic-graduated-native" };
+        } catch (error) {
+          senderError = error;
+          throw error;
+        }
+      });
+      const result = await sendMailboxOutbox(db, keys, queued.id, { send }, mime);
+      if (senderError) throw senderError;
+      expect(result).toMatchObject({ status: "accepted", recipientCount: 2 });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(physicalModelCalls).toBe(1);
+      await sendMailboxOutbox(db, keys, queued.id, { send }, mime);
+      expect(send).toHaveBeenCalledTimes(1);
+      const rows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.target, `graduated:${queued.id}`));
+      expect(rows.filter((r) => r.action === "sending.graduated_reserved")).toHaveLength(1);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+  it("preserves immutable approval and refuses dispatch after actual mailbox ownership changes", async () => {
+    const f = await setup();
+    const queued = await f.queued();
+    const otherOwner = await setup();
+    await expect(
+      db
+        .update(schema.mailboxOutbox)
+        .set({ approvedBy: otherOwner.actor.userId })
+        .where(eq(schema.mailboxOutbox.id, queued.id)),
+    ).rejects.toThrow();
+    const [newMember] = await db
+      .insert(schema.teamMembers)
+      .values({ teamId: f.teamId, userId: otherOwner.actor.userId, role: "member" })
+      .returning();
+    await db
+      .update(schema.mailboxes)
+      .set({ ownerUserId: otherOwner.actor.userId, ownerMembershipId: newMember!.id })
+      .where(eq(schema.mailboxes.id, f.mailboxId));
+    try {
+      await enable(f);
+      const send = vi.fn();
+      await sendMailboxOutbox(db, keys, queued.id, { send }, mime);
+      expect(send).not.toHaveBeenCalled();
+      const rows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.target, `graduated:${queued.id}`));
+      expect(rows).toHaveLength(0);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+  it("fresh credit-floor refusal holds the exact queued MIME without sender or admission debit", async () => {
+    const f = await setup();
+    const queued = await f.queued();
+    const [before] = await db
+      .select()
+      .from(schema.mailboxOutbox)
+      .where(eq(schema.mailboxOutbox.id, queued.id));
+    try {
+      await enable(f, 5);
+      const send = vi.fn();
+      expect(await sendMailboxOutbox(db, keys, queued.id, { send }, mime)).toMatchObject({
+        status: "queued",
+        errorCode: mailboxSendHoldCode("rate_limited"),
+      });
+      expect(send).not.toHaveBeenCalled();
+      const [after] = await db
+        .select()
+        .from(schema.mailboxOutbox)
+        .where(eq(schema.mailboxOutbox.id, queued.id));
+      expect(after!.status).toBe("queued");
+      expect(after!.errorCode).toBe(mailboxSendHoldCode("rate_limited"));
+      expect(after!.ciphertext).toEqual(before!.ciphertext);
+      expect(
+        await db
+          .select()
+          .from(schema.auditLog)
+          .where(eq(schema.auditLog.target, `graduated:${queued.id}`)),
+      ).toHaveLength(0);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+  it("retains pending model identity and budget when its private source is deleted", async () => {
+    const f = await setup();
+    const queued = await f.queued();
+    let attemptId: string | undefined;
+    try {
+      await enable(f);
+      const send = vi.fn(async () => {
+        const context = await getGraduatedSendingContext();
+        const reservation = await reserveJudgeAttempt(
+          db,
+          {
+            teamId: f.teamId,
+            emailId: queued.id,
+            attemptId: randomUUID(),
+            inputTokenUpperBound: 1000000,
+            sourceKind: "mailbox",
+          },
+          {
+            ...context,
+            judgeEnvelope: { ...context.judgeEnvelope!, accountKey: "synthetic-retention-account" },
+          },
+        );
+        attemptId = reservation.attemptId;
+        throw new MailboxSendDeferredError("preflight_unavailable");
+      });
+      expect(await sendMailboxOutbox(db, keys, queued.id, { send }, mime)).toMatchObject({
+        status: "queued",
+      });
+      expect(attemptId).toBeDefined();
+      await db.delete(schema.mailboxOutbox).where(eq(schema.mailboxOutbox.id, queued.id));
+      const result: unknown = await db.execute(
+        sql`select message_kind,message_id,email_id,mailbox_outbox_id,state,reserved_units::text as units from sending_judge_attempts where account_key='synthetic-retention-account' and attempt_id=${attemptId}::uuid`,
+      );
+      const rows = Array.isArray(result) ? result : (result as { rows: unknown[] }).rows;
+      expect(rows).toEqual([
+        {
+          message_kind: "mailbox",
+          message_id: queued.id,
+          email_id: null,
+          mailbox_outbox_id: null,
+          state: "pending",
+          units: "302457600",
+        },
+      ]);
+      await expect(
+        db.execute(
+          sql`update sending_judge_attempts set message_id=${randomUUID()}::uuid where account_key='synthetic-retention-account' and attempt_id=${attemptId}::uuid`,
+        ),
+      ).rejects.toThrow();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe("external graduated full Native pipeline", () => {
+  beforeEach(async () => {
+    await client.close();
+    await resetNativeFixtureDatabase();
+    vi.spyOn(SESv2Client.prototype, "send").mockImplementation((async () => {
+      throw new Error("external fixture forbids every SES SDK read/send");
+    }) as never);
+  });
+  async function external(recipient = "one@example.invalid") {
+    const f = await setup();
+    const { mailboxId } = await createMailboxExternalAccount(db, keys, f.actor, {
+      address: "customer@gmail.com",
+      label: "Synthetic external",
+      servers: {
+        provider: "gmail",
+        imapHost: "imap.gmail.com",
+        smtpHost: "smtp.gmail.com",
+        smtpPort: 465,
+        smtpSecurity: "tls",
+        username: "customer@gmail.com",
+      },
+      secret: "synthetic-fixture-password",
+    });
+    const raw = Buffer.from(
+      `From: customer@gmail.com\r\nTo: ${recipient}\r\nSubject: Hello\r\nMessage-ID: <${randomUUID()}@fixture.invalid>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nHello, can we talk tomorrow?`,
+    );
+    const draft = await saveMailboxDraft(db, keys, f.actor, {
+      mailboxId,
+      expectedRevision: 0,
+      raw,
+    });
+    const queued = await queueMailboxDraft(
+      db,
+      keys,
+      f.actor,
+      { mailboxId, id: draft.id, expectedRevision: draft.revision },
+      mime,
+    );
+    return { ...f, mailboxId, queued, raw };
+  }
+  for (const scenario of [
+    "positive",
+    "judge_reject",
+    "credential_revoked_during_model",
+    "membership_revoked_during_model",
+    "suspended",
+    "unverified_foreign",
+    "unverified_own",
+    "spoof_from",
+    "forged_proof",
+    "foreign_tenant",
+    "stale_credential",
+    "revoked_membership",
+    "operator_paused",
+  ]) {
+    it(scenario, async () => {
+      const f = await external();
+      let models = 0,
+        sesGets = 0;
+      const ses = vi.fn();
+      const smtp = vi.fn(async () => ({ messageId: "synthetic-external-accepted" }));
+      try {
+        vi.stubEnv(
+          "SENDING_PROVIDER_POLICY_JSON",
+          JSON.stringify({
+            version: 1,
+            graduated: true,
+            defaults: { transactional: "ses", campaign: "disabled" },
+          }),
+        );
+        vi.stubEnv("ABUSE_JUDGE", "openai");
+        vi.stubEnv("ABUSE_JUDGE_BASE_URL", "https://api.commandcode.ai/provider/v1");
+        vi.stubEnv("ABUSE_JUDGE_MODEL", "deepseek/deepseek-v4.1-flash");
+        vi.stubEnv("ABUSE_JUDGE_API_KEY", "synthetic-fixture-only");
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+            if (String(url) === "https://api.commandcode.ai/alpha/billing/credits")
+              return new Response(
+                JSON.stringify({
+                  credits: {
+                    monthlyCredits: 10,
+                    purchasedCredits: 8,
+                    freeCredits: 5,
+                    belowThreshold: false,
+                  },
+                  windowLimits: {
+                    fiveHour: { used: 0, cap: 100, resetAt: Date.now() + 3600000 },
+                    weekly: { used: 0, cap: 100, resetAt: Date.now() + 3600000 },
+                    exceeded: false,
+                  },
+                }),
+                { status: 200 },
+              );
+            if (String(url) !== "https://api.commandcode.ai/provider/v1/chat/completions") {
+              sesGets++;
+              throw new Error("unexpected physical network");
+            }
+            models++;
+            expect(JSON.parse(String(init?.body)).max_tokens).toBe(2048);
+            expect(Buffer.byteLength(String(init?.body))).toBeLessThanOrEqual(65536);
+            const pending: unknown = await db.execute(
+              sql`select count(*)::int as n from sending_judge_attempts where team_id=${f.teamId} and message_kind='mailbox' and mailbox_outbox_id=${f.queued.id} and email_id is null and state='pending'`,
+            );
+            expect(
+              (Array.isArray(pending) ? pending : (pending as { rows: unknown[] }).rows)[0],
+            ).toEqual({ n: 1 });
+            if (scenario === "credential_revoked_during_model")
+              await db
+                .update(schema.mailboxExternalAccounts)
+                .set({
+                  status: "auth_failed",
+                  connectionGeneration: sql`${schema.mailboxExternalAccounts.connectionGeneration}+1`,
+                })
+                .where(eq(schema.mailboxExternalAccounts.mailboxId, f.mailboxId));
+            if (scenario === "membership_revoked_during_model")
+              await db.delete(schema.teamMembers).where(eq(schema.teamMembers.teamId, f.teamId));
+            const answers = Object.fromEntries(
+              Object.entries(ABUSE_JUDGE_QUESTIONS).map(([k, q]) => [
+                k,
+                q.type === "choice"
+                  ? Object.keys(q.criteria)[0]
+                  : scenario === "judge_reject"
+                    ? 100
+                    : 0,
+              ]),
+            );
+            return new Response(
+              JSON.stringify({
+                choices: [{ finish_reason: "stop", message: { content: JSON.stringify(answers) } }],
+                usage: { prompt_tokens: 20, completion_tokens: 10 },
+              }),
+              { status: 200 },
+            );
+          }),
+        );
+        if (scenario === "suspended")
+          await db
+            .update(schema.teams)
+            .set({ suspendedAt: new Date() })
+            .where(eq(schema.teams.id, f.teamId));
+        if (scenario.startsWith("unverified"))
+          await db
+            .update(schema.user)
+            .set({ emailVerified: false })
+            .where(eq(schema.user.id, f.actor.userId));
+        if (scenario === "stale_credential")
+          await db
+            .update(schema.mailboxExternalAccounts)
+            .set({ status: "auth_failed" })
+            .where(eq(schema.mailboxExternalAccounts.mailboxId, f.mailboxId));
+        if (scenario === "revoked_membership")
+          await db.delete(schema.teamMembers).where(eq(schema.teamMembers.userId, f.actor.userId));
+        const factory = createAbuseJudge({
+          provider: "openai",
+          baseUrl: "https://api.commandcode.ai/provider/v1",
+          model: "deepseek/deepseek-v4.1-flash",
+          apiKey: "synthetic-fixture-only",
+          timeoutMs: 20000,
+        })!;
+        const adapter = createMailboxExternalAwareSender(db, keys, { send: ses }, undefined, {
+          isCloud: true,
+          lookup: (async () => [{ address: "142.250.0.109", family: 4 }]) as never,
+          createTransport: (() => ({ sendMail: smtp, close() {} })) as never,
+        });
+        const policy = {
+          version: 1 as const,
+          graduated: true,
+          paused: scenario === "operator_paused",
+          defaults: { transactional: "ses", campaign: "disabled" },
+        } as const;
+        const rootModule = await import("@millionsend/core");
+        const wrapped = createMailboxContentPolicySender(db, adapter, true, policy, null, factory);
+        let sender = wrapped;
+        if (["spoof_from", "foreign_tenant"].includes(scenario))
+          sender = {
+            send: (input) =>
+              wrapped.send({
+                ...input,
+                ...(scenario === "spoof_from"
+                  ? { from: "spoof@gmail.com" }
+                  : { teamId: randomUUID() }),
+              }),
+          };
+        if (scenario === "forged_proof") {
+          const { reserveGraduatedSending } = await import("../src/graduated-sending.js");
+          await expect(
+            db.transaction((tx) =>
+              reserveGraduatedSending(tx as unknown as Db, {
+                teamId: f.teamId,
+                emailId: f.queued.id,
+                from: "customer@gmail.com",
+                recipients: ["one@example.invalid"],
+                campaign: false,
+                senderProof: {} as never,
+              }),
+            ),
+          ).rejects.toMatchObject({ status: 403 });
+          expect(models).toBe(0);
+          expect(smtp).not.toHaveBeenCalled();
+          return;
+        }
+        if (scenario === "unverified_own") {
+          // The real registered principal remains the recipient, not the SMTP account.
+          // Recreate through the encrypted draft/approval path, never mutate a sealed row.
+          vi.unstubAllEnvs();
+          const [u] = await db.select().from(schema.user).where(eq(schema.user.id, f.actor.userId));
+          const raw = Buffer.from(
+            `From: customer@gmail.com\r\nTo: ${u!.email}\r\nSubject: Own test\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nHello`,
+          );
+          const d = await saveMailboxDraft(db, keys, f.actor, {
+            mailboxId: f.mailboxId,
+            expectedRevision: 0,
+            raw,
+          });
+          const q = await queueMailboxDraft(
+            db,
+            keys,
+            f.actor,
+            { mailboxId: f.mailboxId, id: d.id, expectedRevision: d.revision },
+            mime,
+          );
+          vi.stubEnv("SENDING_PROVIDER_POLICY_JSON", JSON.stringify(policy));
+          vi.stubEnv("ABUSE_JUDGE", "openai");
+          vi.stubEnv("ABUSE_JUDGE_BASE_URL", "https://api.commandcode.ai/provider/v1");
+          vi.stubEnv("ABUSE_JUDGE_MODEL", "deepseek/deepseek-v4.1-flash");
+          vi.stubEnv("ABUSE_JUDGE_API_KEY", "synthetic-fixture-only");
+          f.queued = q;
+        }
+        const result = await sendMailboxOutbox(db, keys, f.queued.id, sender, mime);
+        console.log("EXTERNAL_RESULT", scenario, JSON.stringify(result), "models", models);
+        if (["positive", "unverified_own"].includes(scenario)) {
+          expect(result.status).toBe("accepted");
+          expect(smtp).toHaveBeenCalledTimes(1);
+          expect(models).toBe(1);
+          await sendMailboxOutbox(db, keys, f.queued.id, sender, mime);
+          expect(smtp).toHaveBeenCalledTimes(1);
+          expect((await rootModule.fetchDeliverabilityHealth(db, f.teamId)).sent).toBe(0);
+          expect(
+            await db.select().from(schema.emails).where(eq(schema.emails.teamId, f.teamId)),
+          ).toHaveLength(0);
+        } else {
+          expect(result.status).not.toBe("accepted");
+          expect(smtp).not.toHaveBeenCalled();
+        }
+        if (
+          [
+            "suspended",
+            "unverified_foreign",
+            "stale_credential",
+            "revoked_membership",
+            "spoof_from",
+            "foreign_tenant",
+            "operator_paused",
+          ].includes(scenario)
+        )
+          expect(models).toBe(0);
+        if (scenario === "judge_reject") {
+          expect(models).toBe(1);
+          const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, f.teamId));
+          expect(team!.suspendedAt).toBeNull();
+        }
+        if (
+          ["credential_revoked_during_model", "membership_revoked_during_model"].includes(scenario)
+        ) {
+          expect(models).toBe(1);
+          expect(result.status).toBe("queued");
+          expect(result.errorCode).toMatch(
+            /^mailbox_deferred:(review_required|preflight_unavailable)$/,
+          );
+          const [activeTeam] = await db
+            .select()
+            .from(schema.teams)
+            .where(eq(schema.teams.id, f.teamId));
+          expect(activeTeam!.suspendedAt).toBeNull();
+        }
+        expect(ses).not.toHaveBeenCalled();
+        expect(sesGets).toBe(0);
+        expect(SESv2Client.prototype.send).not.toHaveBeenCalled();
+      } finally {
+        vi.restoreAllMocks();
+        vi.unstubAllEnvs();
+        vi.unstubAllGlobals();
+      }
+    }, 40000);
+  }
 });

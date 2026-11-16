@@ -79,6 +79,7 @@ export interface PixStripe {
     voidInvoice(id: string, params?: Stripe.InvoiceVoidInvoiceParams): Promise<Stripe.Invoice>;
   };
   refunds: {
+    retrieve?: (id: string) => Promise<Stripe.Refund>;
     create(
       params: Stripe.RefundCreateParams,
       options?: Stripe.RequestOptions,
@@ -343,7 +344,7 @@ export async function readPixPayment(
 
 /** Gives a Pix payment back in full: once per payment, whatever retries come. */
 export async function refundPixPayment(stripe: PixStripe, payment: PixPayment, reason: string) {
-  await stripe.refunds.create(
+  return await stripe.refunds.create(
     {
       payment_intent: payment.paymentIntentId,
       reason: "requested_by_customer",

@@ -5,27 +5,27 @@ import type { Db } from "@millionsend/db";
 import * as schema from "@millionsend/db/schema";
 import { sql } from "drizzle-orm";
 import { firstRow } from "./driver-result.js";
+import { reputationCircuitTriggered } from "./graduated-sending-policy.js";
 import { DAY_MS } from "./utc-day.js";
 
 /** Internal MepMail anti-abuse policy, NOT provider limits or guarantees.
  * Warning and pause both use an exact rolling 24-hour window (start, end].
  * Pause is strictly above the line; equality warns but does not pause.
- * A bounce pause needs a real sample: MIN_PAUSE_SENDS sends AND
- * MIN_PAUSE_HARD_BOUNCES hard bounces in the window, so one mistyped address
- * in a young account cannot lock it out of sending. A complaint is a
- * deliverability and consent signal on its own and pauses from the first one.
+ * Strict tenant circuit thresholds have no sample floor. One confirmed
+ * outcome can cross the line; equality never pauses. Unknown denominators
+ * are not positive clean-sending evidence.
  */
 export const WARN_BOUNCE_RATE = 0.015;
 export const WARN_COMPLAINT_RATE = 0.0005;
-export const PAUSE_BOUNCE_RATE = 0.02;
-export const PAUSE_COMPLAINT_RATE = 0.0008;
+export const PAUSE_BOUNCE_RATE = 0.05;
+export const PAUSE_COMPLAINT_RATE = 0.001;
 /** Warning-only anti-noise floor. It must not exempt trial senders from pauses. */
 export const MIN_GUARDRAIL_VOLUME = 100;
 export const MIN_PAUSE_COMPLAINTS = 1;
-export const MIN_PAUSE_HARD_BOUNCES = 3;
+export const MIN_PAUSE_HARD_BOUNCES = 1;
 /** Denominator floor for a bounce pause. Below this the window is too small to
- * call a rate: the account keeps sending instead of locking out on one typo. */
-export const MIN_PAUSE_SENDS = 20;
+ * call a rate; the graduated projection treats unknown rates as unknown. */
+export const MIN_PAUSE_SENDS = 1;
 /** Complaints keep no volume floor: one is enough, whatever the volume. */
 export const MIN_PAUSE_COMPLAINT_SENDS = 1;
 export const MIN_WARN_COMPLAINTS = 1;
@@ -138,11 +138,13 @@ export function evaluateDeliverability(
     minWarnEvents: MIN_WARN_COMPLAINTS,
   });
 
-  const status: DeliverabilityStatus = reasons.some((r) => r.tier === "paused")
-    ? "paused"
-    : reasons.some((r) => r.tier === "warning")
-      ? "warning"
-      : "ok";
+  // Adverse outcomes without a denominator still hold; do not fabricate a rate/reason percentage.
+  const status: DeliverabilityStatus =
+    reputationCircuitTriggered(pause) || reasons.some((r) => r.tier === "paused")
+      ? "paused"
+      : reasons.some((r) => r.tier === "warning")
+        ? "warning"
+        : "ok";
 
   return {
     bounceRate: rateOf(warn.hardBounced, warn.sent),
@@ -242,10 +244,23 @@ export async function fetchDeliverabilityHealth(
     from confirmed c left join outcomes o on o.email_id = c.id
   `),
   );
+  const native = firstRow<{
+    sent: string;
+    hard: string;
+    complaint: string;
+    watermark: Date | null;
+  }>(
+    await db.execute(sql`
+    with facts as (${nativeReputationRows(teamId, now, start)})
+    select count(*) filter(where accepted_at > ${start} and accepted_at <= ${now})::text as sent,
+      count(*) filter(where hard)::text as hard,count(*) filter(where complaint)::text as complaint,
+      max(watermark) as watermark from facts
+  `),
+  );
   const counts: WindowCounts = {
-    sent: Number(row?.sent ?? 0),
-    hardBounced: Number(row?.hardBounced ?? 0),
-    complained: Number(row?.complained ?? 0),
+    sent: Number(row?.sent ?? 0) + Number(native?.sent ?? 0),
+    hardBounced: Number(row?.hardBounced ?? 0) + Number(native?.hard ?? 0),
+    complained: Number(row?.complained ?? 0) + Number(native?.complaint ?? 0),
   };
   return {
     ...evaluateDeliverability({ warn: counts, pause: counts }),
@@ -258,7 +273,46 @@ export async function fetchDeliverabilityHealth(
       hours: 24,
       basis: "confirmed_messages_and_distinct_outcomes",
       countingUnit: "message",
-      outcomeWatermark: row?.watermark ? new Date(row.watermark) : null,
+      outcomeWatermark:
+        [row?.watermark, native?.watermark]
+          .filter((v): v is string | Date => !!v)
+          .map((v) => new Date(v))
+          .sort((a, b) => b.getTime() - a.getTime())[0] ?? null,
     },
   };
+}
+
+/** Private confirmed-message projection. Never exports MIME, addresses or hashes.
+ * Candidate discovery is occurrence-window bounded; every event is then bound
+ * to its exact tenant/box/attempt/provider and an approved private outcome.
+ * Accepted outbox metadata is the trusted worker acknowledgement, not a claim.
+ */
+export function nativeReputationRows(teamId: string, now: Date, start: Date, domainId?: string) {
+  return sql`
+ with candidates as materialized (
+   select o.id from mailbox_outbox o where o.team_id=${teamId}::uuid
+     and o.accepted_at >= ${start} and o.accepted_at <= ${now}
+   union
+   select v.outbox_id from mailbox_outbound_events v
+     inner join mailbox_outbox o on o.id=v.outbox_id and o.team_id=${teamId}::uuid
+     where v.occurred_at >= ${start} and v.occurred_at <= ${now} and v.received_at <= ${now}
+ ), facts as (
+   select o.id,o.accepted_at,
+     coalesce(bool_or(v.outcome='hard_bounce'),false) as hard,
+     coalesce(bool_or(v.outcome='complaint'),false) as complaint,
+     max(v.received_at) filter(where v.outcome in ('hard_bounce','complaint')) as watermark
+   from candidates c inner join mailbox_outbox o on o.id=c.id and o.team_id=${teamId}::uuid
+   inner join mailboxes b on b.id=o.mailbox_id and b.team_id=o.team_id and b.origin='domain'
+   left join mailbox_outbound_events v on v.outbox_id=o.id and v.attempt_id=o.attempt_id
+     and v.provider_message_id=o.provider_message_id
+     and v.occurred_at > ${start} and v.occurred_at <= ${now} and v.received_at <= ${now}
+     and exists(select 1 from mailbox_outbound_outcomes x where x.event_id=v.id and x.recipient_hash=any(o.recipient_hashes))
+   where o.status='accepted' and o.provider_message_id is not null and o.accepted_at <= ${now}
+     and o.created_at <= ${now}
+     and not exists(select 1 from mailbox_outbound_events rejected where rejected.outbox_id=o.id
+       and rejected.attempt_id=o.attempt_id and rejected.provider_message_id=o.provider_message_id
+       and rejected.outcome in ('rejected','rendering_failed') and rejected.received_at<=${now}
+       and rejected.occurred_at<=${now}) ${domainId ? sql`and b.domain_id=${domainId}::uuid` : sql``}
+   group by o.id,o.accepted_at
+ ) select * from facts`;
 }

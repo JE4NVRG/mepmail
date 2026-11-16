@@ -421,6 +421,13 @@
       "when": 1793189739167,
       "tag": "0059_reputation_window_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1793189739168,
+      "tag": "0060_graduated_sending_capacity",
+      "breakpoints": true
     }
   ]
 }

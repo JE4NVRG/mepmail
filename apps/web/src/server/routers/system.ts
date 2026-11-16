@@ -15,6 +15,7 @@ import {
   committedDailyVolume,
   getInstanceSettings,
   pausedRegions,
+  restoreTenantFromReputation,
   sesEventsHealth,
 } from "@millionsend/core";
 import { schema } from "@millionsend/db";
@@ -108,6 +109,32 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
   const sesPaused = createSesPauseProbe(deps.accountClient);
   const regionalStatus = createRegionalSendingStatusProbe(deps.accountClient);
   return router({
+    reviewGraduatedSuspension: teamProcedure
+      .input(
+        z
+          .object({
+            teamId: z.string().uuid(),
+            suspensionId: z.string().uuid(),
+            reason: z.string().trim().min(15).max(500),
+          })
+          .strict(),
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (!(await isInstanceOperator(ctx.db, ctx.session.user.id)))
+          throw new TRPCError({ code: "FORBIDDEN" });
+        const restored = await restoreTenantFromReputation(ctx.db, {
+          ...input,
+          operatorId: ctx.session.user.id,
+        });
+        if (!restored)
+          throw new TRPCError({
+            code: "CONFLICT",
+            message:
+              "The exact owned suspension cannot be cleared while current adverse evidence or another hold remains.",
+          });
+        return { restored: true as const };
+      }),
+
     /**
      * Whether SES has paused sending in any region this deployment serves:
      * accepted mail is parked meanwhile and drains once SES sends again, so

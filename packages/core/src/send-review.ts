@@ -1,6 +1,7 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { graduatedSendingEnabled } from "./graduated-sending.js";
 import { productionVolumeStatus } from "./production-volume.js";
 import { parseMailbox } from "./sender-address.js";
 import { DAY_MS, utcDay } from "./utc-day.js";
@@ -729,6 +730,7 @@ export async function holdOnContentVerdict(
   input: { teamId: string; score: number; categories: readonly string[]; now?: Date },
 ): Promise<boolean> {
   if (!Number.isFinite(input.score) || input.score < CONTENT_HOLD_SCORE) return false;
+  if (graduatedSendingEnabled()) return false;
   const now = input.now ?? new Date();
   const [team] = await db
     .select({

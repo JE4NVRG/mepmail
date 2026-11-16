@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
 import {
+  assertMailboxOutboxSendAccess,
+  authorizeGraduatedExternalSender,
+  getGraduatedSenderReputation,
+  getGraduatedSendingContext,
+  getTenantReputation,
+  graduatedSendingEnabled,
   type MailboxOutboxSender,
   MailboxSendDeferredError,
   parseSingleSender,
@@ -13,10 +19,13 @@ import {
   type DispatchContentSnapshot,
   qualifyDispatchContent,
 } from "../../../packages/core/src/pre-dispatch-content.js";
+import { judgeForEmail } from "./abuse-judge/index.js";
+import { mailboxCorrespondenceCampaign } from "./mailbox-correspondence.js";
 
 type Input = Parameters<MailboxOutboxSender["send"]>[0];
 interface Approval {
   active: boolean;
+  graduatedEligible: boolean;
   root: Input;
   original: string;
   wire: string;
@@ -66,6 +75,11 @@ export function copyMailboxDispatchInput(input: Input, wire = false): Input {
   };
   if (proof) approvals.set(copy, proof);
   return copy;
+}
+
+export function mailboxGraduatedEligible(input: Input): boolean {
+  const approval = approvals.get(input);
+  return !!approval && valid(input, approval) && approval.graduatedEligible;
 }
 
 /** Synchronous last-boundary check: call before irreversible claim AND provider invocation. */
@@ -275,6 +289,70 @@ export async function withMailboxDispatchContent<T>(
       attachments: false,
       mime: wire,
     };
+    if (graduatedSendingEnabled()) {
+      const [box] = await db
+        .select({
+          origin: schema.mailboxes.origin,
+          domainId: schema.mailboxes.domainId,
+          address: schema.mailboxes.address,
+        })
+        .from(schema.mailboxes)
+        .where(
+          and(eq(schema.mailboxes.id, input.mailboxId), eq(schema.mailboxes.teamId, input.teamId)),
+        );
+      if (!box || (box.origin !== "external" && !box.domainId) || box.address !== input.from)
+        held();
+      await assertMailboxOutboxSendAccess(db, input);
+      const context = await getGraduatedSendingContext(
+        box.origin === "external" ? { purpose: "judge" } : {},
+      );
+      const [row] = await db
+        .select()
+        .from(schema.mailboxOutbox)
+        .where(
+          and(
+            eq(schema.mailboxOutbox.id, input.outboxId),
+            eq(schema.mailboxOutbox.teamId, input.teamId),
+            eq(schema.mailboxOutbox.mailboxId, input.mailboxId),
+            eq(schema.mailboxOutbox.attemptId, input.attemptId),
+            eq(schema.mailboxOutbox.status, "sending"),
+          ),
+        );
+      if (!row) held();
+      const reputation =
+        box.origin === "external"
+          ? await getGraduatedSenderReputation(
+              db,
+              await authorizeGraduatedExternalSender(
+                db,
+                {
+                  teamId: input.teamId,
+                  actorUserId: row.approvedBy,
+                  from: input.from,
+                  mailboxId: input.mailboxId,
+                },
+                context,
+              ),
+              context,
+            )
+          : await getTenantReputation(db, input.teamId, { ...context, domainId: box.domainId! });
+      if (
+        !reputation.capacityAvailable ||
+        reputation.state === "suspended" ||
+        reputation.reason === "review_required"
+      )
+        held();
+      const campaign = mailboxCorrespondenceCampaign({
+        to: input.to,
+        cc: input.cc,
+        bcc: input.bcc,
+        subject: source.parsed.subject,
+        html: final.html,
+        text: final.text,
+        headers: Object.fromEntries(final.parsed.headerLines.map((h) => [h.key, h.line])),
+      });
+      if (campaign && !reputation.campaignEligible) held();
+    }
     const decision = await qualifyDispatchContent(
       snapshot,
       {
@@ -283,15 +361,34 @@ export async function withMailboxDispatchContent<T>(
         ageDays: Math.floor((Date.now() - team.createdAt.getTime()) / 86_400_000),
         verifiedDomains: domains.map((d) => d.name),
       },
-      judge,
+      judge && graduatedSendingEnabled()
+        ? judgeForEmail(judge, db, input.teamId, input.outboxId, "mailbox")
+        : judge,
     );
     if (!decision.allowed || fingerprint(input) !== original) held();
   } catch {
     held();
   }
-  const proof: Approval = { active: true, root: input, original, wire: fingerprint(input, wire) };
+  const proof: Approval = {
+    active: true,
+    graduatedEligible: graduatedSendingEnabled(),
+    root: input,
+    original,
+    wire: fingerprint(input, wire),
+  };
   approvals.set(input, proof);
   try {
+    // This check is before any physical adapter invocation. A revoked grant or
+    // unavailable authority read is a known safe deferral, not ambiguous SMTP.
+    try {
+      await assertMailboxOutboxSendAccess(db, input);
+    } catch (error) {
+      const code =
+        typeof error === "object" && error !== null && "code" in error ? error.code : null;
+      throw new MailboxSendDeferredError(
+        code === "forbidden" || code === "not_found" ? "review_required" : "preflight_unavailable",
+      );
+    }
     return await send();
   } finally {
     proof.active = false;

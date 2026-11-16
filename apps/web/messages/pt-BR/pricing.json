@@ -62,7 +62,7 @@
     "items": [
       {
         "q": "Como funciona o excedente?",
-        "a": "Free e Starter têm limite diário (UTC) e não têm excedente: os envios seguem até 50% acima dele, depois esperam numa fila para o dia seguinte, e novos envios só são recusados quando essa fila chega a 3× o limite diário. O Pro 110K anual (R$ 1.490 por ano) tem franquia mensal de 110 mil, sem excedente pago. No Pro e no Scale mensais, o excedente vem ligado (você pode desligar em Cobrança) e é cobrado por 1.000 pela tarifa do plano, até o teto de segurança de 5× o volume incluído no total (o volume mais até 4× de excedente). Com o excedente desligado, ou acima desse teto, novos envios são recusados até o período renovar."
+        "a": "A capacidade cresce com verificação e atividade limpa. Pagar não ignora limites de segurança; franquia mensal não é capacidade diária imediata. Comparações diárias usam mês nominal de 30 dias, não calendário de envio garantido. Franquias de cobrança e condições de excedente do plano permanecem iguais. Os limites atuais de envio aparecem no painel de reputação da equipe."
       },
       {
         "q": "Posso usar Correio e Envio juntos?",
@@ -119,7 +119,7 @@
   "launchFaq": [
     {
       "q": "Como funciona o excedente?",
-      "a": "Free e Starter têm limite diário (UTC) e não têm excedente: os envios seguem até 50% acima dele, depois esperam numa fila para o dia seguinte, e novos envios só são recusados quando essa fila chega a 3× o limite diário. O Pro 110K anual (R$ 1.490 por ano) tem franquia mensal de 110 mil, sem excedente pago. No Pro e no Scale mensais, o excedente vem ligado (você pode desligar em Cobrança) e é cobrado por 1.000 pela tarifa do plano, até o teto de segurança de 5× o volume incluído no total (o volume mais até 4× de excedente). Com o excedente desligado, ou acima desse teto, novos envios são recusados até o período renovar."
+      "a": "A capacidade cresce com verificação e atividade limpa. Pagar não ignora limites de segurança; franquia mensal não é capacidade diária imediata. Comparações diárias usam mês nominal de 30 dias, não calendário de envio garantido. Franquias de cobrança e condições de excedente do plano permanecem iguais. Os limites atuais de envio aparecem no painel de reputação da equipe."
     },
     {
       "q": "Posso usar Correio e Envio juntos?",

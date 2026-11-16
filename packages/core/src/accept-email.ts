@@ -7,6 +7,15 @@ import { type EmailAttachment, encryptEmailBody, sealAttachments } from "./crypt
 import type { Keyring } from "./crypto/keyring.js";
 import type { FunnelEventTarget } from "./funnel-events.js";
 import {
+  authorizeGraduatedSender,
+  graduatedSendingEnabled,
+  reserveGraduatedSending,
+} from "./graduated-sending.js";
+import {
+  getGraduatedSendingContext,
+  graduatedSenderPrincipal,
+} from "./graduated-sending-context.js";
+import {
   INVITATION_MAIL_ACTOR,
   type InvitationMailActor,
   invitationMailRefusal,
@@ -102,11 +111,25 @@ export async function verifyOnboardingSender(
     .innerJoin(schema.user, eq(schema.user.id, schema.teamMembers.userId))
     .where(eq(schema.teamMembers.teamId, teamId));
   const allowed = new Map(members.map((m) => [normalizeAddress(m.email), m.verified]));
+  const [principal] = graduatedSendingEnabled()
+    ? await db
+        .select({ email: schema.user.email })
+        .from(schema.teamSignupRisk)
+        .innerJoin(schema.user, eq(schema.user.id, schema.teamSignupRisk.principalUserId))
+        .where(eq(schema.teamSignupRisk.teamId, teamId))
+    : [];
   for (const r of recipients) {
     const address = extractAddrSpec(r);
     const verified = address === null ? undefined : allowed.get(normalizeAddress(address));
     if (verified === undefined) return { ok: false, reason: "recipient_not_member" };
-    if (opts.requireVerified && !verified) return { ok: false, reason: "recipient_not_verified" };
+    if (
+      opts.requireVerified &&
+      !verified &&
+      (!principal ||
+        address === null ||
+        normalizeAddress(address) !== normalizeAddress(principal.email))
+    )
+      return { ok: false, reason: "recipient_not_verified" };
   }
   // parseSingleSender succeeded inside isOnboardingSender.
   return { ok: true, domainId: null, address: parseSingleSender(from)?.address ?? "" };
@@ -526,7 +549,16 @@ export async function acceptEmail(
   // every accept against the current billing period, whenever it delivers.
   const deliveryAt = payload.scheduledAt ?? new Date();
   const day = utcDay(deliveryAt);
+  const graduatedContext =
+    deps.isCloud && graduatedSendingEnabled() && !auth[SYSTEM_MAIL_ORIGIN]
+      ? await getGraduatedSendingContext()
+      : undefined;
   const runAccept = async (txDb: Db) => {
+    // Every graduated transaction enters the account pool BEFORE a team row lock.
+    // Batch accepts re-enter the same xact lock, never invert the ordering.
+    if (deps.isCloud && graduatedSendingEnabled()) {
+      await txDb.execute(sql`select pg_advisory_xact_lock(18475923, 47)`);
+    }
     // Serialize approval/ingestion and quota reservation under their team lock.
     if (deps.isCloud) {
       await txDb
@@ -534,6 +566,29 @@ export async function acceptEmail(
         .from(schema.teams)
         .where(eq(schema.teams.id, auth.teamId))
         .for("update");
+    }
+    if (deps.isCloud && graduatedSendingEnabled() && !auth[SYSTEM_MAIL_ORIGIN]) {
+      await reserveGraduatedSending(
+        txDb,
+        {
+          teamId: auth.teamId,
+          emailId,
+          from: payload.from,
+          recipients: [...to, ...(cc ?? []), ...(bcc ?? [])],
+          campaign: !!payload.topicId,
+          senderProof: await authorizeGraduatedSender(
+            txDb,
+            {
+              teamId: auth.teamId,
+              actorUserId: await graduatedSenderPrincipal(txDb, auth.teamId),
+              from: payload.from,
+              domainId: payload.domainId,
+            },
+            graduatedContext,
+          ),
+        },
+        graduatedContext,
+      );
     }
     quota = await applySenderProbationQuota(txDb, auth.teamId, quota, deps.isCloud);
     const reservation =

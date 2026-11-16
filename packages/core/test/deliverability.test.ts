@@ -15,16 +15,19 @@ const windows = (sent: number, hardBounced = 0, complained = 0) => {
 };
 describe("MepMail internal rolling-window policy", () => {
   it.each([
-    [10000, 210, 0],
-    [10000, 0, 9],
-    [200, 5, 0],
+    [10000, 501, 0],
+    [10000, 0, 11],
+    [200, 11, 0],
     [100, 0, 1],
-  ])("pauses above the line with explicit noise floors (%i/%i/%i)", (sent, hard, complaints) => {
-    expect(evaluateDeliverability(windows(sent, hard, complaints)).status).toBe("paused");
-  });
+  ])(
+    "pauses strictly above the current tenant circuit line without noise floors (%i/%i/%i)",
+    (sent, hard, complaints) => {
+      expect(evaluateDeliverability(windows(sent, hard, complaints)).status).toBe("paused");
+    },
+  );
   it.each([
-    [10000, 200, 0],
-    [10000, 0, 8],
+    [10000, 500, 0],
+    [10000, 0, 10],
   ])("strict equality is warning, not pause", (s, b, c) => {
     expect(evaluateDeliverability(windows(s, b, c)).status).toBe("warning");
   });
@@ -42,14 +45,25 @@ describe("MepMail internal rolling-window policy", () => {
     [19, 5, 0],
     [20, 2, 0],
     [1, 1, 0],
-    [25, 1, 0],
-  ])("holds a bounce pause under the sample floor (%i/%i/%i)", (sent, hard, complaints) => {
-    expect(evaluateDeliverability(windows(sent, hard, complaints)).status).not.toBe("paused");
+  ])(
+    "pauses above five percent even below the former sample floor (%i/%i/%i)",
+    (sent, hard, complaints) => {
+      expect(evaluateDeliverability(windows(sent, hard, complaints)).status).toBe("paused");
+    },
+  );
+  it("does not suspend a low-volume bounce rate below five percent", () => {
+    expect(evaluateDeliverability(windows(25, 1, 0)).status).not.toBe("paused");
+  });
+  it.each([
+    [0, 1, 0],
+    [0, 0, 1],
+  ])("holds adverse evidence with unknown denominator (%i/%i/%i)", (sent, hard, complained) => {
+    expect(evaluateDeliverability(windows(sent, hard, complained)).status).toBe("paused");
   });
   it.each([
     [20, 3, 0],
-    [100, 3, 0],
-  ])("pauses a bounce rate once the sample floor is met (%i/%i/%i)", (sent, hard, complaints) => {
+    [100, 6, 0],
+  ])("pauses a bounce rate strictly above five percent (%i/%i/%i)", (sent, hard, complaints) => {
     expect(evaluateDeliverability(windows(sent, hard, complaints)).status).toBe("paused");
   });
   it("applies the floor only to statistical warnings and stays zero-safe", () => {
@@ -132,7 +146,7 @@ describe("fetchDeliverabilityHealth production SQL", () => {
     const health = await fetchDeliverabilityHealth(db, team, { now });
     expect(health).toMatchObject({
       sent: 200,
-      status: "paused",
+      status: "warning",
       bounceRate: 0.025,
       complaintRate: 0,
       windowDays: 1,

@@ -3,6 +3,7 @@ import {
   applyJudgedSample,
   buildJudgeBlock,
   decryptEmailBody,
+  graduatedSendingEnabled,
   holdOnContentVerdict,
   type JudgeBlockInput,
   judgeErrorClass,
@@ -14,6 +15,7 @@ import {
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
+import { judgeForEmail } from "../abuse-judge/index.js";
 import type { SystemMailer } from "../system-mail.js";
 import { flushMonitorAlerts } from "./monitor-alerts.js";
 
@@ -77,20 +79,24 @@ export async function judgeSample(
   const started = Date.now();
   let verdict: Awaited<ReturnType<AbuseJudge["judge"]>>;
   try {
-    verdict = await deps.judge.judge(block, {
-      signal: AbortSignal.timeout(deps.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-      onTelemetry: (event) => {
-        console.info("abuse.judge.phase", {
-          sampleId: sample.id,
-          phase: event.phase,
-          elapsedMs: event.elapsedMs,
-          ...(event.headersMs === undefined ? {} : { headersMs: event.headersMs }),
-          ...(event.bodyMs === undefined ? {} : { bodyMs: event.bodyMs }),
-          ...(event.httpStatus === undefined ? {} : { httpStatus: event.httpStatus }),
-          ...(event.errorClass === undefined ? {} : { errorClass: event.errorClass }),
-        });
+    if (graduatedSendingEnabled() && !sample.emailId) return unjudged("admission_required");
+    verdict = await judgeForEmail(deps.judge, db, sample.teamId, sample.emailId ?? "").judge(
+      block,
+      {
+        signal: AbortSignal.timeout(deps.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+        onTelemetry: (event) => {
+          console.info("abuse.judge.phase", {
+            sampleId: sample.id,
+            phase: event.phase,
+            elapsedMs: event.elapsedMs,
+            ...(event.headersMs === undefined ? {} : { headersMs: event.headersMs }),
+            ...(event.bodyMs === undefined ? {} : { bodyMs: event.bodyMs }),
+            ...(event.httpStatus === undefined ? {} : { httpStatus: event.httpStatus }),
+            ...(event.errorClass === undefined ? {} : { errorClass: event.errorClass }),
+          });
+        },
       },
-    });
+    );
   } catch (err) {
     const errorClass = judgeErrorClass(err);
     const latencyMs = Date.now() - started;
@@ -128,6 +134,8 @@ export async function judgeSample(
       .returning({ id: ms.id });
     // A concurrent run already wrote this sample: its verdict stands, the risk moved once.
     if (!judged) return null;
+    // No risk fold, broadcast pause or team hold from a message verdict.
+    if (graduatedSendingEnabled()) return { messageOnly: true };
     const folded = await applyJudgedSample(t, settings, {
       teamId: sample.teamId,
       score: verdict.score,
@@ -137,8 +145,8 @@ export async function judgeSample(
       teamId: sample.teamId,
       score: verdict.score,
       categories: verdict.categories,
-      now,
     });
+
     return folded;
   });
   if (!outcome) return "skipped";

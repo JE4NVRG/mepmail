@@ -3,12 +3,20 @@ import {
   ABUSE_JUDGE_QUESTIONS,
   type AbuseJudge,
   composeJudgeVerdict,
+  GraduatedAdmissionError,
   JudgeError,
   type JudgeTelemetry,
   type JudgeVerdict,
   judgeErrorClass,
   judgeStatusClass,
 } from "@millionsend/core";
+import {
+  COMMANDCODE_INPUT_TOKEN_UPPER_BOUND,
+  type JudgeProviderUsage,
+  MAX_COMMANDCODE_OUTPUT_TOKENS,
+  readJudgeProviderUsage,
+  serializeBoundedJudgeRequest,
+} from "./bounded-frame.js";
 import type { FetchLike } from "./typesafe.js";
 
 /**
@@ -167,13 +175,16 @@ export function createOpenAiJudge(opts: {
   baseUrl: string;
   apiKey?: string | undefined;
   fetch?: FetchLike | undefined;
+  /** Server-owned account-pool gate. Runs after framing, immediately before fetch.
+   * Its typed 429/defer refusal is intentionally outside the transport catch. */
+  beforeFetch?: (() => Promise<void>) | undefined;
 }): AbuseJudge {
   const fetcher: FetchLike = opts.fetch ?? ((url, init) => fetch(url, init));
   const url = `${opts.baseUrl.replace(/\/$/, "")}/chat/completions`;
   return {
     provider: "openai",
     model: opts.model,
-    async judge(block, { signal, onTelemetry }): Promise<JudgeVerdict> {
+    async judge(block, { signal, onTelemetry, onUsage }): Promise<JudgeVerdict> {
       const started = performance.now();
       let phase: JudgeTelemetry["phase"] = "headers";
       let headersMs: number | undefined;
@@ -196,6 +207,19 @@ export function createOpenAiJudge(opts: {
       };
       try {
         if (!opts.apiKey) throw new JudgeError("no_credentials", "ABUSE_JUDGE_API_KEY is unset");
+        const requestBody = serializeBoundedJudgeRequest({
+          model: opts.model,
+          ...(useCommandCodeNonThinking(opts.model, opts.baseUrl)
+            ? { reasoning_effort: "off", max_tokens: MAX_COMMANDCODE_OUTPUT_TOKENS }
+            : {}),
+          temperature: 0,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: OPENAI_JUDGE_SYSTEM_PROMPT },
+            { role: "user", content: `<email>\n${block}\n</email>` },
+          ],
+        });
+        await opts.beforeFetch?.();
         let res: Response;
         try {
           res = await fetcher(url, {
@@ -204,21 +228,11 @@ export function createOpenAiJudge(opts: {
               "content-type": "application/json",
               authorization: `Bearer ${opts.apiKey}`,
             },
-            body: JSON.stringify({
-              model: opts.model,
-              ...(useCommandCodeNonThinking(opts.model, opts.baseUrl)
-                ? { reasoning_effort: "off" }
-                : {}),
-              temperature: 0,
-              response_format: { type: "json_object" },
-              messages: [
-                { role: "system", content: OPENAI_JUDGE_SYSTEM_PROMPT },
-                { role: "user", content: `<email>\n${block}\n</email>` },
-              ],
-            }),
+            body: requestBody,
             signal,
           });
         } catch (err) {
+          if (err instanceof JudgeError || err instanceof GraduatedAdmissionError) throw err;
           const name = (err as { name?: string } | null)?.name;
           if (name === "AbortError" || name === "TimeoutError") {
             throw new JudgeError("timeout", "judge call timed out", { cause: err });
@@ -246,7 +260,10 @@ export function createOpenAiJudge(opts: {
             `judge answered ${res.status}`,
           );
         }
-        let json: { choices?: { message?: { content?: unknown } }[] };
+        let json: {
+          usage?: unknown;
+          choices?: { finish_reason?: unknown; message?: { content?: unknown } }[];
+        };
         try {
           json = (await res.json()) as typeof json;
           bodyMs = Math.round(performance.now() - bodyStarted);
@@ -257,6 +274,19 @@ export function createOpenAiJudge(opts: {
             { cause: err },
           );
         }
+        // Record trusted token consumption even when finish/content is uncertain.
+        // Null means retain the full reservation; never infer usage from string bytes.
+        const usage: JudgeProviderUsage | null = readJudgeProviderUsage(json.usage);
+        const outsideReservation =
+          useCommandCodeNonThinking(opts.model, opts.baseUrl) &&
+          usage !== null &&
+          (usage.inputTokens > COMMANDCODE_INPUT_TOKEN_UPPER_BOUND ||
+            usage.outputTokens > MAX_COMMANDCODE_OUTPUT_TOKENS);
+        await onUsage?.(outsideReservation ? null : usage);
+        if (outsideReservation)
+          throw new JudgeError("parse_error", "judge usage exceeded reserved bounds");
+        if (json.choices?.length !== 1 || json.choices[0]?.finish_reason !== "stop")
+          throw new JudgeError("parse_error", "judge completion is incomplete or uncertain");
         phase = "content";
         const content = json.choices?.[0]?.message?.content;
         if (typeof content !== "string") throw new JudgeError("parse_error", "no message content");

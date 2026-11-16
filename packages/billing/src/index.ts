@@ -149,6 +149,8 @@ export {
   type SendCheckoutResult,
 } from "./send-checkout.js";
 export { resolveSendBillingContract, verifiedSendBillingContract } from "./send-contract.js";
+export { sendNewPurchaseAvailability } from "./send-launch-offer.js";
+export { assertSendSaleCapacity, SendSaleCapacityError } from "./send-sale-capacity.js";
 export {
   dispatchSignupConversions,
   recordSignupConversions,

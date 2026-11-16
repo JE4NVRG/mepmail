@@ -24,6 +24,8 @@ import {
   requirePurchaseEligibility,
 } from "./purchase-eligibility.js";
 import { resolveSendBillingContract, verifiedSendBillingContract } from "./send-contract.js";
+import type { SendSaleCapacitySource } from "./send-sale-capacity.js";
+import { releaseSendSaleCapacity, reserveSendSaleCapacity } from "./send-sale-reservation.js";
 import type { BillingStripe } from "./stripe.js";
 
 type Plan = (typeof schema.planEnum.enumValues)[number];
@@ -244,28 +246,6 @@ export async function applySubscription(
       baseTerms?.priceCents === catalog.priceCents &&
       baseTerms.included === catalog.included &&
       baseTerms.overageCentsPer1k === catalog.overageCentsPer1k;
-    if (stripe && !overage && rung.period === "month" && matchesCatalog) {
-      try {
-        const price = await resolvePriceId(stripe, overageLookupKey(rung));
-        overage = await stripe.subscriptionItems.create({ subscription: sub.id, price });
-      } catch (err) {
-        log(`overage item not added to ${sub.id}: ${String(err)}`);
-      }
-    }
-    if (stripe && overage && rung.period === "month" && matchesCatalog) {
-      const expected = overageLookupKey(rung);
-      if (rungIdentityFromPrice(overage.price)?.key !== rung.key) {
-        try {
-          const price = await resolvePriceId(stripe, expected);
-          overage = await stripe.subscriptionItems.update(overage.id, {
-            price,
-            proration_behavior: "none",
-          });
-        } catch (err) {
-          log(`overage item ${overage.id} not re-pointed to ${expected}: ${String(err)}`);
-        }
-      }
-    }
   } else if (dunning) {
     plan = team.plan;
     planQuota = team.planQuota;
@@ -357,6 +337,42 @@ export async function applySubscription(
       cancelAt: stamp(sub.cancel_at),
     })
     .where(eq(schema.teams.id, team.id));
+  // Only persisted, exact provider state converts a promise to a contract. Pending
+  // updates and transport completion alone keep their hold. No pool lock in this lifecycle.
+  if (sendBillingContract && entitled && !sub.pending_update) {
+    const id = sub.metadata?.mepmail_send_checkout;
+    if (id) await releaseSendSaleCapacity(tx, team.id, id, "contract");
+    const holds = await tx.execute<{ target: string }>(sql`select target from ${schema.auditLog}
+      where team_id=${team.id} and action='sending.sale_reserved' and data->>'kind'='upgrade'
+        and data->>'subscriptionId'=${sub.id} and data->>'rung'=${rung?.key ?? ""}`);
+    const rows = Array.isArray(holds)
+      ? holds
+      : (holds as unknown as { rows: { target: string }[] }).rows;
+    for (const hold of rows) await releaseSendSaleCapacity(tx, team.id, hold.target, "contract");
+  }
+  if (["canceled", "incomplete_expired"].includes(sub.status)) {
+    const attemptId = sub.metadata?.mepmail_send_checkout;
+    if (attemptId) {
+      const [owned] = await tx
+        .select()
+        .from(schema.sendCheckoutAttempts)
+        .where(
+          and(
+            eq(schema.sendCheckoutAttempts.id, attemptId),
+            eq(schema.sendCheckoutAttempts.teamId, team.id),
+          ),
+        );
+      if (owned?.stripeCustomerId === customerId && owned.livemode === sub.livemode)
+        await releaseSendSaleCapacity(tx, team.id, attemptId, "expired");
+    }
+    const holds = await tx.execute<{ target: string }>(
+      sql`select target from ${schema.auditLog} where team_id=${team.id} and action='sending.sale_reserved' and data->>'kind'='upgrade' and data->>'subscriptionId'=${sub.id}`,
+    );
+    const rows = Array.isArray(holds)
+      ? holds
+      : (holds as unknown as { rows: { target: string }[] }).rows;
+    for (const hold of rows) await releaseSendSaleCapacity(tx, team.id, hold.target, "expired");
+  }
 }
 
 async function loadBillingColumns(db: Db, teamId: string) {
@@ -380,38 +396,36 @@ export async function reconcileTeamPlan(deps: BillingDeps, teamId: string): Prom
   const team = await loadBillingColumns(deps.db, teamId);
   if (!team?.stripeCustomerId) return;
   const customerId = team.stripeCustomerId;
-  await deps.db.transaction(async (tx) => {
-    await lockCustomer(tx as unknown as Db, customerId);
-    // Retrieve carries the expansions (a list is nested beyond Stripe's depth limit).
-    let startingAfter: string | undefined;
-    for (;;) {
-      const page = await deps.stripe.subscriptions.list({
-        customer: customerId,
-        status: "all",
-        limit: 100,
-        ...(startingAfter ? { starting_after: startingAfter } : {}),
+
+  // Retrieve carries the expansions (a list is nested beyond Stripe's depth limit).
+  let startingAfter: string | undefined;
+  for (;;) {
+    const page = await deps.stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 100,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    });
+    for (const listed of page.data) {
+      if (isMailboxSubscription(listed)) continue;
+      const sub = await deps.stripe.subscriptions.retrieve(listed.id, {
+        expand: SUBSCRIPTION_EXPAND,
       });
-      for (const listed of page.data) {
-        if (isMailboxSubscription(listed)) continue;
-        const sub = await deps.stripe.subscriptions.retrieve(listed.id, {
-          expand: SUBSCRIPTION_EXPAND,
-        });
-        if (
-          isMailboxSubscription(sub) ||
-          idOf(sub.customer) !== customerId ||
-          (sub.id !== team.stripeSubscriptionId && !rungFromSubscription(sub))
-        )
-          continue;
-        await applySubscription(tx as unknown as Db, sub, deps.log ?? console.warn, deps.stripe);
-        return;
-      }
-      if (!page.has_more) return;
-      const lastId = page.data.at(-1)?.id;
-      if (!lastId || lastId === startingAfter)
-        throw new Error("Stripe subscription pagination stalled");
-      startingAfter = lastId;
+      if (
+        isMailboxSubscription(sub) ||
+        idOf(sub.customer) !== customerId ||
+        (sub.id !== team.stripeSubscriptionId && !rungFromSubscription(sub))
+      )
+        continue;
+      await syncSubscription(deps, customerId, sub.id);
+      return;
     }
-  });
+    if (!page.has_more) return;
+    const lastId = page.data.at(-1)?.id;
+    if (!lastId || lastId === startingAfter)
+      throw new Error("Stripe subscription pagination stalled");
+    startingAfter = lastId;
+  }
 }
 
 /** The team's live subscription, expanded for rung resolution; throws when it has none. */
@@ -426,15 +440,146 @@ async function liveSubscription(deps: BillingDeps, teamId: string) {
   return { customerId: team.stripeCustomerId, sub };
 }
 
-/** Lock first, then read Stripe: the row never receives a state older than one already applied. */
+/** Bounded provider reads never extend a DB lease or projection lock. */
+async function boundedRead<T>(request: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      request,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Subscription read timed out")), 10000);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+const projectionKey = (team: typeof schema.teams.$inferSelect) =>
+  JSON.stringify([
+    team.stripeCustomerId,
+    team.stripeSubscriptionId,
+    team.stripeSubscriptionCreated,
+    team.plan,
+    team.planQuota,
+    team.planStatus,
+    team.billingTerms,
+    team.sendBillingContract,
+    team.currentPeriodStart,
+    team.currentPeriodEnd,
+  ]);
+export async function prepareSubscription(
+  deps: BillingDeps,
+  customerId: string,
+  subscriptionId: string,
+) {
+  const [team] = await deps.db
+    .select()
+    .from(schema.teams)
+    .where(eq(schema.teams.stripeCustomerId, customerId));
+  let sub = await boundedRead(
+    deps.stripe.subscriptions.retrieve(subscriptionId, { expand: SUBSCRIPTION_EXPAND }),
+  );
+  if (sub.id !== subscriptionId || idOf(sub.customer) !== customerId)
+    throw new Error("Subscription identity changed");
+  const key = team ? projectionKey(team) : null;
+  if (!team || isMailboxSubscription(sub)) return { sub, teamId: team?.id ?? null, key };
+  const { base, overage } = subscriptionItems(sub);
+  const rung = rungFromSubscription(sub);
+  const catalog = rung ? rungByKey(rung.key as PlanRungKey) : null;
+  const repair = !!(
+    base &&
+    rung &&
+    catalog &&
+    ["active", "trialing"].includes(sub.status) &&
+    !sub.pending_update &&
+    base.price.active &&
+    base.price.recurring?.interval === "month" &&
+    rung.priceCents === catalog.priceCents &&
+    rung.included === catalog.included &&
+    rungFromPrice(base.price)?.overageCentsPer1k === catalog.overageCentsPer1k &&
+    (!overage || rungIdentityFromPrice(overage.price)?.key !== rung.key)
+  );
+  if (repair && rung && base) {
+    if (team.stripeSubscriptionId !== sub.id)
+      throw new Error("Repair requires the current subscription binding");
+    const price = await resolvePriceId(deps.stripe, overageLookupKey(rung));
+    const fresh = await boundedRead(
+      deps.stripe.subscriptions.retrieve(sub.id, { expand: SUBSCRIPTION_EXPAND }),
+    );
+    const [binding] = await deps.db.select().from(schema.teams).where(eq(schema.teams.id, team.id));
+    if (!binding || projectionKey(binding) !== key || JSON.stringify(fresh) !== JSON.stringify(sub))
+      throw new Error("Repair source changed before POST");
+    const operation = `send-meter-repair:${sub.id}:${base.id}:${base.price.id}:${overage?.id ?? "missing"}:${price}`;
+    // No customer, team, pool or projection transaction spans either repair POST.
+    if (overage)
+      await (
+        deps.stripe.subscriptionItems.update as (
+          id: string,
+          params: Stripe.SubscriptionItemUpdateParams,
+          options: Stripe.RequestOptions,
+        ) => Promise<Stripe.SubscriptionItem>
+      )(overage.id, { price, proration_behavior: "none" }, { idempotencyKey: operation });
+    else
+      await (
+        deps.stripe.subscriptionItems.create as (
+          params: Stripe.SubscriptionItemCreateParams,
+          options: Stripe.RequestOptions,
+        ) => Promise<Stripe.SubscriptionItem>
+      )({ subscription: sub.id, price }, { idempotencyKey: operation });
+    const confirmed = await boundedRead(
+      deps.stripe.subscriptions.retrieve(sub.id, { expand: SUBSCRIPTION_EXPAND }),
+    );
+    const items = subscriptionItems(confirmed);
+    if (
+      confirmed.id !== sub.id ||
+      idOf(confirmed.customer) !== customerId ||
+      confirmed.livemode !== sub.livemode ||
+      confirmed.status !== sub.status ||
+      confirmed.pending_update ||
+      items.base?.id !== base.id ||
+      items.base.price.id !== base.price.id ||
+      items.base.current_period_start !== base.current_period_start ||
+      items.base.current_period_end !== base.current_period_end ||
+      items.overage?.price.id !== price ||
+      (overage && items.overage.id !== overage.id)
+    )
+      throw new Error("Repair readback is ambiguous or stale");
+    sub = confirmed;
+  }
+  return { sub, teamId: team.id, key };
+}
+export async function applyPreparedSubscription(
+  tx: Db,
+  prepared: Awaited<ReturnType<typeof prepareSubscription>>,
+  log: (message: string) => void,
+  stripe?: BillingStripe,
+) {
+  const customer = idOf(prepared.sub.customer);
+  if (!customer) throw new Error("Missing subscription customer");
+  await lockCustomer(tx, customer);
+  if (prepared.teamId) {
+    const [team] = await tx
+      .select()
+      .from(schema.teams)
+      .where(eq(schema.teams.id, prepared.teamId))
+      .for("update");
+    if (!team || projectionKey(team) !== prepared.key)
+      throw new Error("Projection changed after provider readback");
+  }
+  await applySubscription(tx, prepared.sub, log, stripe);
+}
+export async function syncSubscription(
+  deps: BillingDeps,
+  customerId: string,
+  subscriptionId: string,
+) {
+  const prepared = await prepareSubscription(deps, customerId, subscriptionId);
+  await deps.db.transaction((tx) =>
+    applyPreparedSubscription(tx as unknown as Db, prepared, deps.log ?? console.warn, deps.stripe),
+  );
+}
 async function applyLocked(deps: BillingDeps, customerId: string, subscriptionId: string) {
-  await deps.db.transaction(async (tx) => {
-    await lockCustomer(tx as unknown as Db, customerId);
-    const sub = await deps.stripe.subscriptions.retrieve(subscriptionId, {
-      expand: SUBSCRIPTION_EXPAND,
-    });
-    await applySubscription(tx as unknown as Db, sub, deps.log ?? console.warn, deps.stripe);
-  });
+  await syncSubscription(deps, customerId, subscriptionId);
 }
 
 /** Drops a pending downgrade: the subscription keeps its current items. */
@@ -476,7 +621,7 @@ export type RungChange =
  * place plan changes happen; the webhook that follows re-applies the state.
  */
 export async function changeRung(
-  deps: BillingDeps,
+  deps: BillingDeps & { capacitySource?: SendSaleCapacitySource },
   input: { teamId: string; rung: PlanRungKey; userId?: string },
 ): Promise<RungChange> {
   const rung = rungByKey(input.rung);
@@ -529,6 +674,17 @@ export async function changeRung(
       teamId: input.teamId,
       userId: input.userId ?? "",
     });
+    const capacity = await reserveSendSaleCapacity(
+      deps.db,
+      {
+        teamId: input.teamId,
+        userId: input.userId ?? "",
+        rung: input.rung,
+        kind: "upgrade",
+        subscriptionId: sub.id,
+      },
+      deps.capacitySource,
+    );
     // Sends made under the old rung settle at its rate before the move.
     if (overage) await reportOverage(deps, { teamId: input.teamId });
     const items: Stripe.SubscriptionUpdateParams.Item[] = [
@@ -543,7 +699,7 @@ export async function changeRung(
     // Settle the old usage above before opening this transaction: its meter pin
     // must remain durable even if the subsequent price-change POST fails.
     let paymentPending = false;
-    await deps.db.transaction(async (transaction) => {
+    const fresh = await deps.db.transaction(async (transaction) => {
       const tx = transaction as unknown as Db;
       await lockCustomer(tx, customerId);
       const [binding] = await tx
@@ -591,20 +747,32 @@ export async function changeRung(
         freshOverage?.price.id !== overage?.price.id
       )
         throw new Error("Subscription changed before the plan update");
-      // A hold or membership change after preflight must not release a pending
-      // downgrade or issue a charge. Keep the team/member locks through the POST.
       await assertPurchaseEligibility(tx, input.teamId);
-      await releaseSchedule({ ...deps, db: tx }, fresh);
-      // Internal subscription mutations and meter emission now share this lock.
-      // A manual change made directly in Stripe remains outside the app's lock.
-      // Charge the difference now; with pending_if_incomplete a declined or
-      // 3DS-pending payment leaves the items unchanged until it is paid.
-      const updated = await deps.stripe.subscriptions.update(sub.id, {
+      return fresh;
+    });
+    // Committed reservation and binding preflight precede every mutation; no customer/team lock spans POST.
+    await releaseSchedule(deps, fresh);
+    const updated = await deps.stripe.subscriptions.update(
+      sub.id,
+      {
         items,
         proration_behavior: "always_invoice",
         payment_behavior: "pending_if_incomplete",
-      });
-      paymentPending = !!updated?.pending_update;
+      },
+      { idempotencyKey: `send-upgrade:${capacity.id}` },
+    );
+    paymentPending = !!updated?.pending_update;
+    const preparedProjection = await prepareSubscription(deps, customerId, sub.id);
+    await deps.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Db;
+      await lockCustomer(tx, customerId);
+      const [binding] = await tx
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, input.teamId))
+        .for("update");
+      if (binding?.stripeCustomerId !== customerId || binding.stripeSubscriptionId !== sub.id)
+        throw new Error("Subscription binding changed after plan update");
       // What was accepted inside the old volume is never re-judged as overage
       // under the new one: the period row counts it as already settled.
       if (!paymentPending && rung.period === "month" && base.current_period_start) {
@@ -621,10 +789,12 @@ export async function changeRung(
             ),
           );
       }
-      const confirmed = await deps.stripe.subscriptions.retrieve(sub.id, {
-        expand: SUBSCRIPTION_EXPAND,
-      });
-      await applySubscription(tx, confirmed, deps.log ?? console.warn, deps.stripe);
+      await applyPreparedSubscription(
+        tx,
+        preparedProjection,
+        deps.log ?? console.warn,
+        deps.stripe,
+      );
     });
     return paymentPending ? { applied: "payment_pending" } : { applied: "now" };
   }

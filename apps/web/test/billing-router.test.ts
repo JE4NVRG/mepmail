@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { type BillingStripe, priceMetadata } from "@millionsend/billing";
 import {
@@ -17,11 +18,49 @@ import type { TeamRole } from "@/server/membership";
 import { createBillingRouter } from "@/server/routers/billing";
 import { createCallerFactory, router } from "@/server/trpc";
 import { applySubscription } from "../../../packages/billing/src/subscription";
+import { SESv2Client } from "../../../packages/core/node_modules/@aws-sdk/client-sesv2";
 
 // Authentication is synthetic in these router unit cases. Live membership
 // enforcement is covered by the operations integration tests without this mock.
 vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
 
+const capacityFixture = vi.hoisted(() => ({ credits: 100000, unknown: false }));
+vi.mock("../../../packages/core/src/graduated-sending-context.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../packages/core/src/graduated-sending-context.js")
+    >();
+  return {
+    ...actual,
+    getGraduatedSendingContext: () => {
+      if (capacityFixture.unknown) throw Error("metadata unavailable");
+      return actual.getGraduatedSendingContext({
+        config: {
+          provider: "openai",
+          model: "deepseek/deepseek-v4.1-flash",
+          baseUrl: "https://api.commandcode.ai/provider/v1",
+          apiKey: "fixture-only",
+        },
+        fetch: (async () =>
+          new Response(
+            JSON.stringify({
+              credits: {
+                monthlyCredits: capacityFixture.credits,
+                purchasedCredits: 0,
+                freeCredits: 0,
+                belowThreshold: false,
+              },
+              windowLimits: {
+                exceeded: false,
+                fiveHour: { used: 0, cap: 1000000000, resetAt: Date.now() + 3600000 },
+                weekly: { used: 0, cap: 1000000000, resetAt: Date.now() + 3600000 },
+              },
+            }),
+          )) as typeof fetch,
+      });
+    },
+  };
+});
 const h = vi.hoisted(() => ({
   runCronNow: vi.fn(async (_name: string) => {}),
   sent: [] as SystemMailMessage[],
@@ -371,6 +410,21 @@ async function teamRow(teamId: string) {
 const auditRows = () =>
   db.select({ action: schema.auditLog.action, data: schema.auditLog.data }).from(schema.auditLog);
 
+/** Previously committed legacy intent. This does NOT prove new high-volume
+ * sales are admissible under the current 3-RPM envelope. */
+async function seedCommittedLegacyUpgrade(teamId: string, rung: PlanRungKey) {
+  const current = await teamRow(teamId);
+  if (!current?.stripeSubscriptionId) throw new Error("Missing legacy subscription");
+  const id = randomUUID();
+  await db.insert(schema.auditLog).values({
+    teamId,
+    actorId: "u1",
+    action: "sending.sale_reserved",
+    target: id,
+    data: { id, kind: "upgrade", rung, subscriptionId: current.stripeSubscriptionId },
+  });
+}
+
 const notificationRows = () =>
   db
     .select({ kind: schema.teamNotifications.kind, key: schema.teamNotifications.periodKey })
@@ -378,6 +432,47 @@ const notificationRows = () =>
 
 beforeEach(async () => {
   ({ db, close } = await createTestDb());
+  capacityFixture.credits = 100000;
+  capacityFixture.unknown = false;
+  vi.stubEnv("SENDING_PROVIDER_POLICY_JSON", JSON.stringify({ graduated: true }));
+  vi.spyOn(SESv2Client.prototype, "send").mockImplementation(async () => ({
+    SendingEnabled: true,
+    ProductionAccessEnabled: true,
+    EnforcementStatus: "HEALTHY",
+    SendQuota: { Max24HourSend: 1000000, SentLast24Hours: 0, MaxSendRate: 14 },
+  }));
+  await db.execute(
+    sql.raw(
+      "create table if not exists mailbox_outbox(id uuid,team_id uuid,mailbox_id uuid,accepted_at timestamptz,attempt_id uuid,provider_message_id text,status text,created_at timestamptz,recipient_hashes text[])",
+    ),
+  );
+  await db.execute(
+    sql.raw(
+      "create table if not exists mailbox_outbound_events(id text,outbox_id uuid,attempt_id uuid,provider_message_id text,outcome text,occurred_at timestamptz,received_at timestamptz)",
+    ),
+  );
+  await db.execute(
+    sql.raw(
+      "create table if not exists mailbox_outbound_outcomes(event_id text,recipient_hash text)",
+    ),
+  );
+  await db.execute(
+    sql.raw("create table if not exists mailboxes(id uuid,team_id uuid,origin text)"),
+  );
+  await db.execute(
+    sql.raw("alter table mailboxes add column if not exists origin text default 'domain'"),
+  );
+
+  await db.execute(
+    sql.raw(
+      "create table if not exists sending_judge_account_debt(account_key text primary key,debt_units bigint,last_meter_id text,last_meter_at timestamptz,last_remaining_units bigint)",
+    ),
+  );
+  await db.execute(
+    sql.raw(
+      "create table if not exists sending_judge_attempts(account_key text,state text,reserved_units bigint)",
+    ),
+  );
   const ddl = readFileSync(
     new URL(
       "../../../packages/db/mailbox-drizzle/0007_mailbox_customer_request.sql",
@@ -410,6 +505,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   h.runCronNow.mockClear();
@@ -517,7 +613,7 @@ describe("billing router", () => {
     for (const writes of Object.values(calls)) expect(writes).toEqual([]);
   });
 
-  it("keeps the real legacy USD20 price and checkout when the new offer is disabled", async () => {
+  it("preserves the legacy USD20 contract while refusing another overcommitting sale", async () => {
     vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "false");
     const existing = await subscribedTeam("pro_100k");
     await db
@@ -534,6 +630,21 @@ describe("billing router", () => {
     });
     expect(await teamRow(existing)).toEqual(before);
     const fresh = await createTeam(db, "legacy-checkout");
+    await seedBuyer(fresh);
+    await expect(
+      callerFor(fresh, "owner").billing.checkout({ rung: "pro_100k" }),
+    ).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: "SEND_SALE_CAPACITY_INSUFFICIENT",
+    });
+    expect(calls.customers).toEqual([]);
+    expect(calls.checkouts).toEqual([]);
+    expect(await teamRow(existing)).toEqual(before);
+  });
+
+  it("uses the real legacy USD20 checkout price with an otherwise unallocated shared pool", async () => {
+    vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "false");
+    const fresh = await createTeam(db, "fresh-legacy-price");
     await seedBuyer(fresh);
     await callerFor(fresh, "owner").billing.checkout({ rung: "pro_100k" });
     const baseId = calls.checkouts[0]?.line_items?.[0]?.price;
@@ -642,10 +753,21 @@ describe("billing router", () => {
         ]);
       }
       expect(await db.select().from(schema.sendCheckoutAttempts)).toHaveLength(1);
-      expect((await auditRows())[0]?.data).toMatchObject({
-        interval,
-        checkoutAttemptId: expect.any(String),
-      });
+      const audits = await auditRows();
+      const started = audits.find((r) => r.action === "billing.checkout_started");
+      expect(started?.data).toMatchObject({ interval, checkoutAttemptId: expect.any(String) });
+      if (!started) throw new Error("Expected persisted checkout_started audit");
+      expect(audits.filter((r) => r.action === "sending.sale_reserved")).toEqual([
+        {
+          action: "sending.sale_reserved",
+          data: {
+            id: (started.data as { checkoutAttemptId: string }).checkoutAttemptId,
+            kind: "card",
+            rung: "pro_100k",
+            subscriptionId: null,
+          },
+        },
+      ]);
     },
   );
   it("status preserves archived subscription prices through the real resolver and quota path", async () => {
@@ -816,7 +938,7 @@ describe("billing router", () => {
     const teamId = await createTeam(db, "acme");
     await seedBuyer(teamId);
     const admin = callerFor(teamId, "admin");
-    expect(await admin.billing.checkout({ rung: "scale_1m" })).toEqual({
+    expect(await admin.billing.checkout({ rung: "pro_100k" })).toEqual({
       url: "https://checkout.stripe.com/c/cs_1",
     });
     expect(calls.customers).toEqual([
@@ -830,7 +952,7 @@ describe("billing router", () => {
       mode: "subscription",
       customer: "cus_new",
       client_reference_id: teamId,
-      line_items: [{ price: "price_scale_1m", quantity: 1 }, { price: "price_scale_1m_overage" }],
+      line_items: [{ price: "price_pro_100k", quantity: 1 }, { price: "price_pro_100k_overage" }],
       success_url: "https://app.example.com/settings/billing?checkout=success",
       cancel_url: "https://app.example.com/settings/billing",
       automatic_tax: { enabled: true },
@@ -844,18 +966,25 @@ describe("billing router", () => {
       plan: "free",
       planStatus: "none",
     });
-    expect(await auditRows()).toEqual([
+    const audits = await auditRows();
+    expect(audits.filter((r) => r.action.startsWith("billing."))).toEqual([
       {
         action: "billing.checkout_started",
-        data: { rung: "scale_1m", interval: "month", checkoutAttemptId: expect.any(String) },
+        data: { rung: "pro_100k", interval: "month", checkoutAttemptId: expect.any(String) },
+      },
+    ]);
+    expect(audits.filter((r) => r.action.startsWith("sending."))).toEqual([
+      {
+        action: "sending.sale_reserved",
+        data: { id: expect.any(String), kind: "card", rung: "pro_100k", subscriptionId: null },
       },
     ]);
 
     // An open financial intent is reused, and changing its plan is refused.
-    await admin.billing.checkout({ rung: "scale_1m" });
+    await admin.billing.checkout({ rung: "pro_100k" });
     expect(calls.customers).toHaveLength(1);
     expect(calls.checkouts).toHaveLength(1);
-    await expect(admin.billing.checkout({ rung: "pro_100k" })).rejects.toMatchObject({
+    await expect(admin.billing.checkout({ rung: "starter" })).rejects.toMatchObject({
       code: "CONFLICT",
       message: "SEND_CHECKOUT_CONFLICT",
     });
@@ -886,7 +1015,13 @@ describe("billing router", () => {
     });
     expect(calls.customers).toHaveLength(1);
     expect(calls.checkouts).toHaveLength(0);
-    expect(await auditRows()).toHaveLength(0);
+    expect((await auditRows()).filter((r) => r.action.startsWith("billing."))).toHaveLength(0);
+    expect((await auditRows()).filter((r) => r.action.startsWith("sending."))).toEqual([
+      {
+        action: "sending.sale_reserved",
+        data: { id: expect.any(String), kind: "card", rung: "pro_100k", subscriptionId: null },
+      },
+    ]);
   });
 
   it("checkout is refused while a subscription is live; status says so", async () => {
@@ -910,7 +1045,12 @@ describe("billing router", () => {
       .set({ planStatus: "canceled" })
       .where(eq(schema.teams.id, teamId));
     expect((await owner.billing.status()).hasLiveSubscription).toBe(false);
-    expect(await owner.billing.checkout({ rung: "scale_500k" })).toEqual({
+    await expect(owner.billing.checkout({ rung: "scale_500k" })).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: "SEND_SALE_CAPACITY_INSUFFICIENT",
+    });
+    expect(calls.checkouts).toEqual([]);
+    expect(await owner.billing.checkout({ rung: "pro_100k" })).toEqual({
       url: "https://checkout.stripe.com/c/cs_1",
     });
   });
@@ -979,8 +1119,9 @@ describe("billing router", () => {
     expect(collector).toHaveBeenCalledTimes(1);
   });
 
-  it("changePlan moves up at once with prorations, re-pricing the metered item, and drains on a raise", async () => {
+  it("legacy committed intent: changePlan moves up at once with prorations, re-pricing the metered item, and drains on a raise", async () => {
     const teamId = await subscribedTeam("pro_100k");
+    await seedCommittedLegacyUpgrade(teamId, "scale_500k");
     const owner = callerFor(teamId, "owner");
     expect(await owner.billing.changePlan({ rung: "scale_500k" })).toEqual({ applied: "now" });
     expect(calls.updates).toEqual([
@@ -1001,8 +1142,21 @@ describe("billing router", () => {
       pendingRung: null,
     });
     expect(h.runCronNow).toHaveBeenCalledWith("quota.drain");
-    expect(await auditRows()).toEqual([
+    const audits = await auditRows();
+    expect(audits.filter((r) => r.action.startsWith("billing."))).toEqual([
       { action: "billing.plan_changed", data: { rung: "scale_500k", applied: "now" } },
+    ]);
+    expect(audits.filter((r) => r.action.startsWith("sending."))).toEqual([
+      {
+        action: "sending.sale_reserved",
+        data: {
+          id: expect.any(String),
+          kind: "upgrade",
+          rung: "scale_500k",
+          subscriptionId: "sub_1",
+        },
+      },
+      { action: "sending.sale_released", data: { reason: "contract" } },
     ]);
   });
 
@@ -1039,8 +1193,9 @@ describe("billing router", () => {
     },
   );
 
-  it("changePlan adds the metered item a subscription from before the ladder lacks", async () => {
+  it("legacy committed intent: changePlan adds the metered item a subscription from before the ladder lacks", async () => {
     const teamId = await subscribedTeam("pro_100k", { metered: false });
+    await seedCommittedLegacyUpgrade(teamId, "pro_200k");
     await callerFor(teamId, "owner").billing.changePlan({ rung: "pro_200k" });
     expect(calls.updates[0]?.items).toEqual([
       { id: "si_base", price: "price_pro_200k" },
@@ -1115,9 +1270,10 @@ describe("billing router", () => {
     ]);
   });
 
-  it("changePlan tells the owners about a move once per period, keyed like the webhook's own report", async () => {
+  it("legacy committed intent: changePlan tells the owners about a move once per period, keyed like the webhook's own report", async () => {
     vi.stubEnv("NOTIFICATIONS_EMAIL_FROM", "MepMail <notices@mail.example.com>");
     const teamId = await subscribedTeam("pro_100k");
+    await seedCommittedLegacyUpgrade(teamId, "scale_500k");
     await db.insert(schema.user).values({ id: "ada", name: "Ada", email: "ada@example.com" });
     await db.insert(schema.teamMembers).values({ teamId, userId: "ada", role: "owner" });
     const owner = callerFor(teamId, "owner");
@@ -1134,6 +1290,7 @@ describe("billing router", () => {
     // A scheduled move down is not a move yet; the move up that drops it is news of its own.
     await owner.billing.changePlan({ rung: "pro_200k" });
     expect(h.sent).toHaveLength(1);
+    await seedCommittedLegacyUpgrade(teamId, "scale_1m");
     await owner.billing.changePlan({ rung: "scale_1m" });
     expect(calls.scheduleReleases).toEqual(["sub_sched_1"]);
     expect(h.sent.map((m) => m.subject)).toEqual([
@@ -1277,5 +1434,127 @@ describe("the system team", () => {
     expect(calls.checkouts).toEqual([]);
     expect(calls.portals).toEqual([]);
     expect(await auditRows()).toEqual([]);
+  });
+});
+
+describe("new upgrades respect the measured envelope independently of legacy commitments", () => {
+  it("admits a NEW Starter to Pro110K upgrade inside the actual shared flow", async () => {
+    const teamId = await subscribedTeam("starter");
+    expect(await callerFor(teamId, "owner").billing.changePlan({ rung: "pro_100k" })).toEqual({
+      applied: "now",
+    });
+    expect(calls.updates[0]?.items).toEqual([
+      { id: "si_base", price: "price_pro_100k" },
+      { price: "price_pro_100k_overage" },
+    ]);
+    expect(await teamRow(teamId)).toMatchObject({
+      plan: "pro",
+      planQuota: 110000,
+      stripeOverageItemId: "si_overage",
+    });
+    const audits = await auditRows();
+    expect(
+      audits.some(
+        (x) =>
+          x.action === "sending.sale_reserved" &&
+          x.data?.kind === "upgrade" &&
+          x.data?.rung === "pro_100k",
+      ),
+    ).toBe(true);
+  });
+  it.each(["pro_200k", "scale_500k", "scale_1m"] as const)(
+    "refuses a NEW %s upgrade without a provider POST",
+    async (rung) => {
+      const teamId = await subscribedTeam("pro_100k"),
+        before = await teamRow(teamId);
+      h.runCronNow.mockClear();
+      await expect(callerFor(teamId, "owner").billing.changePlan({ rung })).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+        message: "SEND_SALE_CAPACITY_INSUFFICIENT",
+      });
+      expect(calls.updates).toEqual([]);
+      expect(calls.scheduleCreates).toEqual([]);
+      expect(calls.scheduleReleases).toEqual([]);
+      expect(h.runCronNow).not.toHaveBeenCalled();
+      expect(await teamRow(teamId)).toEqual(before);
+    },
+  );
+});
+
+describe("graduated API new-acquisition gates", () => {
+  it.each(["scale_1_5m", "scale_2_5m"] as const)(
+    "rejects direct checkout %s without provider writes",
+    async (rung) => {
+      vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false");
+      const teamId = await createTeam(db);
+      await seedBuyer(teamId);
+      await expect(callerFor(teamId, "owner").billing.checkout({ rung })).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+        message: "SEND_PLAN_ENTERPRISE_REQUIRED",
+      });
+      vi.stubEnv("PIX_PAYMENTS_OPEN", "true");
+      await expect(callerFor(teamId, "owner").billing.pixCheckout({ rung })).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+        message: "SEND_PLAN_ENTERPRISE_REQUIRED",
+      });
+      for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+    },
+  );
+  it.each(["scale_1_5m", "scale_2_5m"] as const)(
+    "preserves active signed contract %s in status",
+    async (rung) => {
+      const teamId = await subscribedTeam(rung);
+      const status = await callerFor(teamId, "owner").billing.status();
+      expect(status.plan).toBe("scale");
+      expect(status.rung).toBe(rung);
+      for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+    },
+  );
+});
+
+describe("real server capacity closes NEW sales only", () => {
+  const tiny = () => {
+    capacityFixture.credits = 10;
+  };
+  it.each([
+    ["scale_1m", "capacity_insufficient"],
+    ["pro_100k", "capacity_insufficient"],
+  ])("refuses %s checkout with %s before provider writes", async (rung, reason) => {
+    vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false");
+    tiny();
+    const teamId = await createTeam(db, "capacity-fixture");
+    await seedBuyer(teamId);
+    await expect(callerFor(teamId, "owner").billing.checkout({ rung })).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: `SEND_SALE_${reason.toUpperCase()}`,
+    });
+    for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+  });
+  it("a malformed receipt closes new sales instead of trusting a client boolean", async () => {
+    vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false");
+    capacityFixture.unknown = true;
+    vi.stubEnv("GRADUATED_SENDING_CAPACITY_JSON", '{"version":1,"available":true}');
+    const teamId = await createTeam(db, "capacity-malformed");
+    await seedBuyer(teamId);
+    await expect(
+      callerFor(teamId, "owner").billing.checkout({ rung: "pro_100k" }),
+    ).rejects.toMatchObject({ message: "SEND_SALE_CAPACITY_UNKNOWN" });
+    for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+  });
+  it("an active 1.1M contract still reads, renews and cancels while new sales are closed", async () => {
+    const teamId = await subscribedTeam("scale_1m");
+    tiny();
+    const owner = callerFor(teamId, "owner");
+    expect((await owner.billing.status()).rung).toBe("scale_1m");
+    await expect(owner.billing.checkout({ rung: "pro_100k" })).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: "SEND_CHECKOUT_SUBSCRIPTION_EXISTS",
+    });
+    await expect(owner.billing.changePlan({ rung: "scale_1_5m" })).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: "SEND_PLAN_ENTERPRISE_REQUIRED",
+    });
+    for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+    expect((await owner.billing.status()).rung).toBe("scale_1m");
   });
 });

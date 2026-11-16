@@ -14,6 +14,15 @@ import {
   encryptPayload,
 } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
+import {
+  authorizeGraduatedExternalSender,
+  authorizeGraduatedSender,
+  graduatedSendingEnabled,
+  reserveGraduatedSending,
+  suspendTenantFromReputation,
+} from "./graduated-sending.js";
+import { getGraduatedSendingContext } from "./graduated-sending-context.js";
+import { GraduatedAdmissionError } from "./graduated-sending-policy.js";
 import { appendMailboxActivity } from "./mailbox-activity.js";
 import {
   MailboxAgentAccessError,
@@ -399,7 +408,7 @@ async function recordOutboundEvidence(
       previous.providerMessageId !== messageId
     )
       throw new MailboxContentError("conflict");
-    return;
+    return id;
   }
   await tx
     .insert(mailboxOutboundOutcomes)
@@ -423,6 +432,7 @@ async function recordOutboundEvidence(
         });
     }
   }
+  return id;
 }
 
 /** Scoped private DTO for an already-authorized caller. Eight disjoint counts
@@ -1135,7 +1145,8 @@ export async function acceptMailboxOutbox(
     throw new MailboxContentError("invalid");
   const now = evidence.now ?? new Date();
   if (!Number.isFinite(now.getTime())) throw new MailboxContentError("invalid");
-  return db.transaction(async (transaction) => {
+  let circuitWitness: { teamId: string; id: string } | undefined;
+  const result = await db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
     const [known] = await tx.select().from(mailboxOutbox).where(eq(mailboxOutbox.id, outboxId));
     if (!known) throw new MailboxContentError("not_found");
@@ -1196,7 +1207,16 @@ export async function acceptMailboxOutbox(
           );
       }
       if (evidence.outboundEvidence)
-        await recordOutboundEvidence(tx, row!, evidence.messageId, evidence.outboundEvidence, now);
+        circuitWitness = {
+          teamId: row!.teamId,
+          id: await recordOutboundEvidence(
+            tx,
+            row!,
+            evidence.messageId,
+            evidence.outboundEvidence,
+            now,
+          ),
+        };
       return outboxDto(row!, true);
     }
     if (
@@ -1246,15 +1266,40 @@ export async function acceptMailboxOutbox(
       .where(eq(mailboxOutbox.id, row!.id))
       .returning();
     if (evidence.outboundEvidence)
-      await recordOutboundEvidence(
-        tx,
-        accepted!,
-        evidence.messageId,
-        evidence.outboundEvidence,
-        now,
-      );
+      circuitWitness = {
+        teamId: accepted!.teamId,
+        id: await recordOutboundEvidence(
+          tx,
+          accepted!,
+          evidence.messageId,
+          evidence.outboundEvidence,
+          now,
+        ),
+      };
     return outboxDto(accepted!, false);
   });
+  // ROOT only AFTER private COMMIT: never invert admission's team->outbox order.
+  // A crash/ACK loss retries the existing immutable event and re-runs this gate.
+  const fact = evidence.outboundEvidence;
+  if (
+    circuitWitness &&
+    fact &&
+    graduatedSendingEnabled() &&
+    (fact.outcome === "complaint" || fact.outcome === "hard_bounce") &&
+    fact.occurredAt <= now &&
+    now.getTime() - fact.occurredAt.getTime() < 86400000
+  ) {
+    await suspendTenantFromReputation(
+      db,
+      {
+        teamId: circuitWitness.teamId,
+        providerEventId: circuitWitness.id,
+        witnessServerSource: "mailbox",
+      },
+      { clock: () => now },
+    );
+  }
+  return result;
 }
 
 /** Native adapter pre-SMTP revalidation, including after the global quota lock.
@@ -1279,6 +1324,37 @@ export async function assertMailboxOutboxSendAccess(
     );
   if (!known) throw new MailboxContentError("forbidden");
   const check = async (tx: Db, expiresAt?: Date | null) => {
+    const [externalBox] = await tx
+      .select()
+      .from(schema.mailboxes)
+      .where(
+        and(eq(schema.mailboxes.id, input.mailboxId), eq(schema.mailboxes.teamId, input.teamId)),
+      );
+    if (externalBox?.origin === "external") {
+      const [account] = await tx
+        .select()
+        .from(schema.mailboxExternalAccounts)
+        .where(
+          and(
+            eq(schema.mailboxExternalAccounts.mailboxId, input.mailboxId),
+            eq(schema.mailboxExternalAccounts.teamId, input.teamId),
+          ),
+        );
+      const [team] = await tx.select().from(schema.teams).where(eq(schema.teams.id, input.teamId));
+      if (
+        !account ||
+        account.status !== "active" ||
+        externalBox.status !== "planned" ||
+        externalBox.address !== input.from ||
+        !team ||
+        team.suspendedAt ||
+        (team.sendReviewAt &&
+          (!team.sendReviewClearedAt || team.sendReviewAt > team.sendReviewClearedAt)) ||
+        (expiresAt && expiresAt.getTime() <= Date.now())
+      )
+        throw new MailboxContentError("forbidden");
+      return;
+    }
     const plan = await lockMailboxService(tx, input.teamId);
     await requireMailboxSeat(tx, input.teamId, input.mailboxId, plan);
     const [domain] = await tx
@@ -1363,6 +1439,7 @@ export async function sendMailboxOutbox(
   if (known.status !== "queued") return outboxDto(known, true);
   let prepared: { row: Outbox; raw: Buffer; parsed: Awaited<ReturnType<typeof envelope>> };
   try {
+    let graduatedContext: Awaited<ReturnType<typeof getGraduatedSendingContext>> | undefined;
     const prepare = async (tx: Db, credentialExpiresAt?: Date | null) => {
       const [member] = await tx
         .select({ id: schema.teamMembers.id })
@@ -1445,6 +1522,55 @@ export async function sendMailboxOutbox(
       // Time can advance during decryption/parsing even while credential rows are locked.
       if (credentialExpiresAt && credentialExpiresAt.getTime() <= Date.now())
         throw new MailboxAgentAccessError("forbidden");
+      // External SMTP retains its independently authenticated box/credential
+      // authority and existing own-provider limits; it has no managed SES domain.
+      if (graduatedSendingEnabled()) {
+        graduatedContext = await getGraduatedSendingContext(
+          box?.origin === "external" ? { purpose: "judge" } : {},
+        );
+        try {
+          const senderProof =
+            box?.origin === "external"
+              ? await authorizeGraduatedExternalSender(
+                  tx,
+                  {
+                    teamId: row.teamId,
+                    actorUserId: row.approvedBy,
+                    from: parsed.from,
+                    mailboxId: box.id,
+                  },
+                  graduatedContext,
+                )
+              : await authorizeGraduatedSender(
+                  tx,
+                  {
+                    teamId: row!.teamId,
+                    actorUserId: row!.approvedBy,
+                    from: parsed.from,
+                    domainId: box?.domainId ?? null,
+                  },
+                  graduatedContext,
+                );
+          await reserveGraduatedSending(
+            tx,
+            {
+              teamId: row!.teamId,
+              emailId: row!.id,
+              from: parsed.from,
+              recipients,
+              campaign: false,
+              senderProof,
+            },
+            graduatedContext,
+          );
+        } catch (error) {
+          if (error instanceof GraduatedAdmissionError)
+            throw new MailboxSendDeferredError(
+              error.status === 429 ? "rate_limited" : "review_required",
+            );
+          throw error;
+        }
+      }
       const [claimed] = await tx
         .update(mailboxOutbox)
         .set({
@@ -1459,30 +1585,42 @@ export async function sendMailboxOutbox(
         .returning();
       return { row: claimed!, raw, parsed };
     };
-    if (known.approvalKind === "agent") {
-      if (!known.agentKeyId) throw new MailboxAgentAccessError("forbidden");
-      prepared = await withMailboxAgentQueuedSendAccess(
-        db,
-        {
-          keyId: known.agentKeyId,
-          teamId: known.teamId,
-          mailboxId: known.mailboxId,
-          approvedBy: known.approvedBy,
-          approvedMembershipId: known.approvedMembershipId,
-        },
-        ({ db: tx, expiresAt }) => prepare(tx, expiresAt),
-      );
-    } else if (known.approvalKind === "human" && known.agentKeyId === null) {
-      prepared = await withMailboxSendAccess(
-        db,
-        { teamId: known.teamId, userId: known.approvedBy },
-        known.mailboxId,
-        (tx) => prepare(tx),
-      );
-    } else {
-      throw new MailboxAgentAccessError("forbidden");
-    }
+    const prepareAuthorized = async (
+      accessDb: Db,
+    ): Promise<Awaited<ReturnType<typeof prepare>>> => {
+      if (known.approvalKind === "agent") {
+        if (!known.agentKeyId) throw new MailboxAgentAccessError("forbidden");
+        return withMailboxAgentQueuedSendAccess(
+          accessDb,
+          {
+            keyId: known.agentKeyId,
+            teamId: known.teamId,
+            mailboxId: known.mailboxId,
+            approvedBy: known.approvedBy,
+            approvedMembershipId: known.approvedMembershipId,
+          },
+          ({ db: tx, expiresAt }) => prepare(tx, expiresAt),
+        );
+      } else if (known.approvalKind === "human" && known.agentKeyId === null) {
+        return withMailboxSendAccess(
+          accessDb,
+          { teamId: known.teamId, userId: known.approvedBy },
+          known.mailboxId,
+          (tx) => prepare(tx),
+        );
+      } else {
+        throw new MailboxAgentAccessError("forbidden");
+      }
+    };
+    prepared = graduatedSendingEnabled()
+      ? await db.transaction(async (tx) => {
+          await tx.execute(sql`select pg_advisory_xact_lock(18475923,47)`);
+          return prepareAuthorized(tx as unknown as Db);
+        })
+      : await prepareAuthorized(db);
   } catch (error) {
+    if (error instanceof GraduatedAdmissionError)
+      error = new MailboxSendDeferredError("rate_limited");
     if (error instanceof MailboxSendDeferredError) {
       const [deferred] = await db
         .update(mailboxOutbox)

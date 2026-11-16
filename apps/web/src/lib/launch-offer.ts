@@ -1,3 +1,6 @@
+import enAvailability from "../../messages/en/sending-availability.json";
+import ptAvailability from "../../messages/pt-BR/sending-availability.json";
+
 /** Approved launch presentation, separate from the existing billing catalog. */
 export const LAUNCH_OFFER = {
   currency: "USD",
@@ -185,3 +188,13 @@ export function describeLaunchPlan(
     internalMailbox: null,
   };
 }
+/** Presentation only; new-purchase authorization belongs to the server. */
+export function sendingOfferAvailability(rungOrVolume: string | number) {
+  if (["scale_1_5m", "scale_2_5m", 1_650_000, 2_750_000].includes(rungOrVolume))
+    return "enterprise";
+  return rungOrVolume === "scale_1m" || rungOrVolume === 1_100_000
+    ? "availability_review"
+    : "self_serve";
+}
+export const sendingAvailabilityCopy = (locale: string) =>
+  locale === "pt-BR" ? ptAvailability : enAvailability;

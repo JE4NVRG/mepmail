@@ -362,6 +362,14 @@ export {
   type UmamiEventBody,
   userFunnelProps,
 } from "./funnel-events.js";
+export { type CommandCodeMeter, getCommandCodeMeter } from "./graduated-commandcode-meter.js";
+export * from "./graduated-sending.js";
+export {
+  authorizeGraduatedExternalSender,
+  getGraduatedSenderReputation,
+} from "./graduated-sending.js";
+export { getGraduatedSendingContext } from "./graduated-sending-context.js";
+export * from "./graduated-sending-policy.js";
 export {
   accountMailCard,
   EMAIL_WHITE_TILE_URL,
@@ -710,6 +718,7 @@ export {
 } from "./mailbox-thread.js";
 export {
   acceptMailboxOutbox,
+  assertMailboxOutboxSendAccess,
   checkMailboxRecipientBlocks,
   failQueuedMailboxOutbox,
   getMailboxOutboundSummary,

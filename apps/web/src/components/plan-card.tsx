@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { trackEvent } from "@/lib/analytics";
 import type { LandingPlan, PlanCopy } from "@/lib/landing-plans";
+import { sendingAvailabilityCopy, sendingOfferAvailability } from "@/lib/launch-offer";
 import { useClosedSignupLabel } from "./signup-availability";
 import { SignupCta } from "./signup-cta";
 
@@ -28,6 +29,8 @@ export interface PlanCardLabels {
 
 export function PlanCard({ plan, labels }: { plan: LandingPlan; labels: PlanCardLabels }) {
   const copy: PlanCopy = plan.copy;
+  const availability = sendingOfferAvailability(plan.rung);
+  const availabilityCopy = sendingAvailabilityCopy(plan.locale ?? "en");
   const closedLabel = useClosedSignupLabel();
   const card = useRef<HTMLElement | null>(null);
   // One view per card per page load: scrolling away and back is not a new view,
@@ -58,11 +61,12 @@ export function PlanCard({ plan, labels }: { plan: LandingPlan; labels: PlanCard
       {plan.featured ? <span className="gtm-plan-badge">{labels.featuredBadge}</span> : null}
       <h3>{plan.name}</h3>
       <p className="gtm-price">
-        {plan.price}
-        <span>{labels.perMonth}</span>
+        {availability === "enterprise" ? availabilityCopy.enterprise : plan.price}
+        {availability !== "enterprise" ? <span>{labels.perMonth}</span> : null}
       </p>
       {copy.priceNote ? <p className="gtm-cta-note">{copy.priceNote}</p> : null}
       <p className="gtm-volume">{copy.volume}</p>
+      <p className="gtm-cta-note">{availabilityCopy.notice}</p>
       <dl>
         <div>
           <dt>{labels.limitsLabel}</dt>
@@ -77,12 +81,21 @@ export function PlanCard({ plan, labels }: { plan: LandingPlan; labels: PlanCard
           <dd>{copy.attachment}</dd>
         </div>
       </dl>
-      <SignupCta
-        className="ms-btn ms-btn-primary gtm-action"
-        label={copy.cta ?? labels.cta}
-        plan={plan.name}
-        rung={plan.rung}
-      />
+      {availability === "enterprise" ? (
+        <a className="ms-btn ms-btn-primary gtm-action" href="mailto:suporte@mepmail.dev">
+          {availabilityCopy.contact}
+        </a>
+      ) : (
+        <SignupCta
+          className="ms-btn ms-btn-primary gtm-action"
+          label={copy.cta ?? labels.cta}
+          plan={plan.name}
+          rung={plan.rung}
+        />
+      )}
+      {availability === "availability_review" ? (
+        <p className="gtm-cta-note">{availabilityCopy.review}</p>
+      ) : null}
       {!closedLabel && plan.price !== "US$ 0" ? (
         <p className="gtm-cta-note">{labels.ctaNote}</p>
       ) : null}

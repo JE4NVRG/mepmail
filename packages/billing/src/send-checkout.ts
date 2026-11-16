@@ -50,9 +50,16 @@ import {
 import {
   resolveSendLaunchPrice,
   SEND_LAUNCH_OFFER,
+  sendNewPurchaseAvailability,
   verifySendIntroCoupon,
 } from "./send-launch-offer.js";
 import { initialSendPixFacts } from "./send-purchase.js";
+import type { SendSaleCapacitySource } from "./send-sale-capacity.js";
+import {
+  releaseSendSaleCapacity,
+  reserveSendSaleCapacity,
+  SendSaleIntentConflict,
+} from "./send-sale-reservation.js";
 import type { BillingStripe } from "./stripe.js";
 import { idOf, lockCustomer } from "./subscription.js";
 
@@ -78,8 +85,21 @@ export class SendCheckoutError extends Error {
     this.name = "SendCheckoutError";
   }
 }
+async function reserveCheckoutSale(
+  db: Db,
+  input: Parameters<typeof reserveSendSaleCapacity>[1],
+  source?: SendSaleCapacitySource,
+): ReturnType<typeof reserveSendSaleCapacity> {
+  try {
+    return await reserveSendSaleCapacity(db, input, source);
+  } catch (error) {
+    if (error instanceof SendSaleIntentConflict) throw new SendCheckoutError("conflict");
+    throw error;
+  }
+}
 export interface SendCheckoutDeps {
   db: Db;
+  capacitySource?: SendSaleCapacitySource;
   stripe: BillingStripe;
   livemode: boolean;
   advertising?: MetaCheckoutAdvertising;
@@ -169,32 +189,34 @@ async function ensureCustomer(deps: SendCheckoutDeps, input: SendCheckoutInput):
   });
   if (prepared.customer) return prepared.customer;
   try {
-    // This explicit transaction is never automatically replayed. The intent already committed.
-    // Keeping the team lock through this one POST prevents a parallel Mail Customer creation.
+    // The durable creating request excludes every other Customer creator. No DB lock crosses POST.
+    const [request] = await deps.db
+      .select()
+      .from(schema.mailboxCustomerRequests)
+      .where(eq(schema.mailboxCustomerRequests.teamId, input.team.id));
+    if (
+      !request ||
+      request.status !== "creating" ||
+      request.idempotencyKey !== prepared.key ||
+      request.livemode !== deps.livemode
+    )
+      throw new SendCheckoutError("pending");
+    const customer = await deps.stripe.customers.create(
+      {
+        name: request.name,
+        email: request.email,
+        metadata: {
+          team_id: input.team.id,
+          [MAILBOX_CUSTOMER_METADATA_KEY]: request.idempotencyKey,
+        },
+      },
+      { idempotencyKey: request.idempotencyKey },
+    );
     return await deps.db.transaction(async (transaction) => {
       const tx = transaction as unknown as Db;
       const team = await currentTeam(tx, input);
-      if (team.stripeCustomerId) return team.stripeCustomerId;
-      const [request] = await tx
-        .select()
-        .from(schema.mailboxCustomerRequests)
-        .where(eq(schema.mailboxCustomerRequests.teamId, team.id))
-        .for("update");
-      if (
-        !request ||
-        request.status !== "creating" ||
-        request.idempotencyKey !== prepared.key ||
-        request.livemode !== deps.livemode
-      )
-        throw new SendCheckoutError("pending");
-      const customer = await deps.stripe.customers.create(
-        {
-          name: request.name,
-          email: request.email,
-          metadata: { team_id: team.id, [MAILBOX_CUSTOMER_METADATA_KEY]: request.idempotencyKey },
-        },
-        { idempotencyKey: request.idempotencyKey },
-      );
+      if (team.stripeCustomerId && team.stripeCustomerId !== customer.id)
+        throw new SendCheckoutError("conflict");
       if (!/^cus_[A-Za-z0-9_]+$/.test(customer.id) || customer.livemode !== deps.livemode)
         throw new SendCheckoutError("pending");
       await tx
@@ -341,6 +363,8 @@ export async function beginSendCheckout(
 ): Promise<SendCheckoutResult> {
   deps = { ...deps };
   input = { ...input, team: { ...input.team } };
+  if (sendNewPurchaseAvailability(input.rung) === "enterprise")
+    throw new SendCheckoutError("invalid");
   if (typeof deps.livemode !== "boolean" || !input.userId) throw new SendCheckoutError("invalid");
   const rung = rungByKey(input.rung);
   const interval = input.interval ?? "month";
@@ -350,6 +374,12 @@ export async function beginSendCheckout(
   if (rung.priceCents <= 0) throw new Error(`rung ${input.rung} is not for sale`);
   await requirePurchaseEligibility(deps.db, { teamId: input.team.id, userId: input.userId });
   // Price lookups are read-only. Once an attempt exists, its frozen IDs always win.
+  await deps.db.transaction((transaction) => currentTeam(transaction as unknown as Db, input));
+  const capacity = await reserveCheckoutSale(
+    deps.db,
+    { teamId: input.team.id, userId: input.userId, rung: input.rung, kind: "card" },
+    deps.capacitySource,
+  );
   const customer = await ensureCustomer(deps, input);
   const existing = await deps.db
     .select()
@@ -412,7 +442,7 @@ export async function beginSendCheckout(
       return active;
     }
     if (!price) throw new SendCheckoutError("pending");
-    const id = randomUUID();
+    const id = capacity.id;
     const productId = launchPrice ? idOf(launchPrice.product) : null;
     const intro = launchPrice && interval === "month" && (await qualifiesForIntro(deps, customer));
     const coupon =
@@ -498,46 +528,64 @@ export async function beginSendCheckout(
   });
   let postStarted = false;
   try {
+    const attempt = await deps.db.transaction(async (transaction): Promise<Attempt> => {
+      const tx = transaction as unknown as Db;
+      const team = await currentTeam(tx, input);
+      const [attempt] = await tx
+        .select()
+        .from(schema.sendCheckoutAttempts)
+        .where(eq(schema.sendCheckoutAttempts.id, claim.id))
+        .for("update");
+      if (
+        !attempt ||
+        attempt.leaseToken !== claim.leaseToken ||
+        team.stripeCustomerId !== attempt.stripeCustomerId
+      )
+        throw new SendCheckoutError("pending");
+      return attempt;
+    });
+    await noOtherSubscription(deps, attempt.stripeCustomerId);
+    let session: Stripe.Checkout.Session;
+    if (attempt.stripeSessionId) {
+      if (!deps.stripe.checkout.sessions.retrieve) throw new SendCheckoutError("unknown");
+      session = await deps.stripe.checkout.sessions.retrieve(attempt.stripeSessionId);
+    } else {
+      const recovered = await noLegacySession(deps, attempt);
+      if (recovered) session = recovered;
+      else {
+        const time = await now(deps.db);
+        if (
+          !attempt.firstRequestedAt ||
+          time.getTime() - attempt.firstRequestedAt.getTime() >= REPLAY_WINDOW_MS
+        )
+          throw new SendCheckoutError("unknown");
+        postStarted = true;
+        session = await deps.stripe.checkout.sessions.create(
+          attempt.parameters as Stripe.Checkout.SessionCreateParams,
+          { idempotencyKey: attempt.idempotencyKey },
+        );
+      }
+    }
+    if (!matches(session, attempt)) throw new SendCheckoutError("unknown");
     const outcome = await deps.db.transaction(
       async (transaction): Promise<SendCheckoutResult | { error: "expired" | "pending" }> => {
         const tx = transaction as unknown as Db;
         const team = await currentTeam(tx, input);
-        const [attempt] = await tx
+        const [owned] = await tx
           .select()
           .from(schema.sendCheckoutAttempts)
-          .where(eq(schema.sendCheckoutAttempts.id, claim.id))
+          .where(eq(schema.sendCheckoutAttempts.id, attempt.id))
           .for("update");
         if (
-          !attempt ||
-          attempt.leaseToken !== claim.leaseToken ||
+          !owned ||
+          owned.leaseToken !== claim.leaseToken ||
+          owned.teamId !== team.id ||
           team.stripeCustomerId !== attempt.stripeCustomerId
         )
           throw new SendCheckoutError("pending");
-        await noOtherSubscription(deps, attempt.stripeCustomerId);
-        let session: Stripe.Checkout.Session;
-        if (attempt.stripeSessionId) {
-          if (!deps.stripe.checkout.sessions.retrieve) throw new SendCheckoutError("unknown");
-          session = await deps.stripe.checkout.sessions.retrieve(attempt.stripeSessionId);
-        } else {
-          const recovered = await noLegacySession(deps, attempt);
-          if (recovered) session = recovered;
-          else {
-            const time = await now(tx);
-            if (
-              !attempt.firstRequestedAt ||
-              time.getTime() - attempt.firstRequestedAt.getTime() >= REPLAY_WINDOW_MS
-            )
-              throw new SendCheckoutError("unknown");
-            postStarted = true;
-            session = await deps.stripe.checkout.sessions.create(
-              attempt.parameters as Stripe.Checkout.SessionCreateParams,
-              { idempotencyKey: attempt.idempotencyKey },
-            );
-          }
-        }
-        if (!matches(session, attempt)) throw new SendCheckoutError("unknown");
         const time = await now(tx);
         if (session.status === "expired") {
+          await releaseSendSaleCapacity(tx, attempt.teamId, attempt.id, "expired");
           await tx
             .update(schema.sendCheckoutAttempts)
             .set({
@@ -567,6 +615,7 @@ export async function beginSendCheckout(
           )
             throw new SendCheckoutError("unknown");
           if (["canceled", "incomplete_expired"].includes(subscription.status)) {
+            await releaseSendSaleCapacity(tx, attempt.teamId, attempt.id, "expired");
             await tx
               .update(schema.sendCheckoutAttempts)
               .set({
@@ -720,16 +769,96 @@ export async function beginSendPixCheckout(
   pix: PixStripe,
   input: SendCheckoutInput,
 ): Promise<{ url: string }> {
+  if (sendNewPurchaseAvailability(input.rung) === "enterprise")
+    throw new SendCheckoutError("invalid");
   if (typeof deps.livemode !== "boolean" || !input.userId) throw new SendCheckoutError("invalid");
   const interval = input.interval ?? "month";
   if (interval !== "month" && interval !== "year") throw new SendCheckoutError("invalid");
   await requirePurchaseEligibility(deps.db, { teamId: input.team.id, userId: input.userId });
+  await deps.db.transaction((transaction) => currentTeam(transaction as unknown as Db, input));
+  const capacity = await reserveCheckoutSale(
+    deps.db,
+    { teamId: input.team.id, userId: input.userId, rung: input.rung, kind: "pix" },
+    deps.capacitySource,
+  );
   const customer = await ensureCustomer(deps, input);
-  const attemptId = randomUUID();
+  const attemptId = capacity.id;
   const terms = await deps.db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
     const team = await currentTeam(tx, input);
     if (team.stripeCustomerId !== customer) throw new SendCheckoutError("conflict");
+    const [existing] = await tx
+      .select()
+      .from(schema.sendCheckoutAttempts)
+      .where(eq(schema.sendCheckoutAttempts.id, attemptId))
+      .for("update");
+    if (existing) {
+      if (
+        existing.teamId !== team.id ||
+        existing.rung !== input.rung ||
+        existing.livemode !== deps.livemode ||
+        existing.parameters?.method !== "pix" ||
+        existing.parameters?.mepmail_send_interval !== interval ||
+        !existing.parameters?.pixTerms
+      )
+        throw new SendCheckoutError("conflict");
+      // A lost response requires provider readback. Never replay a time-dependent PIX create payload.
+      if (!existing.checkoutUrl) {
+        const sessions = deps.stripe.checkout.sessions;
+        if (!sessions.list) throw new SendCheckoutError("unknown");
+        let after: string | undefined;
+        let recovered: Stripe.Checkout.Session | null = null;
+        for (;;) {
+          const page = await sessions.list({
+            customer,
+            limit: 100,
+            ...(after ? { starting_after: after } : {}),
+          });
+          for (const session of page.data) {
+            if (session.metadata?.mepmail_pix_attempt !== attemptId) continue;
+            if (
+              recovered ||
+              idOf(session.customer) !== customer ||
+              session.livemode !== deps.livemode ||
+              session.mode !== "payment" ||
+              session.client_reference_id !== team.id ||
+              session.metadata?.team_id !== team.id
+            )
+              throw new SendCheckoutError("unknown");
+            recovered = session;
+          }
+          if (!page.has_more) break;
+          const last = page.data.at(-1)?.id;
+          if (!last || last === after) throw new SendCheckoutError("unknown");
+          after = last;
+        }
+        if (!recovered) throw new SendCheckoutError("pending");
+        if (recovered.status === "expired") {
+          await releaseSendSaleCapacity(tx, team.id, attemptId, "expired");
+          // Return a terminal outcome so the release commits before the caller reports expiry.
+          return {
+            ...(existing.parameters.pixTerms as Awaited<ReturnType<typeof sendPixTerms>>),
+            savedUrl: null,
+            expired: true,
+          };
+        }
+        if (
+          recovered.status !== "open" ||
+          !recovered.url ||
+          !/^https:\/\/checkout\.stripe\.com\//.test(recovered.url)
+        )
+          throw new SendCheckoutError("pending");
+        await tx
+          .update(schema.sendCheckoutAttempts)
+          .set({ stripeSessionId: recovered.id, checkoutUrl: recovered.url, updatedAt: new Date() })
+          .where(eq(schema.sendCheckoutAttempts.id, attemptId));
+        existing.checkoutUrl = recovered.url;
+      }
+      return {
+        ...(existing.parameters.pixTerms as Awaited<ReturnType<typeof sendPixTerms>>),
+        savedUrl: existing.checkoutUrl,
+      };
+    }
     await noOtherSubscription(deps, customer);
     const terms = await sendPixTerms(deps, pix, customer, input.rung, interval);
     // The durable intent of this Pix purchase: the anchor of its advertising context, like a
@@ -750,6 +879,7 @@ export async function beginSendPixCheckout(
         idempotencyKey: `pix-send:${team.id}:${attemptId}`,
         parameters: {
           method: "pix",
+          pixTerms: terms,
           client_reference_id: team.id,
           mepmail_send_interval: interval,
           line_items: [
@@ -762,29 +892,35 @@ export async function beginSendPixCheckout(
     if (!attempt) throw new SendCheckoutError("unknown");
     await prepareMetaCheckout(tx, attempt, deps.advertising, at);
     await prepareGoogleCheckout(tx, attempt, deps.googleAdvertising, at);
-    return terms;
+    return { ...terms, savedUrl: null as string | null };
   });
-  const url = await deps.db.transaction(async (transaction) => {
-    const tx = transaction as unknown as Db;
-    const team = await currentTeam(tx, input);
-    if (team.stripeCustomerId !== customer) throw new SendCheckoutError("conflict");
-    return createPixCheckoutSession(pix, {
-      kind: "send_start",
-      teamId: input.team.id,
-      customerId: customer,
-      amount: terms.amount,
-      product: terms.product,
-      priceId: terms.price,
-      quantity: 1,
-      interval,
-      ...(terms.overage ? { overagePriceId: terms.overage } : {}),
-      ...(terms.coupon ? { coupon: terms.coupon } : {}),
-      attemptId,
-      successUrl: input.successUrl,
-      cancelUrl: input.cancelUrl,
-      idempotencyKey: `pix-send:${input.team.id}:${attemptId}`,
-    });
+  if ("expired" in terms && terms.expired) throw new SendCheckoutError("expired");
+  if (terms.savedUrl) return { url: terms.savedUrl };
+  const url = await createPixCheckoutSession(pix, {
+    kind: "send_start",
+    teamId: input.team.id,
+    customerId: customer,
+    amount: terms.amount,
+    product: terms.product,
+    priceId: terms.price,
+    quantity: 1,
+    interval,
+    ...(terms.overage ? { overagePriceId: terms.overage } : {}),
+    ...(terms.coupon ? { coupon: terms.coupon } : {}),
+    attemptId,
+    successUrl: input.successUrl,
+    cancelUrl: input.cancelUrl,
+    idempotencyKey: `pix-send:${input.team.id}:${attemptId}`,
   });
+  await deps.db
+    .update(schema.sendCheckoutAttempts)
+    .set({ checkoutUrl: url, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.sendCheckoutAttempts.id, attemptId),
+        eq(schema.sendCheckoutAttempts.teamId, input.team.id),
+      ),
+    );
   return { url };
 }
 
@@ -843,10 +979,93 @@ export async function fulfillSendPixStart(
   pix: PixStripe,
   payment: PixPayment,
   log: (message: string) => void,
-): Promise<"fulfilled" | "refunded"> {
-  await lockCustomer(db, payment.customerId);
+): Promise<"fulfilled" | "refunded" | "refund_pending"> {
   const refund = async (reason: string) => {
-    await refundPixPayment(pix, payment, reason);
+    const target = `pix-refund:${payment.paymentIntentId}`;
+    const claim = await db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Db;
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${target}))`);
+      const prior = await tx
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.teamId, payment.teamId),
+            eq(schema.auditLog.target, target),
+            eq(schema.auditLog.action, "sending.pix_refund_requested"),
+          ),
+        );
+      if (prior.length) return false;
+      await tx.insert(schema.auditLog).values({
+        teamId: payment.teamId,
+        action: "sending.pix_refund_requested",
+        target,
+        data: {
+          sessionId: payment.sessionId,
+          customerId: payment.customerId,
+          amount: payment.amount,
+        },
+      });
+      return true;
+    });
+    let refunded: Stripe.Refund | null = null;
+    if (claim) {
+      try {
+        refunded = await refundPixPayment(pix, payment, reason);
+      } catch {
+        log(`pix ${payment.sessionId}: refund_pending (${reason})`);
+        return "refund_pending" as const;
+      }
+      await db.insert(schema.auditLog).values({
+        teamId: payment.teamId,
+        action: "sending.pix_refund_result",
+        target,
+        data: { refundId: refunded.id, sessionId: payment.sessionId },
+      });
+    } else {
+      const [result] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.teamId, payment.teamId),
+            eq(schema.auditLog.target, target),
+            eq(schema.auditLog.action, "sending.pix_refund_result"),
+          ),
+        );
+      const refundId = result?.data?.refundId;
+      if (typeof refundId === "string" && pix.refunds.retrieve)
+        refunded = await pix.refunds.retrieve(refundId);
+    }
+    if (
+      !refunded ||
+      refunded.status !== "succeeded" ||
+      idOf(refunded.payment_intent) !== payment.paymentIntentId ||
+      refunded.amount !== payment.amount ||
+      refunded.currency !== "brl"
+    ) {
+      log(`pix ${payment.sessionId}: refund_pending (${reason})`);
+      return "refund_pending" as const;
+    }
+    if (payment.attemptId) {
+      const [owned] = await db
+        .select()
+        .from(schema.sendCheckoutAttempts)
+        .where(
+          and(
+            eq(schema.sendCheckoutAttempts.id, payment.attemptId),
+            eq(schema.sendCheckoutAttempts.teamId, payment.teamId),
+          ),
+        );
+      if (
+        owned &&
+        owned.stripeCustomerId === payment.customerId &&
+        owned.livemode === deps.livemode &&
+        owned.parameters?.method === "pix" &&
+        owned.stripeSessionId === payment.sessionId
+      )
+        await releaseSendSaleCapacity(db, payment.teamId, owned.id, "refunded");
+    }
     log(`pix ${payment.sessionId}: refunded (${reason})`);
     return "refunded" as const;
   };
@@ -931,6 +1150,7 @@ export async function fulfillSendPixStart(
   const invoiceId = idOf(sub.latest_invoice);
   if (!invoiceId) throw new SendCheckoutError("pending");
   if ((await settlePixInvoice(pix, invoiceId, payment)) === "paid") {
+    // The subscription webhook persists the authoritative contract before releasing its promise.
     if (attempt)
       await recordSendPixPurchase(db, deps, pix, payment, attempt, sub.id, invoiceId, log);
     return "fulfilled";

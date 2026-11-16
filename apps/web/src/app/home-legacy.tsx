@@ -29,7 +29,13 @@ import {
   formatUsd,
   formatVolume,
 } from "@/lib/landing-pricing";
-import { CORREIO_FROM_BRL_CENTS, CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
+import {
+  CORREIO_FROM_BRL_CENTS,
+  CORREIO_FROM_CENTS,
+  LAUNCH_OFFER,
+  sendingAvailabilityCopy,
+  sendingOfferAvailability,
+} from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
 import { publicSignupCopy } from "@/lib/public-signup-copy";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
@@ -109,12 +115,14 @@ export async function LegacyHome() {
   const priceRows = comparisonRowsForLocale(launchOfferEnabled, locale);
   const comparison = priceRows.map((row) => [
     formatVolume(row.volume, locale),
-    formatComparisonPrice(row.mepmail, locale),
+    sendingOfferAvailability(row.volume) === "enterprise"
+      ? sendingAvailabilityCopy(locale).enterprise
+      : `${formatComparisonPrice(row.mepmail, locale)}${sendingOfferAvailability(row.volume) === "availability_review" ? ` · ${sendingAvailabilityCopy(locale).review}` : ""}`,
     formatComparisonPrice(row.resend, locale),
     formatComparisonPrice(row.sendgrid, locale),
     formatComparisonPrice(row.postmark, locale),
     formatComparisonPrice(row.mailgun, locale),
-    row.savings,
+    sendingOfferAvailability(row.volume) === "enterprise" ? "—" : row.savings,
   ]);
   const site = {
     skip: t("skip"),

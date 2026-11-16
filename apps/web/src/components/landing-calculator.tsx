@@ -10,6 +10,7 @@ import {
   type PriceRow,
 } from "@/lib/landing-pricing";
 import { computeSavings } from "@/lib/landing-savings";
+import { sendingAvailabilityCopy, sendingOfferAvailability } from "@/lib/launch-offer";
 
 export interface CalcLabels {
   title: string;
@@ -52,6 +53,8 @@ export function LandingCalculator({
     if (!row) throw new RangeError("Missing comparison row");
     return computeSavings(row);
   }, [index, rows]);
+  const availability = sendingOfferAvailability(savings.row.volume);
+  const availabilityCopy = sendingAvailabilityCopy(locale);
   const volume = formatVolume(savings.row.volume, locale);
   const savingsText = labels.savings
     .replace("{percent}", String(savings.savingsPct))
@@ -86,16 +89,33 @@ export function LandingCalculator({
       <div className="gtm-calc-result" aria-live="polite">
         <p className="gtm-calc-line">
           <span>{labels.ours}</span>
-          <strong>{formatComparisonPrice(savings.row.mepmail, locale)}</strong>
+          <strong>
+            {availability === "enterprise"
+              ? availabilityCopy.enterprise
+              : formatComparisonPrice(savings.row.mepmail, locale)}
+          </strong>
         </p>
         <p className="gtm-calc-line">
           <span>{labels.cheapest.replace("{name}", savings.competitor.name)}</span>
           <strong>{formatComparisonPrice(savings.competitor.price, locale)}</strong>
         </p>
-        <p className="gtm-calc-savings">{savingsText}</p>
+        {availability !== "enterprise" ? (
+          <>
+            <p className="gtm-calc-savings">{savingsText}</p>
+            <p className="gtm-note">
+              {labels.annual.replace(
+                "{usd}",
+                formatComparisonPrice(savings.savingsYearUsd, locale),
+              )}
+            </p>
+          </>
+        ) : null}
         <p className="gtm-note">
-          {labels.annual.replace("{usd}", formatComparisonPrice(savings.savingsYearUsd, locale))}
+          {availability === "availability_review"
+            ? availabilityCopy.review
+            : availabilityCopy.notice}
         </p>
+        <p className="gtm-note">{availabilityCopy.nominal}</p>
       </div>
       <a className="ms-btn ms-btn-primary gtm-action" href={mailto}>
         {labels.cta}

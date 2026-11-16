@@ -10,7 +10,7 @@ import {
 import { syntheticCompleteCleanAnswers } from "./fixtures/complete-judge-answers.js";
 
 const reply = (content: string, status = 200) =>
-  new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+  new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content } }] }), {
     status,
     headers: { "content-type": "application/json" },
   });
@@ -174,7 +174,7 @@ describe("OpenAI-compatible judge", () => {
             { role: "system", content: OPENAI_JUDGE_SYSTEM_PROMPT },
             { role: "user", content: `<email>\n${block}\n</email>` },
           ],
-          ...(nonThinking ? { reasoning_effort: "off" } : {}),
+          ...(nonThinking ? { reasoning_effort: "off", max_tokens: 2048 } : {}),
         });
       } finally {
         fetchMock.mockRestore();

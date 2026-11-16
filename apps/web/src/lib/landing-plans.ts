@@ -30,6 +30,7 @@ export interface PlanCopy {
 }
 
 export interface LandingPlan extends PlanBase {
+  locale?: string;
   copy: PlanCopy;
 }
 
@@ -66,9 +67,11 @@ export function plansWithCopy(
         : launch
           ? `US$ ${LAUNCH_OFFER.sending.monthlyCents / 100}`
           : plan.price;
-    if (!launch) return { ...plan, price, copy: localizedCopy };
+    if (!launch)
+      return { ...plan, price, locale: currency === "brl" ? "pt-BR" : "en", copy: localizedCopy };
     return {
       ...plan,
+      locale: currency === "brl" ? "pt-BR" : "en",
       price,
       copy: {
         ...localizedCopy,

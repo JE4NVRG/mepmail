@@ -42,6 +42,7 @@ import {
   findDisguise,
   findSuppressed,
   findTopicOptOuts,
+  GraduatedAdmissionError,
   getSignupSendingRestriction,
   isTeamSuspended,
   type Keyring,
@@ -3384,6 +3385,20 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
   // Uncaught throws must still speak Resend's error format — SDK clients
   // parse the body as JSON.
   app.onError((err, c) => {
+    if (err instanceof GraduatedAdmissionError) {
+      if (err.status === 429) c.header("Retry-After", String(err.safeRetryAfter));
+      return c.json(
+        {
+          ...errorBody(err.status, err.code, err.message),
+          reason: err.reason,
+          reasonTranslations: err.publicReason,
+          plan: err.plan,
+          effectiveDaily: err.effectiveDaily,
+          safeRetryAfter: err.safeRetryAfter,
+        },
+        err.status,
+      );
+    }
     console.error("unhandled api error", err);
     return c.json(errorBody(500, "internal_server_error", "An unexpected error occurred"), 500);
   });

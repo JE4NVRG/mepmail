@@ -59,3 +59,10 @@ export async function verifySendIntroCoupon(
     throw new Error("Sending introductory coupon does not match the approved offer");
   return coupon.id;
 }
+/** New acquisitions only; existing contract prices, allowances and renewals are unchanged. */
+export function sendNewPurchaseAvailability(
+  rung: string,
+): "self_serve" | "availability_review" | "enterprise" {
+  if (rung === "scale_1_5m" || rung === "scale_2_5m") return "enterprise";
+  return rung === "scale_1m" ? "availability_review" : "self_serve";
+}

@@ -74,6 +74,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.1130.0",
     "@millionsend/db": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "zod": "^4.6.3"

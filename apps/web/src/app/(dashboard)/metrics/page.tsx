@@ -17,6 +17,7 @@ import { Odometer } from "@/components/odometer";
 import { PageHeader } from "@/components/page-header";
 import { Select } from "@/components/select";
 import { Skeleton } from "@/components/skeleton";
+import { TeamReputation } from "@/components/team-reputation";
 import { CircleInfoGlyph } from "@/components/tooltip";
 import { codeRichTags } from "@/lib/code-rich-tags";
 import { formatDayUtc } from "@/lib/format";
@@ -537,6 +538,7 @@ export default function MetricsPage() {
         }
       />
 
+      <TeamReputation />
       <DeliverabilityRecovery
         health={health.isError || health.isPending ? undefined : health.data}
       />

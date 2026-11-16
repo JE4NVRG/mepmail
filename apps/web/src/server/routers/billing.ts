@@ -24,7 +24,9 @@ import {
   readMetaConversionConfig,
   rungFromSubscription,
   SendCheckoutError,
+  SendSaleCapacityError,
   SUBSCRIPTION_EXPAND,
+  sendNewPurchaseAvailability,
   setOverage as setSubscriptionOverage,
 } from "@millionsend/billing";
 import { env } from "@millionsend/config";
@@ -342,6 +344,12 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
             message: "SEND_CHECKOUT_SUBSCRIPTION_EXISTS",
           });
         }
+        if (sendNewPurchaseAvailability(input.rung) === "enterprise") {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "SEND_PLAN_ENTERPRISE_REQUIRED",
+          });
+        }
         const offerEnabled = launchOfferEnabled();
         if (input.interval === "year" && (!offerEnabled || input.rung !== "pro_100k")) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "SEND_CHECKOUT_INVALID" });
@@ -368,6 +376,11 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
             },
           );
         } catch (error) {
+          if (error instanceof SendSaleCapacityError)
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: `SEND_SALE_${error.reason.toUpperCase()}`,
+            });
           if (error instanceof PurchaseEligibilityError) throw purchaseEligibilityError(error);
           if (!(error instanceof SendCheckoutError)) throw error;
           const code =
@@ -425,6 +438,12 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
             message: "SEND_CHECKOUT_SUBSCRIPTION_EXISTS",
           });
         }
+        if (sendNewPurchaseAvailability(input.rung) === "enterprise") {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "SEND_PLAN_ENTERPRISE_REQUIRED",
+          });
+        }
         const offerEnabled = launchOfferEnabled();
         if (input.interval === "year" && (!offerEnabled || input.rung !== "pro_100k")) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "SEND_CHECKOUT_INVALID" });
@@ -452,6 +471,11 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
             },
           );
         } catch (error) {
+          if (error instanceof SendSaleCapacityError)
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: `SEND_SALE_${error.reason.toUpperCase()}`,
+            });
           if (error instanceof PurchaseEligibilityError) throw purchaseEligibilityError(error);
           if (error instanceof PixBillingError)
             throw new TRPCError({ code: "PRECONDITION_FAILED", message: "pix_unavailable" });
@@ -498,10 +522,24 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         if (!hasLiveSubscription(team.planStatus)) {
           throw new TRPCError({ code: "PRECONDITION_FAILED" });
         }
+        if (
+          input.rung !== teamRung(team.plan, team.planQuota).key &&
+          sendNewPurchaseAvailability(input.rung) === "enterprise"
+        ) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "SEND_PLAN_ENTERPRISE_REQUIRED",
+          });
+        }
         const change = await changeRung(
           { db: ctx.db, stripe: deps.stripe() },
           { teamId: ctx.teamId, rung: input.rung, userId: ctx.session.user.id },
         ).catch((error: unknown) => {
+          if (error instanceof SendSaleCapacityError)
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: `SEND_SALE_${error.reason.toUpperCase()}`,
+            });
           if (error instanceof PurchaseEligibilityError) throw purchaseEligibilityError(error);
           if (error instanceof PixBillingError)
             throw new TRPCError({ code: "PRECONDITION_FAILED", message: "SEND_PIX_PLAN_CHANGE" });

@@ -33,7 +33,15 @@ export interface AbuseJudge {
   readonly model: string;
   judge(
     block: string,
-    opts: { signal: AbortSignal; onTelemetry?: (event: JudgeTelemetry) => void },
+    opts: {
+      signal: AbortSignal;
+      onTelemetry?: (event: JudgeTelemetry) => void;
+      /** Authenticated provider usage only. Null retains the maximum reservation.
+       * A ledger failure rejects this attempt; no content/header is exposed. */
+      onUsage?: (
+        usage: { inputTokens: number; outputTokens: number } | null,
+      ) => void | Promise<void>;
+    },
   ): Promise<JudgeVerdict>;
 }
 

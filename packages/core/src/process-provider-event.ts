@@ -13,6 +13,7 @@ import {
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
+import { graduatedSendingEnabled, suspendTenantFromReputation } from "./graduated-sending.js";
 import { revalidateProductionVolumeOutcome } from "./production-volume.js";
 export interface SerializedSesEvent {
   eventType: string;
@@ -177,6 +178,8 @@ export async function processProviderEvent(
   const deliveries: QueuedWebhookDelivery[] = [];
   const applied = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Db;
+    if (graduatedSendingEnabled())
+      await txDb.execute(sql`select pg_advisory_xact_lock(18475923, 47)`);
     if (eventType === "bounced" || eventType === "complained")
       await txDb
         .select({ id: schema.teams.id })
@@ -214,6 +217,11 @@ export async function processProviderEvent(
       .onConflictDoNothing()
       .returning({ id: schema.emailEvents.id });
     if (!inserted) return false;
+    if (graduatedSendingEnabled() && (eventType === "bounced" || eventType === "complained"))
+      await suspendTenantFromReputation(txDb, {
+        teamId: email.teamId,
+        providerEventId: inserted.id,
+      });
 
     await applyStatusCas(txDb, email.id, status);
     if (eventType === "bounced" || eventType === "complained")

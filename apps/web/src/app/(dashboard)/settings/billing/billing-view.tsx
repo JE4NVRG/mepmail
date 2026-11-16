@@ -40,6 +40,8 @@ import {
   type LaunchBillingPeriod,
   type LaunchMailboxTierId,
   parseLaunchMailboxQuantity,
+  sendingAvailabilityCopy,
+  sendingOfferAvailability,
 } from "@/lib/launch-offer";
 import { billingPurchaseReturn } from "@/lib/purchase-return";
 import { statusGlow } from "@/lib/status-glow";
@@ -1103,7 +1105,10 @@ export function BillingView({
               // its own, else its entry rung.
               const r = active ? selected : (PLAN_RUNGS.find((x) => x.plan === p) ?? selected);
               const isCurrent = r.key === current.key;
-              const forSale = canManage && r.priceCents > 0 && !isCurrent;
+              const availability = sendingOfferAvailability(r.key);
+              const availabilityCopy = sendingAvailabilityCopy(locale);
+              const forSale =
+                canManage && r.priceCents > 0 && !isCurrent && availability !== "enterprise";
               // Stripe charges a different rung at the same or a higher price now.
               // A reduction and keeping a pending downgrade's current rung are not purchases.
               const needsPurchaseReview =
@@ -1137,6 +1142,13 @@ export function BillingView({
                       })}
                     </div>
                   ) : null}
+                  {!isCurrent && availability === "enterprise" ? (
+                    <p>
+                      <a href="mailto:suporte@mepmail.dev">{availabilityCopy.enterprise}</a>
+                    </p>
+                  ) : null}
+                  {availability === "availability_review" ? <p>{availabilityCopy.review}</p> : null}
+                  {isCurrent ? <p>{availabilityCopy.existing}</p> : null}
                   <div className="ms-plan-cap">
                     <span className="ms-digits">{fmt.format(r.included)}</span>
                     <span className="ms-plan-per">

@@ -511,6 +511,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@aws-sdk/client-sesv2':
+        specifier: ^3.1130.0
+        version: 3.1130.0
       '@millionsend/db':
         specifier: workspace:*
         version: link:../db
