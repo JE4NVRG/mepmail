@@ -1,5 +1,6 @@
 import { SESv2Client, type SESv2ClientConfig, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import {
+  assertMailboxOutboxSendAccess,
   checkSignupSend,
   evaluateEmailInsights,
   graduatedSendingEnabled,
@@ -655,6 +656,13 @@ export function createMailboxSesSender(
         if (accountPaused() || opts.exhausted?.(region) || opts.sesQuota?.exhausted(region))
           throw new MailboxSendDeferredError(accountPaused() ? "sending_paused" : "quota_exceeded");
         if (opts.isCloud !== false) await checkMailboxContent(db, input);
+        if (opts.isCloud !== false && graduatedSendingEnabled()) {
+          try {
+            await assertMailboxOutboxSendAccess(db, input);
+          } catch {
+            throw new MailboxSendDeferredError("review_required");
+          }
+        }
         assertMailboxDispatchContent(input, input.raw, opts.isCloud);
         let response: Awaited<ReturnType<MailboxSesClient["send"]>>;
         try {

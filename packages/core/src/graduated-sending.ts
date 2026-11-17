@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { campaignDomainDnsReady } from "./campaign-consent.js";
 import {
   fetchDeliverabilityHealth,
@@ -19,6 +19,7 @@ import {
   type TenantReputationDto,
   tenantSendingMinuteCeiling,
 } from "./graduated-sending-policy.js";
+import { withMailboxSendAccess } from "./mailbox-private-store.js";
 import { teamQuota } from "./plans.js";
 import { extractAddrSpec, normalizeAddress } from "./suppressions.js";
 
@@ -398,6 +399,12 @@ export async function reserveGraduatedSending(
   },
   context?: GraduatedContext,
 ): Promise<TenantReputationDto> {
+  const candidate = input.senderProof && senderProofs.get(input.senderProof);
+  if (
+    candidate?.native &&
+    (!context || context !== candidate.context || !originalGraduatedContexts.has(context))
+  )
+    throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
   await db.execute(sql`select pg_advisory_xact_lock(18475923, 47)`);
   await db.execute(sql`select pg_advisory_xact_lock(hashtext(${input.teamId}))`);
   const now = await wallClock(db, context);
@@ -444,6 +451,23 @@ export async function reserveGraduatedSending(
   }
   if (principalId !== proof.principalId)
     throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
+  if (proof.native) {
+    if (context !== proof.context || !context || !originalGraduatedContexts.has(context))
+      throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
+    await nativeSenderAuthority(
+      db,
+      {
+        teamId: proof.teamId,
+        actorUserId: proof.native.actorUserId,
+        mailboxId: proof.native.mailboxId,
+        from: proof.from,
+        domainId: proof.domainId,
+        principalId: proof.principalId,
+      },
+      proof.native,
+    );
+    judgeEnvelope(await wallClock(db, context), context);
+  }
   const [membership] = await db
     .select({ id: schema.teamMembers.userId })
     .from(schema.teamMembers)
@@ -608,6 +632,123 @@ export function markOriginalGraduatedContext<T extends object>(context: T): T {
   originalGraduatedContexts.add(context);
   return context;
 }
+interface NativeSenderAuthority {
+  mailboxId: string;
+  actorUserId: string;
+  actorMembershipId: string;
+  principalMembershipId: string;
+  principalVerified: boolean;
+  grantId: string | null;
+}
+/** A mailbox selector is not authority. Issue/revalidate only under the original
+ * owner/send-grant guard, and bind both actors' exact membership generations.
+ * Approval remains B; standing/funding independently follows registered A. */
+async function nativeSenderAuthority(
+  db: Db,
+  input: {
+    teamId: string;
+    actorUserId: string;
+    mailboxId: string;
+    from: string;
+    domainId: string | null;
+    principalId: string;
+  },
+  expected?: NativeSenderAuthority,
+): Promise<NativeSenderAuthority> {
+  try {
+    return await withMailboxSendAccess(
+      db,
+      { teamId: input.teamId, userId: input.actorUserId },
+      input.mailboxId,
+      async (tx, membershipId) => {
+        const [box] = await tx
+          .select()
+          .from(schema.mailboxes)
+          .where(
+            and(
+              eq(schema.mailboxes.id, input.mailboxId),
+              eq(schema.mailboxes.teamId, input.teamId),
+            ),
+          );
+        const [principal] = await tx
+          .select({ id: schema.teamMembers.id, verified: schema.user.emailVerified })
+          .from(schema.teamMembers)
+          .innerJoin(schema.user, eq(schema.user.id, schema.teamMembers.userId))
+          .where(
+            and(
+              eq(schema.teamMembers.teamId, input.teamId),
+              eq(schema.teamMembers.userId, input.principalId),
+            ),
+          )
+          .for("share");
+        if (!box || box.address !== input.from || box.domainId !== input.domainId || !principal)
+          throw new Error("native_sender_required");
+        if (input.domainId) {
+          const at = await wallClock(tx);
+          const [domain] = await tx
+            .select()
+            .from(schema.domains)
+            .where(
+              and(eq(schema.domains.id, input.domainId), eq(schema.domains.teamId, input.teamId)),
+            )
+            .for("share");
+          if (
+            !domain ||
+            !campaignDomainDnsReady(domain) ||
+            input.from.split("@")[1] !== domain.name.toLowerCase() ||
+            !domain.verifiedAt ||
+            domain.verifiedAt > at ||
+            !domain.lastCheckedAt ||
+            domain.lastCheckedAt > at ||
+            at.getTime() - domain.lastCheckedAt.getTime() > 86400000 ||
+            !domain.dmarcCheckedAt ||
+            domain.dmarcCheckedAt > at ||
+            at.getTime() - domain.dmarcCheckedAt.getTime() > 86400000
+          )
+            throw new Error("native_sender_required");
+        }
+        let grantId: string | null = null;
+        if (box.ownerUserId !== input.actorUserId || box.ownerMembershipId !== membershipId) {
+          const [grant] = await tx
+            .select()
+            .from(schema.mailboxGrants)
+            .where(
+              and(
+                eq(schema.mailboxGrants.teamId, input.teamId),
+                eq(schema.mailboxGrants.mailboxId, input.mailboxId),
+                eq(schema.mailboxGrants.userId, input.actorUserId),
+                eq(schema.mailboxGrants.membershipId, membershipId),
+                isNull(schema.mailboxGrants.revokedAt),
+              ),
+            )
+            .for("share");
+          if (!grant || grant.revokedAt || grant.permission !== "send")
+            throw new Error("native_sender_required");
+          grantId = grant.id;
+        }
+        const authority = {
+          mailboxId: input.mailboxId,
+          actorUserId: input.actorUserId,
+          actorMembershipId: membershipId,
+          principalMembershipId: principal.id,
+          principalVerified: principal.verified,
+          grantId,
+        };
+        if (
+          expected &&
+          (expected.actorMembershipId !== membershipId ||
+            expected.principalMembershipId !== principal.id ||
+            expected.principalVerified !== principal.verified ||
+            expected.grantId !== grantId)
+        )
+          throw new Error("native_sender_required");
+        return authority;
+      },
+    );
+  } catch {
+    throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
+  }
+}
 const senderProofs = new WeakMap<
   GraduatedSenderProof,
   {
@@ -616,6 +757,8 @@ const senderProofs = new WeakMap<
     from: string;
     domainId: string | null;
     external?: { mailboxId: string; generation: number };
+    native?: NativeSenderAuthority;
+    context?: GraduatedContext | undefined;
     at: number;
   }
 >();
@@ -624,9 +767,17 @@ const senderProofs = new WeakMap<
  * No deserialized boolean or client-created object can represent this proof. */
 export async function authorizeGraduatedSender(
   db: Db,
-  input: { teamId: string; actorUserId: string; from: string; domainId: string | null },
+  input: {
+    teamId: string;
+    actorUserId: string;
+    from: string;
+    domainId: string | null;
+    mailboxId?: string;
+  },
   context?: GraduatedContext,
 ): Promise<GraduatedSenderProof> {
+  if (input.mailboxId && (!context || !originalGraduatedContexts.has(context)))
+    throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
   const now = await wallClock(db, context);
   const observed = await loadTenant(db, input.teamId, now, input.domainId ?? undefined, context);
   const [member] = await db
@@ -640,7 +791,12 @@ export async function authorizeGraduatedSender(
     )
     .limit(1);
   const from = normalizeAddress(extractAddrSpec(input.from));
-  if (!member || observed.principalId !== input.actorUserId || !from)
+  if (
+    !member ||
+    !observed.principalId ||
+    (!input.mailboxId && observed.principalId !== input.actorUserId) ||
+    !from
+  )
     throw new GraduatedAdmissionError("registered_sender_required", observed.dto.plan, 0);
   if (input.domainId) {
     const [d] = await db
@@ -667,9 +823,20 @@ export async function authorizeGraduatedSender(
   const proof = Object.freeze({}) as GraduatedSenderProof;
   senderProofs.set(proof, {
     teamId: input.teamId,
-    principalId: input.actorUserId,
+    principalId: observed.principalId,
     from,
     domainId: input.domainId,
+    ...(input.mailboxId
+      ? {
+          native: await nativeSenderAuthority(db, {
+            ...input,
+            mailboxId: input.mailboxId,
+            from,
+            principalId: observed.principalId,
+          }),
+          context,
+        }
+      : {}),
     at: now.getTime(),
   });
   return proof;
@@ -681,6 +848,8 @@ export async function authorizeGraduatedExternalSender(
   input: { teamId: string; actorUserId: string; from: string; mailboxId: string },
   context?: GraduatedContext,
 ): Promise<GraduatedSenderProof> {
+  if (!context || !originalGraduatedContexts.has(context))
+    throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
   const now = await wallClock(db, context);
   const observed = await loadTenant(db, input.teamId, now, undefined, context, true);
   const [member] = await db
@@ -710,7 +879,7 @@ export async function authorizeGraduatedExternalSender(
   const from = normalizeAddress(extractAddrSpec(input.from));
   if (
     !member ||
-    observed.principalId !== input.actorUserId ||
+    !observed.principalId ||
     !box ||
     box.origin !== "external" ||
     box.status !== "planned" ||
@@ -722,9 +891,16 @@ export async function authorizeGraduatedExternalSender(
   const proof = Object.freeze({}) as GraduatedSenderProof;
   senderProofs.set(proof, {
     teamId: input.teamId,
-    principalId: input.actorUserId,
+    principalId: observed.principalId,
     from,
     domainId: null,
+    native: await nativeSenderAuthority(db, {
+      ...input,
+      from,
+      domainId: null,
+      principalId: observed.principalId,
+    }),
+    context,
     external: { mailboxId: input.mailboxId, generation: account.connectionGeneration },
     at: now.getTime(),
   });
@@ -736,10 +912,62 @@ export async function getGraduatedSenderReputation(
   context?: GraduatedContext,
 ): Promise<TenantReputationDto> {
   const p = senderProofs.get(proof);
+  if (
+    !p ||
+    (p.native && (!context || context !== p.context || !originalGraduatedContexts.has(context)))
+  )
+    throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
   const now = await wallClock(db, context);
   if (!p || now.getTime() - p.at > 30000 || now.getTime() < p.at)
     throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
-  return (await loadTenant(db, p.teamId, now, p.domainId ?? undefined, context, !!p.external)).dto;
+  const observed = await loadTenant(
+    db,
+    p.teamId,
+    now,
+    p.domainId ?? undefined,
+    context,
+    !!p.external,
+  );
+  if (p.native) {
+    if (
+      context !== p.context ||
+      !context ||
+      !originalGraduatedContexts.has(context) ||
+      observed.principalId !== p.principalId
+    )
+      throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
+    await nativeSenderAuthority(
+      db,
+      {
+        teamId: p.teamId,
+        actorUserId: p.native.actorUserId,
+        mailboxId: p.native.mailboxId,
+        from: p.from,
+        domainId: p.domainId,
+        principalId: p.principalId,
+      },
+      p.native,
+    );
+    if (p.external) {
+      const [account] = await db
+        .select()
+        .from(schema.mailboxExternalAccounts)
+        .where(
+          and(
+            eq(schema.mailboxExternalAccounts.mailboxId, p.external.mailboxId),
+            eq(schema.mailboxExternalAccounts.teamId, p.teamId),
+          ),
+        );
+      if (
+        !account ||
+        account.status !== "active" ||
+        account.connectionGeneration !== p.external.generation
+      )
+        throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
+    }
+    judgeEnvelope(await wallClock(db, context), context);
+  }
+  return observed.dto;
 }
 /** Integer provider accounting units, not dollars or inferred RPM entitlement.
  * Parent supplies a qualified operational envelope and fresh shared meter. */

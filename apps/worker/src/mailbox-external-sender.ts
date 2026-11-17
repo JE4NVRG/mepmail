@@ -1,7 +1,9 @@
 import { lookup } from "node:dns/promises";
 import {
+  assertMailboxOutboxSendAccess,
   checkSignupSend,
   fetchTeamStanding,
+  graduatedSendingEnabled,
   type Keyring,
   MailboxExternalOAuthError,
   type MailboxOutboxSender,
@@ -118,6 +120,13 @@ export function createMailboxExternalAwareSender(
         if (!(await checkSignupSend(db, input.teamId, recipients)).allowed)
           throw new MailboxSendDeferredError("review_required");
         const raw = stripMailboxPrivateHeaders(Buffer.from(input.raw));
+        if (deps.isCloud !== false && graduatedSendingEnabled()) {
+          try {
+            await assertMailboxOutboxSendAccess(db, input);
+          } catch {
+            throw new MailboxSendDeferredError("review_required");
+          }
+        }
         assertMailboxDispatchContent(input, raw, deps.isCloud);
         const info = await transport.sendMail({
           envelope: { from: input.from, to: [...input.to, ...input.cc, ...input.bcc] },

@@ -17,6 +17,8 @@ import type { Keyring } from "./crypto/keyring.js";
 import {
   authorizeGraduatedExternalSender,
   authorizeGraduatedSender,
+  type GraduatedSenderProof,
+  getGraduatedSenderReputation,
   graduatedSendingEnabled,
   reserveGraduatedSending,
   suspendTenantFromReputation,
@@ -1302,6 +1304,50 @@ export async function acceptMailboxOutbox(
   return result;
 }
 
+// Capabilities live only for this dispatcher's physical attempt. They are never
+// serialized onto the adapter DTO, and every exit clears its own entry.
+const activeGraduatedClaims = new Map<
+  string,
+  { proof: GraduatedSenderProof; context: Awaited<ReturnType<typeof getGraduatedSendingContext>> }
+>();
+
+/** The original queue caller recorded the actual approver, draft revision and
+ * outbox together. Legacy/forged rows without that event cannot bootstrap a
+ * graduated admission at dispatch; never manufacture or backfill provenance. */
+async function assertOriginalMailboxApproval(db: Db, row: Outbox): Promise<void> {
+  const approvals = await db
+    .select({ actorId: schema.auditLog.actorId, data: schema.auditLog.data })
+    .from(schema.auditLog)
+    .where(
+      and(
+        eq(schema.auditLog.teamId, row.teamId),
+        eq(schema.auditLog.action, "mailbox.send_approved"),
+        eq(schema.auditLog.target, `mailbox:${row.mailboxId}`),
+        sql`${schema.auditLog.data}->>'outboxId'=${row.id}`,
+      ),
+    )
+    .limit(2);
+  const actorId =
+    row.approvalKind === "agent" && row.agentKeyId
+      ? `mailbox_agent:${row.agentKeyId}`
+      : row.approvalKind === "human" && row.agentKeyId === null
+        ? `user:${row.approvedBy}`
+        : null;
+  if (
+    !actorId ||
+    approvals.length !== 1 ||
+    !approvals.some(
+      (a) =>
+        a.actorId === actorId &&
+        a.data?.mailboxId === row.mailboxId &&
+        a.data?.outboxId === row.id &&
+        a.data?.itemId === row.draftId &&
+        a.data?.revision === row.draftRevision,
+    )
+  )
+    throw new MailboxSendDeferredError("review_required");
+}
+
 /** Native adapter pre-SMTP revalidation, including after the global quota lock.
  * Uses the original approval provenance and existing authorization/seat locks;
  * it neither claims nor refunds counters, outbox state or provider receipts.
@@ -1330,6 +1376,18 @@ export async function assertMailboxOutboxSendAccess(
       .where(
         and(eq(schema.mailboxes.id, input.mailboxId), eq(schema.mailboxes.teamId, input.teamId)),
       );
+    if (graduatedSendingEnabled()) {
+      const active = activeGraduatedClaims.get(input.attemptId);
+      if (!active) throw new MailboxContentError("forbidden");
+      await assertOriginalMailboxApproval(tx, known);
+      const reputation = await getGraduatedSenderReputation(tx, active.proof, active.context);
+      if (
+        reputation.state === "suspended" ||
+        reputation.reason === "review_required" ||
+        (externalBox?.origin !== "external" && reputation.reason === "verify_domain")
+      )
+        throw new MailboxContentError("forbidden");
+    }
     if (externalBox?.origin === "external") {
       const [account] = await tx
         .select()
@@ -1438,8 +1496,9 @@ export async function sendMailboxOutbox(
   if (!known) throw new MailboxContentError("not_found");
   if (known.status !== "queued") return outboxDto(known, true);
   let prepared: { row: Outbox; raw: Buffer; parsed: Awaited<ReturnType<typeof envelope>> };
+  let graduatedProof: GraduatedSenderProof | undefined;
+  let graduatedContext: Awaited<ReturnType<typeof getGraduatedSendingContext>> | undefined;
   try {
-    let graduatedContext: Awaited<ReturnType<typeof getGraduatedSendingContext>> | undefined;
     const prepare = async (tx: Db, credentialExpiresAt?: Date | null) => {
       const [member] = await tx
         .select({ id: schema.teamMembers.id })
@@ -1474,6 +1533,7 @@ export async function sendMailboxOutbox(
           raw: Buffer.alloc(0),
           parsed: { from: "", to: [], cc: [], bcc: [], count: 0 },
         };
+      if (graduatedSendingEnabled()) await assertOriginalMailboxApproval(tx, row);
       const [box] = await tx
         .select()
         .from(schema.mailboxes)
@@ -1548,9 +1608,11 @@ export async function sendMailboxOutbox(
                     actorUserId: row!.approvedBy,
                     from: parsed.from,
                     domainId: box?.domainId ?? null,
+                    mailboxId: box!.id,
                   },
                   graduatedContext,
                 );
+          graduatedProof = senderProof;
           await reserveGraduatedSending(
             tx,
             {
@@ -1671,6 +1733,8 @@ export async function sendMailboxOutbox(
   }
   const { row, raw, parsed } = prepared;
   if (!raw.length) return outboxDto(row, true);
+  if (graduatedProof && graduatedContext)
+    activeGraduatedClaims.set(row.attemptId!, { proof: graduatedProof, context: graduatedContext });
   try {
     const result = await sender.send({
       idempotencyKey: row.id,
@@ -1735,6 +1799,8 @@ export async function sendMailboxOutbox(
     if (changed) return outboxDto(changed, false);
     const [current] = await db.select().from(mailboxOutbox).where(eq(mailboxOutbox.id, row.id));
     return outboxDto(current!, true);
+  } finally {
+    activeGraduatedClaims.delete(row.attemptId!);
   }
 }
 
