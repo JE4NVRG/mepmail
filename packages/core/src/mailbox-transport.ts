@@ -1382,6 +1382,7 @@ async function assertOriginalMailboxApproval(db: Db, row: Outbox): Promise<void>
 export async function assertMailboxOutboxSendAccess(
   db: Db,
   input: Parameters<MailboxOutboxSender["send"]>[0],
+  purpose: "relay" | "content_preflight" | "ses" = "relay",
 ): Promise<void> {
   const [known] = await db
     .select()
@@ -1467,7 +1468,8 @@ export async function assertMailboxOutboxSendAccess(
     if (
       !domain ||
       domain.status !== "verified" ||
-      !domain.relayEnabledAt ||
+      (!domain.relayEnabledAt &&
+        !(graduatedSendingEnabled() && (purpose === "content_preflight" || purpose === "ses"))) ||
       domain.origin === "external" ||
       domain.address !== input.from ||
       !team ||

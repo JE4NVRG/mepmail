@@ -302,7 +302,7 @@ export async function withMailboxDispatchContent<T>(
         );
       if (!box || (box.origin !== "external" && !box.domainId) || box.address !== input.from)
         held();
-      await assertMailboxOutboxSendAccess(db, input);
+      await assertMailboxOutboxSendAccess(db, input, "content_preflight");
       const context = await getGraduatedSendingContext(
         box.origin === "external" ? { purpose: "judge" } : {},
       );
@@ -381,7 +381,7 @@ export async function withMailboxDispatchContent<T>(
     // This check is before any physical adapter invocation. A revoked grant or
     // unavailable authority read is a known safe deferral, not ambiguous SMTP.
     try {
-      await assertMailboxOutboxSendAccess(db, input);
+      await assertMailboxOutboxSendAccess(db, input, "content_preflight");
     } catch (error) {
       const code =
         typeof error === "object" && error !== null && "code" in error ? error.code : null;

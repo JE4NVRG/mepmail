@@ -659,7 +659,7 @@ export function createMailboxSesSender(
         if (opts.isCloud !== false) await checkMailboxContent(db, input);
         if (opts.isCloud !== false && graduatedSendingEnabled()) {
           try {
-            await assertMailboxOutboxSendAccess(db, input);
+            await assertMailboxOutboxSendAccess(db, input, "ses");
             assertMailboxOutboxSendFresh(input);
           } catch {
             throw new MailboxSendDeferredError("review_required");

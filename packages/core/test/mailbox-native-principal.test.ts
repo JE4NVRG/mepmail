@@ -9,11 +9,13 @@ import { and, eq, type SQL, sql } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAbuseJudge } from "../../../apps/worker/src/abuse-judge/index.js";
+import { createMailboxAzureSender } from "../../../apps/worker/src/mailbox-azure-sender.js";
 import { createMailboxExternalAwareSender } from "../../../apps/worker/src/mailbox-external-sender.js";
 import {
   createMailboxContentPolicySender,
   createMailboxSesSender,
 } from "../../../apps/worker/src/mailbox-sender.js";
+import { env, unsubscribeBaseUrl } from "../../config/src/index.js";
 import { ABUSE_JUDGE_QUESTIONS } from "../src/abuse-judge/questions.js";
 import { EnvKeyring } from "../src/crypto/keyring.js";
 import {
@@ -25,6 +27,7 @@ import {
 } from "../src/graduated-sending.js";
 import { getGraduatedSendingContext } from "../src/graduated-sending-context.js";
 import { createMailboxExternalAccount } from "../src/mailbox-external-accounts.js";
+import { prepareMailboxOptout } from "../src/mailbox-optout.js";
 import { saveMailboxDraft, withMailboxSendAccess } from "../src/mailbox-private-store.js";
 import {
   createMailboxRegistry,
@@ -1078,4 +1081,152 @@ describe("system finite regional quota", () => {
     const paid = await getTenantReputation(db, f.teamId, { ...context, domainId: f.domainId });
     expect(paid).toMatchObject({ plan: "starter", effectiveDaily: 2, warmupPercent: 25 });
   });
+});
+
+describe("native SES relay separation", () => {
+  it("System SES with relay NULL uses original approval, model and physical adapter once", async () => {
+    const f = await realm("owner", true),
+      send = sender(f);
+    await db
+      .update(schema.domains)
+      .set({ relayEnabledAt: null })
+      .where(eq(schema.domains.id, f.domainId));
+    const entitlement = await mailboxServiceEntitlement(db, f.teamId);
+    expect(requireMailboxOperationalPlan(entitlement).unlimitedOutbound).toBe(true);
+    expect(entitlement.plan!.periodEnd.getTime()).toBeLessThan(Date.now());
+    const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+    record("ses-null-relay", {
+      result,
+      models,
+      claims,
+      physical: send.transport.mock.calls.length,
+    });
+    expect(result.status).toBe("accepted");
+    expect(models).toBe(1);
+    expect(claims).toBe(1);
+    expect(send.transport).toHaveBeenCalledTimes(1);
+    const before = await ledger(f);
+    expect(before.attempts).toEqual([{ state: "settled", units: "180000" }]);
+    const debt = await db.execute(
+      sql`select debt_units::text as units from sending_judge_account_debt where account_key='commandcode-primary'`,
+    );
+    await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+    expect(await ledger(f)).toEqual(before);
+    expect(
+      await db.execute(
+        sql`select debt_units::text as units from sending_judge_account_debt where account_key='commandcode-primary'`,
+      ),
+    ).toEqual(debt);
+    expect(models).toBe(1);
+    expect(send.transport).toHaveBeenCalledTimes(1);
+    const [domain] = await db
+      .select()
+      .from(schema.domains)
+      .where(eq(schema.domains.id, f.domainId));
+    expect(domain!.relayEnabledAt).toBeNull();
+  });
+  it("default, unknown purpose and forged DTO stay strict during original active SES claim", async () => {
+    const f = await realm("owner", true),
+      send = sender(f);
+    await db
+      .update(schema.domains)
+      .set({ relayEnabledAt: null })
+      .where(eq(schema.domains.id, f.domainId));
+    // Interpose only the declared synthetic adapter: the original caller still owns its claim.
+    const checked = {
+      send: async (input: Parameters<MailboxOutboxSender["send"]>[0]) => {
+        await expect(assertMailboxOutboxSendAccess(db, input)).rejects.toMatchObject({
+          code: "forbidden",
+        });
+        await expect(
+          assertMailboxOutboxSendAccess(db, { ...input, purpose: "ses" } as never),
+        ).rejects.toMatchObject({ code: "forbidden" });
+        await expect(
+          assertMailboxOutboxSendAccess(db, input, "unknown" as never),
+        ).rejects.toMatchObject({ code: "forbidden" });
+        await expect(
+          assertMailboxOutboxSendAccess(db, input, false as never),
+        ).rejects.toMatchObject({ code: "forbidden" });
+        await assertMailboxOutboxSendAccess(db, input, "content_preflight");
+        await assertMailboxOutboxSendAccess(db, input, "ses");
+        vi.stubEnv("SENDING_PROVIDER_POLICY_JSON", JSON.stringify({ ...policy, graduated: false }));
+        await expect(assertMailboxOutboxSendAccess(db, input, "ses")).rejects.toMatchObject({
+          code: "forbidden",
+        });
+        await expect(
+          assertMailboxOutboxSendAccess(db, input, "content_preflight"),
+        ).rejects.toMatchObject({ code: "forbidden" });
+        vi.stubEnv("SENDING_PROVIDER_POLICY_JSON", JSON.stringify(policy));
+        return send.send(input);
+      },
+    };
+    expect((await sendMailboxOutbox(db, keys, f.queued.id, checked, mime)).status).toBe("accepted");
+    expect(send.transport).toHaveBeenCalledTimes(1);
+  });
+  for (const enabled of [false, true])
+    it(`original selected Azure requires relay attestation: ${enabled}`, async () => {
+      const f = await realm("owner", true);
+      await db
+        .update(schema.domains)
+        .set({ relayEnabledAt: enabled ? new Date() : null })
+        .where(eq(schema.domains.id, f.domainId));
+      const restoration = {
+        version: 1 as const,
+        paused: false,
+        allowedTeamIds: [f.teamId],
+        defaults: { transactional: "disabled", campaign: "disabled" },
+        teams: { [f.teamId]: { transactional: "azure_smtp", campaign: "disabled" } },
+        restoration: {
+          teams: {
+            [f.teamId]: {
+              notBefore: new Date(Date.now() - 86400000).toISOString(),
+              senders: [f.from],
+            },
+          },
+        },
+      };
+      vi.stubEnv("SENDING_PROVIDER_POLICY_JSON", JSON.stringify(restoration));
+      const physical = vi.fn(async () => ({ messageId: `smtp-relay:azure:${randomUUID()}` }));
+      const judge = createAbuseJudge({
+        provider: "openai",
+        baseUrl: "https://api.commandcode.ai/provider/v1",
+        model: "deepseek/deepseek-v4.1-flash",
+        apiKey: "synthetic-fixture-only",
+        timeoutMs: 20000,
+      })!;
+      const azure = createMailboxAzureSender(db, {
+        policy: restoration,
+        relay: { name: "azure", sender: { sendRaw: physical } as never },
+        isCloud: true,
+        contentJudge: judge,
+      });
+      const footer = await prepareMailboxOptout(db, f.teamId, ["recipient@example.invalid"], {
+        baseUrl: unsubscribeBaseUrl() ?? "",
+        masterKey: Buffer.from(env.MASTER_ENCRYPTION_KEY!, "base64"),
+      });
+      const raw = Buffer.from(
+        `From: ${f.from}\r\nTo: recipient@example.invalid\r\nSubject: Tomorrow\r\nContent-Type: text/plain; charset=utf-8\r\nList-Unsubscribe: <${footer.url}>\r\n\r\nHello, can we talk tomorrow?${footer.text}`,
+      );
+      const draft = await saveMailboxDraft(db, keys, f.actor, {
+        mailboxId: f.mailboxId,
+        expectedRevision: 0,
+        raw,
+      });
+      const queued = await queueMailboxDraft(
+        db,
+        keys,
+        f.actor,
+        { mailboxId: f.mailboxId, id: draft.id, expectedRevision: draft.revision },
+        mime,
+      );
+      const result = await sendMailboxOutbox(db, keys, queued.id, azure, mime);
+      record(`azure-relay-${enabled}`, { result, physical: physical.mock.calls.length });
+      if (enabled) {
+        expect(result.status).toBe("accepted");
+        expect(physical).toHaveBeenCalledTimes(1);
+      } else {
+        expect(result.status).not.toBe("accepted");
+        expect(physical).not.toHaveBeenCalled();
+      }
+    });
 });
