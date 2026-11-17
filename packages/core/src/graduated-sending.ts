@@ -774,6 +774,7 @@ async function nativeSenderAuthority(
     throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
   }
 }
+const renewedProofs = new WeakSet<GraduatedSenderProof>();
 const senderProofs = new WeakMap<
   GraduatedSenderProof,
   {
@@ -787,6 +788,48 @@ const senderProofs = new WeakMap<
     at: number;
   }
 >();
+/** Server-internal one-shot post-judge renewal. A registered proof keeps its
+ * literal proof instant and every original binding; only a distinct registered
+ * and physically fresh context is bound. Never builds authority from caller
+ * input, never extends the 30 s identity deadline, never renews twice. */
+export async function renewGraduatedSenderProof(
+  db: Db,
+  proof: GraduatedSenderProof,
+  context?: GraduatedContext,
+): Promise<"fresh" | "expired" | GraduatedSenderProof> {
+  const p = senderProofs.get(proof);
+  const now = await wallClock(db, context);
+  const at = now.getTime();
+  if (
+    !p ||
+    !p.context ||
+    !originalGraduatedContexts.has(p.context) ||
+    p.at > at ||
+    at - p.at > 30_000
+  )
+    throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
+  const original = Date.parse(p.context.judgeEnvelope?.meterExpiresAt ?? "");
+  if (!Number.isFinite(original))
+    throw new GraduatedAdmissionError("capacity_unavailable", "unknown", 0);
+  if (!context) return original <= at ? "expired" : "fresh";
+  const fresh = context.judgeEnvelope;
+  if (
+    context === p.context ||
+    !originalGraduatedContexts.has(context) ||
+    original > at ||
+    renewedProofs.has(proof) ||
+    !fresh ||
+    !Number.isFinite(Date.parse(fresh.meterAt)) ||
+    !Number.isFinite(Date.parse(fresh.meterExpiresAt)) ||
+    Date.parse(fresh.meterAt) > at ||
+    Date.parse(fresh.meterExpiresAt) <= at
+  )
+    throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
+  renewedProofs.add(proof);
+  const renewed = Object.freeze({}) as GraduatedSenderProof;
+  senderProofs.set(renewed, { ...p, context });
+  return renewed;
+}
 /** Server constructor: current registered principal, actual membership and
  * current SPF/DKIM domain proof. Caller MUST retain existing mailbox/plan gates.
  * No deserialized boolean or client-created object can represent this proof. */

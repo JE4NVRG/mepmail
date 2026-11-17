@@ -21,6 +21,7 @@ import {
   type GraduatedSenderProof,
   getGraduatedSenderReputation,
   graduatedSendingEnabled,
+  renewGraduatedSenderProof,
   reserveGraduatedSending,
   suspendTenantFromReputation,
 } from "./graduated-sending.js";
@@ -1470,6 +1471,8 @@ const activeGraduatedClaims = new Map<
   {
     proof: GraduatedSenderProof;
     context: Awaited<ReturnType<typeof getGraduatedSendingContext>>;
+    /** At most one post-judge renewal per private attempt. */
+    renewed: boolean;
     teamId: string;
     mailboxId: string;
     outboxId: string;
@@ -1537,10 +1540,32 @@ async function assertOriginalMailboxApproval(db: Db, row: Outbox): Promise<void>
  * Uses the original approval provenance and existing authorization/seat locks;
  * it neither claims nor refunds counters, outbox state or provider receipts.
  */
+type AdmissionRenewal =
+  | { kind: "missing_freshness"; claim: object; external: boolean }
+  | {
+      kind: "renewed";
+      proof: GraduatedSenderProof;
+      context: Awaited<ReturnType<typeof getGraduatedSendingContext>>;
+    };
+
+/** Native adapter pre-SMTP revalidation, including after the global quota lock.
+ * Uses the original approval provenance and existing authorization/seat locks;
+ * it neither claims nor refunds counters, outbox state or provider receipts.
+ *
+ * `renewExpiredAdmission` is passed only by the post-judge caller. All existing
+ * access validations (external account/licence/team, or plan/seat/domain/period)
+ * run first, in this same function and in both phases. Only then, when the
+ * claim's original five-second observation is provably expired by the canonical
+ * wallClock, the first locked pass returns a phase marker. The genuine meter
+ * read happens with no access transaction open, and the second full locked pass
+ * re-runs every validation before the helper binds a new proof and the fresh
+ * context is published after COMMIT, once per attempt.
+ */
 export async function assertMailboxOutboxSendAccess(
   db: Db,
   input: Parameters<MailboxOutboxSender["send"]>[0],
   purpose: "relay" | "content_preflight" | "ses" = "relay",
+  renewExpiredAdmission = false,
 ): Promise<void> {
   const [known] = await db
     .select()
@@ -1555,25 +1580,20 @@ export async function assertMailboxOutboxSendAccess(
       ),
     );
   if (!known) throw new MailboxContentError("forbidden");
-  const check = async (tx: Db, expiresAt?: Date | null) => {
+  const check = async (
+    tx: Db,
+    expiresAt?: Date | null,
+    renewal?: {
+      fresh: Awaited<ReturnType<typeof getGraduatedSendingContext>>;
+      claim: object;
+    },
+  ): Promise<AdmissionRenewal | void> => {
     const [externalBox] = await tx
       .select()
       .from(schema.mailboxes)
       .where(
         and(eq(schema.mailboxes.id, input.mailboxId), eq(schema.mailboxes.teamId, input.teamId)),
       );
-    if (graduatedSendingEnabled()) {
-      const active = activeGraduatedClaims.get(input.attemptId);
-      if (!active) throw new MailboxContentError("forbidden");
-      await assertOriginalMailboxApproval(tx, known);
-      const reputation = await getGraduatedSenderReputation(tx, active.proof, active.context);
-      if (
-        reputation.state === "suspended" ||
-        reputation.reason === "review_required" ||
-        (externalBox?.origin !== "external" && reputation.reason === "verify_domain")
-      )
-        throw new MailboxContentError("forbidden");
-    }
     if (externalBox?.origin === "external") {
       const [account] = await tx
         .select()
@@ -1597,75 +1617,154 @@ export async function assertMailboxOutboxSendAccess(
         (expiresAt && expiresAt.getTime() <= Date.now())
       )
         throw new MailboxContentError("forbidden");
-      return;
+    } else {
+      const plan = await lockMailboxService(tx, input.teamId);
+      await requireMailboxSeat(tx, input.teamId, input.mailboxId, plan);
+      const [domain] = await tx
+        .select({
+          status: schema.domains.status,
+          relayEnabledAt: schema.domains.relayEnabledAt,
+          address: schema.mailboxes.address,
+          origin: schema.mailboxes.origin,
+        })
+        .from(schema.mailboxes)
+        .innerJoin(
+          schema.domains,
+          and(
+            eq(schema.domains.id, schema.mailboxes.domainId),
+            eq(schema.domains.teamId, schema.mailboxes.teamId),
+          ),
+        )
+        .where(
+          and(eq(schema.mailboxes.id, input.mailboxId), eq(schema.mailboxes.teamId, input.teamId)),
+        )
+        .for("share");
+      const [team] = await tx.select().from(schema.teams).where(eq(schema.teams.id, input.teamId));
+      const at = new Date();
+      const period = plan.unlimitedOutbound ? null : mailboxSubscriptionUsagePeriod(plan, at);
+      if (
+        !domain ||
+        domain.status !== "verified" ||
+        (!domain.relayEnabledAt &&
+          !(graduatedSendingEnabled() && (purpose === "content_preflight" || purpose === "ses"))) ||
+        domain.origin === "external" ||
+        domain.address !== input.from ||
+        !team ||
+        team.suspendedAt ||
+        (team.sendReviewAt &&
+          (!team.sendReviewClearedAt || team.sendReviewClearedAt < team.sendReviewAt)) ||
+        (expiresAt && expiresAt.getTime() <= at.getTime()) ||
+        (!plan.unlimitedOutbound &&
+          (!mailboxServiceActive(plan, at) ||
+            !period ||
+            period.start.getTime() !== known.periodStart.getTime() ||
+            period.end.getTime() !== known.periodEnd.getTime()))
+      )
+        throw new MailboxContentError("forbidden");
     }
-    const plan = await lockMailboxService(tx, input.teamId);
-    await requireMailboxSeat(tx, input.teamId, input.mailboxId, plan);
-    const [domain] = await tx
-      .select({
-        status: schema.domains.status,
-        relayEnabledAt: schema.domains.relayEnabledAt,
-        address: schema.mailboxes.address,
-        origin: schema.mailboxes.origin,
-      })
-      .from(schema.mailboxes)
-      .innerJoin(
-        schema.domains,
-        and(
-          eq(schema.domains.id, schema.mailboxes.domainId),
-          eq(schema.domains.teamId, schema.mailboxes.teamId),
-        ),
+    if (!graduatedSendingEnabled()) return;
+    const active = activeGraduatedClaims.get(input.attemptId);
+    if (!active) throw new MailboxContentError("forbidden");
+    if (renewal) {
+      // Second full locked pass: same attempt row, same private map object.
+      const [current] = await tx
+        .select()
+        .from(mailboxOutbox)
+        .where(
+          and(
+            eq(mailboxOutbox.id, known.id),
+            eq(mailboxOutbox.teamId, known.teamId),
+            eq(mailboxOutbox.mailboxId, known.mailboxId),
+            eq(mailboxOutbox.attemptId, input.attemptId),
+            eq(mailboxOutbox.status, "sending"),
+          ),
+        );
+      if (
+        !current ||
+        active !== renewal.claim ||
+        active.renewed ||
+        current.approvedBy !== known.approvedBy ||
+        current.approvedMembershipId !== known.approvedMembershipId ||
+        current.approvalKind !== known.approvalKind ||
+        current.agentKeyId !== known.agentKeyId
       )
-      .where(
-        and(eq(schema.mailboxes.id, input.mailboxId), eq(schema.mailboxes.teamId, input.teamId)),
+        throw new MailboxContentError("forbidden");
+      await assertOriginalMailboxApproval(tx, current);
+      const proof = await renewGraduatedSenderProof(tx, active.proof, renewal.fresh);
+      if (typeof proof === "string") throw new MailboxContentError("forbidden");
+      const renewed = await getGraduatedSenderReputation(tx, proof, renewal.fresh);
+      if (
+        renewed.state === "suspended" ||
+        renewed.reason === "review_required" ||
+        (externalBox?.origin !== "external" && renewed.reason === "verify_domain")
       )
-      .for("share");
-    const [team] = await tx.select().from(schema.teams).where(eq(schema.teams.id, input.teamId));
-    const at = new Date();
-    const period = plan.unlimitedOutbound ? null : mailboxSubscriptionUsagePeriod(plan, at);
+        throw new MailboxContentError("forbidden");
+      return { kind: "renewed", proof, context: renewal.fresh };
+    }
+    await assertOriginalMailboxApproval(tx, known);
+    if (renewExpiredAdmission && purpose === "content_preflight" && !active.renewed) {
+      const state = await renewGraduatedSenderProof(tx, active.proof);
+      if (state === "expired")
+        return {
+          kind: "missing_freshness",
+          claim: active,
+          external: externalBox?.origin === "external",
+        };
+    }
+    const reputation = await getGraduatedSenderReputation(tx, active.proof, active.context);
     if (
-      !domain ||
-      domain.status !== "verified" ||
-      (!domain.relayEnabledAt &&
-        !(graduatedSendingEnabled() && (purpose === "content_preflight" || purpose === "ses"))) ||
-      domain.origin === "external" ||
-      domain.address !== input.from ||
-      !team ||
-      team.suspendedAt ||
-      (team.sendReviewAt &&
-        (!team.sendReviewClearedAt || team.sendReviewClearedAt < team.sendReviewAt)) ||
-      (expiresAt && expiresAt.getTime() <= at.getTime()) ||
-      (!plan.unlimitedOutbound &&
-        (!mailboxServiceActive(plan, at) ||
-          !period ||
-          period.start.getTime() !== known.periodStart.getTime() ||
-          period.end.getTime() !== known.periodEnd.getTime()))
+      reputation.state === "suspended" ||
+      reputation.reason === "review_required" ||
+      (externalBox?.origin !== "external" && reputation.reason === "verify_domain")
     )
       throw new MailboxContentError("forbidden");
   };
-  if (known.approvalKind === "agent" && known.agentKeyId) {
-    await withMailboxAgentQueuedSendAccess(
-      db,
-      {
-        keyId: known.agentKeyId,
-        teamId: known.teamId,
-        mailboxId: known.mailboxId,
-        approvedBy: known.approvedBy,
-        approvedMembershipId: known.approvedMembershipId,
-      },
-      ({ db: tx, expiresAt }) => check(tx, expiresAt),
-    );
-  } else if (known.approvalKind === "human" && known.agentKeyId === null) {
-    await withMailboxSendAccess(
-      db,
-      { teamId: known.teamId, userId: known.approvedBy },
-      known.mailboxId,
-      (tx, membershipId) => {
-        if (membershipId !== known.approvedMembershipId) throw new MailboxContentError("forbidden");
-        return check(tx);
-      },
-    );
-  } else throw new MailboxContentError("forbidden");
+  const runAccess = async (renewal?: {
+    fresh: Awaited<ReturnType<typeof getGraduatedSendingContext>>;
+    claim: object;
+  }): Promise<AdmissionRenewal | void> => {
+    if (known.approvalKind === "agent" && known.agentKeyId) {
+      return withMailboxAgentQueuedSendAccess(
+        db,
+        {
+          keyId: known.agentKeyId,
+          teamId: known.teamId,
+          mailboxId: known.mailboxId,
+          approvedBy: known.approvedBy,
+          approvedMembershipId: known.approvedMembershipId,
+        },
+        ({ db: tx, expiresAt }) => check(tx, expiresAt, renewal),
+      );
+    }
+    if (known.approvalKind === "human" && known.agentKeyId === null) {
+      return withMailboxSendAccess(
+        db,
+        { teamId: known.teamId, userId: known.approvedBy },
+        known.mailboxId,
+        (tx, membershipId) => {
+          if (membershipId !== known.approvedMembershipId)
+            throw new MailboxContentError("forbidden");
+          return check(tx, undefined, renewal);
+        },
+      );
+    }
+    throw new MailboxContentError("forbidden");
+  };
+  const first = await runAccess();
+  if (!first) return;
+  if (first.kind !== "missing_freshness") return;
+  // No access transaction or advisory lock is open: the genuine meter read for
+  // the same private attempt happens outside custody.
+  const fresh = await getGraduatedSendingContext(first.external ? { purpose: "judge" } : {});
+  const second = await runAccess({ fresh, claim: first.claim });
+  if (!second || second.kind !== "renewed") throw new MailboxContentError("forbidden");
+  // The wrapper returned only after COMMIT. Publish on the same map entry once.
+  const current = activeGraduatedClaims.get(input.attemptId);
+  if (!current || current !== first.claim || current.renewed)
+    throw new MailboxContentError("forbidden");
+  current.proof = second.proof;
+  current.context = second.context;
+  current.renewed = true;
 }
 
 /** Internal worker. The durable claim precedes the external side effect. A job
@@ -1924,6 +2023,7 @@ export async function sendMailboxOutbox(
     activeGraduatedClaims.set(row.attemptId!, {
       proof: graduatedProof,
       context: graduatedContext,
+      renewed: false,
       teamId: row.teamId,
       mailboxId: row.mailboxId,
       outboxId: row.id,

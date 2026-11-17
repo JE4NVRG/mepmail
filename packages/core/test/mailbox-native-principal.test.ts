@@ -67,6 +67,12 @@ let beforePhysical: (() => Promise<void>) | undefined;
 let tailAfterCommit: (() => void) | undefined;
 let tailArmed = false;
 let tailHooks = 0;
+// Instrumentation only: proves the renewal meter read happens with no access
+// transaction open and lets the fixture revoke authority during that window.
+let accessTxDepth = 0;
+let renewalArmed = false;
+let renewalMeterCalls: number[] = [];
+let duringRenewal: (() => Promise<void>) | undefined;
 const keys = new EnvKeyring(new Map([[1, randomBytes(32)]]), 1);
 const dialect = new PgDialect();
 function record(name: string, data: unknown) {
@@ -95,16 +101,21 @@ function clocked(target: Db, depth = 0): Db {
     get(t, key) {
       if (key === "transaction")
         return async (operation: (tx: Db) => Promise<unknown>) => {
-          const result = await t.transaction((tx) =>
-            operation(clocked(tx as unknown as Db, depth + 1)),
-          );
-          // Advance only after the original outer transaction has COMMITTED.
-          // All reputation/financial/seat/domain reads ran with the fresh clock.
-          if (depth === 0 && tailArmed) {
-            tailArmed = false;
-            tailAfterCommit?.();
+          accessTxDepth += 1;
+          try {
+            const result = await t.transaction((tx) =>
+              operation(clocked(tx as unknown as Db, depth + 1)),
+            );
+            // Advance only after the original outer transaction has COMMITTED.
+            // All reputation/financial/seat/domain reads ran with the fresh clock.
+            if (depth === 0 && tailArmed) {
+              tailArmed = false;
+              tailAfterCommit?.();
+            }
+            return result;
+          } finally {
+            accessTxDepth -= 1;
           }
-          return result;
         };
       if (key === "execute")
         return (query: SQL | string) => {
@@ -158,6 +169,10 @@ beforeEach(() => {
   tailAfterCommit = undefined;
   tailArmed = false;
   tailHooks = 0;
+  accessTxDepth = 0;
+  renewalArmed = false;
+  renewalMeterCalls = [];
+  duringRenewal = undefined;
   vi.stubEnv("SENDING_PROVIDER_POLICY_JSON", JSON.stringify(policy));
   vi.stubEnv("ABUSE_JUDGE", "openai");
   vi.stubEnv("ABUSE_JUDGE_BASE_URL", "https://api.commandcode.ai/provider/v1");
@@ -177,6 +192,11 @@ beforeEach(() => {
     vi.fn(async (url: unknown, init?: RequestInit) => {
       if (String(url) === "https://api.commandcode.ai/alpha/billing/credits") {
         expect(init?.method).toBe("GET");
+        if (renewalArmed) {
+          renewalArmed = false;
+          renewalMeterCalls.push(accessTxDepth);
+          await duringRenewal?.();
+        }
         return Response.json({
           credits: {
             monthlyCredits: credits,
@@ -1656,4 +1676,204 @@ describe("original agent reauthorization", () => {
         .where(eq(schema.mailboxOutbox.id, row.id));
       expect(await retry(f)).toMatchObject({ id: row.id, status: "failed", errorCode: error });
     });
+});
+
+// A clean judge that consumes the canonical 5 s admission envelope must not
+// deny the same private attempt: the post-judge caller renews once, with the
+// genuine meter read outside every access lock, then re-reads authority.
+describe("native post-judge envelope freshness", () => {
+  for (const mode of ["owner", "external"] as const)
+    it(`real caller renews ${mode} once after a clean judge and sends once`, async () => {
+      const f = await realm(mode),
+        adapter = sender(f);
+      const observed = await getGraduatedSendingContext(
+        mode === "external" ? { purpose: "judge" } : {},
+      );
+      const envelope = observed.judgeEnvelope!;
+      const origin = Date.parse(envelope.meterAt),
+        expires = Date.parse(envelope.meterExpiresAt);
+      let modelAge: number | undefined;
+      duringModel = async () => {
+        // Fixture latency only: no production write, no model, no SES.
+        vi.setSystemTime(Date.now() + 5001);
+        modelAge = Date.now() - origin;
+        renewalArmed = true;
+      };
+      const result = await sendMailboxOutbox(db, keys, f.queued.id, adapter, mime);
+      const accounting = await ledger(f);
+      record(`postjudge-${mode}`, {
+        boundary: "post-judge assertMailboxOutboxSendAccess/content_preflight",
+        originalEnvelopeSpanMs: expires - origin,
+        identityDeadlineMs: 30000,
+        modelAge,
+        renewalMeterOpenTx: renewalMeterCalls,
+        result,
+        models,
+        claims,
+        attempts: accounting.attempts,
+        admissions: accounting.rows.length,
+        physical: adapter.transport.mock.calls.length,
+      });
+      expect(expires - origin).toBe(5000);
+      expect(modelAge).toBeGreaterThan(5000);
+      // The genuine meter read ran with no access transaction open.
+      expect(renewalMeterCalls).toEqual([0]);
+      expect(models).toBe(1);
+      expect(claims).toBe(1);
+      expect(accounting.rows).toHaveLength(1);
+      expect(accounting.attempts).toEqual([{ state: "settled", units: "180000" }]);
+      expect(result).toMatchObject({ status: "accepted" });
+      expect(adapter.transport).toHaveBeenCalledTimes(1);
+    });
+
+  it("refuses revocation during the unlocked renewal read without a provider call", async () => {
+    const f = await realm("owner", false, true),
+      adapter = sender(f);
+    duringModel = async () => {
+      vi.setSystemTime(Date.now() + 5001);
+      renewalArmed = true;
+    };
+    duringRenewal = async () => {
+      expect(accessTxDepth).toBe(0);
+      await remove(f, "b");
+    };
+    const result = await sendMailboxOutbox(db, keys, f.queued.id, adapter, mime);
+    record("renewal-revocation", {
+      renewalMeterOpenTx: renewalMeterCalls,
+      result,
+      models,
+      claims,
+      physical: adapter.transport.mock.calls.length,
+      attempts: (await ledger(f)).attempts,
+    });
+    expect(renewalMeterCalls).toEqual([0]);
+    expect(models).toBe(1);
+    expect(claims).toBe(1);
+    expect(adapter.transport).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: "queued",
+      errorCode: "mailbox_deferred:review_required",
+    });
+  });
+
+  it("keeps default relay and unflagged preflight fail-closed before the model", async () => {
+    const f = await realm("owner"),
+      adapter = sender(f);
+    const flagged = {
+      send: async (input: Parameters<MailboxOutboxSender["send"]>[0]) => {
+        // Same claim, envelope provably expired; only the explicit post-judge
+        // callsite may renew. Default relay and unflagged preflight refuse.
+        vi.setSystemTime(Date.now() + 5001);
+        for (const call of [
+          () => assertMailboxOutboxSendAccess(db, input),
+          () => assertMailboxOutboxSendAccess(db, input, "relay"),
+          () => assertMailboxOutboxSendAccess(db, input, "content_preflight"),
+        ])
+          await expect(call()).rejects.toMatchObject({ reason: "capacity_unavailable" });
+        return adapter.send(input);
+      },
+    };
+    const result = await sendMailboxOutbox(db, keys, f.queued.id, flagged, mime);
+    record("unflagged-fail-closed", {
+      result,
+      models,
+      claims,
+      physical: adapter.transport.mock.calls.length,
+    });
+    expect(result).toMatchObject({
+      status: "queued",
+      errorCode: "mailbox_deferred:semantic_content_review",
+    });
+    expect(models).toBe(0);
+    expect(claims).toBe(1);
+    expect(adapter.transport).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the fresh observation expires before the second locked pass commits", async () => {
+    const f = await realm("owner"),
+      adapter = sender(f);
+    duringModel = async () => {
+      vi.setSystemTime(Date.now() + 5001);
+      renewalArmed = true;
+    };
+    duringRenewal = async () => {
+      // The new observation was built, then the clock crosses its 5 s window
+      // before the locked re-read: no provider and no second judge.
+      expect(accessTxDepth).toBe(0);
+      vi.setSystemTime(Date.now() + 5001);
+    };
+    const result = await sendMailboxOutbox(db, keys, f.queued.id, adapter, mime);
+    record("renewal-expired-before-commit", {
+      renewalMeterOpenTx: renewalMeterCalls,
+      result,
+      models,
+      claims,
+      physical: adapter.transport.mock.calls.length,
+    });
+    expect(renewalMeterCalls).toEqual([0]);
+    expect(models).toBe(1);
+    expect(claims).toBe(1);
+    expect(adapter.transport).not.toHaveBeenCalled();
+    expect(result.status).toBe("queued");
+  });
+
+  it("refuses a Native seat invalidated during the unlocked renewal read", async () => {
+    const f = await realm("owner"),
+      adapter = sender(f);
+    duringModel = async () => {
+      vi.setSystemTime(Date.now() + 5001);
+      renewalArmed = true;
+    };
+    duringRenewal = async () => {
+      expect(accessTxDepth).toBe(0);
+      await db
+        .update(schema.mailboxSubscriptions)
+        .set({ seats: 0 })
+        .where(eq(schema.mailboxSubscriptions.teamId, f.teamId));
+    };
+    const result = await sendMailboxOutbox(db, keys, f.queued.id, adapter, mime);
+    record("renewal-native-seat-invalidated", {
+      renewalMeterOpenTx: renewalMeterCalls,
+      result,
+      models,
+      claims,
+      physical: adapter.transport.mock.calls.length,
+    });
+    expect(renewalMeterCalls).toEqual([0]);
+    expect(models).toBe(1);
+    expect(claims).toBe(1);
+    expect(adapter.transport).not.toHaveBeenCalled();
+    expect(result.status).toBe("queued");
+  });
+
+  it("refuses external connection generation drift during the renewal read", async () => {
+    const f = await realm("external"),
+      adapter = sender(f);
+    duringModel = async () => {
+      vi.setSystemTime(Date.now() + 5001);
+      renewalArmed = true;
+    };
+    duringRenewal = async () => {
+      expect(accessTxDepth).toBe(0);
+      await db
+        .update(schema.mailboxExternalAccounts)
+        .set({
+          connectionGeneration: sql`${schema.mailboxExternalAccounts.connectionGeneration}+1`,
+        })
+        .where(eq(schema.mailboxExternalAccounts.mailboxId, f.mailboxId));
+    };
+    const result = await sendMailboxOutbox(db, keys, f.queued.id, adapter, mime);
+    record("renewal-external-generation-drift", {
+      renewalMeterOpenTx: renewalMeterCalls,
+      result,
+      models,
+      claims,
+      physical: adapter.transport.mock.calls.length,
+    });
+    expect(renewalMeterCalls).toEqual([0]);
+    expect(models).toBe(1);
+    expect(claims).toBe(1);
+    expect(adapter.transport).not.toHaveBeenCalled();
+    expect(result.status).toBe("queued");
+  });
 });

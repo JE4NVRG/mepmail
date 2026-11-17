@@ -381,7 +381,9 @@ export async function withMailboxDispatchContent<T>(
     // This check is before any physical adapter invocation. A revoked grant or
     // unavailable authority read is a known safe deferral, not ambiguous SMTP.
     try {
-      await assertMailboxOutboxSendAccess(db, input, "content_preflight");
+      // Only this post-judge caller may renew a provably expired admission
+      // envelope inside the same private attempt; pre-model and relay stay closed.
+      await assertMailboxOutboxSendAccess(db, input, "content_preflight", true);
     } catch (error) {
       const code =
         typeof error === "object" && error !== null && "code" in error ? error.code : null;
