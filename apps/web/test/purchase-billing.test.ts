@@ -524,17 +524,47 @@ describe("billing inside the Android app (Google Play: nothing sold there)", () 
   });
 });
 
-it("shows no executable200K purchase action even for an approved owner", () => {
-  const tree = BillingView({ checkout: null, requestedRung: "pro_200k" });
-  expect(
-    nodes(tree).some(
-      (node) => node.type === "button" && node.props.className === "ms-btn ms-btn-primary",
-    ),
-  ).toBe(false);
-  expect(
-    nodes(tree).some(
-      (node) => node.type === "a" && node.props.href === "mailto:suporte@mepmail.dev",
-    ),
-  ).toBe(true);
-  expect(h.mutate).not.toHaveBeenCalled();
-});
+for (const locale of ["en", "pt-BR"]) {
+  it.each([false, true])(
+    `${locale} approved owner explicitly purchases the selected self-serve 220K tier (subscribed=%s)`,
+    (subscribed) => {
+      h.locale = locale;
+      h.subscribed = subscribed;
+      const rung = PLAN_RUNGS.find((plan) => plan.key === "pro_200k");
+      if (!rung) throw new Error("Missing canonical 220K catalog rung");
+      const tree = BillingView({ checkout: null, requestedRung: rung.key });
+      expect(nodes(tree).find((node) => node.props.id === "ms-volume")?.props.value).toBe(3);
+      expect(
+        nodes(tree).some((node) => node.props.formatted === formatUsd(rung.priceCents, locale)),
+      ).toBe(true);
+      const action = nodes(tree).find(
+        (node) => node.type === "button" && node.props.className === "ms-btn ms-btn-primary",
+      );
+      if (!action) throw new Error("Missing selected self-serve purchase action");
+      expect(action.props.disabled).toBeFalsy();
+      expect(h.mutate).not.toHaveBeenCalled();
+      (action.props.onClick as () => void)();
+      expect(h.mutate).toHaveBeenCalledExactlyOnceWith(
+        subscribed ? { rung: rung.key } : { rung: rung.key, interval: "month" },
+      );
+    },
+  );
+  it.each(["scale_1_5m", "scale_2_5m"] as const)(
+    `${locale} keeps %s as consultation only even for an approved owner`,
+    (requestedRung) => {
+      h.locale = locale;
+      const tree = BillingView({ checkout: null, requestedRung });
+      expect(
+        nodes(tree).some(
+          (node) => node.type === "button" && node.props.className === "ms-btn ms-btn-primary",
+        ),
+      ).toBe(false);
+      const consult = nodes(tree).find(
+        (node) => node.type === "a" && node.props.href === "mailto:suporte@mepmail.dev",
+      );
+      expect(consult).toBeDefined();
+      expect(consult?.props.onClick).toBeUndefined();
+      expect(h.mutate).not.toHaveBeenCalled();
+    },
+  );
+}

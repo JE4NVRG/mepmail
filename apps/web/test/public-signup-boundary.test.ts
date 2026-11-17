@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { PLAN_RUNGS } from "@millionsend/core/plans";
 import { afterAll, beforeEach, describe, it } from "vitest";
 
 // Only this test's VM resolver consumes server-only. No Vite/global alias is installed.
@@ -250,16 +251,19 @@ function ext(id: string): VmValue {
   if (s === "lib/launch-offer")
     return {
       ...compile(
-        source("apps/web/src/lib/launch-offer.ts").slice(
-          source("apps/web/src/lib/launch-offer.ts").indexOf(
-            "export function sendingOfferAvailability(",
+        'import { PLAN_RUNGS } from "@millionsend/core/plans";\n' +
+          source("apps/web/src/lib/launch-offer.ts").slice(
+            source("apps/web/src/lib/launch-offer.ts").indexOf(
+              "export function sendingOfferAvailability(",
+            ),
+            source("apps/web/src/lib/launch-offer.ts").indexOf(
+              "export const sendingAvailabilityCopy",
+            ),
           ),
-          source("apps/web/src/lib/launch-offer.ts").indexOf(
-            "export const sendingAvailabilityCopy",
-          ),
-        ),
         "sending-offer-availability.ts",
-        ext,
+        // The extracted function retains its actual public-catalog dependency.
+        // Keep unrelated route fixtures isolated; do not invent a second pricing ladder.
+        (id) => (id === "@millionsend/core/plans" ? { PLAN_RUNGS } : ext(id)),
       ),
       sendingAvailabilityCopy: (locale: string) =>
         JSON.parse(source(`apps/web/messages/${locale}/sending-availability.json`)),
