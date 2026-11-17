@@ -1165,6 +1165,12 @@ describe("native SES relay separation", () => {
   });
   for (const enabled of [false, true])
     it(`original selected Azure requires relay attestation: ${enabled}`, async () => {
+      const syntheticMaster = Buffer.alloc(32, 73);
+      vi.stubEnv("MASTER_ENCRYPTION_KEY", syntheticMaster.toString("base64"));
+      vi.stubEnv("APP_BASE_URL", "https://optout.example.invalid");
+      vi.stubEnv("UNSUBSCRIBE_BASE_URL", undefined);
+      expect(env.MASTER_ENCRYPTION_KEY).toBe(syntheticMaster.toString("base64"));
+      expect(unsubscribeBaseUrl()).toBe("https://optout.example.invalid");
       const f = await realm("owner", true);
       await db
         .update(schema.domains)
@@ -1202,7 +1208,7 @@ describe("native SES relay separation", () => {
       });
       const footer = await prepareMailboxOptout(db, f.teamId, ["recipient@example.invalid"], {
         baseUrl: unsubscribeBaseUrl() ?? "",
-        masterKey: Buffer.from(env.MASTER_ENCRYPTION_KEY!, "base64"),
+        masterKey: syntheticMaster,
       });
       const raw = Buffer.from(
         `From: ${f.from}\r\nTo: recipient@example.invalid\r\nSubject: Tomorrow\r\nContent-Type: text/plain; charset=utf-8\r\nList-Unsubscribe: <${footer.url}>\r\n\r\nHello, can we talk tomorrow?${footer.text}`,
