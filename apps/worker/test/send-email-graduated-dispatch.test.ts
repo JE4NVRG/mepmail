@@ -13,7 +13,8 @@ import {
 } from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { eq, sql } from "drizzle-orm";
+import { eq, type SQL, sql } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAbuseJudge } from "../src/abuse-judge/index.js";
 import { type SendDeps, sendEmail } from "../src/handlers/send-email.js";
@@ -43,11 +44,43 @@ let meterFails = false;
 let transported = 0;
 let modelMutation: (() => Promise<void>) | undefined;
 const capturedMime: Buffer[] = [];
+// Install Date BEFORE static imports: the original runtime observer captures
+// Date.now when constructed. Keep that same fake clock for the suite rather
+// than replacing the captured function between cases. Non-Date timers stay real.
+const { suiteEpoch } = vi.hoisted(() => {
+  const epoch = Date.now();
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(epoch);
+  return { suiteEpoch: epoch };
+});
+let clockCase = 0;
+const dialect = new PgDialect();
+
+/** Test-only projection of the exact production DB wall-clock read. The
+ * returned row is produced by PGlite SQL, bound to the SAME frozen JS clock
+ * used by original meter observations. No business query/result is replaced.
+ * Freeze Date only: PGlite/AbortSignal/promise timers remain real and runnable. */
+function controlDatabaseClock() {
+  const execute = fixture.db.execute.bind(fixture.db);
+  vi.spyOn(fixture.db, "execute").mockImplementation(((query: Parameters<typeof execute>[0]) => {
+    const statement = typeof query === "string" ? query : dialect.sqlToQuery(query as SQL).sql;
+    if (statement.trim() === "select clock_timestamp()::text as at") {
+      return execute(sql`select ${new Date(Date.now()).toISOString()}::timestamptz::text as at`);
+    }
+    return execute(query);
+  }) as typeof fixture.db.execute);
+}
 
 beforeAll(async () => {
   fixture = await createTestDb();
 });
-afterAll(async () => fixture?.close());
+afterAll(async () => {
+  try {
+    await fixture?.close();
+  } finally {
+    vi.useRealTimers();
+  }
+});
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -275,7 +308,18 @@ function send(emailId: string, overrides: Partial<SendDeps> = {}) {
   return sendEmail(fixture.db, deps(overrides), { emailId });
 }
 
-beforeEach(() => {
+beforeEach(async (context) => {
+  // Monotonic, separate epochs expire the previous case's five-second cache;
+  // no test consumes another case's successful regional/meter observation.
+  vi.setSystemTime(suiteEpoch + ++clockCase * 10000);
+  controlDatabaseClock();
+  const clock = resultRows(await fixture.db.execute(sql`select clock_timestamp()::text as at`));
+  const sqlAt = Date.parse(String(clock[0]!.at));
+  expect(sqlAt).toBe(Date.now());
+  console.info(
+    "CLOCK_PROOF",
+    JSON.stringify({ case: context.task.name, jsAt: Date.now(), sqlAt, ttlMs: 5000 }),
+  );
   transported = 0;
   capturedMime.length = 0;
   modelMutation = undefined;
@@ -379,6 +423,10 @@ describe("ordinary API dispatch under graduated sending", () => {
     const t = await tenant("meter-down");
     const email = await seed(t);
     await admit(email.id, t.teamId, t.domainId);
+    expect(await admitCount(t.teamId)).toBe(1);
+    // Expire this case's successful observation BEFORE injecting failure. A
+    // failed fresh read, not cached setup evidence, is the negative's subject.
+    vi.setSystemTime(Date.now() + 5000);
     meterFails = true;
     expect(await send(email.id)).toBe("parked");
     expect(transported).toBe(0);
@@ -446,6 +494,7 @@ describe("ordinary API dispatch under graduated sending", () => {
     const t = await tenant("late-domain-claim");
     const email = await seed(t);
     await admit(email.id, t.teamId, t.domainId);
+    let claimHooks = 0;
     const update = fixture.db.update.bind(fixture.db);
     vi.spyOn(fixture.db, "update").mockImplementation(((table: unknown) => {
       const q = update(table as never);
@@ -460,10 +509,12 @@ describe("ordinary API dispatch under graduated sending", () => {
           const returning = selected.returning.bind(selected);
           selected.returning = (async (fields: unknown) => {
             const rows = (await returning(fields as never)) as unknown as unknown[];
-            if (rows.length)
+            if (rows.length) {
+              claimHooks++;
               await update(schema.domains)
                 .set({ status: "pending" })
                 .where(eq(schema.domains.id, t.domainId));
+            }
             return rows;
           }) as typeof selected.returning;
           return selected;
@@ -474,6 +525,7 @@ describe("ordinary API dispatch under graduated sending", () => {
     }) as typeof fixture.db.update);
     expect(await send(email.id)).toBe("parked");
     expect(modelPosts).toBe(1);
+    expect(claimHooks).toBe(1);
     expect(transported).toBe(0);
     const [row] = await fixture.db
       .select()
@@ -495,8 +547,8 @@ describe("ordinary API dispatch under graduated sending", () => {
     const select = fixture.db.select.bind(fixture.db);
     let expired = false;
     vi.spyOn(fixture.db, "select").mockImplementation(((...args: unknown[]) => {
-      // The first wall clock sample precedes these queries. Advance the real
-      // fixture DB wall clock by waiting, never by restamping the context.
+      // Advance BOTH JS and the exact test-only SQL clock projection inside
+      // the awaited query; the original private-branded context is untouched.
       if (!expired) {
         expired = true;
         const query = select(...(args as Parameters<typeof select>));
@@ -504,11 +556,11 @@ describe("ordinary API dispatch under graduated sending", () => {
         query.from = ((table: Parameters<typeof from>[0]) => {
           const result = from(table);
           const then = result.then.bind(result);
-          // biome-ignore lint/suspicious/noThenProperty: delay the real Drizzle thenable to exercise observation expiry during DB I/O
-          result.then = ((resolve: unknown, reject: unknown) =>
-            new Promise((r) => setTimeout(r, 5100)).then(() =>
-              then(resolve as never, reject as never),
-            )) as typeof result.then;
+          // biome-ignore lint/suspicious/noThenProperty: exercise expiry inside the real awaited Drizzle query without a wall-clock sleep
+          result.then = ((resolve: unknown, reject: unknown) => {
+            vi.setSystemTime(Date.now() + 5000);
+            return then(resolve as never, reject as never);
+          }) as typeof result.then;
           return result;
         }) as typeof query.from;
         return query;
@@ -522,9 +574,12 @@ describe("ordinary API dispatch under graduated sending", () => {
         context,
       ),
     ).toBe(false);
+    const after = resultRows(await fixture.db.execute(sql`select clock_timestamp()::text as at`));
+    expect(Date.parse(String(after[0]!.at))).toBe(Date.now());
+    expect(Date.now()).toBe(Date.parse(context.judgeEnvelope!.meterExpiresAt));
     expect(modelPosts).toBe(0);
     expect(transported).toBe(0);
-  }, 15000);
+  });
 
   it("JSON cloned observation cannot acquire original server context authority", async () => {
     const t = await tenant("cloned-context");
