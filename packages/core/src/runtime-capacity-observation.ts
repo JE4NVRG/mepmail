@@ -1,6 +1,7 @@
 import { GetAccountCommand, type GetAccountResponse, SESv2Client } from "@aws-sdk/client-sesv2";
 import {
   type CommandCodeMeter,
+  hasCommandCodeResetUnscheduledProof,
   hasCommandCodeWindowHeadroomProof,
 } from "./graduated-commandcode-meter.js";
 import type { CapacityReceipt } from "./graduated-sending-policy.js";
@@ -90,7 +91,7 @@ export function fundedCreditUnits(meter: CommandCodeMeter, now: number): number 
       w.used >= w.cap ||
       w.remaining <= 0 ||
       !integer(w.resetAtMs) ||
-      w.resetAtMs <= now
+      (w.resetAtMs <= now && !hasCommandCodeResetUnscheduledProof(meter, w))
     )
       throw new Error("capacity_unavailable");
   }

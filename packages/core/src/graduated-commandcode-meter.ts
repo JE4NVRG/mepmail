@@ -26,7 +26,13 @@ export interface CommandCodeMeter {
   };
   windows: Record<
     "fiveHour" | "weekly",
-    { used: number; cap: number; remaining: number; resetAtMs: number }
+    {
+      used: number;
+      cap: number;
+      remaining: number;
+      resetAtMs: number;
+      resetState?: "unscheduled-empty";
+    }
   >;
   windowExceeded: unknown;
   windowHeadroomProof?: Readonly<CommandCodeWindowHeadroomProof>;
@@ -41,6 +47,23 @@ export function hasCommandCodeWindowHeadroomProof(meter: CommandCodeMeter): bool
   const proof = windowHeadroomProofs.get(meter);
   return (
     proof !== undefined && meter.windowHeadroomProof === proof && meter.windowExceeded === null
+  );
+}
+type MeterWindow = CommandCodeMeter["windows"]["fiveHour"];
+const resetUnscheduledProofs = new WeakMap<CommandCodeMeter, ReadonlySet<MeterWindow>>();
+/** Original, authenticated finite observation only. Zero is NOT a promised future
+ * reset, refill, inactive-window contract, or permission carried by a DTO. */
+export function hasCommandCodeResetUnscheduledProof(
+  meter: CommandCodeMeter,
+  window: MeterWindow,
+): boolean {
+  return (
+    resetUnscheduledProofs.get(meter)?.has(window) === true &&
+    window.resetState === "unscheduled-empty" &&
+    window.resetAtMs === 0 &&
+    window.used === 0 &&
+    window.cap > 0 &&
+    window.remaining === window.cap
   );
 }
 const nonnegative = (v: unknown): v is number =>
@@ -66,7 +89,7 @@ export async function getCommandCodeMeter(input: {
   try {
     response = await (input.fetch ?? fetch)(
       "https://api.commandcode.ai/alpha/billing/credits" +
-        (input.orgId ? "?orgId=" + encodeURIComponent(input.orgId) : ""),
+        (input.orgId ? `?orgId=${encodeURIComponent(input.orgId)}` : ""),
       {
         method: "GET",
         headers: { authorization: `Bearer ${input.apiKey}` },
@@ -100,8 +123,19 @@ export async function getCommandCodeMeter(input: {
   )
     return refused();
   const windows = {} as CommandCodeMeter["windows"];
+  const unscheduled = new Set<MeterWindow>();
   for (const name of ["fiveHour", "weekly"] as const) {
     const v = object(w[name]);
+    // Local finite-inventory compatibility policy, NOT a provider sentinel
+    // contract. No reset/refill is inferred. Both explicit headroom flags,
+    // original adapter custody and the unchanged five-second origin are required.
+    const emptyUnscheduled =
+      v?.resetAt === 0 &&
+      !Object.is(v.resetAt, -0) &&
+      v.used === 0 &&
+      w.limited === true &&
+      object(w.fiveHour)?.exceeded === false &&
+      object(w.weekly)?.exceeded === false;
     if (
       !v ||
       (w.exceeded === null && v.exceeded !== false) ||
@@ -111,7 +145,7 @@ export async function getCommandCodeMeter(input: {
       !nonnegative(v.resetAt) ||
       v.cap <= 0 ||
       v.used >= v.cap ||
-      v.resetAt <= now()
+      (v.resetAt <= now() && !emptyUnscheduled)
     )
       return refused();
     windows[name] = Object.freeze({
@@ -119,7 +153,9 @@ export async function getCommandCodeMeter(input: {
       cap: v.cap,
       remaining: Math.max(0, v.cap - v.used),
       resetAtMs: v.resetAt,
+      ...(emptyUnscheduled ? { resetState: "unscheduled-empty" as const } : {}),
     });
+    if (emptyUnscheduled) unscheduled.add(windows[name]);
   }
   const end = now();
   if (end < start || end - start >= 5000) return refused();
@@ -159,5 +195,6 @@ export async function getCommandCodeMeter(input: {
   }
   // Bind the proof to immutable raw/numeric/freshness evidence. A clone, JSON
   // round trip or hand-built proof cannot acquire this process-local custody.
+  if (unscheduled.size) resetUnscheduledProofs.set(meter, unscheduled);
   return Object.freeze(meter);
 }
