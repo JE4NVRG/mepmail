@@ -920,14 +920,14 @@ describe("setOverage", () => {
 });
 
 describe("source-bound upgrade admission (no capacity assertion mock)", () => {
-  it("refuses 200k before meter, schedule or price mutations and retains the prior contract", async () => {
+  it("refuses the Enterprise 1.65M tier before meter, schedule or price mutations and retains the prior contract", async () => {
     const teamId = await subscribedTeam(withOverage(), 110_500);
     const before = await team(teamId);
     const usageBefore = await db
       .select()
       .from(schema.usagePeriods)
       .where(eq(schema.usagePeriods.teamId, teamId));
-    await expect(changeRung(deps(), { teamId, rung: "pro_200k" })).rejects.toThrow(
+    await expect(changeRung(deps(), { teamId, rung: "scale_1_5m" })).rejects.toThrow(
       "enterprise_required",
     );
     expect(await team(teamId)).toEqual(before);
@@ -969,7 +969,7 @@ describe("source-bound upgrade admission (no capacity assertion mock)", () => {
   });
 });
 
-it("refuses a supported real-gate upgrade when the selected region has insufficient fresh capacity", async () => {
+it("refuses a supported real-gate upgrade with a fresh original model inventory below one full frame", async () => {
   const teamId = await subscribedTeam(
     subscription("sub_region", "cus_region", "active", "millionsend_starter_monthly"),
   );
@@ -988,11 +988,15 @@ it("refuses a supported real-gate upgrade when the selected region has insuffici
           if (!current) throw new Error("fixture requires a complete fresh regional receipt");
           const receipt = {
             ...current,
-            observations: { ...current.observations, sesSentLast24Hours: 999000 },
-            buffers: { ...current.buffers, sesRemaining24Hours: (1000000 - 999000) * 0.98 },
+            buffers: {
+              ...current.buffers,
+              modelCreditUnitsAfterSafetyFloor: 302457599,
+              modelFramesBeforeLocalCommitments: 0,
+            },
           };
           return {
             ...observed,
+            judgeEnvelope: { ...observed.judgeEnvelope!, remainingCreditUnits: 302457599 },
             capacityReceipt: receipt,
             regionalCapacity: {
               "us-east-1": receipt,

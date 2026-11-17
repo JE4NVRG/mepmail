@@ -1,3 +1,4 @@
+import { PLAN_RUNGS } from "@millionsend/core/plans";
 import enAvailability from "../../messages/en/sending-availability.json";
 import ptAvailability from "../../messages/pt-BR/sending-availability.json";
 
@@ -192,15 +193,13 @@ export function describeLaunchPlan(
 export function sendingOfferAvailability(
   rungOrVolume: string | number,
 ): "self_serve" | "availability_review" | "enterprise" {
-  // The current 3 RPM ceiling cannot fulfill a new monthly offer above Pro110K.
-  // Catalog quotas and existing signed contracts are not changed by this purchase fence.
-  if (
-    ["pro_200k", "scale_500k", "scale_1m", "scale_1_5m", "scale_2_5m"].includes(
-      String(rungOrVolume),
-    ) ||
-    (typeof rungOrVolume === "number" && rungOrVolume > 110_000)
-  )
-    return "enterprise";
+  // Match the server's static catalog fence without importing its Stripe module.
+  // Actual regional health and currently funded admission are server-owned checks,
+  // not a promise made by a nominal plan allowance or this presentation helper.
+  const rung = PLAN_RUNGS.find((plan) =>
+    typeof rungOrVolume === "number" ? plan.included === rungOrVolume : plan.key === rungOrVolume,
+  );
+  if (rung && ["scale_1_5m", "scale_2_5m"].includes(rung.key)) return "enterprise";
   return "self_serve";
 }
 export const sendingAvailabilityCopy = (locale: string) =>

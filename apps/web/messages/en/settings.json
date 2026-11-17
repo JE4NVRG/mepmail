@@ -278,6 +278,8 @@
     "countingNote": "Each recipient (To, Cc and Bcc) of an accepted email counts as one send, even if delivery fails later. Addresses already on your suppression list do not count."
   },
   "billing": {
+    "gradualSending": "New verified domains start at 25% of the daily plan limit, increasing by 25% after each 7 clean days, subject to reputation checks. Your plan allowance is a usage ceiling, not immediate sending capacity; peaks may queue. Payment does not bypass these checks.",
+    "gradualSendingLink": "See current limits in Domains.",
     "summary": {
       "title": "Subscription overview",
       "currentPeriod": "Current period",

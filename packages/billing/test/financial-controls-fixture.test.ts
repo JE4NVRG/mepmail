@@ -48,10 +48,10 @@ it("partial Native history remains denied, never silently counted as zero", asyn
   }
 });
 
-it("the valid three-RPM fixture still refuses an oversized new commitment", async () => {
+it("the static Enterprise tier refuses before DB capacity or financial POSTs", async () => {
   const f = await checkoutFixture();
   try {
-    await expect(beginSendCheckout(f.deps, { ...f.input, rung: "pro_200k" })).rejects.toThrow(
+    await expect(beginSendCheckout(f.deps, { ...f.input, rung: "scale_1_5m" })).rejects.toThrow(
       "invalid",
     );
     expect(f.posts).toEqual([]);
@@ -60,7 +60,7 @@ it("the valid three-RPM fixture still refuses an oversized new commitment", asyn
   }
 });
 
-it("still enforces real capacity for a supported new purchase with fresh regional shortage", async () => {
+it("a fresh original model inventory below one full frame refuses a supported new purchase", async () => {
   const f = await checkoutFixture();
   try {
     await expect(
@@ -73,11 +73,15 @@ it("still enforces real capacity for a supported new purchase with fresh regiona
             if (!current) throw new Error("fixture requires a complete fresh regional receipt");
             const receipt = {
               ...current,
-              observations: { ...current.observations, sesSentLast24Hours: 999000 },
-              buffers: { ...current.buffers, sesRemaining24Hours: (1000000 - 999000) * 0.98 },
+              buffers: {
+                ...current.buffers,
+                modelCreditUnitsAfterSafetyFloor: 302457599,
+                modelFramesBeforeLocalCommitments: 0,
+              },
             };
             return {
               ...observed,
+              judgeEnvelope: { ...observed.judgeEnvelope!, remainingCreditUnits: 302457599 },
               capacityReceipt: receipt,
               regionalCapacity: {
                 "us-east-1": receipt,

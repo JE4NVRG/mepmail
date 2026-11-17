@@ -24,7 +24,7 @@ import { SESv2Client } from "../../../packages/core/node_modules/@aws-sdk/client
 // enforcement is covered by the operations integration tests without this mock.
 vi.mock("@/server/request-membership", async () => import("./fixtures/legacy-router-membership"));
 
-const capacityFixture = vi.hoisted(() => ({ credits: 100000, unknown: false }));
+const capacityFixture = vi.hoisted(() => ({ credits: 100000, unknown: false, sesHealthy: true }));
 vi.mock("../../../packages/core/src/graduated-sending-context.js", async (importOriginal) => {
   const actual =
     await importOriginal<
@@ -78,6 +78,30 @@ vi.mock("@/server/auth", () => ({
     throw new Error("Router caller fixture must not initialize authentication");
   },
 }));
+// Synthetic Pix SDK: canonical price GET remains permitted; every financial method traps.
+vi.mock("@/server/billing", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/server/billing")>();
+  return {
+    ...actual,
+    getPixStripe: () =>
+      new Proxy(
+        {},
+        {
+          get(_target, key) {
+            if (key === "prices")
+              return {
+                retrieve: async (id: string) => ({
+                  ...priceById(id),
+                  billing_scheme: "per_unit",
+                  currency_options: { brl: { unit_amount: 14900 } },
+                }),
+              };
+            throw new Error("Pix financial method reached before capacity refusal");
+          },
+        },
+      ),
+  };
+});
 vi.mock("@/server/system-mail", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/server/system-mail")>();
   return { ...actual, sendAccountMail: (m: SystemMailMessage) => void h.sent.push(m) };
@@ -365,9 +389,15 @@ function callerFor(teamId: string, role: TeamRole) {
  */
 async function subscribedTeam(
   key: PlanRungKey,
-  opts: { overage?: boolean; metered?: boolean } = {},
+  opts: {
+    overage?: boolean;
+    metered?: boolean;
+    name?: string;
+    customerId?: string;
+    subscriptionId?: string;
+  } = {},
 ): Promise<string> {
-  const teamId = await createTeam(db);
+  const teamId = await createTeam(db, opts.name);
   const rung = rungByKey(key);
   const metered = opts.metered ?? rung.period === "month";
   schedule = null;
@@ -375,14 +405,15 @@ async function subscribedTeam(
     item("si_base", price(key)),
     ...(metered ? [item("si_overage", price(key, true))] : []),
   ]);
+  sub = { ...sub, id: opts.subscriptionId ?? sub.id, customer: opts.customerId ?? sub.customer };
   await db
     .update(schema.teams)
     .set({
       plan: rung.plan,
       planQuota: rung.period === "month" ? rung.included : null,
       planStatus: "active",
-      stripeCustomerId: "cus_1",
-      stripeSubscriptionId: "sub_1",
+      stripeCustomerId: sub.customer as string,
+      stripeSubscriptionId: sub.id,
       stripeOverageItemId: metered ? "si_overage" : null,
       overageEnabled: opts.overage ?? false,
       currentPeriodStart: PERIOD_START,
@@ -410,8 +441,8 @@ async function teamRow(teamId: string) {
 const auditRows = () =>
   db.select({ action: schema.auditLog.action, data: schema.auditLog.data }).from(schema.auditLog);
 
-/** Previously committed legacy intent. This does NOT prove new high-volume
- * sales are admissible under the current 3-RPM envelope. */
+/** Previously committed legacy intent is preserved, not treated as current
+ * financial authorization or a permanently reserved nominal allowance. */
 async function seedCommittedLegacyUpgrade(teamId: string, rung: PlanRungKey) {
   const current = await teamRow(teamId);
   if (!current?.stripeSubscriptionId) throw new Error("Missing legacy subscription");
@@ -434,12 +465,13 @@ beforeEach(async () => {
   ({ db, close } = await createTestDb());
   capacityFixture.credits = 100000;
   capacityFixture.unknown = false;
+  capacityFixture.sesHealthy = true;
   vi.stubEnv("SENDING_PROVIDER_POLICY_JSON", JSON.stringify({ graduated: true }));
   vi.spyOn(SESv2Client.prototype, "send").mockImplementation(async () => ({
     SendingEnabled: true,
     ProductionAccessEnabled: true,
-    EnforcementStatus: "HEALTHY",
-    SendQuota: { Max24HourSend: 1000000, SentLast24Hours: 0, MaxSendRate: 14 },
+    EnforcementStatus: capacityFixture.sesHealthy ? "HEALTHY" : "SHUTDOWN",
+    SendQuota: { Max24HourSend: 54900, SentLast24Hours: 5, MaxSendRate: 14 },
   }));
   await db.execute(
     sql.raw(
@@ -613,7 +645,7 @@ describe("billing router", () => {
     for (const writes of Object.values(calls)) expect(writes).toEqual([]);
   });
 
-  it("preserves the legacy USD20 contract while refusing another overcommitting sale", async () => {
+  it("preserves the legacy USD20 contract while a funded new checkout replays once", async () => {
     vi.stubEnv("SEND_LAUNCH_OFFER_ENABLED", "false");
     const existing = await subscribedTeam("pro_100k");
     await db
@@ -631,14 +663,20 @@ describe("billing router", () => {
     expect(await teamRow(existing)).toEqual(before);
     const fresh = await createTeam(db, "legacy-checkout");
     await seedBuyer(fresh);
-    await expect(
-      callerFor(fresh, "owner").billing.checkout({ rung: "pro_100k" }),
-    ).rejects.toMatchObject({
-      code: "PRECONDITION_FAILED",
-      message: "SEND_SALE_CAPACITY_INSUFFICIENT",
+    const owner = callerFor(fresh, "owner");
+    expect((await owner.billing.purchaseEligibility()).eligible).toBe(true);
+    const first = await owner.billing.checkout({ rung: "pro_100k" });
+    expect(await owner.billing.checkout({ rung: "pro_100k" })).toEqual(first);
+    expect(calls.customers).toHaveLength(1);
+    expect(calls.checkouts).toHaveLength(1);
+    expect(calls.checkouts[0]).toMatchObject({
+      customer: "cus_new",
+      client_reference_id: fresh,
+      line_items: [{ price: "price_pro_100k", quantity: 1 }, { price: "price_pro_100k_overage" }],
     });
-    expect(calls.customers).toEqual([]);
-    expect(calls.checkouts).toEqual([]);
+    expect(priceById("price_pro_100k")).toMatchObject({ unit_amount: 2000, currency: "usd" });
+    expect(await teamRow(fresh)).toMatchObject({ stripeCustomerId: "cus_new", plan: "free" });
+    expect(await db.select().from(schema.sendCheckoutAttempts)).toHaveLength(1);
     expect(await teamRow(existing)).toEqual(before);
   });
 
@@ -722,11 +760,7 @@ describe("billing router", () => {
       const teamId = await createTeam(db);
       await expect(
         callerFor(teamId, "owner").billing.checkout({ rung, interval: "year" }),
-      ).rejects.toMatchObject(
-        rung === "pro_200k"
-          ? { code: "PRECONDITION_FAILED", message: "SEND_PLAN_ENTERPRISE_REQUIRED" }
-          : { code: "BAD_REQUEST", message: "SEND_CHECKOUT_INVALID" },
-      );
+      ).rejects.toMatchObject({ code: "BAD_REQUEST", message: "SEND_CHECKOUT_INVALID" });
       expect(calls.customers).toEqual([]);
       expect(calls.checkouts).toEqual([]);
     },
@@ -1038,7 +1072,7 @@ describe("billing router", () => {
         .set({ stripeCustomerId: "cus_1", stripeSubscriptionId: "sub_1", planStatus })
         .where(eq(schema.teams.id, teamId));
       expect((await owner.billing.status()).hasLiveSubscription).toBe(true);
-      await expect(owner.billing.checkout({ rung: "scale_500k" })).rejects.toMatchObject({
+      await expect(owner.billing.checkout({ rung: "scale_1_5m" })).rejects.toMatchObject({
         code: "PRECONDITION_FAILED",
       });
     }
@@ -1049,7 +1083,7 @@ describe("billing router", () => {
       .set({ planStatus: "canceled" })
       .where(eq(schema.teams.id, teamId));
     expect((await owner.billing.status()).hasLiveSubscription).toBe(false);
-    await expect(owner.billing.checkout({ rung: "scale_500k" })).rejects.toMatchObject({
+    await expect(owner.billing.checkout({ rung: "scale_1_5m" })).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
       message: "SEND_PLAN_ENTERPRISE_REQUIRED",
     });
@@ -1125,11 +1159,11 @@ describe("billing router", () => {
 
   it("a legacy reservation alone cannot authorize a new high-volume financial upgrade", async () => {
     const teamId = await subscribedTeam("pro_100k");
-    await seedCommittedLegacyUpgrade(teamId, "scale_500k");
+    await seedCommittedLegacyUpgrade(teamId, "scale_1_5m");
     const before = await teamRow(teamId);
     const audits = await auditRows();
     const owner = callerFor(teamId, "owner");
-    await expect(owner.billing.changePlan({ rung: "scale_500k" })).rejects.toMatchObject({
+    await expect(owner.billing.changePlan({ rung: "scale_1_5m" })).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
       message: "SEND_PLAN_ENTERPRISE_REQUIRED",
     });
@@ -1174,10 +1208,10 @@ describe("billing router", () => {
 
   it("a pre-ladder subscription cannot add metered billing through an unavailable upgrade", async () => {
     const teamId = await subscribedTeam("pro_100k", { metered: false });
-    await seedCommittedLegacyUpgrade(teamId, "pro_200k");
+    await seedCommittedLegacyUpgrade(teamId, "scale_2_5m");
     const before = await teamRow(teamId);
     await expect(
-      callerFor(teamId, "owner").billing.changePlan({ rung: "pro_200k" }),
+      callerFor(teamId, "owner").billing.changePlan({ rung: "scale_2_5m" }),
     ).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
       message: "SEND_PLAN_ENTERPRISE_REQUIRED",
@@ -1252,11 +1286,11 @@ describe("billing router", () => {
   it("an unavailable upgrade emits no plan-change notification even with a legacy reservation", async () => {
     vi.stubEnv("NOTIFICATIONS_EMAIL_FROM", "MepMail <notices@mail.example.com>");
     const teamId = await subscribedTeam("pro_100k");
-    await seedCommittedLegacyUpgrade(teamId, "scale_500k");
+    await seedCommittedLegacyUpgrade(teamId, "scale_1_5m");
     await db.insert(schema.user).values({ id: "ada", name: "Ada", email: "ada@example.com" });
     await db.insert(schema.teamMembers).values({ teamId, userId: "ada", role: "owner" });
     const owner = callerFor(teamId, "owner");
-    await expect(owner.billing.changePlan({ rung: "scale_500k" })).rejects.toMatchObject({
+    await expect(owner.billing.changePlan({ rung: "scale_1_5m" })).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
       message: "SEND_PLAN_ENTERPRISE_REQUIRED",
     });
@@ -1427,7 +1461,7 @@ describe("new upgrades respect the measured envelope independently of legacy com
       ),
     ).toBe(true);
   });
-  it.each(["pro_200k", "scale_500k", "scale_1m"] as const)(
+  it.each(["scale_1_5m", "scale_2_5m"] as const)(
     "refuses a NEW %s upgrade without a provider POST",
     async (rung) => {
       const teamId = await subscribedTeam("pro_100k"),
@@ -1469,7 +1503,7 @@ describe("graduated API new-acquisition gates", () => {
       });
     },
   );
-  it.each(["pro_200k", "scale_500k", "scale_1m", "scale_1_5m", "scale_2_5m"] as const)(
+  it.each(["scale_1_5m", "scale_2_5m"] as const)(
     "rejects direct checkout %s without provider writes",
     async (rung) => {
       vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false");
@@ -1499,15 +1533,51 @@ describe("graduated API new-acquisition gates", () => {
   );
 });
 
+describe("new self-serve catalog purchases", () => {
+  it.each(["pro_200k", "scale_500k", "scale_1m"] as const)(
+    "admits %s through the buyer API with exact price, identity and one durable replay",
+    async (rung) => {
+      const teamId = await createTeam(db, "current-funded-buyer");
+      await seedBuyer(teamId);
+      const owner = callerFor(teamId, "owner");
+      expect((await owner.billing.purchaseEligibility()).eligible).toBe(true);
+      const result = await owner.billing.checkout({ rung });
+      expect(await owner.billing.checkout({ rung })).toEqual(result);
+      expect(calls.customers).toHaveLength(1);
+      expect(calls.customers[0]?.metadata).toMatchObject({ team_id: teamId });
+      expect(calls.checkouts).toHaveLength(1);
+      expect(calls.checkouts[0]).toMatchObject({
+        customer: "cus_new",
+        client_reference_id: teamId,
+        line_items: [{ price: `price_${rung}`, quantity: 1 }, { price: `price_${rung}_overage` }],
+      });
+      expect(priceById(`price_${rung}`)).toMatchObject({
+        unit_amount: rungByKey(rung).priceCents,
+        currency: "usd",
+        recurring: { interval: "month" },
+      });
+      expect(await db.select().from(schema.sendCheckoutAttempts)).toHaveLength(1);
+      expect(await teamRow(teamId)).toMatchObject({ plan: "free", stripeCustomerId: "cus_new" });
+      expect(calls.itemCreates).toEqual([]);
+      expect(calls.meterEvents).toEqual([]);
+      expect(h.sent).toEqual([]);
+    },
+  );
+});
+
 describe("real server capacity closes NEW sales only", () => {
-  const tiny = () => {
-    capacityFixture.credits = 10;
+  const tiny = async () => {
+    // Original observer must still produce a healthy full-frame receipt above its $5 floor.
+    // Outstanding shared ROOT debt leaves less than one frame for a NEW admission.
+    capacityFixture.credits = 5.4;
+    await db.execute(sql`insert into sending_judge_account_debt(account_key,debt_units,last_meter_id,last_meter_at,last_remaining_units)
+      values ('commandcode-primary',302457600,'fixture-original-meter',clock_timestamp(),400000000)`);
   };
   it.each([["pro_100k", "capacity_insufficient"]] as const)(
     "refuses %s checkout with %s before provider writes",
     async (rung, reason) => {
       vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false");
-      tiny();
+      await tiny();
       const teamId = await createTeam(db, "capacity-fixture");
       await seedBuyer(teamId);
       await expect(callerFor(teamId, "owner").billing.checkout({ rung })).rejects.toMatchObject({
@@ -1517,6 +1587,50 @@ describe("real server capacity closes NEW sales only", () => {
       for (const writes of Object.values(calls)) expect(writes).toEqual([]);
     },
   );
+  for (const fault of ["depleted", "unknown", "ses_unhealthy"] as const)
+    for (const method of ["card", "pix", "upgrade"] as const)
+      it(`${method} refuses ${fault} current capacity without provider writes or legacy changes`, async () => {
+        vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false");
+        vi.stubEnv("PIX_PAYMENTS_OPEN", "true");
+        const legacy = await subscribedTeam("pro_100k", { metered: false });
+        await seedCommittedLegacyUpgrade(legacy, "pro_200k");
+        const target =
+          method === "upgrade"
+            ? await subscribedTeam("starter", {
+                metered: false,
+                name: "new-upgrade-target",
+                customerId: "cus_target",
+                subscriptionId: "sub_target",
+              })
+            : await createTeam(db, "current-capacity-negative");
+        if (method !== "upgrade") await seedBuyer(target);
+        const before = await teamRow(legacy);
+        const targetBefore = await teamRow(target);
+        const audits = await auditRows();
+        if (fault === "depleted") await tiny();
+        else if (fault === "unknown") capacityFixture.unknown = true;
+        else capacityFixture.sesHealthy = false;
+        const owner = callerFor(target, "owner");
+        const action =
+          method === "upgrade"
+            ? owner.billing.changePlan({ rung: "pro_200k" })
+            : method === "pix"
+              ? owner.billing.pixCheckout({ rung: "pro_100k" })
+              : owner.billing.checkout({ rung: "pro_100k" });
+        await expect(action).rejects.toMatchObject({
+          code: "PRECONDITION_FAILED",
+          message:
+            fault === "depleted" ? "SEND_SALE_CAPACITY_INSUFFICIENT" : "SEND_SALE_CAPACITY_UNKNOWN",
+        });
+        for (const writes of Object.values(calls)) expect(writes).toEqual([]);
+        expect(await teamRow(legacy)).toEqual(before);
+        expect(await teamRow(target)).toEqual(targetBefore);
+        expect(await auditRows()).toEqual(audits);
+        expect(await db.select().from(schema.sendCheckoutAttempts)).toEqual([]);
+        expect(h.sent).toEqual([]);
+        expect(await notificationRows()).toEqual([]);
+        expect(h.runCronNow).not.toHaveBeenCalled();
+      });
   it("a malformed receipt closes new sales instead of trusting a client boolean", async () => {
     vi.stubEnv("NEW_SUBSCRIPTIONS_PAUSED", "false");
     capacityFixture.unknown = true;
@@ -1530,7 +1644,7 @@ describe("real server capacity closes NEW sales only", () => {
   });
   it("an active 1.1M contract still reads, renews and cancels while new sales are closed", async () => {
     const teamId = await subscribedTeam("scale_1m");
-    tiny();
+    await tiny();
     const owner = callerFor(teamId, "owner");
     expect((await owner.billing.status()).rung).toBe("scale_1m");
     await expect(owner.billing.checkout({ rung: "pro_100k" })).rejects.toMatchObject({

@@ -142,6 +142,16 @@ function Check() {
   );
 }
 
+/** Purchase disclosure only: existing trusted domains retain their established warm-up. */
+export function SendingWarmupNotice() {
+  const t = useTranslations("settings.billing");
+  return (
+    <p style={{ color: "var(--ms-muted)", fontSize: 14, lineHeight: 1.6, margin: "0 0 16px" }}>
+      {t("gradualSending")} <a href="/domains">{t("gradualSendingLink")}</a>
+    </p>
+  );
+}
+
 export function BillingView({
   checkout,
   requestedRung = null,
@@ -512,6 +522,7 @@ export function BillingView({
       {notice}
       <PixInvoices canManage={canManage} returned={pixReturned} />
       <PurchaseReviewNotice review={purchaseReview} returnTo={reviewReturnTo} />
+      <SendingWarmupNotice />
 
       {showComboStep && comboIntent ? (
         <LaunchComboMailStep
@@ -1065,6 +1076,7 @@ export function BillingView({
         size="full"
       >
         <div className="ms-plan-dialog">
+          <SendingWarmupNotice />
           <PurchaseReviewNotice review={purchaseReview} returnTo={reviewReturnTo} />
           <div className="ms-volume">
             <label htmlFor="ms-volume" className="ms-microlabel">

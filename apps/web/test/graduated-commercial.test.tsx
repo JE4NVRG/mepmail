@@ -9,7 +9,10 @@ import {
 } from "../../../packages/billing/src/send-checkout";
 import { sendNewPurchaseAvailability } from "../../../packages/billing/src/send-launch-offer";
 import en from "../messages/en/landing.json";
+import enSettings from "../messages/en/settings.json";
 import pt from "../messages/pt-BR/landing.json";
+import ptSettings from "../messages/pt-BR/settings.json";
+import { SendingWarmupNotice } from "../src/app/(dashboard)/settings/billing/billing-view";
 import { PlanCard } from "../src/components/plan-card";
 import { ReputationPanel, type ReputationSnapshot } from "../src/components/reputation-panel";
 import { recommendedDomainRegion } from "../src/lib/domain-region-recommendation";
@@ -21,7 +24,11 @@ import {
 } from "../src/lib/launch-offer";
 
 const ctx = vi.hoisted(() => ({ locale: "en" }));
-vi.mock("next-intl", () => ({ useLocale: () => ctx.locale }));
+vi.mock("next-intl", () => ({
+  useLocale: () => ctx.locale,
+  useTranslations: () => (key: keyof typeof enSettings.billing) =>
+    (ctx.locale === "pt-BR" ? ptSettings : enSettings).billing[key],
+}));
 vi.mock("@/lib/analytics", () => ({ trackEvent: () => {} }));
 vi.mock("@/components/signup-cta", () => ({
   SignupCta: (p: { rung: string; label: string }) =>
@@ -55,6 +62,28 @@ const labels = {
   featuredBadge: "Featured",
 };
 describe("graduated commercial and customer reputation", () => {
+  for (const locale of ["en", "pt-BR"]) {
+    it(`${locale} discloses new-domain warm-up before purchase without resetting existing contracts`, () => {
+      ctx.locale = locale;
+      const html = renderToStaticMarkup(createElement(SendingWarmupNotice));
+      const copy = (locale === "pt-BR" ? ptSettings : enSettings).billing;
+      expect(html).toContain(copy.gradualSending);
+      expect(html).toContain(copy.gradualSendingLink);
+      expect(html).toContain('href="/domains"');
+      expect(html).toContain("25%");
+      expect(html).toContain("7");
+      const source = readFileSync(
+        new URL("../src/app/(dashboard)/settings/billing/billing-view.tsx", import.meta.url),
+        "utf8",
+      );
+      const body = source.slice(source.indexOf("export function BillingView"));
+      expect(body.indexOf("<SendingWarmupNotice />")).toBeLessThan(
+        body.indexOf('<Card\n        title={t("plan")}'),
+      );
+      expect(body).toContain('<div className="ms-plan-dialog">\n          <SendingWarmupNotice />');
+      expect(html).not.toMatch(/CommandCode|RPM|SLA/);
+    });
+  }
   it("new domain prefers healthy us-east-1, preserving explicit selections and existing regions", () => {
     const regions = [
       { code: "eu-west-1", production: true, sendingHealthy: true },
@@ -132,6 +161,11 @@ describe("graduated commercial and customer reputation", () => {
             expect(sendingOfferAvailability(plan.rung)).toBe(
               sendNewPurchaseAvailability(plan.rung),
             );
+            const catalog = PLAN_RUNGS.find((rung) => rung.key === plan.rung);
+            if (!catalog) throw new Error("Every rendered offer requires a catalog rung");
+            expect(sendingOfferAvailability(catalog.included)).toBe(
+              sendNewPurchaseAvailability(plan.rung),
+            );
             if (sendingOfferAvailability(plan.rung) === "enterprise") {
               expect(html).toContain(sendingAvailabilityCopy(locale).enterprise);
               expect(html).not.toContain("/signup");
@@ -140,8 +174,6 @@ describe("graduated commercial and customer reputation", () => {
               expect(html).toContain(plan.price);
               expect(html).toContain("/signup");
             }
-            if (plan.rung === "scale_1m")
-              expect(html).toContain(sendingAvailabilityCopy(locale).enterprise);
           }
           expect(LAUNCH_OFFER.sending.monthlyCents).toBe(2900);
           expect(LAUNCH_OFFER.sending.brlMonthlyCents).toBe(14900);
@@ -182,7 +214,7 @@ describe("graduated commercial and customer reputation", () => {
     expect(a).toContain("0% · 0 / 100");
     expect(a).toContain("Unknown · 0 / 0");
   });
-  for (const rung of ["pro_200k", "scale_500k", "scale_1m", "scale_1_5m", "scale_2_5m"] as const)
+  for (const rung of ["scale_1_5m", "scale_2_5m"] as const)
     for (const method of ["card", "pix"])
       it(`${method} direct bypass ${rung} fails before DB/provider calls`, async () => {
         const touched: string[] = [];
@@ -221,10 +253,11 @@ describe("graduated commercial and customer reputation", () => {
       priceCents: 54900,
     });
   });
-  it("the current 3 RPM envelope closes every offer above Pro110K, by key and volume", () => {
+  it("only the two consultation tiers are statically closed, by catalog key and included volume", () => {
     for (const rung of PLAN_RUNGS) {
-      const expected =
-        rung.period === "month" && rung.included > 110_000 ? "enterprise" : "self_serve";
+      const expected = ["scale_1_5m", "scale_2_5m"].includes(rung.key)
+        ? "enterprise"
+        : "self_serve";
       expect(sendNewPurchaseAvailability(rung.key)).toBe(expected);
       expect(sendingOfferAvailability(rung.key)).toBe(expected);
       expect(sendingOfferAvailability(rung.included)).toBe(expected);

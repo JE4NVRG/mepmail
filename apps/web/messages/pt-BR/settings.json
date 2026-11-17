@@ -278,6 +278,8 @@
     "countingNote": "Cada destinatário (Para, Cc e Cco) de um e-mail aceito conta um envio, mesmo que a entrega falhe depois. Endereços já na sua lista de supressão não contam."
   },
   "billing": {
+    "gradualSending": "Novos domínios verificados começam com 25% do limite diário do plano, avançando 25% a cada 7 dias sem problemas, conforme as verificações de reputação. A franquia é um teto de uso, não capacidade imediata de envio; picos podem aguardar na fila. O pagamento não dispensa essas validações.",
+    "gradualSendingLink": "Consulte os limites atuais em Domínios.",
     "summary": {
       "title": "Resumo da assinatura",
       "currentPeriod": "Período atual",
