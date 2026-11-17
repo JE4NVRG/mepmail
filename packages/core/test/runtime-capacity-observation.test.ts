@@ -83,14 +83,14 @@ describe("runtime capacity original-custody feed", () => {
     const r = await observe(async () => meter());
     expect(r.regionalCapacity["eu-west-1"]).toBeNull();
     const east = r.regionalCapacity["us-east-1"]!;
-    expect(east.globalDaily).toBeLessThanOrEqual(4320);
-    expect(east.globalPerMinute).toBe(3);
+    expect(east.globalDaily).toBe(98000);
+    expect(east.globalPerMinute).toBe(823);
     expect(east.commercial.worstCaseTokensPerAdmission).toBe(1002048);
     expect(east.commercial.worstCaseCostUsd).toBe(0.3024576);
     expect(east.observations.sesMax24HourSend).toBe(100000);
     expect(east.observations.sesSentLast24Hours).toBe(100);
     expect(east.buffers.sesRemaining24Hours).toBe(97900);
-    expect(east.commercial.judgeTokensPerMinute).toBe(3006144);
+    expect(east.commercial.judgeTokensPerMinute).toBe(120245760);
     expect(east.buffers.modelCreditUnitsAfterSafetyFloor).toBe(95000000000);
     expect(east.dailySemantics).toBe("nominal-flow-ceiling-not-resource-guarantee");
   });
@@ -163,7 +163,7 @@ describe("runtime capacity original-custody feed", () => {
       }),
     });
     const first = (await observe(async () => meter(at, credits))).regionalCapacity["us-east-1"]!;
-    expect(first.globalDaily).toBe(4320);
+    expect(first.globalDaily).toBe(98000);
     expect(first.buffers.modelFramesBeforeLocalCommitments).toBe(16);
     accepted = 16;
     at += 5000;
@@ -268,7 +268,7 @@ describe("runtime capacity original-custody feed", () => {
       },
       fetch: transport as typeof fetch,
     });
-    expect(r.capacityReceipt?.globalDaily).toBe(4320);
+    expect(r.capacityReceipt?.globalDaily).toBe(98000);
     expect(r.capacityReceipt?.buffers.modelFramesBeforeLocalCommitments).toBe(16);
     expect(r.capacityReceipt?.buffers.localCommitments).toBe("parent-ledger-required");
     expect(r.capacityReceipt?.dailySemantics).toBe("nominal-flow-ceiling-not-resource-guarantee");

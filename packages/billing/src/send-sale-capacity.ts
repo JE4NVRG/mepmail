@@ -53,9 +53,9 @@ function freshObservation(
     !c ||
     !j ||
     j.accountKey !== "commandcode-primary" ||
-    j.rpm !== 3 ||
-    j.tenantRpm > 3 ||
-    j.concurrency !== 1 ||
+    (j.throughputMode === "bounded-concurrency"
+      ? j.rpm !== 120 || j.tenantRpm !== 120 || j.concurrency !== 2
+      : j.rpm !== 3 || j.tenantRpm > 3 || j.concurrency !== 1) ||
     j.maxInputTokens !== 1000000 ||
     j.maxOutputTokens !== 2048 ||
     j.reservedCreditUnits !== 302457600 ||
@@ -215,10 +215,11 @@ export async function assertSendSaleCapacity(
   await assertSendSaleObservationFresh(db, observation!);
 }
 
-/** A conservative first-30-day purchase guard, NOT a funded recurring SLA.
- * Current stock is never multiplied into throughput or treated as replenishment.
- * Existing contracts and promises remain intact; a new promise requires enough
- * current model inventory for thirty nominal days plus unliquidated ROOT debt. */
+/** Entitlement is a usage cap, not dedicated infrastructure or immediate delivery.
+ * New sales require healthy regional capacity and one currently funded admission.
+ * Financial holds remain durable, but nominal plan caps do not reserve a month's
+ * worst-case model frames or permanently partition the shared SES rolling quota.
+ * Actual sends independently join ROOT holds/debt, concurrency and SES usage. */
 export function evaluateRuntimeSendSaleCapacity(
   v: RuntimeCapacityReceipt | null | undefined,
   context: RuntimeGraduatedContext,
@@ -273,26 +274,15 @@ export function evaluateRuntimeSendSaleCapacity(
     )
   )
     throw new SendSaleCapacityError("capacity_unknown");
-  const shared = Math.min(
-    v.globalPerMinute,
-    v.judgePerMinute,
-    j.rpm,
-    Math.floor(c.judgeTokensPerMinute / c.worstCaseTokensPerAdmission),
-  );
-  const tenant = Math.min(v.tenantPerMinute, j.tenantRpm, shared);
-  const promised = commitments.reduce((a, b) => a + b, requiredDaily);
-  const frames = promised * 30;
-  const credits = frames * j.reservedCreditUnits;
-  // SES stock is a rolling24h buffer: compare NEW outstanding nominal daily
-  // commitments, never debit SES's already-observed usage a second time.
+  // A finite current admission, not a forecast or a recurring funded SLA.
+  const credits = j.reservedCreditUnits + held + debt;
   if (
     !Number.isSafeInteger(credits) ||
-    requiredDaily > tenant * 1440 ||
-    promised > Math.min(v.globalDaily, shared * 1440) ||
-    usedDaily + incrementalDaily > v.globalDaily ||
-    usedMinute >= shared ||
-    promised > b.sesRemaining24Hours ||
-    credits + held + debt > j.remainingCreditUnits
+    requiredDaily > v.globalDaily ||
+    usedDaily >= v.globalDaily ||
+    usedMinute >= v.globalPerMinute ||
+    b.sesRemaining24Hours < 1 ||
+    credits > j.remainingCreditUnits
   )
     throw new SendSaleCapacityError("capacity_insufficient");
 }

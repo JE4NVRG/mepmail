@@ -113,7 +113,7 @@ export function tenantSendingMinuteCeiling(
         : Number.isSafeInteger(planDaily) && planDaily > 0
           ? Math.floor((planDaily * (state === "established" ? 100 : warmupPercent)) / 100)
           : 0;
-  return daily > 0 ? Math.min(3, Math.max(1, Math.ceil(daily / 1440))) : 0;
+  return daily > 0 ? Math.max(1, Math.ceil(daily / 1440)) : 0;
 }
 /** A fresh credit inventory is an additional deliverable buffer, not an absolute
  * daily quota. Completed attempts release unused reserve; they do not reduce

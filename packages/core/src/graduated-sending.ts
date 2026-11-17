@@ -737,6 +737,8 @@ export async function getGraduatedSenderReputation(
  * Parent supplies a qualified operational envelope and fresh shared meter. */
 export interface JudgeOperationalEnvelope {
   accountKey: string;
+  /** Only the original server context may select concurrent queue admission. */
+  throughputMode?: "bounded-concurrency";
   meterId: string;
   meterAt: string;
   meterExpiresAt: string;
@@ -762,6 +764,8 @@ function judgeEnvelope(now: Date, context?: GraduatedContext): JudgeOperationalE
   }
   if (
     !v ||
+    (v.throughputMode !== undefined &&
+      (!context?.judgeEnvelope || v.throughputMode !== "bounded-concurrency")) ||
     !/^[a-zA-Z0-9_-]{1,80}$/.test(v.accountKey) ||
     !v.meterId ||
     !Number.isFinite(Date.parse(v.meterAt)) ||
@@ -913,17 +917,10 @@ export async function reserveJudgeAttempt(
       };
     }
     if (context?.judgeEnvelope) {
-      const last = firstRow<{ at: Date }>(
-        await tx.execute(
-          sql`select max(created_at) as at from sending_judge_attempts where account_key=${v.accountKey}`,
-        ),
-      );
-      if (last?.at && now.getTime() - new Date(last.at).getTime() < 20000)
-        throw new GraduatedAdmissionError("minute_limit", "unknown", 0, 20);
       if (
-        v.rpm !== 3 ||
-        v.tenantRpm > 3 ||
-        v.concurrency !== 1 ||
+        (v.throughputMode === "bounded-concurrency"
+          ? v.rpm !== 120 || v.tenantRpm !== 120 || v.tpm !== 120245760 || v.concurrency !== 2
+          : v.rpm !== 3 || v.tenantRpm > 3 || v.concurrency !== 1) ||
         v.maxInputTokens !== 1000000 ||
         v.maxOutputTokens !== 2048 ||
         v.reservedCreditUnits !== 302457600 ||
@@ -999,8 +996,8 @@ export async function reserveJudgeAttempt(
     );
     if (
       !u ||
-      Number(u.calls) + 1 > v.rpm ||
-      Number(u.tokens) + tokens > v.tpm ||
+      (v.throughputMode !== "bounded-concurrency" &&
+        (Number(u.calls) + 1 > v.rpm || Number(u.tokens) + tokens > v.tpm)) ||
       Number(u.tenant) + 1 > tenantRpm ||
       Number(u.active) + 1 > v.concurrency ||
       Number(u.credits) + v.reservedCreditUnits > v.remainingCreditUnits

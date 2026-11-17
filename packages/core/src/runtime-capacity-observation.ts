@@ -10,7 +10,11 @@ export const CAPACITY_REGIONS = ["us-east-1", "eu-west-1"] as const;
 const TTL_MS = 5000;
 const FRAME_TOKENS = 1002048;
 const FRAME_CREDIT_UNITS = 302457600;
-const TOKEN_RESERVATIONS_PER_MINUTE = 3 * FRAME_TOKENS;
+// An operating pool, not a claimed provider RPM/TPM entitlement. ROOT enforces
+// actual in-flight slots and fresh account inventory for every physical attempt.
+export const JUDGE_OPERATING_CONCURRENCY = 2;
+export const JUDGE_OPERATING_MINUTE = JUDGE_OPERATING_CONCURRENCY * 60;
+const TOKEN_RESERVATIONS_PER_MINUTE = JUDGE_OPERATING_MINUTE * FRAME_TOKENS;
 const MAX = Number.MAX_SAFE_INTEGER;
 /** Resource inventory at the observation origin, NOT a flow/day allowance.
  * The parent must atomically reconcile its held reservations and unsettled debt;
@@ -128,7 +132,7 @@ function receipt(
     return null;
   const nominal = Math.floor(q.Max24HourSend * 0.98);
   const remaining = Math.max(0, nominal - q.SentLast24Hours);
-  const minute = Math.min(3, Math.floor(q.MaxSendRate * 60 * 0.98));
+  const minute = Math.floor(q.MaxSendRate * 60 * 0.98);
   const fundedAdmissions = Math.floor(units / FRAME_CREDIT_UNITS);
   // Flow ceilings and stocks have different dimensions. Neither SES remaining
   // headroom nor the current model inventory is an absolute per-day allowance.
@@ -148,7 +152,7 @@ function receipt(
     globalDaily: daily,
     globalPerMinute: minute,
     tenantPerMinute: minute,
-    judgePerMinute: 3,
+    judgePerMinute: JUDGE_OPERATING_MINUTE,
     dailySemantics: "nominal-flow-ceiling-not-resource-guarantee",
     commercial: Object.freeze({
       judgeTokensPerMinute: TOKEN_RESERVATIONS_PER_MINUTE,
