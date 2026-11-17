@@ -163,6 +163,15 @@ export function evaluateDeliverability(
  * use occurredAt, never arrival/day buckets; createdAt excludes future reads.
  * Outcomes may refer to older accepted sends. They still count in their own
  * occurrence window; rates are intentionally not clamped to hide that risk.
+ *
+ * One Permanent bounce is excluded from the hard numerator and the adversity
+ * watermark: SES `OnAccountSuppressionList` with authenticated SNS provenance
+ * and that exact subtype, i.e. the address sat on the instance-wide ACCOUNT
+ * suppression list and SES never attempted a delivery for this team (see
+ * process-provider-event isAccountListDrop). The event row, status and webhook
+ * stay recorded, the acceptance still counts in the denominator, and everything
+ * else — the tenant's own list, General, a real Permanent, complaints, a null
+ * or malformed payload, or a non-SES `azure:` sender id — keeps counting.
  */
 export async function fetchDeliverabilityHealth(
   db: Db,
@@ -188,7 +197,16 @@ export async function fetchDeliverabilityHealth(
     -- evidence aggregate avoids OR/EXISTS becoming a lifetime event hash scan.
     with window_events as materialized (
       select ${v.emailId} as email_id, ${v.type} as type,
-        ${v.bounceType} as bounce_type, ${v.createdAt} as created_at
+        ${v.bounceType} as bounce_type, ${v.createdAt} as created_at,
+        -- Account-level suppression drop: SES never attempted this delivery.
+        -- Require authenticated SES provenance (an SNS message id that is not
+        -- the Azure sender) plus the exact subtype inside an object payload,
+        -- so a purged/null/malformed payload never becomes an exemption.
+        coalesce((${v.type} = 'bounced' and ${v.bounceType} = 'Permanent'
+          and ${v.snsMessageId} is not null and ${v.snsMessageId} not like 'azure:%'
+          and jsonb_typeof(${v.data} -> 'bounce') = 'object'
+          and ${v.data} -> 'bounce' ->> 'bounceSubType' = 'OnAccountSuppressionList'
+        ), false) as account_suppression_drop
       from ${v} inner join lateral (
         select ${e.id} from ${e}
         where ${e.id} = ${v.emailId} and ${e.teamId} = ${teamId}
@@ -235,6 +253,7 @@ export async function fetchDeliverabilityHealth(
         ) as arrived_at
       from window_events w inner join confirmed c on c.id = w.email_id
       where ((w.type = 'bounced' and w.bounce_type = 'Permanent') or w.type = 'complained')
+        and not w.account_suppression_drop
       group by w.email_id
     )
     select count(*) filter (where c.accepted_at > ${start} and c.accepted_at <= ${now})::text as sent,

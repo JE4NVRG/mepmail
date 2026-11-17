@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
-import { type SQL, sql } from "drizzle-orm";
+import { eq, type SQL, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fetchDeliverabilityHealth } from "../src/deliverability.js";
 import { firstRow } from "../src/driver-result.js";
@@ -112,6 +112,7 @@ describe("window-bounded deliverability query", () => {
       createdAt?: Date;
       snsMessageId?: string | null;
       bounceType?: string;
+      data?: Record<string, unknown> | null;
     } = {},
   ) {
     await db.insert(schema.emailEvents).values({
@@ -121,6 +122,7 @@ describe("window-bounded deliverability query", () => {
       createdAt: options.createdAt ?? at(0.5),
       snsMessageId: options.snsMessageId === undefined ? randomUUID() : options.snsMessageId,
       bounceType: options.bounceType ?? null,
+      data: options.data ?? undefined,
     });
   }
   async function compare(teamId: string) {
@@ -225,6 +227,115 @@ describe("window-bounded deliverability query", () => {
       complaintRate: 0,
       bounceRate: 0,
       pause: { complained: 1 },
+    });
+  });
+  // SES dropped the message because the address sits on the ACCOUNT-level
+  // suppression list: no delivery to this team's recipient was ever attempted,
+  // the event/status/webhook stay recorded, but the team's hard numerator and
+  // adversity watermark must not attribute it. Every lookalike stays counted.
+  const sesBounce = (bounceSubType?: string) => ({
+    eventType: "Bounce",
+    bounce: {
+      bounceType: "Permanent",
+      ...(bounceSubType === undefined ? {} : { bounceSubType }),
+      recipients: ["a@example.test"],
+    },
+  });
+  it("excludes only the authenticated SES account-list drop from hard bounces", async () => {
+    const team = await createTeam(db, `account-list-${randomUUID()}`);
+    const accepted = await emails(team, 5);
+    const [dropped] = accepted;
+    if (!dropped) throw new Error("Missing fixture");
+    await event(dropped.id, "bounced", {
+      bounceType: "Permanent",
+      occurredAt: at(2),
+      createdAt: at(1),
+      data: sesBounce("OnAccountSuppressionList"),
+    });
+    // Canonical live shape: five accepted messages, one account-list drop,
+    // zero complaints. The drop was 5/1 before this cut and is 5/0 after it.
+    const unset = await fetchDeliverabilityHealth(db, team, { now });
+    expect(unset).toMatchObject({
+      sent: 5,
+      bounceRate: 0,
+      complaintRate: 0,
+      status: "ok",
+      reasons: [],
+      pause: { sent: 5, hardBounced: 0, complained: 0, windowDays: 1 },
+      rollingWindow: { outcomeWatermark: null },
+    });
+    // History is preserved: the bounce event itself is still recorded.
+    const recorded = await db
+      .select({ id: schema.emailEvents.id })
+      .from(schema.emailEvents)
+      .where(eq(schema.emailEvents.emailId, dropped.id));
+    expect(recorded).toHaveLength(1);
+  });
+  it("keeps every non-exempt Permanent bounce and complaint in the same window", async () => {
+    const team = await createTeam(db, `account-list-mixed-${randomUUID()}`);
+    const rows = await emails(team, 8);
+    const [exempt, real, tenant, noProvenance, azure, purged, malformed, complaint] = rows;
+    if (
+      !exempt ||
+      !real ||
+      !tenant ||
+      !noProvenance ||
+      !azure ||
+      !purged ||
+      !malformed ||
+      !complaint
+    )
+      throw new Error("Missing fixtures");
+    await event(exempt.id, "bounced", {
+      bounceType: "Permanent",
+      createdAt: at(0.9),
+      data: sesBounce("OnAccountSuppressionList"),
+    });
+    await event(real.id, "bounced", {
+      bounceType: "Permanent",
+      createdAt: at(0.85),
+      data: sesBounce("General"),
+    });
+    // The tenant's own suppression list is real evidence against this team.
+    await event(tenant.id, "bounced", {
+      bounceType: "Permanent",
+      createdAt: at(0.8),
+      data: sesBounce("OnTenantSuppressionList"),
+    });
+    // Without provider provenance the subtype claim is not trusted.
+    await event(noProvenance.id, "bounced", {
+      bounceType: "Permanent",
+      snsMessageId: null,
+      createdAt: at(0.75),
+      data: sesBounce("OnAccountSuppressionList"),
+    });
+    // Azure states no SES subtype; its prefix is not authenticated SES.
+    await event(azure.id, "bounced", {
+      bounceType: "Permanent",
+      snsMessageId: `azure:${randomUUID()}`,
+      createdAt: at(0.7),
+      data: {
+        eventType: "Bounce",
+        bounce: { bounceType: "Permanent", recipients: ["a@example.test"] },
+      },
+    });
+    // Retention may purge the payload: an unreadable subtype is not exempt.
+    await event(purged.id, "bounced", {
+      bounceType: "Permanent",
+      createdAt: at(0.6),
+      data: null,
+    });
+    await event(malformed.id, "bounced", {
+      bounceType: "Permanent",
+      createdAt: at(0.55),
+      data: { eventType: "Bounce", bounce: "not-an-object" },
+    });
+    await event(complaint.id, "complained", { createdAt: at(0.4) });
+    expect(await fetchDeliverabilityHealth(db, team, { now })).toMatchObject({
+      sent: 8,
+      pause: { sent: 8, hardBounced: 6, complained: 1, windowDays: 1 },
+      // Earliest surviving arrival is the complaint, not the exempt drop.
+      rollingWindow: { outcomeWatermark: at(0.4) },
     });
   });
   it("EXPLAIN bounds confirmation to candidates as history grows, with identical results", async () => {
