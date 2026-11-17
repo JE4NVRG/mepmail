@@ -990,6 +990,164 @@ async function queueAuthorizedMailboxDraft(
       previous.approvedMembershipId !== approvedMembershipId
     )
       throw new MailboxContentError("conflict");
+    // Fresh authenticated consent may recover only an agent refusal BEFORE any
+    // attempt. Never reset a provider/unknown claim or recapture its reservation.
+    if (
+      approval.kind === "agent" &&
+      previous.status === "failed" &&
+      previous.errorCode === "agent_authorization_refused"
+    ) {
+      if (
+        previous.attemptId !== null ||
+        previous.attemptedAt !== null ||
+        previous.acceptedAt !== null ||
+        previous.providerMessageId !== null ||
+        previous.providerRfcMessageId !== null ||
+        box.origin === "external"
+      )
+        throw new MailboxContentError("conflict");
+      await assertOriginalMailboxApproval(tx, previous);
+      const [receipt] = await tx
+        .select({ id: mailboxOutboundEvents.id })
+        .from(mailboxOutboundEvents)
+        .where(eq(mailboxOutboundEvents.outboxId, previous.id))
+        .limit(1);
+      const [azureClaim] = await tx
+        .select({ id: schema.auditLog.id })
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.teamId, actor.teamId),
+            eq(schema.auditLog.action, "sending.mailbox_azure_claimed"),
+            sql`${schema.auditLog.data}->>'outboxId'=${previous.id}`,
+          ),
+        )
+        .limit(1);
+      if (azureClaim) throw new MailboxContentError("conflict");
+      const attempts = await tx.execute(
+        sql`select 1 as present from sending_judge_attempts where mailbox_outbox_id=${previous.id}::uuid limit 1`,
+      );
+      const rows = Array.isArray(attempts) ? attempts : (attempts as { rows?: unknown[] }).rows;
+      if (receipt || !rows || rows.length) throw new MailboxContentError("conflict");
+      const [draft] = await tx
+        .select()
+        .from(schema.mailboxItems)
+        .where(
+          and(
+            eq(schema.mailboxItems.id, input.id),
+            eq(schema.mailboxItems.mailboxId, input.mailboxId),
+            eq(schema.mailboxItems.teamId, actor.teamId),
+          ),
+        )
+        .for("update");
+      if (
+        !draft ||
+        draft.kind !== "draft" ||
+        draft.revision !== input.expectedRevision ||
+        draft.trashedAt !== null
+      )
+        throw new MailboxContentError("conflict");
+      const [team] = await tx.select().from(schema.teams).where(eq(schema.teams.id, actor.teamId));
+      const [domain] = await tx
+        .select({ status: schema.domains.status })
+        .from(schema.domains)
+        .where(and(eq(schema.domains.id, box.domainId!), eq(schema.domains.teamId, actor.teamId)))
+        .for("share");
+      if (
+        !team ||
+        team.suspendedAt ||
+        (team.sendReviewAt &&
+          (!team.sendReviewClearedAt || team.sendReviewClearedAt < team.sendReviewAt)) ||
+        domain?.status !== "verified"
+      )
+        throw new MailboxContentError("forbidden");
+      const plan = await lockMailboxService(tx, actor.teamId, now);
+      await requireMailboxSeat(tx, actor.teamId, input.mailboxId, plan);
+      const period = mailboxSubscriptionUsagePeriod(plan, now);
+      if (
+        !plan.unlimitedOutbound &&
+        (!period ||
+          !mailboxServiceActive(plan, now) ||
+          period.start.getTime() !== previous.periodStart.getTime() ||
+          period.end.getTime() !== previous.periodEnd.getTime())
+      )
+        throw new MailboxReservationExpiredError();
+      const raw = await open(previous, keys),
+        current = await open(draft, keys);
+      if (
+        !raw.equals(current) ||
+        raw.length !== previous.rawBytes ||
+        hash(raw) !== previous.rawSha256
+      )
+        throw new MailboxContentError("conflict");
+      const parsed = await envelope(mime, raw, true);
+      const recipients = [...parsed.to, ...parsed.cc, ...parsed.bcc];
+      if (
+        parsed.from !== box.address ||
+        parsed.count !== previous.recipientCount ||
+        previous.recipientHashes === null ||
+        JSON.stringify(checkedHashes(previous.recipientHashes)) !==
+          JSON.stringify(approvedHashes(actor.teamId, recipients, parsed.count))
+      )
+        throw new MailboxContentError("conflict");
+      if (
+        !(await checkSignupSend(tx, actor.teamId, recipients)).allowed ||
+        (await mailboxBlockedRecipients(tx, { teamId: actor.teamId, recipients })).length
+      )
+        throw new MailboxContentError("forbidden");
+      if (!plan.unlimitedOutbound) {
+        const [usage] = await tx
+          .select({
+            recipients: sql<string>`coalesce(sum(${mailboxOutbox.recipientCount}),0)::text`,
+          })
+          .from(mailboxOutbox)
+          .where(
+            and(
+              plan.quotaScope === "team" ? undefined : eq(mailboxOutbox.mailboxId, input.mailboxId),
+              eq(mailboxOutbox.teamId, actor.teamId),
+              eq(mailboxOutbox.periodStart, previous.periodStart),
+              ne(mailboxOutbox.status, "failed"),
+            ),
+          );
+        if (
+          BigInt(usage?.recipients ?? "0") + BigInt(parsed.count) >
+          BigInt(plan.includedOutboundPerMailbox)
+        )
+          throw new MailboxServiceError("quota");
+        await assertMailboxOutboundBytes(tx, plan, previous.periodStart, raw.length, parsed.count);
+        await assertMailboxTrialSending(tx, plan, parsed.count, now);
+      }
+      if (approval.expiresAt && approval.expiresAt.getTime() <= Date.now())
+        throw new MailboxAgentAccessError("forbidden");
+      if (!plan.unlimitedOutbound && previous.periodEnd.getTime() <= Date.now())
+        throw new MailboxReservationExpiredError();
+      const [requeued] = await tx
+        .update(mailboxOutbox)
+        .set({ status: "queued", errorCode: null, updatedAt: now })
+        .where(
+          and(
+            eq(mailboxOutbox.id, previous.id),
+            eq(mailboxOutbox.status, "failed"),
+            eq(mailboxOutbox.errorCode, "agent_authorization_refused"),
+          ),
+        )
+        .returning();
+      if (!requeued) throw new MailboxContentError("conflict");
+      await tx.insert(schema.auditLog).values({
+        teamId: actor.teamId,
+        actorId: `mailbox_agent:${approval.agentKeyId}`,
+        target: `mailbox:${input.mailboxId}`,
+        action: "mailbox.agent_send_reauthorized",
+        data: {
+          mailboxId: input.mailboxId,
+          keyId: approval.agentKeyId,
+          itemId: input.id,
+          revision: input.expectedRevision,
+          outboxId: previous.id,
+        },
+      });
+      return outboxDto(requeued, false);
+    }
     return outboxDto(previous, true);
   }
   const [draft] = await tx

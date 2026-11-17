@@ -26,6 +26,7 @@ import {
   reserveGraduatedSending,
 } from "../src/graduated-sending.js";
 import { getGraduatedSendingContext } from "../src/graduated-sending-context.js";
+import { createMailboxAgentKey } from "../src/mailbox-agent-access.js";
 import { createMailboxExternalAccount } from "../src/mailbox-external-accounts.js";
 import { prepareMailboxOptout } from "../src/mailbox-optout.js";
 import { saveMailboxDraft, withMailboxSendAccess } from "../src/mailbox-private-store.js";
@@ -42,6 +43,7 @@ import {
   assertMailboxOutboxSendAccess,
   type MailboxOutboxSender,
   type MailboxTransportMimeAdapter,
+  queueMailboxAgentDraft,
   queueMailboxDraft,
   sendMailboxOutbox,
 } from "../src/mailbox-transport.js";
@@ -207,7 +209,11 @@ beforeEach(() => {
   );
 });
 
-async function realm(mode: "owner" | "grant" | "external" = "owner", system = false) {
+async function realm(
+  mode: "owner" | "grant" | "external" = "owner",
+  system = false,
+  agent = false,
+) {
   const teamId = await createTeam(db, randomUUID());
   if (system)
     await db.update(schema.teams).set({ plan: "system" }).where(eq(schema.teams.id, teamId));
@@ -307,13 +313,28 @@ async function realm(mode: "owner" | "grant" | "external" = "owner", system = fa
     expect(id).toBe(memberB.id);
   });
   const draft = await saveMailboxDraft(db, keys, actor, { mailboxId, expectedRevision: 0, raw });
-  const queued = await queueMailboxDraft(
-    db,
-    keys,
-    actor,
-    { mailboxId, id: draft.id, expectedRevision: draft.revision },
-    mime,
-  );
+  const agentKey = agent
+    ? await createMailboxAgentKey(db, actor, {
+        mailboxId,
+        label: "Synthetic recovery",
+        scopes: ["read", "draft", "send"],
+      })
+    : null;
+  const queued = agentKey
+    ? await queueMailboxAgentDraft(
+        db,
+        keys,
+        agentKey.token,
+        { id: draft.id, expectedRevision: draft.revision },
+        mime,
+      )
+    : await queueMailboxDraft(
+        db,
+        keys,
+        actor,
+        { mailboxId, id: draft.id, expectedRevision: draft.revision },
+        mime,
+      );
   const [row] = await db
     .select()
     .from(schema.mailboxOutbox)
@@ -321,7 +342,7 @@ async function realm(mode: "owner" | "grant" | "external" = "owner", system = fa
   expect(row).toMatchObject({
     approvedBy: b,
     approvedMembershipId: memberB.id,
-    approvalKind: "human",
+    approvalKind: agent ? "agent" : "human",
     status: "queued",
     attemptId: null,
   });
@@ -337,6 +358,7 @@ async function realm(mode: "owner" | "grant" | "external" = "owner", system = fa
     mailboxId,
     from,
     queued,
+    agentKey,
     grant,
     mode,
   };
@@ -1234,5 +1256,404 @@ describe("native SES relay separation", () => {
         expect(result.status).not.toBe("accepted");
         expect(physical).not.toHaveBeenCalled();
       }
+    });
+});
+
+describe("original agent reauthorization", () => {
+  async function refused(system = true) {
+    const f = await realm("owner", system, true),
+      send = sender(f);
+    await db
+      .update(schema.mailboxAgentKeys)
+      .set({ scopes: ["read", "draft"] })
+      .where(eq(schema.mailboxAgentKeys.id, f.agentKey!.id));
+    const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+    expect(result).toMatchObject({ status: "failed", errorCode: "agent_authorization_refused" });
+    expect(send.transport).not.toHaveBeenCalled();
+    await db
+      .update(schema.mailboxAgentKeys)
+      .set({ scopes: ["read", "draft", "send"] })
+      .where(eq(schema.mailboxAgentKeys.id, f.agentKey!.id));
+    const [row] = await db
+      .select()
+      .from(schema.mailboxOutbox)
+      .where(eq(schema.mailboxOutbox.id, f.queued.id));
+    return { f, send, row: row! };
+  }
+  const retry = (f: Awaited<ReturnType<typeof realm>>) =>
+    queueMailboxAgentDraft(
+      db,
+      keys,
+      f.agentKey!.token,
+      { id: f.queued.draftId, expectedRevision: f.queued.draftRevision },
+      mime,
+    );
+  it("fresh same bearer recovers same immutable intent once and worker sends once", async () => {
+    const { f, send, row } = await refused();
+    const first = await retry(f),
+      repeated = await retry(f);
+    expect(first).toMatchObject({ id: row.id, status: "queued", errorCode: null });
+    expect(repeated).toMatchObject({ id: row.id, status: "queued", duplicate: true });
+    const [after] = await db
+      .select()
+      .from(schema.mailboxOutbox)
+      .where(eq(schema.mailboxOutbox.id, row.id));
+    expect({
+      ...after,
+      status: row.status,
+      errorCode: row.errorCode,
+      updatedAt: row.updatedAt,
+    }).toEqual(row);
+    const audit = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        and(
+          eq(schema.auditLog.teamId, f.teamId),
+          eq(schema.auditLog.action, "mailbox.agent_send_reauthorized"),
+        ),
+      );
+    expect(audit).toHaveLength(1);
+    expect((await sendMailboxOutbox(db, keys, row.id, send, mime)).status).toBe("accepted");
+    const before = await ledger(f);
+    expect((await retry(f)).status).toBe("accepted");
+    await sendMailboxOutbox(db, keys, row.id, send, mime);
+    expect(await ledger(f)).toEqual(before);
+    expect(models).toBe(1);
+    expect(claims).toBe(1);
+    expect(send.transport).toHaveBeenCalledTimes(1);
+    record("reauthorization-positive", {
+      sameId: first.id === row.id,
+      models,
+      claims,
+      physical: send.transport.mock.calls.length,
+      audits: audit.length,
+      ledger: before,
+    });
+  });
+  it("refuses finite period expiry after original async envelope parsing before CAS", async () => {
+    const { f, row } = await refused(false);
+    let parsed = 0;
+    const lateMime: MailboxTransportMimeAdapter = {
+      async parse(raw) {
+        const result = await mime.parse(raw);
+        parsed++;
+        vi.setSystemTime(row.periodEnd.getTime() + 1);
+        return result;
+      },
+    };
+    await expect(
+      queueMailboxAgentDraft(
+        db,
+        keys,
+        f.agentKey!.token,
+        { id: row.draftId, expectedRevision: row.draftRevision },
+        lateMime,
+      ),
+    ).rejects.toBeDefined();
+    expect(parsed).toBe(1);
+    const [after] = await db
+      .select()
+      .from(schema.mailboxOutbox)
+      .where(eq(schema.mailboxOutbox.id, row.id));
+    expect(after).toEqual(row);
+    const audits = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        and(
+          eq(schema.auditLog.teamId, f.teamId),
+          eq(schema.auditLog.action, "mailbox.agent_send_reauthorized"),
+        ),
+      );
+    expect(audits).toHaveLength(0);
+    expect(models).toBe(0);
+    expect(claims).toBe(0);
+    record("finite-late-expiry", {
+      parsed,
+      status: after!.status,
+      reauthorizationAudits: audits.length,
+      models,
+      claims,
+    });
+  });
+  it("reauthorizes original preexisting Native admission without another reservation", async () => {
+    const f = await realm("owner", true, true),
+      send = sender(f);
+    const forbiddenPhysical = vi.fn(async () => {
+      throw new Error("NO_PHYSICAL_BEFORE_MODEL");
+    });
+    const held = createMailboxContentPolicySender(
+      db,
+      { send: forbiddenPhysical },
+      true,
+      policy,
+      null,
+      null,
+    );
+    const deferred = await sendMailboxOutbox(db, keys, f.queued.id, held, mime);
+    expect(deferred).toMatchObject({
+      status: "queued",
+      errorCode: "mailbox_deferred:semantic_content_review",
+    });
+    const admitted = await ledger(f);
+    expect(admitted.rows).toHaveLength(1);
+    expect(admitted.attempts).toHaveLength(0);
+    expect(models).toBe(0);
+    expect(forbiddenPhysical).not.toHaveBeenCalled();
+    await db
+      .update(schema.mailboxAgentKeys)
+      .set({ scopes: ["read", "draft"] })
+      .where(eq(schema.mailboxAgentKeys.id, f.agentKey!.id));
+    expect(await sendMailboxOutbox(db, keys, f.queued.id, send, mime)).toMatchObject({
+      status: "failed",
+      errorCode: "agent_authorization_refused",
+    });
+    await db
+      .update(schema.mailboxAgentKeys)
+      .set({ scopes: ["read", "draft", "send"] })
+      .where(eq(schema.mailboxAgentKeys.id, f.agentKey!.id));
+    const [original] = await db
+      .select()
+      .from(schema.mailboxOutbox)
+      .where(eq(schema.mailboxOutbox.id, f.queued.id));
+    expect(await retry(f)).toMatchObject({ id: f.queued.id, status: "queued" });
+    const [requeued] = await db
+      .select()
+      .from(schema.mailboxOutbox)
+      .where(eq(schema.mailboxOutbox.id, f.queued.id));
+    expect({
+      ...requeued,
+      status: original!.status,
+      errorCode: original!.errorCode,
+      updatedAt: original!.updatedAt,
+    }).toEqual(original);
+    expect(await ledger(f)).toEqual(admitted);
+    expect((await sendMailboxOutbox(db, keys, f.queued.id, send, mime)).status).toBe("accepted");
+    const settled = await ledger(f);
+    expect(settled.rows).toEqual(admitted.rows);
+    expect(settled.attempts).toEqual([{ state: "settled", units: "180000" }]);
+    const debt = await db.execute(
+      sql`select debt_units::text as units from sending_judge_account_debt where account_key='commandcode-primary'`,
+    );
+    expect((await retry(f)).status).toBe("accepted");
+    await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+    expect(await ledger(f)).toEqual(settled);
+    expect(
+      await db.execute(
+        sql`select debt_units::text as units from sending_judge_account_debt where account_key='commandcode-primary'`,
+      ),
+    ).toEqual(debt);
+    expect(models).toBe(1);
+    expect(claims).toBe(1);
+    expect(send.transport).toHaveBeenCalledTimes(1);
+    record("preexisting-native-recovery", {
+      nativeBefore: admitted.rows.length,
+      nativeAfter: settled.rows.length,
+      sameNativeAudit: settled.rows[0]!.id === admitted.rows[0]!.id,
+      models,
+      claims,
+      physical: send.transport.mock.calls.length,
+      replayUnchanged: true,
+    });
+  });
+  for (const unsafe of [
+    "revoked",
+    "scope",
+    "expired",
+    "different_key",
+    "revision",
+    "trashed",
+    "approval",
+    "attempt",
+    "provider",
+    "receipt",
+    "suspended",
+    "hashes",
+    "period",
+    "azure_claim",
+  ] as const)
+    it(`refuses unsafe original recovery ${unsafe}`, async () => {
+      const { f, row } = await refused();
+      if (unsafe === "revoked")
+        await db
+          .update(schema.mailboxAgentKeys)
+          .set({ revokedAt: new Date() })
+          .where(eq(schema.mailboxAgentKeys.id, f.agentKey!.id));
+      if (unsafe === "scope")
+        await db
+          .update(schema.mailboxAgentKeys)
+          .set({ scopes: ["read", "draft"] })
+          .where(eq(schema.mailboxAgentKeys.id, f.agentKey!.id));
+      if (unsafe === "expired")
+        await db
+          .update(schema.mailboxAgentKeys)
+          .set({ expiresAt: new Date(Date.now() + 1000) })
+          .where(eq(schema.mailboxAgentKeys.id, f.agentKey!.id));
+      if (unsafe === "expired") vi.setSystemTime(Date.now() + 1001);
+      if (unsafe === "different_key")
+        f.agentKey = await createMailboxAgentKey(db, f.actor, {
+          mailboxId: f.mailboxId,
+          label: "Other",
+          scopes: ["send"],
+        });
+      if (unsafe === "revision")
+        await db
+          .update(schema.mailboxItems)
+          .set({ revision: row.draftRevision + 1 })
+          .where(eq(schema.mailboxItems.id, row.draftId));
+      if (unsafe === "trashed")
+        await db
+          .update(schema.mailboxItems)
+          .set({ trashedAt: new Date() })
+          .where(eq(schema.mailboxItems.id, row.draftId));
+      if (unsafe === "approval") {
+        const raw = Buffer.from(
+          `From: ${f.from}\r\nTo: recipient@example.invalid\r\nSubject: Unapproved\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nSynthetic negative`,
+        );
+        const draft = await saveMailboxDraft(db, keys, f.actor, {
+          mailboxId: f.mailboxId,
+          expectedRevision: 0,
+          raw,
+        });
+        const id = randomUUID();
+        await db
+          .insert(schema.mailboxOutbox)
+          .values({ ...row, id, draftId: draft.id, draftRevision: draft.revision });
+        f.queued = { ...f.queued, id, draftId: draft.id, draftRevision: draft.revision };
+      }
+      if (unsafe === "attempt")
+        await db
+          .update(schema.mailboxOutbox)
+          .set({ attemptId: randomUUID(), attemptedAt: new Date() })
+          .where(eq(schema.mailboxOutbox.id, row.id));
+      if (unsafe === "provider")
+        await db
+          .update(schema.mailboxOutbox)
+          .set({ providerMessageId: "synthetic-unknown" })
+          .where(eq(schema.mailboxOutbox.id, row.id));
+      if (unsafe === "receipt")
+        await db.insert(schema.mailboxOutboundEvents).values({
+          id: "a".repeat(64),
+          outboxId: row.id,
+          attemptId: randomUUID(),
+          providerMessageId: "synthetic-unknown",
+          fingerprint: "b".repeat(64),
+          outcome: "send",
+          occurredAt: new Date(),
+        });
+      if (unsafe === "azure_claim")
+        await db.insert(schema.auditLog).values({
+          teamId: f.teamId,
+          action: "sending.mailbox_azure_claimed",
+          target: `mailbox-outbox:${row.id}`,
+          data: { outboxId: row.id },
+        });
+      if (unsafe === "suspended")
+        await db
+          .update(schema.teams)
+          .set({ suspendedAt: new Date() })
+          .where(eq(schema.teams.id, f.teamId));
+      if (unsafe === "hashes")
+        await db
+          .update(schema.mailboxOutbox)
+          .set({ recipientHashes: null })
+          .where(eq(schema.mailboxOutbox.id, row.id));
+      if (unsafe === "period") {
+        await db.update(schema.teams).set({ plan: "pro" }).where(eq(schema.teams.id, f.teamId));
+      }
+      await expect(retry(f)).rejects.toBeDefined();
+      const [after] = await db
+        .select()
+        .from(schema.mailboxOutbox)
+        .where(eq(schema.mailboxOutbox.id, row.id));
+      expect(after!.status).toBe("failed");
+      expect(models).toBe(0);
+      expect(claims).toBe(0);
+    });
+  for (const consumed of [false, true])
+    it(`finite commercial reservation projected once consumed:${consumed}`, async () => {
+      const { f, row } = await refused(false);
+      await db
+        .update(schema.mailboxSubscriptions)
+        .set({ includedOutboundPerMailbox: 1 })
+        .where(eq(schema.mailboxSubscriptions.teamId, f.teamId));
+      if (consumed) {
+        const raw = Buffer.from(
+          `From: ${f.from}\r\nTo: another@example.invalid\r\nSubject: Other\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nOther synthetic intent`,
+        );
+        const draft = await saveMailboxDraft(db, keys, f.actor, {
+          mailboxId: f.mailboxId,
+          expectedRevision: 0,
+          raw,
+        });
+        await queueMailboxDraft(
+          db,
+          keys,
+          f.actor,
+          { mailboxId: f.mailboxId, id: draft.id, expectedRevision: draft.revision },
+          mime,
+        );
+        await expect(retry(f)).rejects.toMatchObject({ code: "quota" });
+      } else {
+        const results = await Promise.all([retry(f), retry(f)]);
+        expect(results.map((x) => x.id)).toEqual([row.id, row.id]);
+        expect(results.every((x) => x.status === "queued")).toBe(true);
+      }
+      const rows = await db
+        .select()
+        .from(schema.mailboxOutbox)
+        .where(
+          and(eq(schema.mailboxOutbox.teamId, f.teamId), eq(schema.mailboxOutbox.status, "queued")),
+        );
+      expect(rows).toHaveLength(1);
+      const [original] = await db
+        .select()
+        .from(schema.mailboxOutbox)
+        .where(eq(schema.mailboxOutbox.id, row.id));
+      expect(original!.status).toBe(consumed ? "failed" : "queued");
+      const audits = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.teamId, f.teamId),
+            eq(schema.auditLog.action, "mailbox.agent_send_reauthorized"),
+          ),
+        );
+      expect(audits).toHaveLength(consumed ? 0 : 1);
+      expect(models).toBe(0);
+      expect(claims).toBe(0);
+    });
+  it("does not extend recovery to free external SMTP", async () => {
+    const f = await realm("external", true, true),
+      send = sender(f);
+    await db
+      .update(schema.mailboxAgentKeys)
+      .set({ scopes: ["read", "draft"] })
+      .where(eq(schema.mailboxAgentKeys.id, f.agentKey!.id));
+    expect((await sendMailboxOutbox(db, keys, f.queued.id, send, mime)).errorCode).toBe(
+      "agent_authorization_refused",
+    );
+    await db
+      .update(schema.mailboxAgentKeys)
+      .set({ scopes: ["read", "draft", "send"] })
+      .where(eq(schema.mailboxAgentKeys.id, f.agentKey!.id));
+    await expect(retry(f)).rejects.toMatchObject({ code: "conflict" });
+    expect(send.transport).not.toHaveBeenCalled();
+  });
+  for (const error of [
+    "queued_quota",
+    "quota_exceeded",
+    "admission_refused",
+    "reservation_expired",
+  ])
+    it(`never reopens legacy refusal ${error}`, async () => {
+      const { f, row } = await refused();
+      await db
+        .update(schema.mailboxOutbox)
+        .set({ errorCode: error })
+        .where(eq(schema.mailboxOutbox.id, row.id));
+      expect(await retry(f)).toMatchObject({ id: row.id, status: "failed", errorCode: error });
     });
 });
