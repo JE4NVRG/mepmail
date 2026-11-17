@@ -15,6 +15,7 @@ import {
 } from "./crypto/envelope.js";
 import type { Keyring } from "./crypto/keyring.js";
 import {
+  assertGraduatedNativeSenderFresh,
   authorizeGraduatedExternalSender,
   authorizeGraduatedSender,
   type GraduatedSenderProof,
@@ -1308,8 +1309,34 @@ export async function acceptMailboxOutbox(
 // serialized onto the adapter DTO, and every exit clears its own entry.
 const activeGraduatedClaims = new Map<
   string,
-  { proof: GraduatedSenderProof; context: Awaited<ReturnType<typeof getGraduatedSendingContext>> }
+  {
+    proof: GraduatedSenderProof;
+    context: Awaited<ReturnType<typeof getGraduatedSendingContext>>;
+    teamId: string;
+    mailboxId: string;
+    outboxId: string;
+  }
 >();
+
+/** Must run synchronously after the composite access await, directly before
+ * physical send. Only this dispatcher's original private claim can authorize it. */
+export function assertMailboxOutboxSendFresh(
+  input: Parameters<MailboxOutboxSender["send"]>[0],
+): void {
+  const active = activeGraduatedClaims.get(input.attemptId);
+  try {
+    if (
+      !active ||
+      active.teamId !== input.teamId ||
+      active.mailboxId !== input.mailboxId ||
+      active.outboxId !== input.outboxId
+    )
+      throw new Error("native_claim_required");
+    assertGraduatedNativeSenderFresh(active.proof, active.context);
+  } catch {
+    throw new MailboxSendDeferredError("review_required");
+  }
+}
 
 /** The original queue caller recorded the actual approver, draft revision and
  * outbox together. Legacy/forged rows without that event cannot bootstrap a
@@ -1734,7 +1761,13 @@ export async function sendMailboxOutbox(
   const { row, raw, parsed } = prepared;
   if (!raw.length) return outboxDto(row, true);
   if (graduatedProof && graduatedContext)
-    activeGraduatedClaims.set(row.attemptId!, { proof: graduatedProof, context: graduatedContext });
+    activeGraduatedClaims.set(row.attemptId!, {
+      proof: graduatedProof,
+      context: graduatedContext,
+      teamId: row.teamId,
+      mailboxId: row.mailboxId,
+      outboxId: row.id,
+    });
   try {
     const result = await sender.send({
       idempotencyKey: row.id,

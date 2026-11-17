@@ -906,6 +906,24 @@ export async function authorizeGraduatedExternalSender(
   });
   return proof;
 }
+/** Last synchronous native boundary: no I/O, refresh, caller clock or restamp. */
+export function assertGraduatedNativeSenderFresh(
+  proof: GraduatedSenderProof,
+  context: GraduatedContext,
+): void {
+  const p = senderProofs.get(proof);
+  const now = new Date();
+  if (
+    !p?.native ||
+    p.context !== context ||
+    !originalGraduatedContexts.has(context) ||
+    now.getTime() < p.at ||
+    now.getTime() - p.at > 30000
+  )
+    throw new GraduatedAdmissionError("registered_sender_required", "unknown", 0);
+  judgeEnvelope(now, context);
+}
+
 export async function getGraduatedSenderReputation(
   db: Db,
   proof: GraduatedSenderProof,

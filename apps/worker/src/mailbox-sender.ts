@@ -1,6 +1,7 @@
 import { SESv2Client, type SESv2ClientConfig, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import {
   assertMailboxOutboxSendAccess,
+  assertMailboxOutboxSendFresh,
   checkSignupSend,
   evaluateEmailInsights,
   graduatedSendingEnabled,
@@ -659,6 +660,7 @@ export function createMailboxSesSender(
         if (opts.isCloud !== false && graduatedSendingEnabled()) {
           try {
             await assertMailboxOutboxSendAccess(db, input);
+            assertMailboxOutboxSendFresh(input);
           } catch {
             throw new MailboxSendDeferredError("review_required");
           }

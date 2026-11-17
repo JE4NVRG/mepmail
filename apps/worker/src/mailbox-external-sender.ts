@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
 import {
   assertMailboxOutboxSendAccess,
+  assertMailboxOutboxSendFresh,
   checkSignupSend,
   fetchTeamStanding,
   graduatedSendingEnabled,
@@ -123,6 +124,7 @@ export function createMailboxExternalAwareSender(
         if (deps.isCloud !== false && graduatedSendingEnabled()) {
           try {
             await assertMailboxOutboxSendAccess(db, input);
+            assertMailboxOutboxSendFresh(input);
           } catch {
             throw new MailboxSendDeferredError("review_required");
           }

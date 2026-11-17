@@ -53,6 +53,9 @@ let sqlClocks = 0;
 let credits = 10;
 let duringModel: (() => Promise<void>) | undefined;
 let beforePhysical: (() => Promise<void>) | undefined;
+let tailAfterCommit: (() => void) | undefined;
+let tailArmed = false;
+let tailHooks = 0;
 const keys = new EnvKeyring(new Map([[1, randomBytes(32)]]), 1);
 const dialect = new PgDialect();
 function record(name: string, data: unknown) {
@@ -76,12 +79,22 @@ const mime: MailboxTransportMimeAdapter = {
 };
 // The only fixture query adapter is a real parameterized SQL projection of the
 // production DB wall clock. Preserve every business query, including nested tx.
-function clocked(target: Db): Db {
+function clocked(target: Db, depth = 0): Db {
   return new Proxy(target, {
     get(t, key) {
       if (key === "transaction")
-        return (operation: (tx: Db) => Promise<unknown>) =>
-          t.transaction((tx) => operation(clocked(tx as unknown as Db)));
+        return async (operation: (tx: Db) => Promise<unknown>) => {
+          const result = await t.transaction((tx) =>
+            operation(clocked(tx as unknown as Db, depth + 1)),
+          );
+          // Advance only after the original outer transaction has COMMITTED.
+          // All reputation/financial/seat/domain reads ran with the fresh clock.
+          if (depth === 0 && tailArmed) {
+            tailArmed = false;
+            tailAfterCommit?.();
+          }
+          return result;
+        };
       if (key === "execute")
         return (query: SQL | string) => {
           const statement = typeof query === "string" ? query : dialect.sqlToQuery(query).sql;
@@ -131,6 +144,9 @@ beforeEach(() => {
   credits = 10;
   duringModel = undefined;
   beforePhysical = undefined;
+  tailAfterCommit = undefined;
+  tailArmed = false;
+  tailHooks = 0;
   vi.stubEnv("SENDING_PROVIDER_POLICY_JSON", JSON.stringify(policy));
   vi.stubEnv("ABUSE_JUDGE", "openai");
   vi.stubEnv("ABUSE_JUDGE_BASE_URL", "https://api.commandcode.ai/provider/v1");
@@ -338,7 +354,10 @@ function sender(f: Realm) {
           undefined,
           {
             isCloud: true,
-            lookup: (async () => [{ address: "142.250.0.109", family: 4 }]) as never,
+            lookup: (async () => {
+              await beforePhysical?.();
+              return [{ address: "142.250.0.109", family: 4 }];
+            }) as never,
             createTransport: (() => ({ sendMail: transport, close() {} })) as never,
           },
         )
@@ -413,143 +432,312 @@ async function remove(f: Realm, who: "a" | "b", recreate = false) {
       .values({ teamId: f.teamId, userId: f[who], role: who === "a" ? "owner" : "member" });
 }
 
-describe("native registered principal A / actual approver B", () => {
-  for (const mode of ["owner", "grant", "external"] as const)
-    it(`real caller admits ${mode} B once without impersonating A`, async () => {
-      const f = await realm(mode),
-        send = sender(f);
-      const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
-      // Preserve a causal RED witness even though the real dispatcher safely maps
-      // the constructor's registered_sender_required into a review hold.
-      let reason: unknown = null;
-      try {
-        await issue(
-          f,
-          await getGraduatedSendingContext(mode === "external" ? { purpose: "judge" } : {}),
+if (process.env.NATIVE_FRESHNESS_TAIL_ONLY !== "1")
+  describe("native registered principal A / actual approver B", () => {
+    for (const mode of ["owner", "grant", "external"] as const)
+      it(`real caller admits ${mode} B once without impersonating A`, async () => {
+        const f = await realm(mode),
+          send = sender(f);
+        const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+        // Preserve a causal RED witness even though the real dispatcher safely maps
+        // the constructor's registered_sender_required into a review hold.
+        let reason: unknown = null;
+        try {
+          await issue(
+            f,
+            await getGraduatedSendingContext(mode === "external" ? { purpose: "judge" } : {}),
+          );
+        } catch (e) {
+          reason = (e as { reason?: string }).reason;
+        }
+        console.log(
+          "NATIVE_PRINCIPAL_CASE",
+          JSON.stringify({
+            mode,
+            result,
+            constructorReason: reason,
+            claims,
+            models,
+            physical: send.transport.mock.calls.length,
+          }),
         );
-      } catch (e) {
-        reason = (e as { reason?: string }).reason;
-      }
-      console.log(
-        "NATIVE_PRINCIPAL_CASE",
-        JSON.stringify({
-          mode,
+        expect(result.status, String(reason)).toBe("accepted");
+        expect(claims).toBe(1);
+        expect(models).toBe(1);
+        expect(send.transport).toHaveBeenCalledTimes(1);
+        const before = await ledger(f);
+        record(`accepted-${mode}`, {
           result,
-          constructorReason: reason,
+          principal: f.a,
+          approver: f.b,
           claims,
           models,
           physical: send.transport.mock.calls.length,
-        }),
-      );
-      expect(result.status, String(reason)).toBe("accepted");
-      expect(claims).toBe(1);
-      expect(models).toBe(1);
-      expect(send.transport).toHaveBeenCalledTimes(1);
-      const before = await ledger(f);
-      record(`accepted-${mode}`, {
-        result,
-        principal: f.a,
-        approver: f.b,
-        claims,
-        models,
-        physical: send.transport.mock.calls.length,
-        admissions: before.rows.length,
-        attempts: before.attempts,
-      });
-      expect(before.rows).toHaveLength(1);
-      expect(before.rows[0]!.data).toMatchObject({
-        version: 1,
-        units: 1,
-        transport: mode === "external" ? "external" : "ses",
-      });
-      expect(before.attempts).toEqual([{ state: "settled", units: "180000" }]);
-      const approval = await db
-        .select()
-        .from(schema.auditLog)
-        .where(
-          and(
-            eq(schema.auditLog.teamId, f.teamId),
-            eq(schema.auditLog.action, "mailbox.send_approved"),
-          ),
-        );
-      expect(approval).toHaveLength(1);
-      expect(approval[0]).toMatchObject({
-        actorId: `user:${f.b}`,
-        data: { outboxId: f.queued.id },
-      });
-      const debt: unknown = await db.execute(
-        sql`select debt_units::text as units from sending_judge_account_debt where account_key='commandcode-primary'`,
-      );
-      expect(
-        Number(
-          (Array.isArray(debt) ? debt : (debt as { rows: { units: string }[] }).rows)[0].units,
-        ),
-      ).toBeGreaterThanOrEqual(180000);
-      await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
-      expect(await ledger(f)).toEqual(before);
-      expect(
-        await db.execute(
+          admissions: before.rows.length,
+          attempts: before.attempts,
+        });
+        expect(before.rows).toHaveLength(1);
+        expect(before.rows[0]!.data).toMatchObject({
+          version: 1,
+          units: 1,
+          transport: mode === "external" ? "external" : "ses",
+        });
+        expect(before.attempts).toEqual([{ state: "settled", units: "180000" }]);
+        const approval = await db
+          .select()
+          .from(schema.auditLog)
+          .where(
+            and(
+              eq(schema.auditLog.teamId, f.teamId),
+              eq(schema.auditLog.action, "mailbox.send_approved"),
+            ),
+          );
+        expect(approval).toHaveLength(1);
+        expect(approval[0]).toMatchObject({
+          actorId: `user:${f.b}`,
+          data: { outboxId: f.queued.id },
+        });
+        const debt: unknown = await db.execute(
           sql`select debt_units::text as units from sending_judge_account_debt where account_key='commandcode-primary'`,
-        ),
-      ).toEqual(debt);
-      record(`replay-${mode}`, {
-        claims,
-        models,
-        physical: send.transport.mock.calls.length,
-        debtUnchanged: true,
+        );
+        expect(
+          Number(
+            (Array.isArray(debt) ? debt : (debt as { rows: { units: string }[] }).rows)[0].units,
+          ),
+        ).toBeGreaterThanOrEqual(180000);
+        await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+        expect(await ledger(f)).toEqual(before);
+        expect(
+          await db.execute(
+            sql`select debt_units::text as units from sending_judge_account_debt where account_key='commandcode-primary'`,
+          ),
+        ).toEqual(debt);
+        record(`replay-${mode}`, {
+          claims,
+          models,
+          physical: send.transport.mock.calls.length,
+          debtUnchanged: true,
+        });
+        expect(claims).toBe(1);
+        expect(models).toBe(1);
+        expect(send.transport).toHaveBeenCalledTimes(1);
+        expect(sqlClocks).toBeGreaterThan(0);
+        if (mode === "external") expect(SESv2Client.prototype.send).not.toHaveBeenCalled();
       });
+    for (const kind of [
+      "removed_B",
+      "recreated_B",
+      "revoked_grant",
+      "removed_A",
+      "held_A",
+      "insufficient_budget",
+    ] as const)
+      it(`refuses ${kind} before claim/model`, async () => {
+        const f = await realm(kind === "revoked_grant" ? "grant" : "owner"),
+          send = sender(f);
+        if (kind === "removed_B" || kind === "recreated_B")
+          await remove(f, "b", kind === "recreated_B");
+        if (kind === "revoked_grant") await revokeMailboxRegistry(db, f.admin, f.grant!.id);
+        if (kind === "removed_A") await remove(f, "a");
+        if (kind === "held_A")
+          await db
+            .update(schema.teams)
+            .set({ sendReviewAt: new Date() })
+            .where(eq(schema.teams.id, f.teamId));
+        if (kind === "insufficient_budget") credits = 5;
+        const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+        expect(result.status).not.toBe("accepted");
+        expect(claims).toBe(0);
+        expect(models).toBe(0);
+        expect(send.transport).not.toHaveBeenCalled();
+        expect(await ledger(f)).toEqual({ rows: [], attempts: [] });
+      });
+    for (const kind of [
+      "removed_B",
+      "recreated_B",
+      "removed_A",
+      "recreated_A",
+      "revoked_grant",
+    ] as const)
+      it(`rechecks original proof after await: ${kind}`, async () => {
+        const f = await realm(kind === "revoked_grant" ? "grant" : "owner"),
+          context = await getGraduatedSendingContext();
+        const proof = await issue(f, context);
+        expect((await getGraduatedSenderReputation(db, proof, context)).state).toBe(
+          "domain_verified",
+        );
+        if (kind === "revoked_grant") await revokeMailboxRegistry(db, f.admin, f.grant!.id);
+        else await remove(f, kind.endsWith("A") ? "a" : "b", kind.startsWith("recreated"));
+        await expect(getGraduatedSenderReputation(db, proof, context)).rejects.toMatchObject({
+          reason: "registered_sender_required",
+        });
+        await expect(
+          reserveGraduatedSending(
+            db,
+            {
+              teamId: f.teamId,
+              emailId: f.queued.id,
+              from: f.from,
+              recipients: ["recipient@example.invalid"],
+              campaign: false,
+              senderProof: proof,
+            },
+            context,
+          ),
+        ).rejects.toMatchObject({ reason: "registered_sender_required" });
+        expect(await ledger(f)).toEqual({ rows: [], attempts: [] });
+      });
+    for (const kind of ["removed_B", "removed_A", "revoked_grant", "unverified_A"] as const)
+      it(`post-model ${kind} clears only its claim and retains settled debt`, async () => {
+        const f = await realm(kind === "revoked_grant" ? "grant" : "owner"),
+          send = sender(f);
+        duringModel = async () => {
+          expect(claims).toBe(1);
+          expect(models).toBe(1);
+          if (kind === "revoked_grant") await revokeMailboxRegistry(db, f.admin, f.grant!.id);
+          else if (kind === "unverified_A")
+            await db
+              .update(schema.user)
+              .set({ emailVerified: false })
+              .where(eq(schema.user.id, f.a));
+          else await remove(f, kind === "removed_A" ? "a" : "b");
+        };
+        const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+        expect(claims).toBe(1);
+        expect(models).toBe(1);
+        expect(send.transport).not.toHaveBeenCalled();
+        expect(result.status).toBe("queued");
+        expect((await ledger(f)).attempts).toEqual([{ state: "settled", units: "180000" }]);
+        const [row] = await db
+          .select()
+          .from(schema.mailboxOutbox)
+          .where(eq(schema.mailboxOutbox.id, f.queued.id));
+        expect(row).toMatchObject({ approvedBy: f.b, attemptId: null, attemptedAt: null });
+      });
+    it("rechecks B at final SES throttle boundary after clean model", async () => {
+      const f = await realm(),
+        send = sender(f);
+      beforePhysical = async () => {
+        expect(models).toBe(1);
+        await remove(f, "b");
+      };
+      const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
       expect(claims).toBe(1);
       expect(models).toBe(1);
-      expect(send.transport).toHaveBeenCalledTimes(1);
-      expect(sqlClocks).toBeGreaterThan(0);
-      if (mode === "external") expect(SESv2Client.prototype.send).not.toHaveBeenCalled();
+      expect(send.transport).not.toHaveBeenCalled();
+      expect(result.status).toBe("queued");
+      expect((await ledger(f)).attempts).toEqual([{ state: "settled", units: "180000" }]);
     });
-  for (const kind of [
-    "removed_B",
-    "recreated_B",
-    "revoked_grant",
-    "removed_A",
-    "held_A",
-    "insufficient_budget",
-  ] as const)
-    it(`refuses ${kind} before claim/model`, async () => {
-      const f = await realm(kind === "revoked_grant" ? "grant" : "owner"),
-        send = sender(f);
-      if (kind === "removed_B" || kind === "recreated_B")
-        await remove(f, "b", kind === "recreated_B");
-      if (kind === "revoked_grant") await revokeMailboxRegistry(db, f.admin, f.grant!.id);
-      if (kind === "removed_A") await remove(f, "a");
-      if (kind === "held_A")
+    it("rechecks the exact current sender-domain name at the final physical boundary", async () => {
+      const f = await realm(),
+        adapter = sender(f);
+      beforePhysical = async () => {
+        expect(models).toBe(1);
         await db
-          .update(schema.teams)
-          .set({ sendReviewAt: new Date() })
-          .where(eq(schema.teams.id, f.teamId));
-      if (kind === "insufficient_budget") credits = 5;
-      const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
-      expect(result.status).not.toBe("accepted");
+          .update(schema.domains)
+          .set({ name: `${randomUUID()}.example.invalid` })
+          .where(eq(schema.domains.id, f.domainId));
+      };
+      const result = await sendMailboxOutbox(db, keys, f.queued.id, adapter, mime);
+      expect(claims).toBe(1);
+      expect(models).toBe(1);
+      expect(adapter.transport).not.toHaveBeenCalled();
+      expect(result.status).toBe("queued");
+      expect((await ledger(f)).attempts).toEqual([{ state: "settled", units: "180000" }]);
+    });
+    it("does not decrypt or backfill a counterfeit legacy outbox without original approval audit", async () => {
+      const f = await realm(),
+        adapter = sender(f);
+      const [source] = await db
+        .select()
+        .from(schema.mailboxOutbox)
+        .where(eq(schema.mailboxOutbox.id, f.queued.id));
+      // Negative only: clone a real queued snapshot into a distinct, unapproved
+      // draft/outbox identity to represent a legacy or forged provenance row.
+      // No positive case inserts its own business claim/admission/audit.
+      const raw = Buffer.from(
+        `From: ${f.from}\r\nTo: recipient@example.invalid\r\nSubject: Legacy\r\n\r\nHello`,
+      );
+      const draft = await saveMailboxDraft(db, keys, f.actor, {
+        mailboxId: f.mailboxId,
+        expectedRevision: 0,
+        raw,
+      });
+      const id = randomUUID();
+      await db
+        .insert(schema.mailboxOutbox)
+        .values({ ...source!, id, draftId: draft.id, draftRevision: draft.revision });
+      const unwrap = vi
+        .spyOn(keys, "unwrapDek")
+        .mockRejectedValue(new Error("UNPROVEN_ROW_MUST_NOT_REACH_DECRYPT"));
+      const result = await sendMailboxOutbox(db, keys, id, adapter, mime);
+      expect(result).toMatchObject({
+        status: "queued",
+        errorCode: "mailbox_deferred:review_required",
+      });
+      expect(unwrap).not.toHaveBeenCalled();
       expect(claims).toBe(0);
       expect(models).toBe(0);
-      expect(send.transport).not.toHaveBeenCalled();
+      expect(adapter.transport).not.toHaveBeenCalled();
       expect(await ledger(f)).toEqual({ rows: [], attempts: [] });
     });
-  for (const kind of [
-    "removed_B",
-    "recreated_B",
-    "removed_A",
-    "recreated_A",
-    "revoked_grant",
-  ] as const)
-    it(`rechecks original proof after await: ${kind}`, async () => {
-      const f = await realm(kind === "revoked_grant" ? "grant" : "owner"),
-        context = await getGraduatedSendingContext();
+    it("rechecks B after claim and before model at an awaited adapter boundary", async () => {
+      const f = await realm(),
+        adapter = sender(f);
+      const result = await sendMailboxOutbox(
+        db,
+        keys,
+        f.queued.id,
+        {
+          send: async (input) => {
+            await remove(f, "b");
+            return adapter.send(input);
+          },
+        },
+        mime,
+      );
+      expect(claims).toBe(1);
+      expect(models).toBe(0);
+      expect(adapter.transport).not.toHaveBeenCalled();
+      expect(result.status).toBe("queued");
+      expect((await ledger(f)).attempts).toEqual([]);
+    });
+    it("retains the external credential generation fence after model and on proof reuse", async () => {
+      const f = await realm("external"),
+        adapter = sender(f),
+        context = await getGraduatedSendingContext({ purpose: "judge" });
       const proof = await issue(f, context);
+      expect((await getGraduatedSenderReputation(db, proof, context)).state).toBe("verified");
+      duringModel = async () => {
+        expect(models).toBe(1);
+        await db
+          .update(schema.mailboxExternalAccounts)
+          .set({
+            connectionGeneration: sql`${schema.mailboxExternalAccounts.connectionGeneration}+1`,
+          })
+          .where(eq(schema.mailboxExternalAccounts.mailboxId, f.mailboxId));
+      };
+      const result = await sendMailboxOutbox(db, keys, f.queued.id, adapter, mime);
+      expect(claims).toBe(1);
+      expect(models).toBe(1);
+      expect(adapter.transport).not.toHaveBeenCalled();
+      expect(result.status).toBe("queued");
+      expect((await ledger(f)).attempts).toEqual([{ state: "settled", units: "180000" }]);
+      await expect(getGraduatedSenderReputation(db, proof, context)).rejects.toMatchObject({
+        reason: "registered_sender_required",
+      });
+      expect(SESv2Client.prototype.send).not.toHaveBeenCalled();
+    });
+    it("expires the same original observation without restamping its native proof", async () => {
+      const f = await realm(),
+        context = await getGraduatedSendingContext(),
+        proof = await issue(f, context);
       expect((await getGraduatedSenderReputation(db, proof, context)).state).toBe(
         "domain_verified",
       );
-      if (kind === "revoked_grant") await revokeMailboxRegistry(db, f.admin, f.grant!.id);
-      else await remove(f, kind.endsWith("A") ? "a" : "b", kind.startsWith("recreated"));
+      vi.setSystemTime(Date.now() + 5001);
       await expect(getGraduatedSenderReputation(db, proof, context)).rejects.toMatchObject({
-        reason: "registered_sender_required",
+        reason: "capacity_unavailable",
       });
       await expect(
         reserveGraduatedSending(
@@ -564,230 +752,143 @@ describe("native registered principal A / actual approver B", () => {
           },
           context,
         ),
-      ).rejects.toMatchObject({ reason: "registered_sender_required" });
+      ).rejects.toThrow();
       expect(await ledger(f)).toEqual({ rows: [], attempts: [] });
     });
-  for (const kind of ["removed_B", "removed_A", "revoked_grant", "unverified_A"] as const)
-    it(`post-model ${kind} clears only its claim and retains settled debt`, async () => {
-      const f = await realm(kind === "revoked_grant" ? "grant" : "owner"),
-        send = sender(f);
-      duringModel = async () => {
-        expect(claims).toBe(1);
+    it("rejects DTO authority, cross-tenant mailbox, wrong domain, and cloned capabilities", async () => {
+      const f = await realm(),
+        foreign = await realm(),
+        context = await getGraduatedSendingContext();
+      const input = { teamId: f.teamId, actorUserId: f.b, from: f.from, domainId: f.domainId };
+      await expect(
+        authorizeGraduatedSender(db, { ...input, nativeAuthorized: true } as never, context),
+      ).rejects.toMatchObject({ reason: "registered_sender_required" });
+      await expect(
+        authorizeGraduatedSender(db, { ...input, mailboxId: foreign.mailboxId }, context),
+      ).rejects.toMatchObject({ reason: "registered_sender_required" });
+      await expect(
+        authorizeGraduatedSender(
+          db,
+          { ...input, mailboxId: f.mailboxId, domainId: foreign.domainId },
+          context,
+        ),
+      ).rejects.toMatchObject({ reason: "registered_sender_required" });
+      await expect(issue(f, { ...context })).rejects.toMatchObject({
+        reason: "registered_sender_required",
+      });
+      const proof = await issue(f, context);
+      await expect(getGraduatedSenderReputation(db, { ...proof }, context)).rejects.toMatchObject({
+        reason: "registered_sender_required",
+      });
+      await expect(getGraduatedSenderReputation(db, proof, { ...context })).rejects.toMatchObject({
+        reason: "registered_sender_required",
+      });
+      await expect(
+        reserveGraduatedSending(
+          db,
+          {
+            teamId: f.teamId,
+            emailId: f.queued.id,
+            from: f.from,
+            recipients: ["recipient@example.invalid"],
+            campaign: false,
+            senderProof: proof,
+          },
+          { ...context },
+        ),
+      ).rejects.toMatchObject({ reason: "registered_sender_required" });
+      // A caller-created DTO cannot bootstrap a durable admission or a claim.
+      await expect(
+        assertMailboxOutboxSendAccess(db, {
+          teamId: f.teamId,
+          mailboxId: f.mailboxId,
+          outboxId: f.queued.id,
+          attemptId: randomUUID(),
+          from: f.from,
+          to: ["recipient@example.invalid"],
+          cc: [],
+          bcc: [],
+          raw: Buffer.alloc(0),
+          idempotencyKey: f.queued.id,
+        }),
+      ).rejects.toThrow();
+      expect(await ledger(f)).toEqual({ rows: [], attempts: [] });
+      expect(models).toBe(0);
+    });
+  });
+
+describe("native final composite freshness tail", () => {
+  for (const mode of ["owner", "external"] as const)
+    it(`refuses ${mode} after final access COMMIT expires the original observation`, async () => {
+      const f = await realm(mode),
+        adapter = sender(f);
+      const original = await getGraduatedSendingContext(
+        mode === "external" ? { purpose: "judge" } : {},
+      );
+      const origin = Date.parse(original.judgeEnvelope!.meterAt),
+        expires = Date.parse(original.judgeEnvelope!.meterExpiresAt);
+      let freshAge: number | undefined, expiredAge: number | undefined;
+      beforePhysical = async () => {
         expect(models).toBe(1);
-        if (kind === "revoked_grant") await revokeMailboxRegistry(db, f.admin, f.grant!.id);
-        else if (kind === "unverified_A")
-          await db.update(schema.user).set({ emailVerified: false }).where(eq(schema.user.id, f.a));
-        else await remove(f, kind === "removed_A" ? "a" : "b");
+        expect(claims).toBe(1);
+        expect((await ledger(f)).attempts).toEqual([{ state: "settled", units: "180000" }]);
+        freshAge = Date.now() - origin;
+        expect(Date.now()).toBeLessThan(expires);
+        tailArmed = true;
       };
-      const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+      tailAfterCommit = () => {
+        tailHooks++;
+        expect(models).toBe(1);
+        expect(claims).toBe(1);
+        expect(Date.now()).toBeLessThan(expires);
+        vi.setSystemTime(Date.now() + 5001);
+        expiredAge = Date.now() - origin;
+        record(`tail-after-commit-${mode}`, {
+          boundary: "original-outer-transaction-commit-return",
+          freshAge,
+          expiredAge,
+          origin,
+          expires,
+          now: Date.now(),
+          models,
+          claims,
+        });
+      };
+      const result = await sendMailboxOutbox(db, keys, f.queued.id, adapter, mime);
+      const accounting = await ledger(f);
+      record(`tail-result-${mode}`, {
+        result,
+        tailHooks,
+        freshAge,
+        expiredAge,
+        claims,
+        models,
+        physical: adapter.transport.mock.calls.length,
+        admissions: accounting.rows.length,
+        attempts: accounting.attempts,
+      });
+      expect(tailHooks).toBe(1);
+      expect(freshAge).toBeLessThan(5000);
+      expect(expiredAge).toBeGreaterThan(5000);
       expect(claims).toBe(1);
       expect(models).toBe(1);
-      expect(send.transport).not.toHaveBeenCalled();
-      expect(result.status).toBe("queued");
-      expect((await ledger(f)).attempts).toEqual([{ state: "settled", units: "180000" }]);
+      expect(accounting.rows).toHaveLength(1);
+      expect(accounting.attempts).toEqual([{ state: "settled", units: "180000" }]);
+      expect(adapter.transport).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        status: "queued",
+        errorCode: "mailbox_deferred:review_required",
+      });
       const [row] = await db
         .select()
         .from(schema.mailboxOutbox)
         .where(eq(schema.mailboxOutbox.id, f.queued.id));
-      expect(row).toMatchObject({ approvedBy: f.b, attemptId: null, attemptedAt: null });
+      expect(row).toMatchObject({
+        approvedBy: f.b,
+        approvedMembershipId: f.memberB.id,
+        attemptId: null,
+        attemptedAt: null,
+      });
+      expect(await ledger(f)).toEqual(accounting);
     });
-  it("rechecks B at final SES throttle boundary after clean model", async () => {
-    const f = await realm(),
-      send = sender(f);
-    beforePhysical = async () => {
-      expect(models).toBe(1);
-      await remove(f, "b");
-    };
-    const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
-    expect(claims).toBe(1);
-    expect(models).toBe(1);
-    expect(send.transport).not.toHaveBeenCalled();
-    expect(result.status).toBe("queued");
-    expect((await ledger(f)).attempts).toEqual([{ state: "settled", units: "180000" }]);
-  });
-  it("rechecks the exact current sender-domain name at the final physical boundary", async () => {
-    const f = await realm(),
-      adapter = sender(f);
-    beforePhysical = async () => {
-      expect(models).toBe(1);
-      await db
-        .update(schema.domains)
-        .set({ name: `${randomUUID()}.example.invalid` })
-        .where(eq(schema.domains.id, f.domainId));
-    };
-    const result = await sendMailboxOutbox(db, keys, f.queued.id, adapter, mime);
-    expect(claims).toBe(1);
-    expect(models).toBe(1);
-    expect(adapter.transport).not.toHaveBeenCalled();
-    expect(result.status).toBe("queued");
-    expect((await ledger(f)).attempts).toEqual([{ state: "settled", units: "180000" }]);
-  });
-  it("does not decrypt or backfill a counterfeit legacy outbox without original approval audit", async () => {
-    const f = await realm(),
-      adapter = sender(f);
-    const [source] = await db
-      .select()
-      .from(schema.mailboxOutbox)
-      .where(eq(schema.mailboxOutbox.id, f.queued.id));
-    // Negative only: clone a real queued snapshot into a distinct, unapproved
-    // draft/outbox identity to represent a legacy or forged provenance row.
-    // No positive case inserts its own business claim/admission/audit.
-    const raw = Buffer.from(
-      `From: ${f.from}\r\nTo: recipient@example.invalid\r\nSubject: Legacy\r\n\r\nHello`,
-    );
-    const draft = await saveMailboxDraft(db, keys, f.actor, {
-      mailboxId: f.mailboxId,
-      expectedRevision: 0,
-      raw,
-    });
-    const id = randomUUID();
-    await db
-      .insert(schema.mailboxOutbox)
-      .values({ ...source!, id, draftId: draft.id, draftRevision: draft.revision });
-    const unwrap = vi
-      .spyOn(keys, "unwrapDek")
-      .mockRejectedValue(new Error("UNPROVEN_ROW_MUST_NOT_REACH_DECRYPT"));
-    const result = await sendMailboxOutbox(db, keys, id, adapter, mime);
-    expect(result).toMatchObject({
-      status: "queued",
-      errorCode: "mailbox_deferred:review_required",
-    });
-    expect(unwrap).not.toHaveBeenCalled();
-    expect(claims).toBe(0);
-    expect(models).toBe(0);
-    expect(adapter.transport).not.toHaveBeenCalled();
-    expect(await ledger(f)).toEqual({ rows: [], attempts: [] });
-  });
-  it("rechecks B after claim and before model at an awaited adapter boundary", async () => {
-    const f = await realm(),
-      adapter = sender(f);
-    const result = await sendMailboxOutbox(
-      db,
-      keys,
-      f.queued.id,
-      {
-        send: async (input) => {
-          await remove(f, "b");
-          return adapter.send(input);
-        },
-      },
-      mime,
-    );
-    expect(claims).toBe(1);
-    expect(models).toBe(0);
-    expect(adapter.transport).not.toHaveBeenCalled();
-    expect(result.status).toBe("queued");
-    expect((await ledger(f)).attempts).toEqual([]);
-  });
-  it("retains the external credential generation fence after model and on proof reuse", async () => {
-    const f = await realm("external"),
-      adapter = sender(f),
-      context = await getGraduatedSendingContext({ purpose: "judge" });
-    const proof = await issue(f, context);
-    expect((await getGraduatedSenderReputation(db, proof, context)).state).toBe("verified");
-    duringModel = async () => {
-      expect(models).toBe(1);
-      await db
-        .update(schema.mailboxExternalAccounts)
-        .set({
-          connectionGeneration: sql`${schema.mailboxExternalAccounts.connectionGeneration}+1`,
-        })
-        .where(eq(schema.mailboxExternalAccounts.mailboxId, f.mailboxId));
-    };
-    const result = await sendMailboxOutbox(db, keys, f.queued.id, adapter, mime);
-    expect(claims).toBe(1);
-    expect(models).toBe(1);
-    expect(adapter.transport).not.toHaveBeenCalled();
-    expect(result.status).toBe("queued");
-    expect((await ledger(f)).attempts).toEqual([{ state: "settled", units: "180000" }]);
-    await expect(getGraduatedSenderReputation(db, proof, context)).rejects.toMatchObject({
-      reason: "registered_sender_required",
-    });
-    expect(SESv2Client.prototype.send).not.toHaveBeenCalled();
-  });
-  it("expires the same original observation without restamping its native proof", async () => {
-    const f = await realm(),
-      context = await getGraduatedSendingContext(),
-      proof = await issue(f, context);
-    expect((await getGraduatedSenderReputation(db, proof, context)).state).toBe("domain_verified");
-    vi.setSystemTime(Date.now() + 5001);
-    await expect(getGraduatedSenderReputation(db, proof, context)).rejects.toMatchObject({
-      reason: "capacity_unavailable",
-    });
-    await expect(
-      reserveGraduatedSending(
-        db,
-        {
-          teamId: f.teamId,
-          emailId: f.queued.id,
-          from: f.from,
-          recipients: ["recipient@example.invalid"],
-          campaign: false,
-          senderProof: proof,
-        },
-        context,
-      ),
-    ).rejects.toThrow();
-    expect(await ledger(f)).toEqual({ rows: [], attempts: [] });
-  });
-  it("rejects DTO authority, cross-tenant mailbox, wrong domain, and cloned capabilities", async () => {
-    const f = await realm(),
-      foreign = await realm(),
-      context = await getGraduatedSendingContext();
-    const input = { teamId: f.teamId, actorUserId: f.b, from: f.from, domainId: f.domainId };
-    await expect(
-      authorizeGraduatedSender(db, { ...input, nativeAuthorized: true } as never, context),
-    ).rejects.toMatchObject({ reason: "registered_sender_required" });
-    await expect(
-      authorizeGraduatedSender(db, { ...input, mailboxId: foreign.mailboxId }, context),
-    ).rejects.toMatchObject({ reason: "registered_sender_required" });
-    await expect(
-      authorizeGraduatedSender(
-        db,
-        { ...input, mailboxId: f.mailboxId, domainId: foreign.domainId },
-        context,
-      ),
-    ).rejects.toMatchObject({ reason: "registered_sender_required" });
-    await expect(issue(f, { ...context })).rejects.toMatchObject({
-      reason: "registered_sender_required",
-    });
-    const proof = await issue(f, context);
-    await expect(getGraduatedSenderReputation(db, { ...proof }, context)).rejects.toMatchObject({
-      reason: "registered_sender_required",
-    });
-    await expect(getGraduatedSenderReputation(db, proof, { ...context })).rejects.toMatchObject({
-      reason: "registered_sender_required",
-    });
-    await expect(
-      reserveGraduatedSending(
-        db,
-        {
-          teamId: f.teamId,
-          emailId: f.queued.id,
-          from: f.from,
-          recipients: ["recipient@example.invalid"],
-          campaign: false,
-          senderProof: proof,
-        },
-        { ...context },
-      ),
-    ).rejects.toMatchObject({ reason: "registered_sender_required" });
-    // A caller-created DTO cannot bootstrap a durable admission or a claim.
-    await expect(
-      assertMailboxOutboxSendAccess(db, {
-        teamId: f.teamId,
-        mailboxId: f.mailboxId,
-        outboxId: f.queued.id,
-        attemptId: randomUUID(),
-        from: f.from,
-        to: ["recipient@example.invalid"],
-        cc: [],
-        bcc: [],
-        raw: Buffer.alloc(0),
-        idempotencyKey: f.queued.id,
-      }),
-    ).rejects.toThrow();
-    expect(await ledger(f)).toEqual({ rows: [], attempts: [] });
-    expect(models).toBe(0);
-  });
 });

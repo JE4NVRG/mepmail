@@ -719,6 +719,7 @@ export {
 export {
   acceptMailboxOutbox,
   assertMailboxOutboxSendAccess,
+  assertMailboxOutboxSendFresh,
   checkMailboxRecipientBlocks,
   failQueuedMailboxOutbox,
   getMailboxOutboundSummary,
