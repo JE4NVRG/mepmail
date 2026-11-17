@@ -600,6 +600,14 @@ declare const proofBrand: unique symbol;
 export interface GraduatedSenderProof {
   readonly [proofBrand]: true;
 }
+/** Server-origin capability for the immutable runtime observation. Only the
+ * original context constructor can mark a context; JSON/DTO/structural copies
+ * never acquire it, so it cannot become a public dispatch bypass. */
+const originalGraduatedContexts = new WeakSet<object>();
+export function markOriginalGraduatedContext<T extends object>(context: T): T {
+  originalGraduatedContexts.add(context);
+  return context;
+}
 const senderProofs = new WeakMap<
   GraduatedSenderProof,
   {
@@ -1029,6 +1037,117 @@ export async function reserveJudgeAttempt(
       reservedCreditUnits: v.reservedCreditUnits,
     };
   });
+}
+/** Ordinary API dispatch preflight. Reads current DB authority (email row,
+ * tenant standing, registered principal, domain DNS/DMARC) and requires the
+ * ORIGINAL durable admission witness already written when the row was accepted.
+ * It never creates an admission, financial row or audit: a missing, stale or
+ * mismatched witness is a hold, never a new grant. True is returned only after
+ * every check passes with an original, fresh server observation. */
+export async function verifyGraduatedDispatchAdmission(
+  db: Db,
+  input: { teamId: string; emailId: string },
+  context?: GraduatedContext,
+): Promise<boolean> {
+  if (!context || typeof context !== "object" || !originalGraduatedContexts.has(context as object))
+    return false;
+  try {
+    const now = await wallClock(db, context);
+    judgeEnvelope(now, context);
+    const [email] = await db
+      .select({
+        from: schema.emails.from,
+        to: schema.emails.to,
+        cc: schema.emails.cc,
+        bcc: schema.emails.bcc,
+        domainId: schema.emails.domainId,
+        topicId: schema.emails.topicId,
+      })
+      .from(schema.emails)
+      .where(and(eq(schema.emails.id, input.emailId), eq(schema.emails.teamId, input.teamId)));
+    if (!email) return false;
+    const normalized = [...(email.to ?? []), ...(email.cc ?? []), ...(email.bcc ?? [])]
+      .map((r) => normalizeAddress(extractAddrSpec(r)))
+      .filter((r) => !!r && r.includes("@"));
+    const recipients = [...new Set(normalized)];
+    const from = normalizeAddress(extractAddrSpec(email.from));
+    if (!from || !recipients.length) return false;
+    // Exactly the accept-time witness identity; a stripped/substituted
+    // recipient list can never authorize ADDED recipients or a rewritten audit.
+    const fingerprint = digest(
+      JSON.stringify([
+        input.teamId,
+        from,
+        recipients.slice().sort(),
+        !!email.topicId,
+        email.domainId,
+      ]),
+    );
+    const target = `graduated:${input.emailId}`;
+    const [witness] = await db
+      .select({ data: schema.auditLog.data })
+      .from(schema.auditLog)
+      .where(
+        and(
+          eq(schema.auditLog.teamId, input.teamId),
+          eq(schema.auditLog.action, ACTION),
+          eq(schema.auditLog.target, target),
+        ),
+      )
+      .limit(1);
+    const data = witness?.data;
+    if (
+      !data ||
+      data.version !== 1 ||
+      data.fingerprint !== fingerprint ||
+      !Number.isSafeInteger(data.units) ||
+      data.units !== recipients.length
+    )
+      return false;
+    const [standing] = await db
+      .select({
+        held: schema.teams.sendReviewAt,
+        cleared: schema.teams.sendReviewClearedAt,
+        suspended: schema.teams.suspendedAt,
+      })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, input.teamId));
+    if (
+      !standing ||
+      standing.suspended ||
+      (standing.held && (!standing.cleared || standing.held > standing.cleared))
+    )
+      return false;
+    // Current registered principal: risk-bound identity, else the unique owner.
+    const [risk] = await db
+      .select({ id: schema.teamSignupRisk.principalUserId })
+      .from(schema.teamSignupRisk)
+      .where(eq(schema.teamSignupRisk.teamId, input.teamId));
+    let actorUserId = risk?.id ?? null;
+    if (!actorUserId) {
+      const owners = await db
+        .select({ id: schema.teamMembers.userId })
+        .from(schema.teamMembers)
+        .where(
+          and(eq(schema.teamMembers.teamId, input.teamId), eq(schema.teamMembers.role, "owner")),
+        )
+        .limit(2);
+      if (owners.length !== 1 || !owners[0]) return false;
+      actorUserId = owners[0].id;
+    }
+    await authorizeGraduatedSender(
+      db,
+      { teamId: input.teamId, actorUserId, from: email.from, domainId: email.domainId },
+      context,
+    );
+    // Queries and current-authority validation may outlast the immutable origin.
+    // Recheck the SAME observation against the DB clock; never restamp it.
+    judgeEnvelope(await wallClock(db, context), context);
+    return true;
+  } catch (error) {
+    if (error instanceof GraduatedAdmissionError) return false;
+    throw error;
+  }
 }
 /** Call after confirmed outcome. Ambiguous never frees credit/concurrency.
  * A judge rejection changes no tenant suspension/reputation state. */

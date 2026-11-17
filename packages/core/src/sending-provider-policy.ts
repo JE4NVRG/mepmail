@@ -139,6 +139,14 @@ export function resolveSendingProvider(
     now?: Date | undefined;
     /** Derived by common server admission, never request JSON. */
     tenantEligible?: boolean;
+    /** Verified first-party producer provenance for THIS row (sealed body
+     * origin already row-bound by the caller). Never a public tag, plan name or
+     * request field, and never a customer funding/tenant-admission proof. */
+    provenance?: "customer" | "system";
+    /** Only a caller that has not yet decrypted provenance may defer the
+     * graduated decision to the final route; that route must supply
+     * tenantEligible/provenance before any MIME, claim or transport. */
+    graduatedPending?: boolean;
     teamId: string;
     messageClass: SendingMessageClass;
     emailId?: string;
@@ -157,7 +165,12 @@ export function resolveSendingProvider(
   },
 ): SendingProviderDecision {
   if (policy?.paused) return { kind: "held", reason: "operator_paused" };
-  if (policy?.graduated && input.tenantEligible !== true)
+  if (
+    policy?.graduated &&
+    input.tenantEligible !== true &&
+    input.provenance !== "system" &&
+    input.graduatedPending !== true
+  )
     return { kind: "held", reason: "team_not_allowed" };
   if (
     !policy?.graduated &&

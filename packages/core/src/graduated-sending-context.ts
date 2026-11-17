@@ -20,7 +20,11 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
 import { getCommandCodeMeter } from "./graduated-commandcode-meter.js";
-import { type GraduatedContext, graduatedSendingEnabled } from "./graduated-sending.js";
+import {
+  type GraduatedContext,
+  graduatedSendingEnabled,
+  markOriginalGraduatedContext,
+} from "./graduated-sending.js";
 import { GraduatedAdmissionError } from "./graduated-sending-policy.js";
 export async function graduatedSenderPrincipal(db: Db, teamId: string): Promise<string> {
   const [risk] = await db
@@ -104,15 +108,17 @@ export async function getGraduatedSendingContext(
     reservedCreditUnits: 302457600,
     remainingCreditUnits,
   });
-  return Object.freeze({
-    judgeEnvelope,
-    ...(observation
-      ? {
-          ...(observation.regionalCapacity["us-east-1"]
-            ? { capacityReceipt: observation.regionalCapacity["us-east-1"] }
-            : {}),
-          regionalCapacity: observation.regionalCapacity,
-        }
-      : {}),
-  });
+  return markOriginalGraduatedContext(
+    Object.freeze({
+      judgeEnvelope,
+      ...(observation
+        ? {
+            ...(observation.regionalCapacity["us-east-1"]
+              ? { capacityReceipt: observation.regionalCapacity["us-east-1"] }
+              : {}),
+            regionalCapacity: observation.regionalCapacity,
+          }
+        : {}),
+    }),
+  );
 }

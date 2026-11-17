@@ -19,6 +19,7 @@ import {
   fetchTeamQuota,
   fetchTeamStanding,
   findSuppressed,
+  getGraduatedSendingContext,
   getSignupSendingRestriction,
   graduatedSendingEnabled,
   hashRecipient,
@@ -42,6 +43,7 @@ import {
   substituteUnsubscribeUrl,
   transitionQueueState,
   utcDay,
+  verifyGraduatedDispatchAdmission,
   type WebhookEnqueue,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
@@ -655,8 +657,40 @@ export async function sendEmail(
     sesMessageId: email.sesMessageId,
     latestStatus: email.latestStatus,
   };
+  // Graduated dispatch: a customer row is admitted from its ORIGINAL durable
+  // admission witness plus current DB authority; the never-admitted first-party
+  // platform mail is decided later from its sealed producer origin, so the
+  // preliminary fence may only defer, never grant. No ROOT budget is reserved
+  // here: the physical attempt still reserves before its own model call.
+  const graduatedGate =
+    graduatedSendingEnabled() &&
+    deps.isCloud === true &&
+    deps.sendingProviderPolicy?.graduated === true;
+  let graduatedContext: Awaited<ReturnType<typeof getGraduatedSendingContext>> | undefined;
+  const graduatedWitnessValid = async (): Promise<boolean> => {
+    try {
+      // Reuse only an unexpired original observation, never an eligibility bool.
+      if (
+        !graduatedContext?.judgeEnvelope ||
+        Date.parse(graduatedContext.judgeEnvelope.meterExpiresAt) <= Date.now()
+      )
+        graduatedContext = await getGraduatedSendingContext();
+      return await verifyGraduatedDispatchAdmission(
+        db,
+        { teamId: email.teamId, emailId: email.id },
+        graduatedContext,
+      );
+    } catch {
+      return false;
+    }
+  };
   const preliminaryRoute = resolveSendingProvider(deps.sendingProviderPolicy ?? null, {
     ...restorationMessage,
+    ...(graduatedGate
+      ? (await graduatedWitnessValid())
+        ? { tenantEligible: true }
+        : { graduatedPending: true }
+      : {}),
     now: deps.now?.(),
     teamId: email.teamId,
     messageClass:
@@ -1114,6 +1148,12 @@ export async function sendEmail(
   });
   const route = resolveSendingProvider(deps.sendingProviderPolicy ?? null, {
     ...restorationMessage,
+    // Provenance is known only after decrypting this row's sealed origin.
+    ...(graduatedGate
+      ? systemMail
+        ? { provenance: "system" as const }
+        : { tenantEligible: await graduatedWitnessValid(), provenance: "customer" as const }
+      : {}),
     now: deps.now?.(),
     teamId: email.teamId,
     createdAt: email.createdAt,
@@ -1194,6 +1234,14 @@ export async function sendEmail(
 
   if (!azureRoute && deps.sesQuota?.accountPaused?.(domain?.region) === true) {
     await parkQueued(db, email, "SES account paused");
+    return "parked";
+  }
+
+  // Revalidate graduated admission after the MIME/throttle wait. The model and
+  // claim boundaries are checked again below. A cached boolean from an earlier
+  // route is never reused, and the first-party sealed-origin path is separate.
+  if (graduatedGate && !systemMail && !(await graduatedWitnessValid())) {
+    await parkQueued(db, email, "graduated admission unavailable");
     return "parked";
   }
 
@@ -1305,6 +1353,13 @@ export async function sendEmail(
     contentApproval = decision;
   }
 
+  // The classifier awaited physical I/O: authority may have changed while its
+  // CLEAN result was pending. Keep confirmed model debt; do not claim transport.
+  if (graduatedGate && !systemMail && !(await graduatedWitnessValid())) {
+    await parkQueued(db, email, "graduated admission unavailable after classification");
+    return "parked";
+  }
+  let ownedClaimAt: Date | undefined;
   // Atomic claim (sentAt doubles as the claim marker): closes the
   // double-send windows — a concurrent worker on the same job, and a retry
   // after SES accepted but the post-send bookkeeping failed. Claimed rows
@@ -1345,8 +1400,9 @@ export async function sendEmail(
           isNull(schema.emails.sentAt),
         ),
       )
-      .returning({ id: schema.emails.id });
+      .returning({ id: schema.emails.id, sentAt: schema.emails.sentAt });
     if (claimed.length === 0) return "skipped";
+    ownedClaimAt = claimed[0]!.sentAt ?? undefined;
   }
   if (!campaignWindowOpen()) return "parked";
   // Claim acquisition also awaits the DB. A revoked approval is still a
@@ -1414,6 +1470,28 @@ export async function sendEmail(
       await parkQueued(db, email, "pre-dispatch snapshot changed");
       return "parked";
     }
+  }
+  // Last awaited authority check, after the claim and source-snapshot read,
+  // immediately before physical transport. Only our proven un-dispatched claim
+  // can be released; never touch an ACS receipt, provider ID, quota or model debt.
+  if (graduatedGate && !systemMail && !(await graduatedWitnessValid())) {
+    if (azureRoute || !ownedClaimAt) return "parked";
+    const released = await db
+      .update(schema.emails)
+      .set({ sentAt: null })
+      .where(
+        and(
+          eq(schema.emails.id, email.id),
+          eq(schema.emails.teamId, email.teamId),
+          eq(schema.emails.latestStatus, "queued"),
+          eq(schema.emails.sentAt, ownedClaimAt),
+          isNull(schema.emails.sesMessageId),
+        ),
+      )
+      .returning({ id: schema.emails.id });
+    if (!released.length) return "skipped";
+    await parkQueued(db, email, "graduated admission unavailable before transport");
+    return "parked";
   }
   let messageId: string;
   try {
