@@ -222,12 +222,6 @@ async function loadTenant(
     true,
     now,
   );
-  const planDaily =
-    quota.kind === "month"
-      ? Math.ceil(quota.included / 30)
-      : quota.kind === "day"
-        ? quota.limit
-        : 0;
   const region = domains[0]?.region ?? "us-east-1";
   const observed = context?.regionalCapacity
     ? ((context.regionalCapacity as Partial<Record<string, CapacityReceipt | null>>)[region] ??
@@ -251,6 +245,37 @@ async function loadTenant(
           : JSON.stringify(observed),
         now,
       );
+  // No billing rung is not an infinite resource grant. Admission uses the
+  // selected region's observed flow; the later judge-only observation carries
+  // no SES receipt, so its nominal rate comes from its ORIGINAL qualified Root
+  // envelope. Neither path funds sends: the shared buffers/debt still bind below.
+  const systemEnvelope =
+    team.plan === "system" &&
+    quota.kind === "none" &&
+    context &&
+    originalGraduatedContexts.has(context)
+      ? judgeEnvelope(now, context)
+      : null;
+  const systemDaily =
+    externalEnvelope || context?.regionalCapacity?.[region as "us-east-1" | "eu-west-1"]
+      ? (capacity?.globalDaily ?? 0)
+      : systemEnvelope
+        ? Math.min(
+            systemEnvelope.rpm,
+            systemEnvelope.tenantRpm,
+            Math.floor(
+              systemEnvelope.tpm / (systemEnvelope.maxInputTokens + systemEnvelope.maxOutputTokens),
+            ),
+          ) * 1440
+        : 0;
+  const planDaily =
+    quota.kind === "month"
+      ? Math.ceil(quota.included / 30)
+      : quota.kind === "day"
+        ? quota.limit
+        : team.plan === "system"
+          ? systemDaily
+          : 0;
   const dto = graduatedPolicy(
     {
       principalEmail: principal?.email ?? null,

@@ -20,6 +20,7 @@ import {
   authorizeGraduatedExternalSender,
   authorizeGraduatedSender,
   getGraduatedSenderReputation,
+  getTenantReputation,
   reserveGraduatedSending,
 } from "../src/graduated-sending.js";
 import { getGraduatedSendingContext } from "../src/graduated-sending-context.js";
@@ -31,12 +32,17 @@ import {
   revokeMailboxRegistry,
 } from "../src/mailbox-registry.js";
 import {
+  mailboxServiceEntitlement,
+  requireMailboxOperationalPlan,
+} from "../src/mailbox-service.js";
+import {
   assertMailboxOutboxSendAccess,
   type MailboxOutboxSender,
   type MailboxTransportMimeAdapter,
   queueMailboxDraft,
   sendMailboxOutbox,
 } from "../src/mailbox-transport.js";
+import { teamQuota } from "../src/plans.js";
 
 const { epoch } = vi.hoisted(() => {
   const at = Date.now();
@@ -198,8 +204,10 @@ beforeEach(() => {
   );
 });
 
-async function realm(mode: "owner" | "grant" | "external" = "owner") {
+async function realm(mode: "owner" | "grant" | "external" = "owner", system = false) {
   const teamId = await createTeam(db, randomUUID());
+  if (system)
+    await db.update(schema.teams).set({ plan: "system" }).where(eq(schema.teams.id, teamId));
   const a = randomUUID(),
     b = randomUUID();
   await db.insert(schema.user).values(
@@ -208,6 +216,9 @@ async function realm(mode: "owner" | "grant" | "external" = "owner") {
       name: "Synthetic authority",
       email: `${id}@example.invalid`,
       emailVerified: true,
+      ...(system && id === a
+        ? { createdAt: new Date(Date.UTC(2000, 0, 1) - sequence * 86400000) }
+        : {}),
     })),
   );
   const members = await db
@@ -252,8 +263,8 @@ async function realm(mode: "owner" | "grant" | "external" = "owner") {
     seats: 2,
     storageBytesPerMailbox: 1048576,
     includedOutboundPerMailbox: 100,
-    periodStart: new Date(Date.now() - 86400000),
-    periodEnd: new Date(Date.now() + 86400000),
+    periodStart: new Date(Date.now() - (system ? 44 : 1) * 86400000),
+    periodEnd: new Date(Date.now() + (system ? -14 : 1) * 86400000),
   });
   const mailboxId =
     mode === "external"
@@ -891,4 +902,180 @@ describe("native final composite freshness tail", () => {
       });
       expect(await ledger(f)).toEqual(accounting);
     });
+});
+
+describe("system finite regional quota", () => {
+  it("canonical Pro control traverses identical realm and transport before System", async () => {
+    const f = await realm(),
+      send = sender(f);
+    await db
+      .update(schema.teams)
+      .set({ plan: "pro", currentPeriodEnd: new Date(Date.now() + 86400000) })
+      .where(eq(schema.teams.id, f.teamId));
+    const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+    record("canonical-pro-control", {
+      result,
+      models,
+      claims,
+      physical: send.transport.mock.calls.length,
+    });
+    expect(result.status).toBe("accepted");
+    expect(models).toBe(1);
+    expect(claims).toBe(1);
+    expect(send.transport).toHaveBeenCalledTimes(1);
+    expect((await ledger(f)).attempts).toEqual([{ state: "settled", units: "180000" }]);
+  });
+  it("real System caller uses fresh capacity once, preserves old license and Root debt on replay", async () => {
+    const f = await realm("owner", true),
+      send = sender(f);
+    const entitlement = await mailboxServiceEntitlement(db, f.teamId);
+    expect(requireMailboxOperationalPlan(entitlement)).toMatchObject({
+      unlimitedOutbound: true,
+      unlimitedSeats: true,
+      status: "active",
+    });
+    expect(entitlement.plan!.periodEnd.getTime()).toBeLessThan(Date.now());
+    const context = await getGraduatedSendingContext();
+    const reputation = await getTenantReputation(db, f.teamId, {
+      ...context,
+      domainId: f.domainId,
+    });
+    const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+    record("system-original-caller", {
+      result,
+      reputation,
+      models,
+      claims,
+      physical: send.transport.mock.calls.length,
+    });
+    expect(result.status).toBe("accepted");
+    expect(reputation).toMatchObject({
+      plan: "system",
+      state: "domain_verified",
+      warmupPercent: 25,
+      capacityAvailable: true,
+    });
+    expect(reputation.effectiveDaily).toBeGreaterThan(0);
+    expect(reputation.effectiveDaily).toBeLessThanOrEqual(
+      context.regionalCapacity!["us-east-1"]!.globalDaily,
+    );
+    await expect(issue(f, { ...context })).rejects.toMatchObject({
+      reason: "registered_sender_required",
+    });
+    record("system-finite-positive", {
+      result,
+      reputation,
+      claims,
+      models,
+      physical: send.transport.mock.calls.length,
+    });
+    expect(result.status).toBe("accepted");
+    expect(claims).toBe(1);
+    expect(models).toBe(1);
+    expect(send.transport).toHaveBeenCalledTimes(1);
+    const before = await ledger(f);
+    expect(before.rows).toHaveLength(1);
+    expect(before.attempts).toEqual([{ state: "settled", units: "180000" }]);
+    const debt = await db.execute(
+      sql`select debt_units::text as units from sending_judge_account_debt where account_key='commandcode-primary'`,
+    );
+    await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+    expect(await ledger(f)).toEqual(before);
+    expect(
+      await db.execute(
+        sql`select debt_units::text as units from sending_judge_account_debt where account_key='commandcode-primary'`,
+      ),
+    ).toEqual(debt);
+    expect(models).toBe(1);
+    expect(claims).toBe(1);
+    expect(send.transport).toHaveBeenCalledTimes(1);
+    expect(sqlClocks).toBeGreaterThan(0);
+    record("system-debt-replay", {
+      attempts: before.attempts,
+      admissions: before.rows.length,
+      debt,
+      models,
+      claims,
+      physical: send.transport.mock.calls.length,
+      replayUnchanged: true,
+    });
+  });
+  it("System rejects absent, copied and expired original capacity without model or physical send", async () => {
+    const f = await realm("owner", true);
+    const context = await getGraduatedSendingContext();
+    await expect(issue(f, {})).rejects.toMatchObject({ reason: "registered_sender_required" });
+    await expect(issue(f, JSON.parse(JSON.stringify(context)))).rejects.toMatchObject({
+      reason: "registered_sender_required",
+    });
+    const absent = await getTenantReputation(db, f.teamId, { domainId: f.domainId });
+    expect(absent.capacityAvailable).toBe(false);
+    vi.setSystemTime(Date.now() + 5001);
+    await expect(issue(f, context)).rejects.toMatchObject({ reason: "capacity_unavailable" });
+    expect(models).toBe(0);
+    expect(claims).toBe(0);
+    expect((await ledger(f)).rows).toHaveLength(0);
+    record("system-original-capacity-negative", {
+      absentAvailable: absent.capacityAvailable,
+      clonesDenied: true,
+      expiredDenied: true,
+      models,
+      claims,
+    });
+  });
+  for (const denial of ["unverified", "review", "suspended", "dns", "capacity"] as const)
+    it(`real System caller refuses ${denial} before physical transport`, async () => {
+      const f = await realm("owner", true),
+        send = sender(f);
+      if (denial === "unverified")
+        await db.update(schema.user).set({ emailVerified: false }).where(eq(schema.user.id, f.a));
+      if (denial === "review")
+        await db
+          .update(schema.teams)
+          .set({ sendReviewAt: new Date() })
+          .where(eq(schema.teams.id, f.teamId));
+      if (denial === "suspended")
+        await db
+          .update(schema.teams)
+          .set({ suspendedAt: new Date() })
+          .where(eq(schema.teams.id, f.teamId));
+      if (denial === "dns")
+        await db
+          .update(schema.domains)
+          .set({ dnsRecords: [] })
+          .where(eq(schema.domains.id, f.domainId));
+      if (denial === "capacity")
+        vi.mocked(SESv2Client.prototype.send).mockRejectedValue(
+          new Error("SYNTHETIC_CAPACITY_UNKNOWN") as never,
+        );
+      const result = await sendMailboxOutbox(db, keys, f.queued.id, send, mime);
+      record(`system-refused-${denial}`, {
+        result,
+        claims,
+        models,
+        physical: send.transport.mock.calls.length,
+      });
+      expect(result.status).not.toBe("accepted");
+      expect(models).toBe(0);
+      expect(send.transport).not.toHaveBeenCalled();
+      expect((await ledger(f)).rows).toHaveLength(0);
+    });
+  it("Free and paid keep actual quota/warmup and operator ceiling, never inherit System fallback", async () => {
+    const f = await realm();
+    const context = await getGraduatedSendingContext();
+    const free = await getTenantReputation(db, f.teamId, { ...context, domainId: f.domainId });
+    record("free-comparison", free);
+    expect(free).toMatchObject({ plan: "free", effectiveDaily: 16, warmupPercent: 25 });
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, f.teamId));
+    expect(teamQuota(team!, true).kind).toBe("day");
+    await db
+      .update(schema.teams)
+      .set({
+        plan: "starter",
+        currentPeriodEnd: new Date(Date.now() + 86400000),
+        dailySendCeiling: 2,
+      })
+      .where(eq(schema.teams.id, f.teamId));
+    const paid = await getTenantReputation(db, f.teamId, { ...context, domainId: f.domainId });
+    expect(paid).toMatchObject({ plan: "starter", effectiveDaily: 2, warmupPercent: 25 });
+  });
 });
