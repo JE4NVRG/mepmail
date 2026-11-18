@@ -1,5 +1,6 @@
 import {
   getGraduatedSendingContext,
+  monthlySendDailyRate,
   PLAN_RUNG_KEYS,
   type PlanRungKey,
   rungByKey,
@@ -82,7 +83,7 @@ export async function assertSendSaleObservationFresh(
 }
 const dailyOf = (key: PlanRungKey): number => {
   const rung = rungByKey(key);
-  return rung.period === "month" ? Math.ceil(rung.included / 30) : rung.included;
+  return rung.period === "month" ? monthlySendDailyRate(rung.included) : rung.included;
 };
 
 /** New acquisitions only. Signed contracts, renewals and cancellations never call this. */
@@ -162,7 +163,7 @@ export async function assertSendSaleCapacity(
     commitments.set(
       team.id,
       quota.kind === "month"
-        ? Math.ceil(quota.included / 30)
+        ? monthlySendDailyRate(quota.included, { start: quota.periodStart, end: quota.periodEnd })
         : quota.kind === "day"
           ? quota.limit
           : 0,

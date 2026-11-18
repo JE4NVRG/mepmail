@@ -20,7 +20,7 @@ import {
   tenantSendingMinuteCeiling,
 } from "./graduated-sending-policy.js";
 import { withMailboxSendAccess } from "./mailbox-private-store.js";
-import { teamQuota } from "./plans.js";
+import { monthlySendDailyRate, teamQuota } from "./plans.js";
 import { extractAddrSpec, normalizeAddress } from "./suppressions.js";
 
 const ACTION = "sending.graduated_reserved";
@@ -270,7 +270,7 @@ async function loadTenant(
         : 0;
   const planDaily =
     quota.kind === "month"
-      ? Math.ceil(quota.included / 30)
+      ? monthlySendDailyRate(quota.included, { start: quota.periodStart, end: quota.periodEnd })
       : quota.kind === "day"
         ? quota.limit
         : team.plan === "system"

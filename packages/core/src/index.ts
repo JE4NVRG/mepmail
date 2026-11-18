@@ -795,6 +795,7 @@ export {
   isPlanRungKey,
   type LadderPlan,
   monthlyCapacity,
+  monthlySendDailyRate,
   OVERAGE_HARD_CAP,
   PAID_RUNGS,
   PLAN_ATTACHMENT_BYTES,

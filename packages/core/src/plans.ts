@@ -280,6 +280,23 @@ export function quotaPeriod(
   return { start: monthStart, end: addUtcMonth(monthStart) };
 }
 
+/** Spread a monthly allowance across its signed window, with the existing 30-day
+ * rate as a floor. An unsigned sale is evaluated for the shortest ordinary
+ * calendar month. Short prorated stubs must not get a burst above that bound.
+ */
+export function monthlySendDailyRate(
+  included: number,
+  period?: { start: Date; end: Date },
+): number {
+  const shortestMonthDays = 28;
+  if (!period) return Math.ceil(included / shortestMonthDays);
+  const days = Math.ceil((period.end.getTime() - period.start.getTime()) / DAY_MS);
+  if (!Number.isFinite(days) || period.end.getTime() <= period.start.getTime()) {
+    throw new RangeError("Invalid monthly Send usage period");
+  }
+  return Math.ceil(included / Math.min(30, Math.max(shortestMonthDays, days)));
+}
+
 function planQuota(team: QuotaTeamRow, isCloud: boolean, now: Date): TeamQuota {
   if (!isCloud) return { kind: "none" };
   const plan = effectivePlan(team.plan, team.currentPeriodEnd, now);
