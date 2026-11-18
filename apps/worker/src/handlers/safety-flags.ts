@@ -1,4 +1,4 @@
-import { signupAlertEmail } from "@millionsend/config";
+import { operatorAlertsSink, signupAlertEmail } from "@millionsend/config";
 import {
   buildAccountMail,
   claimNotification,
@@ -72,8 +72,37 @@ export async function notifySendReviews(
   opts: { now: Date; mailer?: SystemMailer | undefined; appBaseUrl?: string | undefined },
 ): Promise<number> {
   let told = 0;
+  const auditSink = operatorAlertsSink() === "audit";
   for (const hold of await unnotifiedSendReviews(db)) {
-    if (!(await markSendReviewNotified(db, hold.id, opts.now))) continue;
+    if (!hold.at) continue;
+    const alert = {
+      kind: "review.held" as const,
+      path: `/console/safety/${hold.id}`,
+      values: { team: hold.name, note: hold.note ?? hold.reason ?? "" },
+      appBaseUrl: opts.appBaseUrl,
+      teamId: hold.id,
+      to: signupAlertEmail(),
+    };
+    if (auditSink) {
+      try {
+        const claimed = await db.transaction(async (tx) => {
+          const txDb = tx as unknown as Db;
+          if (!(await markSendReviewNotified(txDb, hold.id, opts.now, hold.at))) return false;
+          // This sink only writes to the DB. The same transaction keeps the
+          // claim retryable after failure, and serializes competing workers.
+          if (!(await alertOperator(txDb, undefined, { ...alert, strictAudit: true }))) {
+            throw new Error("Operator audit alert was not recorded");
+          }
+          return true;
+        });
+        if (!claimed) continue;
+      } catch {
+        console.error("safety.flags: operator audit alert remains pending", { teamId: hold.id });
+        continue;
+      }
+    } else if (!(await markSendReviewNotified(db, hold.id, opts.now, hold.at))) {
+      continue;
+    }
     told += 1;
     await recordAudit(db, {
       teamId: hold.id,
@@ -98,19 +127,13 @@ export async function notifySendReviews(
       },
     });
     if (!opts.mailer) continue;
-    try {
-      // The alerts box when one is configured, else the instance operator;
-      // under OPERATOR_ALERTS_SINK=audit either route becomes one audit row.
-      await alertOperator(db, opts.mailer, {
-        kind: "review.held",
-        path: `/console/safety/${hold.id}`,
-        values: { team: hold.name, note: hold.note ?? hold.reason ?? "" },
-        appBaseUrl: opts.appBaseUrl,
-        teamId: hold.id,
-        to: signupAlertEmail(),
-      });
-    } catch (err) {
-      console.error(`safety.flags: review notice for ${hold.id} failed`, err);
+    if (!auditSink) {
+      try {
+        // Preserve the legacy e-mail sink; never send e-mail inside the DB transaction.
+        await alertOperator(db, opts.mailer, alert);
+      } catch (err) {
+        console.error(`safety.flags: review notice for ${hold.id} failed`, err);
+      }
     }
     try {
       // A suspension (including phishing) has its own communication policy.

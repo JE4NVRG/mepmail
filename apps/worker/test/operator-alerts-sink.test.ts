@@ -167,6 +167,39 @@ describe("OPERATOR_ALERTS_SINK", () => {
     expect(await operatorAlerts()).toHaveLength(1);
   });
 
+  it("keeps a failed audit alert pending and recovers it once without a mailer", async () => {
+    vi.stubEnv("OPERATOR_ALERTS_SINK", "audit");
+    const other = await createTeam(db, "unrelated-team");
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const readTeam = async (id: string) =>
+      (await db.select().from(schema.teams).where(eq(schema.teams.id, id)))[0];
+    const before = await readTeam(other);
+    await db.execute(
+      sql`alter table audit_log add constraint fixture_refuse_hold_alert check (action <> 'operator.alert') not valid`,
+    );
+    try {
+      await expect(notifySendReviews(db, { now, appBaseUrl })).resolves.toBe(0);
+      expect(await readTeam(teamId)).toMatchObject({
+        sendReviewAt: now,
+        sendReviewNotifiedAt: null,
+      });
+      expect(await operatorAlerts()).toHaveLength(0);
+    } finally {
+      await db.execute(sql`alter table audit_log drop constraint fixture_refuse_hold_alert`);
+      errors.mockRestore();
+    }
+    const retryAt = new Date(now.getTime() + 60_000);
+    await expect(notifySendReviews(db, { now: retryAt, appBaseUrl })).resolves.toBe(1);
+    await expect(notifySendReviews(db, { now: retryAt, appBaseUrl })).resolves.toBe(0);
+    expect(await readTeam(teamId)).toMatchObject({
+      sendReviewAt: now,
+      sendReviewNotifiedAt: retryAt,
+    });
+    expect(await readTeam(other)).toEqual(before);
+    expect(await operatorAlerts()).toMatchObject([{ teamId, data: { kind: "review.held" } }]);
+    expect(sends).toHaveLength(0);
+  });
+
   it("records the operator fallback branch the same way when no alerts box is set", async () => {
     vi.stubEnv("OPERATOR_ALERTS_SINK", "audit");
     vi.stubEnv("SIGNUP_ALERT_EMAIL", undefined);

@@ -768,12 +768,23 @@ export async function unnotifiedSendReviews(db: Db) {
 }
 
 /** Marks a hold as told; false when it was released or already marked meanwhile. */
-export async function markSendReviewNotified(db: Db, teamId: string, now: Date): Promise<boolean> {
+export async function markSendReviewNotified(
+  db: Db,
+  teamId: string,
+  now: Date,
+  expectedHoldAt?: Date | null,
+): Promise<boolean> {
+  if (expectedHoldAt === null) return false;
   const rows = await db
     .update(schema.teams)
     .set({ sendReviewNotifiedAt: now })
     .where(
-      and(eq(schema.teams.id, teamId), activeReview, isNull(schema.teams.sendReviewNotifiedAt)),
+      and(
+        eq(schema.teams.id, teamId),
+        activeReview,
+        isNull(schema.teams.sendReviewNotifiedAt),
+        expectedHoldAt ? eq(schema.teams.sendReviewAt, expectedHoldAt) : undefined,
+      ),
     )
     .returning({ id: schema.teams.id });
   return rows.length > 0;
