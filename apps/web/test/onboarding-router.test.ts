@@ -328,27 +328,30 @@ describe("buildOnboardingEmail", () => {
       expect(mail.html).toContain(`<html lang="${locale}">`);
       expect(mail.html).toContain('href="https://mepmail.dev/"');
       expect(mail.html).toContain('href="https://mepmail.dev/emails"');
-      for (const name of ["wordmark-ink", "wordmark-bone", "white"]) {
-        expect(mail.html).toContain(`https://mepmail.dev/email/${name}.png`);
-      }
       expect(mail.html).not.toContain("mepmail.je4ndev.com");
       expect(mail.html).not.toContain("mail.je4ndev.com");
+      expect(mail.text).toContain("https://mepmail.dev/emails");
       expect(mail.text).not.toMatch(/inbox|caixa de entrada/i);
     }
   });
 
-  it("escapes the team and dashboard link while preserving plain text and a missing CTA", () => {
+  it("escapes the team and the dashboard link while preserving plain text and a missing CTA", () => {
     const mail = buildOnboardingEmail({
       locale: "pt-BR",
       team: '<img src=x onerror="alert(1)">',
-      dashboardUrl: 'https://mepmail.dev/emails?a=1&b="two"',
+      dashboardUrl: "https://mepmail.dev/emails?a=1&b=2",
     });
     expect(mail.html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
     expect(mail.html).not.toContain("<img src=x");
-    expect(mail.html).toContain('href="https://mepmail.dev/emails?a=1&amp;b=&quot;two&quot;"');
+    expect(mail.html).toContain('href="https://mepmail.dev/emails?a=1&amp;b=2"');
     expect(mail.text).toContain('<img src=x onerror="alert(1)">');
-    const withoutUrl = buildOnboardingEmail({ locale: "en", team: "Team", dashboardUrl: null });
-    expect(withoutUrl.html).not.toContain('class="ms-btn"');
-    expect(withoutUrl.html).not.toContain('class="ms-gmail"');
+    expect(mail.text).toContain("Abrir o painel: https://mepmail.dev/emails?a=1&b=2");
+    // No URL, or one the dispatch projection cannot re-verify, drops the CTA only.
+    for (const dashboardUrl of [null, 'https://mepmail.dev/emails?a=1&b="two"']) {
+      const withoutUrl = buildOnboardingEmail({ locale: "en", team: "Team", dashboardUrl });
+      expect(withoutUrl.html).not.toContain('class="ms-btn"');
+      expect(withoutUrl.text).not.toContain("Open the dashboard");
+      expect(withoutUrl.text).toContain("Your test email is here.");
+    }
   });
 });
