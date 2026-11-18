@@ -344,6 +344,57 @@ describe("settings.team.delete", () => {
     expect(factory).not.toHaveBeenCalled();
     expect(await db.select().from(schema.teams)).toHaveLength(0);
   });
+  it("erases an analyzed team without refunding judge work or changing another team", async () => {
+    stubCloud();
+    await enableMailboxErasure();
+    const teamId = await createTeam(db, "analyzed-team");
+    const otherId = await createTeam(db, "other-team");
+    await addMember(teamId, "alice", "owner");
+    await addMember(otherId, "bob", "owner");
+    const from = "sender@example.test";
+    const to = ["receiver@example.test"];
+    const [email, otherEmail] = await db
+      .insert(schema.emails)
+      .values([
+        { teamId, from, to, subject: "Owned message" },
+        { teamId: otherId, from, to, subject: "Control message" },
+      ])
+      .returning({ id: schema.emails.id });
+    if (!email || !otherEmail) throw new Error("missing email fixture");
+    await db.execute(sql`insert into sending_judge_attempts
+      (account_key, attempt_id, team_id, message_kind, message_id, email_id,
+       fingerprint, reserved_tokens, reserved_units, state, outcome, actual_units, reconciled_at)
+      values
+      ('fixture', gen_random_uuid(), ${teamId}, 'email', ${email.id}, ${email.id},
+       repeat('a', 64), 20, 3, 'settled', 'accepted', 3, now()),
+      ('fixture', gen_random_uuid(), ${otherId}, 'email', ${otherEmail.id}, ${otherEmail.id},
+       repeat('b', 64), 20, 4, 'pending', null, null, null)`);
+    async function readLedger() {
+      const result = await db.execute(sql`select team_id, attempt_id, message_id, email_id, state,
+        reserved_units::int, actual_units::int from sending_judge_attempts
+        where account_key = 'fixture' order by state`);
+      // createTestDb uses PGlite behind the production Db type.
+      return (result as unknown as { rows: { team_id: string; email_id: string | null }[] }).rows;
+    }
+    const before = await readLedger();
+    expect(before).toHaveLength(2);
+    const deps: TeamDeletionDeps = {
+      cancelSubscription: async () => {},
+      deleteSesIdentity: async () => {},
+      deleteSesTenant: async () => {},
+      deleteLogo: async () => {},
+    };
+    await deletionCaller("alice", teamId, "owner", deps).settings.team.delete();
+    expect((await db.select({ id: schema.teams.id }).from(schema.teams)).map((r) => r.id)).toEqual([
+      otherId,
+    ]);
+    expect(
+      (await db.select({ id: schema.emails.id }).from(schema.emails)).map((r) => r.id),
+    ).toEqual([otherEmail.id]);
+    expect((await readLedger()).rows).toEqual(
+      before.map((r) => (r.team_id === teamId ? { ...r, email_id: null } : r)),
+    );
+  });
   it("keeps an ambiguous first-Customer request and never reaches Send or external cleanup", async () => {
     stubCloud();
     await enableMailboxErasure();

@@ -428,6 +428,13 @@
       "when": 1793189739168,
       "tag": "0060_graduated_sending_capacity",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1795008266773,
+      "tag": "0061_sending_judge_team_history",
+      "breakpoints": true
     }
   ]
 }
