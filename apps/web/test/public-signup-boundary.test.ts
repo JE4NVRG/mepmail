@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -9,8 +10,10 @@ import vm from "node:vm";
 import { PLAN_RUNGS } from "@millionsend/core/plans";
 import { afterAll, beforeEach, describe, it } from "vitest";
 
-// Only this test's VM resolver consumes server-only. No Vite/global alias is installed.
-// The override is for bounded artifact rehearsals, never application resolution.
+// This test compiles the real sources through its own VM resolver, so it maps
+// `server-only` itself. (apps/web/vitest.config.ts also aliases it for the
+// suites that import src/server/* directly through Vite; neither alias exists
+// in the application resolution, where Next installs the real marker.)
 const root =
   process.env.MEPMAIL_SIGNUP_TEST_SOURCE_ROOT ??
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -39,6 +42,9 @@ const realFiles = new Set([
   "apps/web/src/app/signup/page.tsx",
   "apps/web/src/app/login/page.tsx",
   "apps/web/src/server/public-marketing-admission.ts",
+  // The canary door: policy from the config package, plumbing from the web,
+  // both compiled for real so only env/cookies are injected.
+  "apps/web/src/server/signup-canary.ts",
 ]);
 const source = (name: string) => fs.readFileSync(path.join(root, name), "utf8");
 const old = source;
@@ -63,6 +69,14 @@ function reset(o: VmValue = {}) {
     subscriptions: false,
     mail: false,
     error: null,
+    canary: undefined,
+    canaryCookie: null,
+    // The shape the canary door requires to exist at all.
+    cloud: true,
+    // Off by default: the login screen reads !signupBotProtectionEnabled() for
+    // its own captcha, so only the canary fixtures turn the challenge on.
+    captcha: false,
+    verification: true,
     calls: 0,
     dbCalls: 0,
     ...o,
@@ -107,7 +121,44 @@ function ext(id: string): VmValue {
   if (id === "react" || id === "react/jsx-runtime") return deps(id);
   if (id === "better-auth/api") return { APIError };
   if (id === "@millionsend/config")
-    return { signupOpen: () => state.allow, betaMaxUsers: () => state.cap, env: {} };
+    return {
+      signupOpen: () => state.allow,
+      betaMaxUsers: () => state.cap,
+      isCloudDeployment: () => state.cloud,
+      env: {
+        MEPMAIL_CANARY_SIGNUP: state.canary?.enabled,
+        MEPMAIL_CANARY_SIGNUP_EMAIL: state.canary?.email,
+        MEPMAIL_CANARY_SIGNUP_TOKEN_SHA256: state.canary?.tokenDigest,
+        MEPMAIL_CANARY_SIGNUP_EXPIRES_AT: state.canary?.expiresAt,
+        TURNSTILE_SITE_KEY: state.captcha ? "1x00000000000000000000AA" : undefined,
+        TURNSTILE_SECRET_KEY: state.captcha ? "1x0000000000000000000000000000000AA" : undefined,
+      },
+    };
+  // The canary policy is a pure module: compile the real one, no stubs.
+  if (id === "@millionsend/config/canary-signup")
+    return compile(source("packages/config/src/canary-signup.ts"), "canary-signup.ts", ext);
+  // The digest comparison is the real server-only module, with real node:crypto.
+  if (id === "@/server/canary-signup-token")
+    return compile(
+      source("apps/web/src/server/canary-signup-token.ts"),
+      "canary-signup-token.ts",
+      (dep) => {
+        if (dep === "server-only") return {};
+        if (dep === "node:crypto") return crypto;
+        if (dep === "@millionsend/config/canary-signup")
+          return compile(source("packages/config/src/canary-signup.ts"), "canary-signup.ts", ext);
+        throw Error(`Unapproved dependency ${dep}`);
+      },
+    );
+  // Platform seams the canary adapter reads: only the request cookies.
+  if (id === "next/headers")
+    return {
+      cookies: async () => ({
+        get: (name: string) =>
+          state.canaryCookie ? { name, value: state.canaryCookie } : undefined,
+      }),
+      headers: async () => new Headers(),
+    };
   if (id === "@millionsend/db")
     return {
       getDb: () => ({
@@ -168,8 +219,15 @@ function ext(id: string): VmValue {
     };
   if (s === "server/new-subscriptions")
     return { newSubscriptionsPaused: () => state.subscriptions };
-  if (s === "server/system-mail") return { passwordRecoveryEnabled: () => false };
-  if (s === "server/signup-bot-protection") return { signupBotProtectionEnabled: () => false };
+  if (s === "server/canary-signup-token") return ext("@/server/canary-signup-token");
+  if (s === "server/system-mail")
+    return {
+      passwordRecoveryEnabled: () => false,
+      // The same authority createAuth reads for requireEmailVerification.
+      emailVerificationEnabled: () => state.verification,
+    };
+  if (s === "server/signup-bot-protection")
+    return { signupBotProtectionEnabled: () => state.captcha };
   if (s === "server/ses-pause") return { accountMailDelayed: async () => false };
   if (s === "server/public-seo")
     return {
@@ -465,6 +523,127 @@ describe("public signup server-boundary regression", () => {
           /<input|<form|oauth|Google|GitHub|instant|minute|na hora|minuto/i,
         );
       });
+  // The canary door renders the SAME closed page for everyone else and the
+  // password form for the operator's browser — never the social buttons, and
+  // never the public CTA.
+  const TOKEN = crypto.randomBytes(32).toString("base64url");
+  const DIGEST = crypto.createHash("sha256").update(TOKEN, "utf8").digest("hex");
+  const canaryEnv = (overrides: Record<string, unknown> = {}) => ({
+    enabled: true,
+    email: "qa.canary@mepmail.example",
+    tokenDigest: DIGEST,
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+    ...overrides,
+  });
+  /** A deployment where every canary premise holds and the operator holds the cookie. */
+  const canaryState = (overrides: VmValue = {}) => ({
+    allow: false,
+    count: 2,
+    captcha: true,
+    canary: canaryEnv(),
+    canaryCookie: TOKEN,
+    ...overrides,
+  });
+  for (const locale of ["en", "pt-BR"])
+    it(`canary signup SSR ${locale}: the password form, and only for the cookie holder in the paused state`, async () => {
+      reset(canaryState({ locale }));
+      const view = await load("apps/web/src/app/signup/page.tsx").default({
+        searchParams: Promise.resolve({}),
+      });
+      assert.equal(view.props.mode, "signup");
+      // Social sign-in stays closed even inside the canary door.
+      assert.deepEqual(view.props.providers, { google: false, github: false, microsoft: false });
+      assert.equal(view.props.productUpdates, false);
+      const copy = load("apps/web/src/lib/public-signup-copy.ts").publicSignupCopy(locale);
+      assert.ok(!(await html(view)).includes(copy.paused));
+    });
+  for (const [name, cookie] of [
+    ["no cookie", null],
+    ["a wrong cookie", crypto.randomBytes(32).toString("base64url")],
+    ["an extended cookie", `${TOKEN}0`],
+    ["the digest instead of the token", DIGEST],
+  ] as const)
+    it(`canary signup SSR stays closed with ${name}`, async () => {
+      reset(canaryState({ canaryCookie: cookie }));
+      const markup = await html(
+        await load("apps/web/src/app/signup/page.tsx").default({
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      const copy = load("apps/web/src/lib/public-signup-copy.ts").publicSignupCopy("en");
+      assert.ok(markup.includes(copy.paused));
+      assert.doesNotMatch(markup, /<input|<form|oauth|Google|GitHub/i);
+      // The page never carries the bearer, not even for the visitor it refuses.
+      assert.ok(!markup.includes(TOKEN));
+    });
+  it("canary signup SSR stays closed when the capability is off, expired or partial", async () => {
+    for (const canary of [
+      undefined,
+      canaryEnv({ enabled: false }),
+      canaryEnv({ expiresAt: new Date(Date.now() - 1_000).toISOString() }),
+      canaryEnv({ tokenDigest: "" }),
+      canaryEnv({ tokenDigest: TOKEN }),
+      canaryEnv({ expiresAt: new Date(Date.now() + 10 * 86_400_000).toISOString() }),
+    ]) {
+      reset(canaryState({ canary }));
+      const markup = await html(
+        await load("apps/web/src/app/signup/page.tsx").default({
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      assert.doesNotMatch(markup, /<input|<form/, JSON.stringify(canary));
+    }
+  });
+  it("canary signup SSR stays closed when a deployment prerequisite drifts", async () => {
+    for (const drift of [{ cloud: false }, { captcha: false }, { verification: false }] as const) {
+      reset(canaryState(drift));
+      const markup = await html(
+        await load("apps/web/src/app/signup/page.tsx").default({
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      assert.doesNotMatch(markup, /<input|<form/, JSON.stringify(drift));
+      assert.doesNotMatch(markup, new RegExp(TOKEN));
+    }
+  });
+  it("canary signup SSR never renders past the beta cap: the full state stays full", async () => {
+    // "full" is only reachable with the public door nominally open and the cap
+    // already spent, and the canary is inert there (its closed-door premise is
+    // gone). The page must keep the full copy and the cookie must buy nothing.
+    reset(canaryState({ allow: true, count: 3, cap: 1 }));
+    const markup = await html(
+      await load("apps/web/src/app/signup/page.tsx").default({
+        searchParams: Promise.resolve({}),
+      }),
+    );
+    const copy = load("apps/web/src/lib/public-signup-copy.ts").publicSignupCopy("en");
+    assert.ok(markup.includes(copy.full), "the full-state copy stays visible");
+    assert.ok(!markup.includes(copy.paused));
+    assert.doesNotMatch(markup, /<input|<form|oauth|Google|GitHub/i);
+    assert.ok(!markup.includes(TOKEN));
+    const adapter = load("apps/web/src/server/signup-canary.ts");
+    assert.equal(adapter.canarySignupSettingNow().status, "blocked");
+  });
+  it("canary signup SSR is never cached: the page is force-dynamic", () => {
+    const page = source("apps/web/src/app/signup/page.tsx");
+    assert.match(page, /export const dynamic = "force-dynamic";/);
+    assert.doesNotMatch(page, /export const revalidate|generateStaticParams|unstable_cache/);
+    // The availability probe stays request-scoped for the same reason.
+    assert.match(
+      source("apps/web/src/server/public-signup.ts"),
+      /export const publicSignupAvailability = cache\(/,
+    );
+  });
+  it("leaves the public admission surface free of the canary", () => {
+    for (const name of [
+      "apps/web/src/server/public-signup.ts",
+      "apps/web/src/server/public-marketing-admission.ts",
+      "apps/web/src/components/signup-availability.tsx",
+      "apps/web/src/components/signup-cta.tsx",
+      "apps/web/src/components/site-chrome.tsx",
+    ])
+      assert.doesNotMatch(source(name), /canary/i, name);
+  });
   it("retains open social-provider props and the bootstrap path", async () => {
     for (const fixture of [{ allow: true }, { count: 0 }]) {
       reset(fixture);

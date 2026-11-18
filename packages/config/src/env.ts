@@ -445,6 +445,27 @@ export const env = createEnv({
     // internet-reachable dashboard from handing strangers the SES account.
     ALLOW_SIGNUP: boolFromString,
 
+    // Canary sign-up door: with ALLOW_SIGNUP left false, exactly ONE address
+    // may still register with a password, and only from a browser carrying
+    // the operator's own cookie (see ./canary-signup.ts). All three values
+    // are required together, the switch stays off by default, and the expiry
+    // must sit within 72h of process start — the door is short-lived by
+    // construction.
+    //
+    // _TOKEN_SHA256 is the SHA-256 (lowercase hex) of the 256-bit base64url
+    // token the operator puts in their own browser cookie: the bearer itself
+    // is never configured, only its digest, so no credential sits in an env
+    // var that every role (web, api, worker, smtp) reads. Read through
+    // canarySignupSetting() in apps/web/src/server/signup-canary.ts, which
+    // also re-checks that the deployment is still cloud, still closed to
+    // public sign-up, still enforcing Turnstile and still requiring verified
+    // e-mail. Nothing here is validated at boot: a partial or no-longer-
+    // applicable canary is inert, never a reason to refuse the process.
+    MEPMAIL_CANARY_SIGNUP: boolFromString,
+    MEPMAIL_CANARY_SIGNUP_EMAIL: z.string().optional(),
+    MEPMAIL_CANARY_SIGNUP_TOKEN_SHA256: z.string().optional(),
+    MEPMAIL_CANARY_SIGNUP_EXPIRES_AT: z.string().optional(),
+
     // Cloud-only switch for branded tracking subdomains (a customer CNAMEs
     // track.theirdomain.com at this app). Read through
     // trackingSubdomainsSupported(), which leaves self-host unconditionally on.
@@ -803,6 +824,10 @@ const BACKUP_TUNING_KEYS = ["S3_BACKUP_PREFIX", "BACKUP_CRON", "BACKUP_RETENTION
 
 /** Cross-field rules that per-field schemas cannot express. */
 export function assertEnvConsistency(e: Env): void {
+  // The canary door is deliberately absent from this list: it is an optional
+  // private admission, so a partial, expired or no-longer-applicable canary
+  // must close ITSELF (see canarySignupSetting) instead of refusing the boot
+  // of auth, SMTP and the worker. Nothing else in this process depends on it.
   if (envFlag(e.META_CONVERSIONS_ENABLED)) {
     for (const key of ["META_DATASET_ID", "META_ACCESS_TOKEN", "META_GRAPH_API_VERSION"] as const) {
       if (!e[key]) throw new Error(`META_CONVERSIONS_ENABLED=true requires ${key}`);

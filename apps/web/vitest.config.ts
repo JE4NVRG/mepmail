@@ -5,7 +5,14 @@ export default defineConfig({
   // Page/component tests import .tsx; Next compiles with the automatic runtime.
   esbuild: { jsx: "automatic" },
   resolve: {
-    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // `server-only` is a build-time marker Next aliases for the server graph;
+      // it is not a package anything depends on, so plain Node cannot resolve
+      // it. Without this, any suite importing a `src/server/*` module fails
+      // before its first assertion (test/server-only.ts explains the split).
+      "server-only": fileURLToPath(new URL("./test/server-only.ts", import.meta.url)),
+    },
   },
   test: {
     // PGlite boot + real migrations per suite outlast the 10s default on 2-core CI runners.

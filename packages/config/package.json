@@ -7,6 +7,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./canary-signup": {
+      "types": "./src/canary-signup.ts",
+      "default": "./src/canary-signup.ts"
     }
   },
   "scripts": {

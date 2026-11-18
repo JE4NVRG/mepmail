@@ -1,3 +1,7 @@
+// The canary policy is NOT re-exported here on purpose: it is reachable only
+// through the explicit `@millionsend/config/canary-signup` subpath, used by
+// the web auth adapter and its tests. Keeping it out of the barrel keeps the
+// api/worker/smtp import graph exactly as it was before the door existed.
 export {
   ABUSE_JUDGE_BASE_URL_DEFAULT,
   ABUSE_JUDGE_MODEL_DEFAULT,

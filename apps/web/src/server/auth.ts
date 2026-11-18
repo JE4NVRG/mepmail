@@ -50,6 +50,7 @@ import {
   SIGNUP_BOT_OAUTH_CONTEXT,
   signupBotProtectionEnabled,
 } from "./signup-bot-protection";
+import { canarySignupAdmissionFor } from "./signup-canary";
 import {
   buildMcpConnectedEmail,
   buildPasswordChangedEmail,
@@ -125,11 +126,22 @@ export async function assertNotSoleOwner(db: Db, userId: string): Promise<void> 
  * On top of the policy, an operator may set a beta seat cap
  * (BETA_MAX_USERS): once that many accounts exist, sign-up closes itself —
  * the closed-beta door, without flipping ALLOW_SIGNUP back.
+ *
+ * `canary` is the canary door's admission for the request in flight (see
+ * signup-canary.ts): it bypasses the closed-door check above and nothing
+ * else. It cannot be forged — canarySignupAdmissionFor derives it from the
+ * endpoint path, the address being created and the operator's cookie — and
+ * "one address" is all it buys: the beta cap below applies to it exactly as
+ * it does to anybody else.
  */
-export async function assertSignupAllowed(db: Db, allowSignup: boolean): Promise<void> {
+export async function assertSignupAllowed(
+  db: Db,
+  allowSignup: boolean,
+  canary?: { canaryEmail: string } | null,
+): Promise<void> {
   if (!allowSignup) {
     const [existing] = await db.select({ id: schema.user.id }).from(schema.user).limit(1);
-    if (existing) {
+    if (existing && !canary) {
       throw new APIError("FORBIDDEN", { message: "Signup is disabled." });
     }
   }
@@ -630,8 +642,17 @@ export function createAuth(
       },
       user: {
         create: {
-          before: async (_user, ctx) => {
-            await assertSignupAllowed(db, signupOpen());
+          before: async (user, ctx) => {
+            // The same authority the endpoint hook consulted, re-derived from
+            // this request and bound to the address of the row being created:
+            // a social sign-in, a different address or an expired canary all
+            // fall back to the ordinary closed door.
+            const canary = canarySignupAdmissionFor(ctx, user.email);
+            await assertSignupAllowed(
+              db,
+              signupOpen(),
+              canary.admitted ? { canaryEmail: canary.email } : null,
+            );
             if (signupBotProtectionEnabled()) {
               const state = await getOAuthState();
               if (
@@ -684,9 +705,20 @@ export function createAuth(
         // creation, a 403 reads to better-auth as its own anti-enumeration
         // signal for an address already registered, and the caller is shown
         // "check your inbox" instead of the policy. The database hook below
-        // still guards the paths that create users elsewhere (social sign-in).
+        // still guards the paths that create users elsewhere (social sign-in),
+        // re-deriving the same canary admission for that request.
         if (ctx.path === "/sign-up/email") {
-          await assertSignupAllowed(db, signupOpen());
+          // The canary door: the one bound address, carrying the operator's
+          // own cookie, may pass the closed-door check. Everything below —
+          // Turnstile (hostname + action), the beta cap inside
+          // assertSignupAllowed, email verification — stays as it was.
+          const body = ctx.body as { email?: unknown } | undefined;
+          const canary = canarySignupAdmissionFor(ctx, body?.email);
+          await assertSignupAllowed(
+            db,
+            signupOpen(),
+            canary.admitted ? { canaryEmail: canary.email } : null,
+          );
           if (signupBotProtectionEnabled()) {
             await assertSignupBotVerification(ctx.headers, baseURL);
             verifiedSignupContexts.add(ctx.context);
