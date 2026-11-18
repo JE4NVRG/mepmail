@@ -391,7 +391,7 @@ describe("settings.team.delete", () => {
     expect(
       (await db.select({ id: schema.emails.id }).from(schema.emails)).map((r) => r.id),
     ).toEqual([otherEmail.id]);
-    expect((await readLedger()).rows).toEqual(
+    expect(await readLedger()).toEqual(
       before.map((r) => (r.team_id === teamId ? { ...r, email_id: null } : r)),
     );
   });
