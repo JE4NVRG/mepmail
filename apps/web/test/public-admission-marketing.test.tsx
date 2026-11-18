@@ -15,16 +15,34 @@ import ptStatus from "../messages/pt-BR/status.json";
 import { publicMarketingMessages } from "../src/lib/public-message-scope";
 import { publicSignupCopy } from "../src/lib/public-signup-copy";
 
-const context = vi.hoisted(() => ({ locale: "en", availability: "open", signupUnavailable: false }));
+const context = vi.hoisted(() => ({
+  locale: "en",
+  availability: "open",
+  signupUnavailable: false,
+}));
 vi.mock("next-intl/server", () => ({
   getLocale: async () => context.locale,
-  getTranslations: async (namespace: "pricing" | "landing" | "envio" | "correio" | "correio.v2" | "status") =>
+  getTranslations: async (
+    namespace: "pricing" | "landing" | "envio" | "correio" | "correio.v2" | "status",
+  ) =>
     createTranslator({
       locale: context.locale,
       messages:
         context.locale === "pt-BR"
-          ? { landing: ptLanding, pricing: ptPricing, envio: ptEnvio, correio: ptCorreio, status: ptStatus }
-          : { landing: enLanding, pricing: enPricing, envio: enEnvio, correio: enCorreio, status: enStatus },
+          ? {
+              landing: ptLanding,
+              pricing: ptPricing,
+              envio: ptEnvio,
+              correio: ptCorreio,
+              status: ptStatus,
+            }
+          : {
+              landing: enLanding,
+              pricing: enPricing,
+              envio: enEnvio,
+              correio: enCorreio,
+              status: enStatus,
+            },
       namespace,
     }),
 }));
@@ -113,7 +131,9 @@ describe("public admission: actual public consumers", () => {
         );
         expect(html).not.toContain(publicSignupCopy(locale).admissionBody);
         expect(html).not.toMatch(/data-funnel-product="mail"|data-funnel-plan="(?!free")/);
-        expect(html).not.toMatch(/href="[^"]*(?:checkout|settings(?:%2F|\/)billing|setup(?:%3D|=)correio)/i);
+        expect(html).not.toMatch(
+          /href="[^"]*(?:checkout|settings(?:%2F|\/)billing|setup(?:%3D|=)correio)/i,
+        );
       });
       it.each([
         ["true", "paused"],

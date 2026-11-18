@@ -41,8 +41,7 @@ export function publicSignupCopy(locale: string) {
           "Prices, limits and terms below are catalog references, not an offer available to purchase now.",
         freeCta: "Create a free account",
         freeOnlyTitle: "Free signup is open",
-        freeOnlyBody:
-          "You can create a free account. New subscriptions and trials are paused.",
+        freeOnlyBody: "You can create a free account. New subscriptions and trials are paused.",
         purchasesPausedTitle: "New subscriptions and trials paused",
         purchasesPausedBody:
           "New subscriptions and trials are paused. Existing accounts can still sign in.",

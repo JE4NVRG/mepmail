@@ -17,7 +17,9 @@ export function SignupAvailability({
   freeLabel?: string | null;
   children: ReactNode;
 }) {
-  return <SignupLabels.Provider value={{ closedLabel, freeLabel }}>{children}</SignupLabels.Provider>;
+  return (
+    <SignupLabels.Provider value={{ closedLabel, freeLabel }}>{children}</SignupLabels.Provider>
+  );
 }
 
 export function useSignupLabels() {
