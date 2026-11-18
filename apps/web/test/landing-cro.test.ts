@@ -43,15 +43,9 @@ describe("landing CRO contract", () => {
     expect(v2).not.toContain("200 OK");
     const entry = source("../src/app/page.tsx");
     expect(entry).toMatch(
-      /standaloneMailOpen\(\)\s*\?\s*await HomeV2\(\)\s*:\s*await LegacyHome\(\)/,
+      /standaloneMailOpen\(\)\s*\?\s*await HomeV2\(admission\)\s*:\s*await LegacyHome\(admission\)/,
     );
-    expect(entry).toContain("await publicSignupAvailability()");
-    expect(entry).toContain(
-      'availability === "open" ? null : publicSignupCopy(await getLocale()).check',
-    );
-    expect(entry).toContain(
-      "<SignupAvailability closedLabel={closedLabel}>{home}</SignupAvailability>",
-    );
+    expect(entry).toContain("await publicMarketingAdmission(await getLocale())");
   });
 
   it("never loads production analytics in explicit local preview", () => {
@@ -85,6 +79,11 @@ describe("landing CRO contract", () => {
     expect(html).not.toMatch(/<iframe|srcdoc=|VOLTEI10|4242|<script/i);
     expect(html).toContain('aria-hidden="true" inert=""');
     expect(html).toContain("/signup?next=%2Ftemplates%2Fnew%3Fstarter%3Dwelcome");
+    const closed = renderToStaticMarkup(
+      await PublicStarterGallery({ closedLabel: "Consultar disponibilidade" }),
+    );
+    expect(closed).toContain('href="/status#admission">Consultar disponibilidade');
+    expect(closed).not.toContain('href="/signup');
     expect(html.match(/href="\/signup\?next=/g)).toHaveLength(10);
   });
 

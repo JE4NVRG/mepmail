@@ -3,7 +3,13 @@ import { listStarters } from "@/server/starter-templates";
 import { DeferredTemplatePreview } from "./deferred-template-preview";
 
 /** These cards use the same library as the editor, rather than a screenshot. */
-export async function PublicStarterGallery({ compact = false }: { compact?: boolean }) {
+export async function PublicStarterGallery({
+  compact = false,
+  closedLabel,
+}: {
+  compact?: boolean;
+  closedLabel?: string | null;
+}) {
   const locale = await getLocale();
   const t = await getTranslations("landing.productProof");
   const templates = listStarters(locale);
@@ -22,12 +28,16 @@ export async function PublicStarterGallery({ compact = false }: { compact?: bool
           <div className="cro-starter-copy">
             <Heading>{template.name}</Heading>
             {!compact && <p>{template.description}</p>}
-            <a
-              href={`/signup?next=${encodeURIComponent(`/templates/new?starter=${encodeURIComponent(template.key)}`)}`}
-              aria-label={`${t("open")} · ${template.name}`}
-            >
-              {t("open")} <span aria-hidden="true">↗</span>
-            </a>
+            {closedLabel ? (
+              <a href="/status#admission">{closedLabel}</a>
+            ) : (
+              <a
+                href={`/signup?next=${encodeURIComponent(`/templates/new?starter=${encodeURIComponent(template.key)}`)}`}
+                aria-label={`${t("open")} · ${template.name}`}
+              >
+                {t("open")} <span aria-hidden="true">↗</span>
+              </a>
+            )}
           </div>
         </article>
       ))}

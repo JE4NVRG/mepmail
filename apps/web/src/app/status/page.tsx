@@ -5,7 +5,7 @@ import { legalLinks } from "@/lib/legal-links";
 import { publicSignupCopy } from "@/lib/public-signup-copy";
 import { readPublicStatus } from "@/lib/public-status";
 import { PUBLISHED_INCIDENTS } from "@/lib/public-status-history";
-import { newSubscriptionsPaused } from "@/server/new-subscriptions";
+import { publicMarketingAdmission } from "@/server/public-marketing-admission";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "./status.css";
@@ -36,8 +36,9 @@ export default async function StatusPage() {
     nav: l.raw("nav"),
     footer: l.raw("footer"),
   } as PublicSiteLabels;
-  const admissionPaused = newSubscriptionsPaused();
-  const copy = publicSignupCopy(locale);
+  // Signup storage must not prevent visitors from reading operational status.
+  const admission = await publicMarketingAdmission(locale).catch(() => null);
+  const copy = admission?.copy ?? publicSignupCopy(locale);
   const available = snapshot.checks.every((check) => check.available);
   const stamp = new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
@@ -65,8 +66,14 @@ export default async function StatusPage() {
               className="ms-card gtm-status-service"
               aria-labelledby="admission-title"
             >
-              <h2 id="admission-title">{admissionPaused ? copy.admissionTitle : copy.check}</h2>
-              <p>{admissionPaused ? copy.admissionBody : copy.availabilityBody}</p>
+              <h2 id="admission-title">{admission?.closed ? copy.admissionTitle : copy.check}</h2>
+              <p>{admission?.closed ? copy.admissionBody : copy.availabilityBody}</p>
+              {admission?.freeLabel ? (
+                <>
+                  <a href="/signup">{admission.freeLabel}</a>
+                  {" · "}
+                </>
+              ) : null}
               <a href="/login">{copy.login}</a>
               {" · "}
               <a href="/support">{copy.contact}</a>

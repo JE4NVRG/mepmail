@@ -4,6 +4,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { ArrivalTracker, DocsLink, GithubLink } from "@/components/public-events";
 import { PublicStarterGallery } from "@/components/public-starter-gallery";
+import { SignupCta } from "@/components/signup-cta";
 import {
   PublicFooter,
   PublicHeader,
@@ -24,11 +25,9 @@ import {
 } from "@/lib/landing-pricing";
 import { CORREIO_FROM_BRL_CENTS, CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
-import { publicSignupCopy } from "@/lib/public-signup-copy";
 import { faqJsonLd, organizationJsonLd, siteBaseUrl, websiteJsonLd } from "@/lib/structured-data";
 import { titlePhrases } from "@/lib/title-phrases";
-import { newSubscriptionsPaused } from "@/server/new-subscriptions";
-import { publicSignupAvailability } from "@/server/public-signup";
+import type { publicMarketingAdmission } from "@/server/public-marketing-admission";
 import "./landing.css";
 import "./landing-cro.css";
 import "./site-v2.css";
@@ -72,7 +71,10 @@ function ResendDiff() {
  * check, a block per product, both price ladders and one close. Every price comes from the
  * catalog; every count from the code it describes.
  */
-export async function HomeV2() {
+export async function HomeV2({
+  closed,
+  copy: signupCopy,
+}: Awaited<ReturnType<typeof publicMarketingAdmission>>) {
   const [t, l, mail, prices, locale] = await Promise.all([
     getTranslations("landing.home"),
     getTranslations("landing"),
@@ -81,9 +83,6 @@ export async function HomeV2() {
     getLocale(),
   ]);
   const brazil = locale === "pt-BR";
-  const availability = newSubscriptionsPaused() ? "paused" : await publicSignupAvailability();
-  const closed = availability !== "open";
-  const signupCopy = publicSignupCopy(locale);
   const launchOfferEnabled = process.env.SEND_LAUNCH_OFFER_ENABLED === "true";
   const site = {
     skip: l("skip"),
@@ -154,7 +153,8 @@ export async function HomeV2() {
             <h1 className="v2-display-sans">{headline(t("growth.title"))}</h1>
             <p className="v2-lead">{t("growth.lead")}</p>
             <div className="v2-actions">
-              <SignupLink
+              <SignupCta
+                rung="free"
                 label={t("growth.cta", { free: freeVolume })}
                 className="v2-btn v2-btn-bone"
               />
@@ -164,7 +164,7 @@ export async function HomeV2() {
             </div>
             <p className="v2-note">
               {closed
-                ? signupCopy[availability]
+                ? signupCopy.admissionBody
                 : t.rich("growth.note", {
                     free: freeVolume,
                     starter: money(starter.brlPriceCents, starter.priceCents),
@@ -204,7 +204,9 @@ export async function HomeV2() {
                 {t("correio.more")}
               </a>
             </div>
-            <p className="v2-note">{t.rich("correio.note", { price: mailFrom, b })}</p>
+            <p className="v2-note">
+              {closed ? signupCopy.catalog : t.rich("correio.note", { price: mailFrom, b })}
+            </p>
             <figure>
               <div className="v2-approval">
                 <p className="v2-approval-from">
@@ -436,7 +438,7 @@ export async function HomeV2() {
                   <h3 className="v2-h3">{t("envio.galleryTitle")}</h3>
                   <p className="v2-body v2-gap-sm">{t("envio.galleryBody")}</p>
                 </div>
-                <PublicStarterGallery compact />
+                <PublicStarterGallery compact closedLabel={closed ? signupCopy.check : null} />
                 <figcaption>{l("productProof.caption")}</figcaption>
               </figure>
               <article className="v2-card v2-card-accent v2-cell">
@@ -475,7 +477,7 @@ export async function HomeV2() {
               </article>
             </div>
             <div className="v2-actions v2-gap-lg">
-              <SignupLink label={t("envio.cta")} className="v2-btn v2-btn-bone" />
+              <SignupCta rung="free" label={t("envio.cta")} className="v2-btn v2-btn-bone" />
               <a className="v2-btn v2-btn-line" href="/envio">
                 {t("envio.page")} <span aria-hidden="true">→</span>
               </a>
@@ -557,9 +559,9 @@ export async function HomeV2() {
         <section className="v2-violet v2-sec v2-center" aria-labelledby="home-close-title">
           <div className="v2-wrap v2-stack">
             <h2 id="home-close-title" className="v2-h2 v2-close-title">
-              {closed ? signupCopy[availability] : t("close.title")}
+              {closed ? signupCopy.admissionTitle : t("close.title")}
             </h2>
-            <p className="v2-lead">{closed ? signupCopy[availability] : t("close.body")}</p>
+            <p className="v2-lead">{closed ? signupCopy.admissionBody : t("close.body")}</p>
             <div className="v2-actions">
               <SignupLink
                 label={l("domainHero.cta")}

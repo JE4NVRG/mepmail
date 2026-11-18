@@ -70,7 +70,7 @@ export default async function PricingPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const locale = await getLocale();
-  const { closed, copy } = await publicMarketingAdmission(locale);
+  const { closed, copy, freeLabel } = await publicMarketingAdmission(locale);
   // Only an explicit Mail selection changes the default Send-first ordering.
   const params = (await searchParams) ?? {};
   const sendFirst = params.focus !== "mail";
@@ -232,9 +232,11 @@ export default async function PricingPage({
           ))}
         </ul>
         <p className="v2-fine">
-          {launchOfferEnabled
-            ? t("board.sendLaunch", { first: sendFirstPrice, price: sendPrice })
-            : t("board.sendNote")}
+          {closed
+            ? copy.catalog
+            : launchOfferEnabled
+              ? t("board.sendLaunch", { first: sendFirstPrice, price: sendPrice })
+              : t("board.sendNote")}
         </p>
       </div>
     </div>
@@ -460,7 +462,9 @@ export default async function PricingPage({
                   <p className="v2-note">{t("choice.mailPix")}</p>
                 ) : null}
                 <div className="v2-actions">
-                  {standaloneOpen ? (
+                  {freeLabel ? (
+                    <SignupCta className="v2-btn v2-btn-bone" label={freeLabel} rung="free" />
+                  ) : standaloneOpen ? (
                     <SignupLink
                       label={closed ? copy.check : l("plans.cta")}
                       className="v2-btn v2-btn-bone"
@@ -738,6 +742,7 @@ export default async function PricingPage({
             <h2 id="pricing-faq-title" className="v2-h2 v2-faq-title">
               {t("faq.title")}
             </h2>
+            {freeLabel ? <p className="v2-note">{copy.catalog}</p> : null}
             <div className="v2-faq">
               {faq.map((item, index) => (
                 <details key={item.q} id={index === 0 ? "pricing-usage" : `pricing-faq-${index}`}>
@@ -757,7 +762,8 @@ export default async function PricingPage({
             </h2>
             <p className="v2-lead">{closed ? copy.admissionBody : t("close.body")}</p>
             <div className="v2-actions">
-              <SignupLink
+              <SignupCta
+                rung="free"
                 label={closed ? copy.check : t("close.cta")}
                 className="v2-btn v2-btn-bone"
               />
@@ -774,6 +780,8 @@ export default async function PricingPage({
     </div>
   );
   return (
-    <SignupAvailability closedLabel={closed ? copy.check : null}>{content}</SignupAvailability>
+    <SignupAvailability closedLabel={closed ? copy.check : null} freeLabel={freeLabel}>
+      {content}
+    </SignupAvailability>
   );
 }

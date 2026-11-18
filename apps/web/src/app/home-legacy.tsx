@@ -8,6 +8,7 @@ import { LandingMotion } from "@/components/landing-motion";
 import { PlanCard, type PlanCardLabels } from "@/components/plan-card";
 import { ArrivalTracker, McpConfigCopy } from "@/components/public-events";
 import { PublicStarterGallery } from "@/components/public-starter-gallery";
+import { SignupCta } from "@/components/signup-cta";
 import {
   PublicFooter,
   PublicHeader,
@@ -37,11 +38,10 @@ import {
   sendingOfferAvailability,
 } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
-import { publicSignupCopy } from "@/lib/public-signup-copy";
 import { HOME_STACK_LOGOS } from "@/lib/stack-logos";
 import { faqJsonLd, organizationJsonLd, siteBaseUrl, websiteJsonLd } from "@/lib/structured-data";
 import { titlePhrases } from "@/lib/title-phrases";
-import { publicSignupAvailability } from "@/server/public-signup";
+import type { publicMarketingAdmission } from "@/server/public-marketing-admission";
 import { AgentDemo, type AgentDemoLabels } from "./correio/agent-demo";
 import "./landing-calc.css";
 import "./landing.css";
@@ -89,7 +89,10 @@ export function standaloneMailOpen(): boolean {
  * its own (MAILBOX_STANDALONE_OPEN off: Mail closed, or Mail only as a Send add-on), so
  * self-hosted and closed instances keep the page their flags describe.
  */
-export async function LegacyHome() {
+export async function LegacyHome({
+  closed,
+  copy: signupCopy,
+}: Awaited<ReturnType<typeof publicMarketingAdmission>>) {
   const locale = await getLocale();
   const t = await getTranslations("landing");
   const mail = await getTranslations("correio");
@@ -100,9 +103,6 @@ export async function LegacyHome() {
   const standaloneOpen = standaloneMailOpen();
   // Portuguese readers are Brazil's audience: they see the reais price list (Pix or card).
   const brazil = locale === "pt-BR";
-  const availability = await publicSignupAvailability();
-  const closed = availability !== "open";
-  const signupCopy = publicSignupCopy(locale);
   const mailFrom =
     brazil && standaloneOpen
       ? formatBrlPrice(CORREIO_FROM_BRL_CENTS, locale)
@@ -138,7 +138,7 @@ export async function LegacyHome() {
     overageLabel: t("plans.overageLabel"),
     attachmentLabel: t("plans.attachmentLabel"),
     cta: t("plans.cta"),
-    ctaNote: closed ? signupCopy[availability] : t("plans.ctaNote"),
+    ctaNote: closed ? signupCopy.admissionBody : t("plans.ctaNote"),
     featuredBadge: t("plans.featuredBadge"),
   } satisfies PlanCardLabels;
   const allPlans = plansWithCopy(
@@ -156,7 +156,7 @@ export async function LegacyHome() {
   const mcpPoints = t.raw("mcp.points") as string[];
   const correioPoints = t.raw("correio.points") as string[];
   const story = t.raw("story.steps") as StoryStep[];
-  const sendOffer = proOffer && (
+  const sendOffer = !closed && proOffer && (
     <p className="cro-offer">
       {t(launchOfferEnabled ? "hero.launchOffer" : "hero.offer", {
         volume: new Intl.NumberFormat(locale).format(proOffer.included),
@@ -236,7 +236,7 @@ export async function LegacyHome() {
                     </a>
                   </div>
                   <p className="gtm-note">
-                    {closed ? signupCopy[availability] : t("domainHero.note", { price: mailFrom })}
+                    {closed ? signupCopy.admissionBody : t("domainHero.note", { price: mailFrom })}
                   </p>
                   <p className="cro-domain-send">
                     <a href="#envio">
@@ -309,7 +309,9 @@ export async function LegacyHome() {
                     </li>
                   ))}
                 </ol>
-                <p className="cro-correio-price">{t("correio.price", { price: mailFrom })}</p>
+                <p className="cro-correio-price">
+                  {closed ? signupCopy.catalog : t("correio.price", { price: mailFrom })}
+                </p>
                 <div className="gtm-actions">
                   <SignupLink label={t("domainHero.cta")} />
                   <a className="ms-btn ms-btn-secondary gtm-action" href="/correio">
@@ -339,12 +341,16 @@ export async function LegacyHome() {
                 <h2>{t("hero.title")}</h2>
                 <p className="gtm-lead">{t("hero.lead")}</p>
                 <div className="gtm-actions">
-                  <SignupLink label={t("hero.ctaSignup")} />
+                  <SignupCta
+                    rung="free"
+                    label={t("hero.ctaSignup")}
+                    className="ms-btn ms-btn-primary gtm-action"
+                  />
                   <a className="ms-btn ms-btn-secondary gtm-action" href="#product">
                     {t("hero.ctaPlans")}
                   </a>
                 </div>
-                <p className="gtm-note">{closed ? signupCopy[availability] : t("hero.note")}</p>
+                <p className="gtm-note">{closed ? signupCopy.admissionBody : t("hero.note")}</p>
                 {sendOffer}
               </div>
             </section>
@@ -357,12 +363,16 @@ export async function LegacyHome() {
                 <h1>{t("hero.title")}</h1>
                 <p className="gtm-lead">{t("hero.lead")}</p>
                 <div className="gtm-actions">
-                  <SignupLink label={t("hero.ctaSignup")} />
+                  <SignupCta
+                    rung="free"
+                    label={t("hero.ctaSignup")}
+                    className="ms-btn ms-btn-primary gtm-action"
+                  />
                   <a className="ms-btn ms-btn-secondary gtm-action" href="#product">
                     {t("hero.ctaPlans")}
                   </a>
                 </div>
-                <p className="gtm-note">{closed ? signupCopy[availability] : t("hero.note")}</p>
+                <p className="gtm-note">{closed ? signupCopy.admissionBody : t("hero.note")}</p>
                 {sendOffer}
               </div>
               <figure className="cro-hero-proof">
@@ -370,7 +380,7 @@ export async function LegacyHome() {
                   <span aria-hidden="true" />
                   MepMail / templates
                 </div>
-                <PublicStarterGallery compact />
+                <PublicStarterGallery compact closedLabel={closed ? signupCopy.check : null} />
                 <figcaption>{t("productProof.caption")}</figcaption>
               </figure>
             </div>
@@ -405,14 +415,14 @@ export async function LegacyHome() {
               </ol>
             </div>
             <figure className="cro-product-proof">
-              <PublicStarterGallery />
+              <PublicStarterGallery closedLabel={closed ? signupCopy.check : null} />
               <figcaption>{t("productProof.caption")}</figcaption>
             </figure>
             <p className="cro-product-next">
               {t("productProof.detail")}{" "}
               <a
                 className="ms-btn ms-btn-primary gtm-action"
-                href="/signup?next=%2Ftemplates%2Fnew"
+                href={closed ? "/status#admission" : "/signup?next=%2Ftemplates%2Fnew"}
               >
                 {closed ? signupCopy.check : t("productProof.viewAll")}
               </a>
@@ -516,7 +526,9 @@ export async function LegacyHome() {
                       <li key={point}>{point}</li>
                     ))}
                   </ul>
-                  <p className="cro-correio-price">{t("correio.price", { price: mailFrom })}</p>
+                  <p className="cro-correio-price">
+                    {closed ? signupCopy.catalog : t("correio.price", { price: mailFrom })}
+                  </p>
                   <div className="gtm-actions">
                     <a className="ms-btn ms-btn-primary gtm-action" href="/correio">
                       {t("correio.cta")} <span aria-hidden="true">→</span>
@@ -624,8 +636,12 @@ export async function LegacyHome() {
                 <li key={step}>{step}</li>
               ))}
             </ol>
-            <p className="gtm-note">{closed ? signupCopy[availability] : t("how.note")}</p>
-            <SignupLink label={t("hero.ctaSignup")} />
+            <p className="gtm-note">{closed ? signupCopy.admissionBody : t("how.note")}</p>
+            <SignupCta
+              rung="free"
+              label={t("hero.ctaSignup")}
+              className="ms-btn ms-btn-primary gtm-action"
+            />
           </div>
         </section>
         <section className="gtm-section">
@@ -644,8 +660,8 @@ export async function LegacyHome() {
         </section>
         <section className="gtm-section gtm-alt gtm-close">
           <div className="gtm-container">
-            <h2>{closed ? signupCopy[availability] : t("close.title")}</h2>
-            <p>{closed ? signupCopy[availability] : t("close.body")}</p>
+            <h2>{closed ? signupCopy.admissionTitle : t("close.title")}</h2>
+            <p>{closed ? signupCopy.admissionBody : t("close.body")}</p>
             <SignupLink label={t("close.cta")} />
           </div>
         </section>

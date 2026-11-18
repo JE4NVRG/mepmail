@@ -10,6 +10,13 @@ export function publicSignupCopy(locale: string) {
           "Novos cadastros, assinaturas e testes estão temporariamente indisponíveis. Contas existentes podem entrar e gerenciar suas assinaturas. Ainda não há data de reabertura.",
         catalog:
           "Preços, limites e condições abaixo são referências do catálogo, não uma oferta disponível para contratação agora.",
+        freeCta: "Criar conta gratuita",
+        freeOnlyTitle: "Cadastro gratuito aberto",
+        freeOnlyBody:
+          "Você pode criar uma conta gratuita. Novas assinaturas e testes estão pausados.",
+        purchasesPausedTitle: "Novas assinaturas e testes pausados",
+        purchasesPausedBody:
+          "Novas assinaturas e testes estão pausados. Contas existentes podem continuar entrando.",
         paused: "Novos cadastros pausados",
         full: "Capacidade de cadastro atingida",
         pausedBody:
@@ -32,6 +39,13 @@ export function publicSignupCopy(locale: string) {
           "New registrations, subscriptions and trials are temporarily unavailable. Existing accounts can sign in and manage their subscriptions. No reopening date has been announced.",
         catalog:
           "Prices, limits and terms below are catalog references, not an offer available to purchase now.",
+        freeCta: "Create a free account",
+        freeOnlyTitle: "Free signup is open",
+        freeOnlyBody:
+          "You can create a free account. New subscriptions and trials are paused.",
+        purchasesPausedTitle: "New subscriptions and trials paused",
+        purchasesPausedBody:
+          "New subscriptions and trials are paused. Existing accounts can still sign in.",
         paused: "New registrations paused",
         full: "Registration capacity reached",
         pausedBody:

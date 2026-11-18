@@ -555,6 +555,31 @@ describe("public signup server-boundary regression", () => {
     for (const name of ["PublicHeader", "PublicFooter"])
       await assert.rejects(chrome[name]({ page: "status" }), (e: unknown) => e === error);
   });
+  for (const locale of ["en", "pt-BR"])
+    for (const mail of [false, true])
+      it(`root SSR ${locale}/standalone=${mail}: purchase pause opens only Free signup`, async () => {
+        reset({ locale, mail, allow: true, subscriptions: true });
+        const markup = await html(await load("apps/web/src/app/page.tsx").default());
+        const signupHrefs = [...markup.matchAll(/href="(\/signup[^"]*)"/g)].map((m) => m[1]);
+        assert.deepEqual([...new Set(signupHrefs)], ["/signup"]);
+        assert.match(markup, /href="\/status#admission"/);
+        assert.doesNotMatch(markup, /data-funnel-product="mail"|data-funnel-plan="(?!free")/);
+        assert.ok(
+          markup.includes(locale === "pt-BR" ? "Criar conta gratuita" : "Create a free account"),
+        );
+        assert.ok(
+          markup.includes(
+            locale === "pt-BR"
+              ? "Novas assinaturas e testes estão pausados."
+              : "New subscriptions and trials are paused.",
+          ),
+        );
+        for (const negative of [{ allow: false }, { allow: true, cap: 1 }]) {
+          reset({ locale, mail, subscriptions: true, ...negative });
+          const closed = await html(await load("apps/web/src/app/page.tsx").default());
+          assert.doesNotMatch(closed, /href="\/signup|data-funnel-signup/);
+        }
+      });
   it("preserves both root branches and provider, including closed CTA and unknown failure", async () => {
     for (const mail of [false, true])
       for (const allow of [false, true]) {

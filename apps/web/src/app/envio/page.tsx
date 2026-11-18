@@ -306,7 +306,7 @@ export default async function EnvioPage() {
                   <h3 className="v2-h3">{t("panel.templatesTitle")}</h3>
                   <p className="v2-body v2-gap-sm">{t("panel.templatesBody")}</p>
                 </div>
-                <PublicStarterGallery compact />
+                <PublicStarterGallery compact closedLabel={closed ? copy.check : null} />
                 <figcaption>{l("productProof.caption")}</figcaption>
               </figure>
 
