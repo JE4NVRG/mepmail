@@ -1,3 +1,4 @@
+import type { Db } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { expect, it } from "vitest";
 import { assertSendSaleCapacity, captureSendSaleCapacity } from "../src/send-sale-capacity.js";
@@ -20,7 +21,11 @@ it("checks an unsigned Pro purchase against the shortest regular cycle", async (
           },
         };
       });
-      return db.transaction((tx) => assertSendSaleCapacity(tx, teamId, "pro_100k", observation));
+      return db.transaction((transaction) => {
+        // Match the transaction adapter in send-sale-reservation; the assertion does not use $client.
+        const tx = transaction as unknown as Db;
+        return assertSendSaleCapacity(tx, teamId, "pro_100k", observation);
+      });
     };
 
     await expect(check(3_928)).rejects.toMatchObject({ reason: "capacity_insufficient" });
