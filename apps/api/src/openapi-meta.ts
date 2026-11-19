@@ -756,7 +756,7 @@ export function synthesizeExample(
   if (type === "string") {
     let value: string;
     if (node.format === "uuid" || name === "id" || name?.endsWith("_id"))
-      value = EXAMPLE_IDS[depth % EXAMPLE_IDS.length] ?? EXAMPLE_IDS[0]!;
+      value = EXAMPLE_IDS[depth % EXAMPLE_IDS.length] ?? EXAMPLE_IDS[0] ?? "";
     else if (node.format === "date-time" || name?.endsWith("_at")) value = EXAMPLE_TIME;
     else if (node.format === "email") value = NAMED_VALUES.email!;
     else if (node.format === "uri")
