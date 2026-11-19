@@ -209,7 +209,8 @@
     },
     "notFound": "Domínio não encontrado.",
     "dangerZone": "Zona de risco",
-    "dangerZoneBody": "Remover o domínio apaga o registro do time e desliga a identidade de envio no provedor. Chaves de API presas a este domínio são revogadas e os envios na fila falham. Não dá para desfazer."
+    "dangerZoneBody": "Remover o domínio apaga o registro do time e desliga a identidade de envio no provedor. Chaves de API presas a este domínio são revogadas e os envios na fila falham. Não dá para desfazer.",
+    "deleteBlockedMailboxes": "Este domínio ainda tem caixas de correio. Exclua as caixas em Correio antes de remover o domínio."
   },
   "awsCredentialsWarning": "As credenciais da AWS não estão configuradas — a criação de domínios vai falhar a menos que a cadeia padrão de credenciais da AWS esteja disponível. Defina <code>AWS_ACCESS_KEY_ID</code> e <code>AWS_SECRET_ACCESS_KEY</code> no <code>.env</code> — veja <code>SELF_HOSTING.md</code>.",
   "awsCredentialsCta": "Abrir configuração do SES",

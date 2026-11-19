@@ -1046,7 +1046,11 @@ export function DomainDetail({ id }: { id: string }) {
           <p
             style={{ margin: "8px 0 0", color: "var(--ms-danger)", fontSize: "var(--ms-fs-label)" }}
           >
-            {t("detail.deleteError")}
+            {/mailbox/i.test(
+              String((deleteDomain.error as { message?: string } | null)?.message ?? ""),
+            )
+              ? t("detail.deleteBlockedMailboxes")
+              : t("detail.deleteError")}
           </p>
         ) : null}
         <ModalFooter>

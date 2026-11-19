@@ -994,6 +994,24 @@ export async function reapUnverifiedDomains(
         .from(d)
         .where(and(eq(d.id, id), isNull(d.verifiedAt)));
       if (!domain) continue;
+      // A domain that still owns registry mailboxes is not orphaned storage:
+      // those rows carry credentials and settings the team may still use.
+      // Skipping keeps the reaper out of a foreign-key failure loop; the row
+      // stays until the mailboxes are removed.
+      try {
+        const [box] = await db
+          .select({ id: schema.mailboxes.id })
+          .from(schema.mailboxes)
+          .where(eq(schema.mailboxes.domainId, domain.id))
+          .limit(1);
+        if (box) {
+          console.log(`domains.reap: skipped ${domain.name} (mailboxes)`);
+          continue;
+        }
+      } catch (err) {
+        // The mailbox registry is an optional extension table.
+        if ((err as { code?: string }).code !== "42P01") throw err;
+      }
       if (!(await isIdentitySharedByOtherDomains(db, domain))) {
         try {
           // The stored verifiedAt lags SES by up to a reverify cycle: a DKIM

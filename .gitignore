@@ -21,3 +21,6 @@ build/
 # Turborepo cache
 .turbo/
 !.env.example
+
+# local agent worktrees
+.worktrees/
