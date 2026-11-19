@@ -1537,6 +1537,21 @@ export async function suspendTenantFromReputation(
       .where(eq(schema.teams.id, input.teamId))
       .for("update");
     if (!team) throw new Error("graduated_team_missing");
+    // Operator/system tenants run the instance's own mail and console. The
+    // reputation circuit exists to protect deliverability from a customer, not
+    // to lock the operator out of their own account: leave the decision to a
+    // human and record the evidence instead of suspending automatically.
+    if (team.plan === "system") {
+      await tx.insert(schema.auditLog).values({
+        teamId: team.id,
+        actorId: "system",
+        action: "sending.reputation_review_required",
+        target: input.providerEventId,
+        createdAt: now,
+        data: { version: 1, reason: "system_team_exempt", plan: team.plan },
+      });
+      return { suspended: false, suspensionId: null };
+    }
     if (input.witnessServerSource === "mailbox") {
       const witness = firstRow<{ id: string }>(
         await tx.execute(sql`
