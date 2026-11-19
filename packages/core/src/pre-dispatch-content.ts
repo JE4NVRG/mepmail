@@ -31,7 +31,7 @@ export interface DispatchContentSnapshot {
 }
 export type DispatchContentDecision =
   | { allowed: true; fingerprint: string; verdict: JudgeVerdict }
-  | { allowed: false; reason: string; verdict?: JudgeVerdict };
+  | { allowed: false; reason: string; detail?: string; verdict?: JudgeVerdict };
 
 export function dispatchContentFingerprint(s: DispatchContentSnapshot): string {
   return createHash("sha256")
@@ -75,16 +75,29 @@ export function bindDispatchTracking(
   });
 }
 
-function projectionBlocks(s: DispatchContentSnapshot): string[] | null {
-  if (s.attachments || (!s.html && !s.text)) return null;
-  if (
-    [s.text ?? "", s.sourceText ?? "", s.subject, s.from, ...(s.replyTo ?? [])].some(
-      (value) => value.length > JUDGE_TEXT_MAX_CHARS || hasUnsafeDispatchCharacters(value),
-    )
-  )
-    return null;
+export type ProjectionHold =
+  | "attachments"
+  | "empty_content"
+  | "text_too_long"
+  | "unsafe_characters"
+  | "proof_mismatch"
+  | "html_projection"
+  | "no_blocks";
+type ProjectionResult = { ok: true; blocks: string[] } | { ok: false; detail: ProjectionHold };
+
+// Detail never carries content: only the branch that held the message, so a
+// hold can be explained to the sender without exposing the email itself.
+function projectionBlocks(s: DispatchContentSnapshot): ProjectionResult {
+  if (s.attachments) return { ok: false, detail: "attachments" };
+  if (!s.html && !s.text) return { ok: false, detail: "empty_content" };
+  const scalars = [s.text ?? "", s.sourceText ?? "", s.subject, s.from, ...(s.replyTo ?? [])];
+  if (scalars.some((value) => value.length > JUDGE_TEXT_MAX_CHARS))
+    return { ok: false, detail: "text_too_long" };
+  if (scalars.some((value) => hasUnsafeDispatchCharacters(value)))
+    return { ok: false, detail: "unsafe_characters" };
   const proof = trackingProjections.get(s);
-  if (proof && dispatchContentFingerprint(s) !== proof.fingerprint) return null;
+  if (proof && dispatchContentFingerprint(s) !== proof.fingerprint)
+    return { ok: false, detail: "proof_mismatch" };
   const blocks: string[] = [];
   for (const html of [
     s.sourceHtml,
@@ -93,11 +106,11 @@ function projectionBlocks(s: DispatchContentSnapshot): string[] | null {
   ]) {
     if (!html) continue;
     const text = projectDispatchHtml(html);
-    if (text === null) return null;
+    if (text === null) return { ok: false, detail: "html_projection" };
     blocks.push(text);
   }
   for (const text of [s.sourceText, s.text]) if (text) blocks.push(text);
-  return blocks.length ? blocks : null;
+  return blocks.length ? { ok: true, blocks } : { ok: false, detail: "no_blocks" };
 }
 
 function validVerdict(v: unknown): v is JudgeVerdict {
@@ -127,7 +140,8 @@ export async function qualifyDispatchContent(
 ): Promise<DispatchContentDecision> {
   if (!judge) return { allowed: false, reason: "off" };
   const projections = projectionBlocks(snapshot);
-  if (!projections) return { allowed: false, reason: "uninspectable" };
+  if (!projections.ok)
+    return { allowed: false, reason: "uninspectable", detail: projections.detail };
   const fingerprint = dispatchContentFingerprint(snapshot);
   const blocks = new Set<string>();
   const base = {
@@ -139,7 +153,7 @@ export async function qualifyDispatchContent(
   };
   // Same judge/prompt/rubric. The bounded text projection retains every text
   // node, every alternative, and complete original AND final href bytes.
-  for (const text of projections) blocks.add(buildJudgeBlock({ ...base, html: null, text }));
+  for (const text of projections.blocks) blocks.add(buildJudgeBlock({ ...base, html: null, text }));
   // One indivisible evaluation of this snapshot, not independently paced calls.
   const block = bundleDispatchProjectionBlocks([...blocks]);
   let verdict: JudgeVerdict;

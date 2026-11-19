@@ -1333,6 +1333,7 @@ export async function sendEmail(
       data: {
         emailId: email.id,
         result: changed ? "snapshot_changed" : decision.allowed ? "clean" : decision.reason,
+        detail: decision.allowed || changed ? null : (decision.detail ?? null),
         fingerprint: dispatchContentFingerprint(contentSnapshot),
         model: deps.contentJudge?.model ?? null,
         ...("verdict" in decision && decision.verdict
