@@ -223,14 +223,9 @@ export async function fetchDeliverabilityHealth(
       select ${e.id} as id from ${e}
       where ${e.teamId} = ${teamId} and ${e.createdAt} <= ${now}
         and ${e.sentAt} > ${start} and ${e.sentAt} <= ${now}
-        and not (${e.tags} ? 'mepmail_system')
+        and (${e.tags} is null or not (${e.tags} ? 'mepmail_system'))
       union
-      select w.email_id as id from window_events w
-      inner join lateral (
-        select ${e.id} from ${e}
-        where ${e.id} = w.email_id and not (${e.tags} ? 'mepmail_system')
-        limit 1
-      ) customer_email on true
+      select email_id as id from window_events
     ), confirmed as materialized (
       select candidate_email.id,
         coalesce(proof.sent_at, candidate_email.sent_at, proof.provider_at) as accepted_at
@@ -239,7 +234,7 @@ export async function fetchDeliverabilityHealth(
         from ${e}
         where ${e.id} = candidates.id and ${e.teamId} = ${teamId}
           and ${e.createdAt} <= ${now}
-          and not (${e.tags} ? 'mepmail_system')
+          and (${e.tags} is null or not (${e.tags} ? 'mepmail_system'))
         limit 1
       ) candidate_email on true
       inner join lateral (
