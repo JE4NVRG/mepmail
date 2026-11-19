@@ -6,7 +6,11 @@ import {
 } from "./abuse-judge/block.js";
 import { JUDGE_VERDICT_NOUL } from "./abuse-judge/questions.js";
 import { type AbuseJudge, type JudgeVerdict, judgeErrorClass } from "./abuse-judge/types.js";
-import { hasUnsafeDispatchCharacters, projectDispatchHtml } from "./dispatch-html-projection.js";
+import {
+  hasUnsafeDispatchCharacters,
+  permissiveDispatchProjection,
+  projectDispatchHtml,
+} from "./dispatch-html-projection.js";
 import { bundleDispatchProjectionBlocks } from "./dispatch-projection-bundle.js";
 import { type RewriteOptions, rewriteForTracking } from "./link-tracking.js";
 
@@ -92,7 +96,9 @@ function projectionBlocks(s: DispatchContentSnapshot): string[] | null {
     proof?.finalWithoutPixel ?? s.html,
   ]) {
     if (!html) continue;
-    const text = projectDispatchHtml(html);
+    // Ordinary marketing HTML must not become "uninspectable": fall back to a
+    // permissive projection that still carries every text node and href.
+    const text = projectDispatchHtml(html) ?? permissiveDispatchProjection(html);
     if (text === null) return null;
     blocks.push(text);
   }
