@@ -198,7 +198,7 @@ describe("published OpenAPI document", () => {
   it("keeps the send examples on one sender and one recipient", async () => {
     const doc = await spec();
     const send = doc.paths["/emails"]?.post?.requestBody?.content["application/json"];
-    expect(send).toBeDefined();
+    if (!send) throw new Error("send example missing");
     expect(send.example).toMatchObject({
       from: "Acme <hello@yourdomain.com>",
       to: ["customer@example.com"],
