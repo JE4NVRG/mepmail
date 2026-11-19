@@ -15,7 +15,9 @@ import {
   GraduatedAdmissionError,
   graduatedPolicy,
   parseCapacityReceipt,
+  REPUTATION_MIN_SAMPLE,
   reputationCircuitTriggered,
+  suspensionFloorMet,
   type TenantReputationDto,
   tenantSendingMinuteCeiling,
 } from "./graduated-sending-policy.js";
@@ -1615,6 +1617,27 @@ export async function suspendTenantFromReputation(
     if (team.suspendedAt) return { suspended: false, suspensionId: null };
     const h = await fetchDeliverabilityHealth(tx, input.teamId, { now });
     if (!reputationCircuitTriggered(h.pause)) return { suspended: false, suspensionId: null };
+    if (!suspensionFloorMet(h.pause)) {
+      // The panel already pauses and warns; the account itself keeps sending and
+      // the evidence goes to a human instead of a lockout on the first typo.
+      await tx.insert(schema.auditLog).values({
+        teamId: team.id,
+        actorId: "system",
+        action: "sending.reputation_review_required",
+        target: input.providerEventId,
+        createdAt: now,
+        data: {
+          version: 1,
+          reason: "small_sample",
+          plan: team.plan,
+          sent: h.pause.sent,
+          hardBounced: h.pause.hardBounced,
+          complained: h.pause.complained,
+          minSample: REPUTATION_MIN_SAMPLE,
+        },
+      });
+      return { suspended: false, suspensionId: null };
+    }
     const suspensionId = randomUUID();
     await tx
       .update(schema.teams)

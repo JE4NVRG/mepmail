@@ -136,6 +136,27 @@ export function reputationCircuitTriggered(c: {
     ? c.complained / c.sent > 0.001 || c.hardBounced / c.sent > 0.05
     : c.hardBounced > 0 || c.complained > 0;
 }
+/**
+ * The panel pauses on a bare rate, and that is deliberate: a trial sender should
+ * be told early. Locking the account is a different decision and needs a
+ * denominator, otherwise one mistyped address freezes a brand-new tenant.
+ */
+export const REPUTATION_MIN_SAMPLE = 20;
+/** Repeated hard bounces are actionable whatever the sample size. */
+export const REPUTATION_REPEAT_HARD_BOUNCES = 3;
+
+export function suspensionFloorMet(c: {
+  sent: number;
+  hardBounced: number;
+  complained: number;
+}): boolean {
+  // A complaint says the recipient never asked for this; consent does not wait
+  // for a sample.
+  if (c.complained > 0) return true;
+  if (c.hardBounced >= REPUTATION_REPEAT_HARD_BOUNCES) return true;
+  return c.sent >= REPUTATION_MIN_SAMPLE && c.hardBounced / c.sent > 0.05;
+}
+
 export function graduatedPolicy(
   i: GraduatedInputs,
   capacity: CapacityReceipt | null,
