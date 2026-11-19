@@ -116,7 +116,10 @@ export async function mailboxActorAccessEnabled(
   const cohort = mailboxEarlyAccessCohort();
   if (cohort === undefined) return mailboxAccessEnabled(actor);
   const member = await accessMember(db, actor);
-  if (!member || member.suspendedAt) return false;
+  // Suspension stops sending, not reading: an owner locked out of their own
+  // inbox cannot even see why the account stopped. Create/send stay gated by
+  // mailboxCreateAccessEnabled and the send pipeline.
+  if (!member) return false;
   if (member.plan === "system")
     return (await mailboxServiceEntitlement(db, actor.teamId)).unlimitedSeats;
   if (!cohort) return false;

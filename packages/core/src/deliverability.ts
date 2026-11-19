@@ -217,11 +217,20 @@ export async function fetchDeliverabilityHealth(
         and ${v.createdAt} <= ${now}
         and ${v.type} in ('sent', 'delivered', 'bounced', 'complained', 'delivery_delayed')
     ), candidate_ids as materialized (
+      -- Account mail (verification, reset, invitations) is the platform's own
+      -- transactional traffic: its bounces must never become a tenant's
+      -- reputation evidence, or one mistyped signup address suspends the owner.
       select ${e.id} as id from ${e}
       where ${e.teamId} = ${teamId} and ${e.createdAt} <= ${now}
         and ${e.sentAt} > ${start} and ${e.sentAt} <= ${now}
+        and not (${e.tags} ? 'mepmail_system')
       union
-      select email_id as id from window_events
+      select w.email_id as id from window_events w
+      inner join lateral (
+        select ${e.id} from ${e}
+        where ${e.id} = w.email_id and not (${e.tags} ? 'mepmail_system')
+        limit 1
+      ) customer_email on true
     ), confirmed as materialized (
       select candidate_email.id,
         coalesce(proof.sent_at, candidate_email.sent_at, proof.provider_at) as accepted_at
@@ -230,6 +239,7 @@ export async function fetchDeliverabilityHealth(
         from ${e}
         where ${e.id} = candidates.id and ${e.teamId} = ${teamId}
           and ${e.createdAt} <= ${now}
+          and not (${e.tags} ? 'mepmail_system')
         limit 1
       ) candidate_email on true
       inner join lateral (
