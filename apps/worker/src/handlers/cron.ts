@@ -294,7 +294,7 @@ export async function drainQuotaParked(db: Db, deps: DrainDeps): Promise<DrainRe
           // Sent rows too: a broadcast completed before the status stayed
           // sending until its last row may still hold plan-parked rows.
           inArray(b.status, ["sending", "sent"]),
-          sql`exists (select 1 from emails e where e.broadcast_id = broadcasts.id and e.latest_status = 'queued_quota')`,
+          sql`exists (select 1 from emails e where e.broadcast_id = broadcasts.id and e.latest_status = 'queued_quota' and not (coalesce(e.tags, '{}'::jsonb) ? 'content_review'))`,
         ),
       )
       .orderBy(asc(b.scheduledAt), asc(b.createdAt), asc(b.id));
@@ -405,6 +405,9 @@ async function releaseParkedRows(
       .where(
         and(
           eq(schema.emails.latestStatus, "queued_quota"),
+          // A content hold waits for a human decision, never for quota: releasing
+          // it would re-judge the same message on every sweep.
+          sql`not (coalesce(${schema.emails.tags}, '{}'::jsonb) ? 'content_review')`,
           opts.where,
           queueAdmissionScope(deps.queueAdmission),
           // The operator's holds: a suspended team, or one held for review,

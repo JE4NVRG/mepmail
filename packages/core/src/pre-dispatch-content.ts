@@ -6,7 +6,11 @@ import {
 } from "./abuse-judge/block.js";
 import { JUDGE_VERDICT_NOUL } from "./abuse-judge/questions.js";
 import { type AbuseJudge, type JudgeVerdict, judgeErrorClass } from "./abuse-judge/types.js";
-import { hasUnsafeDispatchCharacters, projectDispatchHtml } from "./dispatch-html-projection.js";
+import {
+  hasUnsafeDispatchCharacters,
+  normalizeDispatchText,
+  projectDispatchHtml,
+} from "./dispatch-html-projection.js";
 import { bundleDispatchProjectionBlocks } from "./dispatch-projection-bundle.js";
 import { type RewriteOptions, rewriteForTracking } from "./link-tracking.js";
 
@@ -90,7 +94,9 @@ type ProjectionResult = { ok: true; blocks: string[] } | { ok: false; detail: Pr
 function projectionBlocks(s: DispatchContentSnapshot): ProjectionResult {
   if (s.attachments) return { ok: false, detail: "attachments" };
   if (!s.html && !s.text) return { ok: false, detail: "empty_content" };
-  const scalars = [s.text ?? "", s.sourceText ?? "", s.subject, s.from, ...(s.replyTo ?? [])];
+  const scalars = [s.text ?? "", s.sourceText ?? "", s.subject, s.from, ...(s.replyTo ?? [])].map(
+    normalizeDispatchText,
+  );
   if (scalars.some((value) => value.length > JUDGE_TEXT_MAX_CHARS))
     return { ok: false, detail: "text_too_long" };
   if (scalars.some((value) => hasUnsafeDispatchCharacters(value)))
@@ -105,7 +111,7 @@ function projectionBlocks(s: DispatchContentSnapshot): ProjectionResult {
     proof?.finalWithoutPixel ?? s.html,
   ]) {
     if (!html) continue;
-    const text = projectDispatchHtml(html);
+    const text = projectDispatchHtml(normalizeDispatchText(html));
     if (text === null) return { ok: false, detail: "html_projection" };
     blocks.push(text);
   }

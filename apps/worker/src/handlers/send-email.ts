@@ -366,6 +366,7 @@ async function parkQueued(
   db: Db,
   email: { id: string; teamId: string },
   why: string,
+  contentReview?: string,
 ): Promise<void> {
   await db.transaction(async (tx) => {
     const txDb = tx as unknown as Db;
@@ -374,6 +375,15 @@ async function parkQueued(
       to: "queued_quota",
     });
     if (!moved) return;
+    // A content hold is a review decision, not quota backpressure: tag the row so
+    // drainQuotaParked leaves it alone instead of re-judging it every sweep.
+    if (contentReview)
+      await txDb
+        .update(schema.emails)
+        .set({
+          tags: sql`coalesce(${schema.emails.tags}, '{}'::jsonb) || jsonb_build_object('content_review', ${contentReview})`,
+        })
+        .where(eq(schema.emails.id, email.id));
     // Against the same counter accept charged: on a monthly plan that is the
     // billing period, which the drain will charge again on release. The cap
     // itself is irrelevant here, so the row is read as Cloud reads it.
@@ -1348,7 +1358,12 @@ export async function sendEmail(
           score: decision.verdict.score,
           categories: decision.verdict.categories,
         });
-      await parkQueued(db, email, "pre-dispatch content review required");
+      await parkQueued(
+        db,
+        email,
+        "pre-dispatch content review required",
+        decision.allowed ? undefined : (decision.detail ?? "unclassified"),
+      );
       return "parked";
     }
     contentApproval = decision;

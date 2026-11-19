@@ -1,5 +1,17 @@
 import { JUDGE_LINK_ROWS_MAX, JUDGE_TEXT_MAX_CHARS } from "./abuse-judge/block.js";
 
+/**
+ * Typography that carries no content is removed before the safety check: a
+ * byte-order mark at the start, soft hyphens used for line breaking, and CRLF
+ * line endings are ordinary in real templates and must not hold a message.
+ * Invisible separators, bidi overrides and other obfuscation stay rejected.
+ */
+export function normalizeDispatchText(value: string): string {
+  return value
+    .replace(/^\uFEFF/, "")
+    .replace(/\u00AD/g, "")
+    .replace(/\r\n?/g, "\n");
+}
 /** Explicit scalar checks avoid decoder replacement and control-regex lint escapes. */
 export function hasUnsafeDispatchCharacters(value: string): boolean {
   for (const character of value) {
