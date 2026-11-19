@@ -144,10 +144,15 @@ export function reputationCircuitDecision(c: {
   hardBounced: number;
   complained: number;
 }): ReputationCircuit {
-  // A complaint says the recipient never asked for this. It stops sending at any
-  // volume; only the bounce rate is noise-sensitive on a small sample.
+  // Repeated harm stops sending at any volume.
+  if (c.complained >= 2) return "suspend";
+  // A rate needs a denominator: below the sample floor the window cannot carry
+  // the ratio, so a bounce becomes evidence for review instead of suspension.
+  if (c.sent >= REPUTATION_MIN_SAMPLE)
+    return c.complained / c.sent > 0.001 || c.hardBounced / c.sent > 0.05 ? "suspend" : "none";
+  // A complaint with a tiny or unknown denominator still means the recipient
+  // never asked for this; hard bounces there are usually one mistyped address.
   if (c.complained > 0) return "suspend";
-  if (c.sent >= REPUTATION_MIN_SAMPLE) return c.hardBounced / c.sent > 0.05 ? "suspend" : "none";
   if (c.hardBounced >= REPUTATION_REPEAT_HARD_BOUNCES) return "suspend";
   return c.hardBounced > 0 ? "review" : "none";
 }

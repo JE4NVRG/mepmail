@@ -48,6 +48,14 @@ describe("reputation circuit sample floor", () => {
     expect(reputationCircuitDecision({ sent: 500, hardBounced: 0, complained: 1 })).toBe("suspend");
   });
 
+  it("keeps equality on the complaint line a warning, not a suspension", () => {
+    // 1 complaint in 1000 sends is exactly 0.1%: the line is strict.
+    expect(reputationCircuitDecision({ sent: 1000, hardBounced: 0, complained: 1 })).toBe("none");
+    expect(reputationCircuitDecision({ sent: 1000, hardBounced: 0, complained: 2 })).toBe(
+      "suspend",
+    );
+  });
+
   it("leaves a clean window alone", () => {
     expect(reputationCircuitDecision({ sent: 0, hardBounced: 0, complained: 0 })).toBe("none");
     expect(reputationCircuitDecision({ sent: 5000, hardBounced: 10, complained: 0 })).toBe("none");
