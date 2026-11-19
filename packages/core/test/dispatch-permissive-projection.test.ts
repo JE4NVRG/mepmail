@@ -19,11 +19,12 @@ describe("permissive dispatch projection", () => {
   it("refuses documents that could render text the judge cannot read", () => {
     expect(permissiveDispatchProjection("<div><script>alert(1)</script></div>")).toBeNull();
     expect(permissiveDispatchProjection('<div style="content: phish"></div>')).toBeNull();
-    expect(permissiveDispatchProjection('<a href="https://x.dev" style="background:url(a)">x</a>')).toBeNull();
+    expect(
+      permissiveDispatchProjection('<a href="https://x.dev" style="background:url(a)">x</a>'),
+    ).toBeNull();
   });
 
   it("refuses an empty document with no text and no links", () => {
     expect(permissiveDispatchProjection("<div><span></span></div>")).toBeNull();
   });
 });
-

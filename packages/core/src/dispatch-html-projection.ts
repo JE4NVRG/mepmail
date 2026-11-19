@@ -293,9 +293,7 @@ export function projectDispatchHtml(html: string): string | null {
  */
 export function permissiveDispatchProjection(html: string): string | null {
   if (/<script|@import|expression\s*\(|content\s*:|url\s*\(/i.test(html)) return null;
-  const body = html
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ");
+  const body = html.replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<!--[\s\S]*?-->/g, " ");
   let out = "";
   const links: string[] = [];
   const tagRe = /<\/?([a-z][a-z0-9-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)\/?>/gi;
