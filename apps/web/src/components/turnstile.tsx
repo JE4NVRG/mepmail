@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { type MutableRefObject, useCallback, useEffect, useRef } from "react";
 
 const SCRIPT_URL = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 /* Global Turnstile calls once the API is usable: the supported "ready" signal
@@ -15,7 +15,6 @@ interface TurnstileApi {
     container: HTMLElement,
     options: {
       sitekey: string;
-      execution: "execute";
       appearance: "interaction-only";
       action?: string;
       callback: (token: string) => void;
@@ -23,7 +22,6 @@ interface TurnstileApi {
       "expired-callback": () => void;
     },
   ): string;
-  execute(widgetId: string): void;
   reset(widgetId: string): void;
   remove(widgetId: string): void;
 }
@@ -63,6 +61,37 @@ function loadTurnstile(): Promise<TurnstileApi> {
   return scriptLoading;
 }
 
+type TokenWaiter = {
+  resolve: (token: string) => void;
+  reject: () => void;
+};
+
+/**
+ * Publica a espera do próximo token antes de pedir o desafio e falha visível
+ * quando o prazo estoura: um pedido que nunca responde não pode travar o botão.
+ */
+function waitForToken(
+  pending: MutableRefObject<TokenWaiter | null>,
+  timeoutMs: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fail = () => reject(new Error("turnstile"));
+    const timer = window.setTimeout(fail, timeoutMs);
+    pending.current = {
+      resolve: (token) => {
+        window.clearTimeout(timer);
+        pending.current = null;
+        resolve(token);
+      },
+      reject: () => {
+        window.clearTimeout(timer);
+        pending.current = null;
+        fail();
+      },
+    };
+  });
+}
+
 /**
  * Cloudflare Turnstile behind a form: a widget that only shows up when
  * Cloudflare needs an interaction, handing back a fresh token per submit.
@@ -97,13 +126,20 @@ export function useTurnstile(siteKey: string | null, action?: string) {
       turnstile.remove(widgetId.current);
       widgetId.current = null;
     }
+    // A espera é publicada antes de renderizar ou resetar: um widget
+    // "managed" pode entregar o token no mesmo tick do render, e uma promessa
+    // criada depois perderia a resposta (o botão ficava 30 s em "enviando…"
+    // e caía em "A verificação falhou").
+    const waiting = waitForToken(pending, TOKEN_TIMEOUT_MS);
     if (!widgetId.current) {
       const slot = slotRef.current;
       if (!slot) throw new Error("turnstile");
       renderedIn.current = slot;
       widgetId.current = turnstile.render(slot, {
         sitekey: siteKey,
-        execution: "execute",
+        // Sem `execution: "execute"`: esse modo só vale para widget
+        // invisível. Num widget "managed" ele impede o desafio interativo de
+        // aparecer, e quem o Cloudflare sinaliza como risco fica sem token.
         appearance: "interaction-only",
         ...(action ? { action } : {}),
         callback: (token) => pending.current?.resolve(token),
@@ -115,24 +151,10 @@ export function useTurnstile(siteKey: string | null, action?: string) {
         },
         "expired-callback": () => pending.current?.reject(),
       });
+      return waiting;
     }
-    const id = widgetId.current;
-    return new Promise((resolve, reject) => {
-      const fail = () => reject(new Error("turnstile"));
-      const timer = window.setTimeout(fail, TOKEN_TIMEOUT_MS);
-      pending.current = {
-        resolve: (token) => {
-          window.clearTimeout(timer);
-          resolve(token);
-        },
-        reject: () => {
-          window.clearTimeout(timer);
-          fail();
-        },
-      };
-      turnstile.reset(id);
-      turnstile.execute(id);
-    });
+    turnstile.reset(widgetId.current);
+    return waiting;
   }, [siteKey, action]);
 
   return { slot: <div ref={slotRef} />, getToken };
