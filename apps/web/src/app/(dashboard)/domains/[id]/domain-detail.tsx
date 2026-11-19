@@ -887,6 +887,44 @@ export function DomainDetail({ id }: { id: string }) {
               setTimeout(() => setHighlightTracking(false), 2400);
             }}
           />
+          <section
+            aria-labelledby="domain-danger-zone"
+            style={{
+              marginTop: 28,
+              paddingTop: 20,
+              borderTop: "1px solid var(--ms-border)",
+              maxWidth: 720,
+            }}
+          >
+            <h2
+              id="domain-danger-zone"
+              className="ms-display"
+              style={{ fontSize: 18, margin: 0, color: "var(--ms-bone)" }}
+            >
+              {t("detail.dangerZone")}
+            </h2>
+            <p
+              style={{
+                margin: "8px 0 14px",
+                color: "var(--ms-muted)",
+                fontSize: 13.5,
+                lineHeight: 1.6,
+              }}
+            >
+              {t("detail.dangerZoneBody")}
+            </p>
+            <button
+              type="button"
+              className="ms-btn ms-btn-destructive"
+              disabled={deleteDomain.isPending}
+              onClick={() => {
+                setConfirmText("");
+                setConfirmingDelete(true);
+              }}
+            >
+              {t("detail.deleteDomain")}
+            </button>
+          </section>
         </div>
       ) : (
         <section style={{ marginTop: 24, maxWidth: 1000 }}>

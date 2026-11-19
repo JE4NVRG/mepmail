@@ -207,7 +207,9 @@
       "change": "Change subdomain",
       "add": "Add a custom subdomain"
     },
-    "notFound": "Domain not found."
+    "notFound": "Domain not found.",
+    "dangerZone": "Danger zone",
+    "dangerZoneBody": "Removing the domain deletes it from the team and tears down the sending identity at the provider. API keys scoped to this domain are revoked and queued sends fail. This cannot be undone."
   },
   "awsCredentialsWarning": "AWS credentials are not configured — domain creation will fail unless the default AWS credential chain is available. Set <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code> in <code>.env</code> — see <code>SELF_HOSTING.md</code>.",
   "awsCredentialsCta": "Open SES setup",
