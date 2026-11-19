@@ -168,5 +168,47 @@
       "body": "O destinatário registrou uma reclamação de tipo não especificado. O endereço é suprimido.",
       "action": "Não reenvie; reveja como este destinatário entrou na sua lista."
     }
+  },
+  "content-hold": {
+    "generic": {
+      "title": "Envio retido na revisao de conteudo",
+      "body": "A revisao de conteudo nao conseguiu ler esta mensagem com seguranca, entao ela nao foi enviada.",
+      "action": "Envie uma versao simples em HTML (texto e links, sem imagens nem scripts) ou use o campo de texto."
+    },
+    "html_projection": {
+      "title": "O HTML usa elementos que a revisao nao le",
+      "body": "Imagens, tabelas com atributos de apresentacao e CSS fora do subconjunto suportado impedem a leitura do conteudo. Texto dentro de imagem nao pode ser revisado.",
+      "action": "Remova imagens e estilos nao suportados e mantenha texto e links visiveis."
+    },
+    "attachments": {
+      "title": "Anexos exigem revisao manual",
+      "body": "Mensagens com anexo nao passam pela revisao automatica de conteudo.",
+      "action": "Envie sem anexo ou peca liberacao na revisao de mensagens retidas."
+    },
+    "unsafe_characters": {
+      "title": "A mensagem tem caracteres invisiveis",
+      "body": "Caracteres de controle ou de direcao de texto escondem conteudo do revisor.",
+      "action": "Reescreva o texto sem caracteres invisiveis."
+    },
+    "text_too_long": {
+      "title": "A mensagem excede o limite de revisao",
+      "body": "O texto passa do tamanho analisado em uma unica revisao.",
+      "action": "Reduza o texto ou divida em envios menores."
+    },
+    "empty_content": {
+      "title": "A mensagem chegou sem corpo",
+      "body": "Sem HTML e sem texto nao ha o que revisar.",
+      "action": "Reenvie com corpo em texto ou HTML."
+    },
+    "no_blocks": {
+      "title": "Nada revisavel foi encontrado",
+      "body": "O conteudo nao gerou texto nem links para analise.",
+      "action": "Reenvie com texto e links explicitos."
+    },
+    "proof_mismatch": {
+      "title": "O conteudo mudou durante a revisao",
+      "body": "A mensagem foi alterada entre a montagem e a checagem.",
+      "action": "Reenvie a mesma mensagem."
+    }
   }
 }

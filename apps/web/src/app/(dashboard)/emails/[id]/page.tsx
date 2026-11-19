@@ -618,6 +618,27 @@ export default function EmailDetailPage() {
     return null;
   }
 
+  // A content hold is a review decision: name the branch that held it so the
+  // sender can fix the message instead of guessing why it never left.
+  const contentReview = (email.tags as Record<string, unknown> | null)?.["content_review"];
+  const CONTENT_HOLD_BRANCHES = [
+    "attachments",
+    "empty_content",
+    "text_too_long",
+    "unsafe_characters",
+    "proof_mismatch",
+    "html_projection",
+    "no_blocks",
+  ] as const;
+  const contentHoldKey =
+    typeof contentReview === "string"
+      ? `content-hold.${
+          (CONTENT_HOLD_BRANCHES as readonly string[]).includes(contentReview)
+            ? contentReview
+            : "generic"
+        }`
+      : null;
+
   return (
     <>
       <PageHeader
@@ -632,6 +653,8 @@ export default function EmailDetailPage() {
         subtitle={sublineParts.join(" · ")}
         actions={<ApiDocsButton />}
       />
+
+      {contentHoldKey ? <GuidanceBlock guidanceKey={contentHoldKey} /> : null}
 
       {email.latestStatus === "delivered" || events.some((event) => event.type === "delivered") ? (
         <p style={{ color: "var(--ms-muted)", fontSize: 13, lineHeight: 1.6 }}>

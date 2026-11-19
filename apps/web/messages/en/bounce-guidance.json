@@ -168,5 +168,47 @@
       "body": "The recipient filed a complaint of an unspecified type. The address is suppressed.",
       "action": "Do not resend; review how this recipient was added to your list."
     }
+  },
+  "content-hold": {
+    "generic": {
+      "title": "Send held for content review",
+      "body": "Content review could not read this message safely, so it was not sent.",
+      "action": "Send a simple HTML version (text and links, no images or scripts) or use the text field."
+    },
+    "html_projection": {
+      "title": "This HTML uses elements review cannot read",
+      "body": "Images, tables with presentation attributes and CSS outside the supported subset block reading. Text inside an image cannot be reviewed.",
+      "action": "Remove unsupported images and styles and keep text and links visible."
+    },
+    "attachments": {
+      "title": "Attachments need manual review",
+      "body": "Messages with attachments do not pass automatic content review.",
+      "action": "Send without the attachment or ask for release in held-message review."
+    },
+    "unsafe_characters": {
+      "title": "The message contains invisible characters",
+      "body": "Control or text-direction characters hide content from the reviewer.",
+      "action": "Rewrite the text without invisible characters."
+    },
+    "text_too_long": {
+      "title": "The message exceeds the review limit",
+      "body": "The text is longer than a single review pass analyses.",
+      "action": "Shorten the text or split it into smaller sends."
+    },
+    "empty_content": {
+      "title": "The message arrived with no body",
+      "body": "Without HTML or text there is nothing to review.",
+      "action": "Resend with a text or HTML body."
+    },
+    "no_blocks": {
+      "title": "Nothing reviewable was found",
+      "body": "The content produced no text or links to analyse.",
+      "action": "Resend with explicit text and links."
+    },
+    "proof_mismatch": {
+      "title": "The content changed during review",
+      "body": "The message changed between assembly and the check.",
+      "action": "Resend the same message."
+    }
   }
 }
