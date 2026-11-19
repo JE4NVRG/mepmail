@@ -758,9 +758,12 @@ export function synthesizeExample(
     if (node.format === "uuid" || name === "id" || name?.endsWith("_id"))
       value = EXAMPLE_IDS[depth % EXAMPLE_IDS.length] ?? EXAMPLE_IDS[0] ?? "";
     else if (node.format === "date-time" || name?.endsWith("_at")) value = EXAMPLE_TIME;
-    else if (node.format === "email") value = NAMED_VALUES.email!;
+    else if (node.format === "email") value = NAMED_VALUES.email ?? "user@example.com";
     else if (node.format === "uri")
-      value = name === "endpoint" ? NAMED_VALUES.endpoint! : NAMED_VALUES.url!;
+      value =
+        name === "endpoint"
+          ? (NAMED_VALUES.endpoint ?? "https://api.example.com")
+          : (NAMED_VALUES.url ?? "https://example.com");
     else value = (name && NAMED_VALUES[name]) ?? (name ? name.replaceAll("_", " ") : "string");
     const min = typeof node.minLength === "number" ? node.minLength : 0;
     const max = typeof node.maxLength === "number" ? node.maxLength : Number.POSITIVE_INFINITY;
