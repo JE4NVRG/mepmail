@@ -980,6 +980,12 @@ export async function reapUnverifiedDomains(
     .from(d)
     .where(and(isNull(d.verifiedAt), lt(d.createdAt, cutoff)))
     .orderBy(asc(d.createdAt));
+  // The mailbox registry is an optional extension table: probe it once so
+  // deployments without it never issue a query against a missing relation.
+  const [mailboxRegistry] = await db
+    .select({ installed: sql<boolean>`to_regclass('public.mailboxes') is not null` })
+    .from(sql`(select 1) as mailbox_extension`);
+  const hasMailboxRegistry = Boolean(mailboxRegistry?.installed);
   let reaped = 0;
   for (const { id } of stale) {
     try {
@@ -998,7 +1004,7 @@ export async function reapUnverifiedDomains(
       // those rows carry credentials and settings the team may still use.
       // Skipping keeps the reaper out of a foreign-key failure loop; the row
       // stays until the mailboxes are removed.
-      try {
+      if (hasMailboxRegistry) {
         const [box] = await db
           .select({ id: schema.mailboxes.id })
           .from(schema.mailboxes)
@@ -1008,9 +1014,6 @@ export async function reapUnverifiedDomains(
           console.log(`domains.reap: skipped ${domain.name} (mailboxes)`);
           continue;
         }
-      } catch (err) {
-        // The mailbox registry is an optional extension table.
-        if ((err as { code?: string }).code !== "42P01") throw err;
       }
       if (!(await isIdentitySharedByOtherDomains(db, domain))) {
         try {
