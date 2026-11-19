@@ -139,7 +139,7 @@
     "sentTo": "Send request accepted for {to}. Wait for the delivery event.",
     "sendError": "Could not send. Try again.",
     "selfHostBase": "Self-hosted: set your SDK's base URL to {url}.",
-    "captchaFailed": "Verification failed. Try again.",
+    "captchaFailed": "We could not verify your browser. Turn off any VPN or proxy and reload the page. Support: mepmail.dev/support",
     "sendLimited": "A few onboarding emails already went out from this team. Try again in an hour."
   },
   "step3": {

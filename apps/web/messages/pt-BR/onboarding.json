@@ -139,7 +139,7 @@
     "sentTo": "Solicitação de envio aceita para {to}. Aguarde o evento de entrega.",
     "sendError": "Não foi possível enviar. Tente de novo.",
     "selfHostBase": "Auto-hospedado: configure a URL base do seu SDK para {url}.",
-    "captchaFailed": "A verificação falhou. Tente de novo.",
+    "captchaFailed": "Não conseguimos validar seu navegador. Desative VPN ou proxy e recarregue a página. Suporte: mepmail.dev/support",
     "sendLimited": "Alguns e-mails de onboarding já saíram deste time. Tente de novo em uma hora."
   },
   "step3": {
