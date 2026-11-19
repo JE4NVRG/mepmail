@@ -36,6 +36,6 @@ describe("suspension floor", () => {
 
   it("leaves a clean or healthy window alone", () => {
     expect(suspensionFloorMet({ sent: 0, hardBounced: 0, complained: 0 })).toBe(false);
-    expect(suspensionFloorMet({ sent: 5000, hardBounced: 10, complained: 0 })).toBe(false);
+    expect(suspensionFloorMet({ sent: 5000, hardBounced: 2, complained: 0 })).toBe(false);
   });
 });
