@@ -127,14 +127,37 @@ export function budgetBackedDailyCeiling(
     throw new Error("capacity_accounting_unknown");
   return Math.min(nominal, Math.min(Number.MAX_SAFE_INTEGER, used + availableFrames));
 }
+/**
+ * A bounce rate needs a denominator. Below this many sends in the window one
+ * mistyped address is evidence to look at, not proof of a bad sender: suspending
+ * on it locks a brand-new tenant out of the product on their first typo.
+ */
+export const REPUTATION_MIN_SAMPLE = 20;
+
+/** Repeated hard bounces are actionable whatever the sample size. */
+export const REPUTATION_REPEAT_HARD_BOUNCES = 3;
+
+export type ReputationCircuit = "suspend" | "review" | "none";
+
+export function reputationCircuitDecision(c: {
+  sent: number;
+  hardBounced: number;
+  complained: number;
+}): ReputationCircuit {
+  // A complaint says the recipient never asked for this. It stops sending at any
+  // volume; only the bounce rate is noise-sensitive on a small sample.
+  if (c.complained > 0) return "suspend";
+  if (c.sent >= REPUTATION_MIN_SAMPLE) return c.hardBounced / c.sent > 0.05 ? "suspend" : "none";
+  if (c.hardBounced >= REPUTATION_REPEAT_HARD_BOUNCES) return "suspend";
+  return c.hardBounced > 0 ? "review" : "none";
+}
+
 export function reputationCircuitTriggered(c: {
   sent: number;
   hardBounced: number;
   complained: number;
 }): boolean {
-  return c.sent > 0
-    ? c.complained / c.sent > 0.001 || c.hardBounced / c.sent > 0.05
-    : c.hardBounced > 0 || c.complained > 0;
+  return reputationCircuitDecision(c) === "suspend";
 }
 export function graduatedPolicy(
   i: GraduatedInputs,

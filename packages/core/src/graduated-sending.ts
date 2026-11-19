@@ -15,6 +15,8 @@ import {
   GraduatedAdmissionError,
   graduatedPolicy,
   parseCapacityReceipt,
+  REPUTATION_MIN_SAMPLE,
+  reputationCircuitDecision,
   reputationCircuitTriggered,
   type TenantReputationDto,
   tenantSendingMinuteCeiling,
@@ -1614,7 +1616,29 @@ export async function suspendTenantFromReputation(
       };
     if (team.suspendedAt) return { suspended: false, suspensionId: null };
     const h = await fetchDeliverabilityHealth(tx, input.teamId, { now });
-    if (!reputationCircuitTriggered(h.pause)) return { suspended: false, suspensionId: null };
+    const circuit = reputationCircuitDecision(h.pause);
+    if (circuit === "none") return { suspended: false, suspensionId: null };
+    // One bad address in a handful of sends is a typo, not a bad sender: keep the
+    // tenant sending and put the evidence in front of a human instead.
+    if (circuit === "review") {
+      await tx.insert(schema.auditLog).values({
+        teamId: team.id,
+        actorId: "system",
+        action: "sending.reputation_review_required",
+        target: input.providerEventId,
+        createdAt: now,
+        data: {
+          version: 1,
+          reason: "small_sample",
+          plan: team.plan,
+          sent: h.pause.sent,
+          hardBounced: h.pause.hardBounced,
+          complained: h.pause.complained,
+          minSample: REPUTATION_MIN_SAMPLE,
+        },
+      });
+      return { suspended: false, suspensionId: null };
+    }
     const suspensionId = randomUUID();
     await tx
       .update(schema.teams)

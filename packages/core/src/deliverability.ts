@@ -11,9 +11,10 @@ import { DAY_MS } from "./utc-day.js";
 /** Internal MepMail anti-abuse policy, NOT provider limits or guarantees.
  * Warning and pause both use an exact rolling 24-hour window (start, end].
  * Pause is strictly above the line; equality warns but does not pause.
- * Strict tenant circuit thresholds have no sample floor. One confirmed
- * outcome can cross the line; equality never pauses. Unknown denominators
- * are not positive clean-sending evidence.
+ * Bounce pauses need a denominator (MIN_PAUSE_SENDS): one confirmed adverse
+ * outcome cannot cross a rate line on a handful of sends, and equality never
+ * pauses. Complaints keep no floor, and unknown denominators are never
+ * positive clean-sending evidence.
  */
 export const WARN_BOUNCE_RATE = 0.015;
 export const WARN_COMPLAINT_RATE = 0.0005;
@@ -25,7 +26,7 @@ export const MIN_PAUSE_COMPLAINTS = 1;
 export const MIN_PAUSE_HARD_BOUNCES = 1;
 /** Denominator floor for a bounce pause. Below this the window is too small to
  * call a rate; the graduated projection treats unknown rates as unknown. */
-export const MIN_PAUSE_SENDS = 1;
+export const MIN_PAUSE_SENDS = 20;
 /** Complaints keep no volume floor: one is enough, whatever the volume. */
 export const MIN_PAUSE_COMPLAINT_SENDS = 1;
 export const MIN_WARN_COMPLAINTS = 1;
