@@ -381,7 +381,7 @@ async function parkQueued(
       await txDb
         .update(schema.emails)
         .set({
-          tags: sql`coalesce(${schema.emails.tags}, '{}'::jsonb) || jsonb_build_object('content_review', ${contentReview})`,
+          tags: sql`coalesce(${schema.emails.tags}, '{}'::jsonb) || ${JSON.stringify({ content_review: contentReview })}::jsonb`,
         })
         .where(eq(schema.emails.id, email.id));
     // Against the same counter accept charged: on a monthly plan that is the
