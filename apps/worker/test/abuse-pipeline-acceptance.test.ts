@@ -502,7 +502,7 @@ it("health intent survives sink failure and restart; concurrent recovery does no
     .update(schema.monitorSamples)
     .set({ status: "judged" })
     .where(eq(schema.monitorSamples.status, "unjudged"));
-  const healthNow = new Date("2026-11-20T00:01:00Z");
+  const healthNow = new Date();
   await db.insert(schema.monitorSamples).values({
     teamId: f.teamId,
     kind: "tier",
