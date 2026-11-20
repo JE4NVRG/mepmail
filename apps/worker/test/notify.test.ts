@@ -280,7 +280,7 @@ it("deliverability pause fires once per episode and again after recovery", async
   const [row] = await deliveries();
   expect(row?.type).toBe("deliverability.paused");
   expect(row?.payload).toMatchObject({
-    data: { metric: "complaint", limit: 0.001, window_days: 1 },
+    data: { metric: "complaint", limit: 0, window_days: 1 },
   });
   expect(await sweepNotifications(db, deps())).toEqual({ sent: 0 });
 
@@ -807,8 +807,7 @@ it("an owner who turned a notice off is skipped for it, and still gets a securit
 });
 
 it.each([
-  { metric: "bounce", equal: { hardBounced: 50 }, above: { hardBounced: 51 }, limit: 0.05 },
-  { metric: "complaint", equal: { complained: 1 }, above: { complained: 2 }, limit: 0.001 },
+  { metric: "bounce", equal: { hardBounced: 20 }, above: { hardBounced: 21 }, limit: 0.02 },
 ])(
   "$metric pause is strictly above the threshold; equality only warns",
   async ({ metric, equal, above, limit }) => {
@@ -827,3 +826,12 @@ it.each([
     expect(sends).toHaveLength(2);
   },
 );
+
+it("a single confirmed complaint pauses without waiting for a rate", async () => {
+  await counters({ sent: 1000, complained: 1 });
+  expect(await sweepNotifications(db, deps())).toEqual({ sent: 1 });
+  expect(sends[0]?.subject).toContain("sending paused");
+  const rows = await deliveries();
+  expect(rows.map((d) => d.type)).toEqual(["deliverability.paused"]);
+  expect(rows[0]?.payload).toMatchObject({ data: { metric: "complaint", limit: 0, window_days: 1 } });
+});

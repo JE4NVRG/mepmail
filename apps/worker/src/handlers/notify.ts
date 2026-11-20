@@ -21,6 +21,7 @@ import {
   nextUtcDayStart,
   PAUSE_BOUNCE_RATE,
   PAUSE_COMPLAINT_RATE,
+  PAUSE_ON_ANY_COMPLAINT,
   type PlanSnapshot,
   parseAuditActor,
   planCapPhrase,
@@ -173,7 +174,9 @@ const lineFor = (r: DeliverabilityReason): number =>
   r.tier === "paused"
     ? r.metric === "bounce"
       ? PAUSE_BOUNCE_RATE
-      : PAUSE_COMPLAINT_RATE
+      : PAUSE_ON_ANY_COMPLAINT
+        ? 0
+        : PAUSE_COMPLAINT_RATE
     : r.metric === "bounce"
       ? WARN_BOUNCE_RATE
       : WARN_COMPLAINT_RATE;

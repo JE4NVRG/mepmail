@@ -164,7 +164,7 @@
       },
       {
         "q": "Qual é a taxa de entrega de vocês?",
-        "a": "Não publicamos uma taxa de entrega da plataforma. Por equipe, reclamações estritamente acima de 0,1% ou rejeições permanentes estritamente acima de 5% em janela móvel de 24 horas suspendem o envio. Não há isenção por amostra mínima. Abaixo desses limites, os demais controles de admissão e segurança continuam válidos. Mensagem retida não é mensagem entregue; a suspensão preserva dados e requer revisão.",
+        "a": "Não publicamos uma taxa de entrega da plataforma. Por equipe, qualquer reclamação confirmada, ou rejeições permanentes estritamente acima de 2%, em janela móvel de 24 horas suspendem o envio. Não há isenção por amostra mínima. Abaixo desses limites, os demais controles de admissão e segurança continuam válidos. Mensagem retida não é mensagem entregue; a suspensão preserva dados e requer revisão.",
         "link": {
           "label": "Pausas de envio",
           "href": "https://docs.mepmail.dev/pt-BR/errors#pausas-e-bloqueios-de-envio"

@@ -138,7 +138,8 @@ export function evaluateDeliverability(
   });
   judge("complaint", {
     warn: WARN_COMPLAINT_RATE,
-    pause: PAUSE_COMPLAINT_RATE,
+    // Any confirmed complaint pauses, so the pause line is zero rather than 0.1%.
+    pause: PAUSE_ON_ANY_COMPLAINT ? 0 : PAUSE_COMPLAINT_RATE,
     minPauseEvents: MIN_PAUSE_COMPLAINTS,
     minPauseSends: MIN_PAUSE_COMPLAINT_SENDS,
     minWarnEvents: MIN_WARN_COMPLAINTS,

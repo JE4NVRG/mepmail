@@ -197,12 +197,12 @@ describe("terms and wording", () => {
       const pct = (rate: number) =>
         `${(rate * 100).toLocaleString(locale === "en" ? "en-US" : "pt-BR")}%`;
       const answer = strings(messages(locale, "support").faq.items).find((text) =>
-        text.includes(pct(coreNumber("deliverability.ts", "PAUSE_COMPLAINT_RATE"))),
+        text.includes(pct(coreNumber("deliverability.ts", "PAUSE_BOUNCE_RATE"))),
       );
       expect(answer, locale).toBeDefined();
-      expect(coreNumber("deliverability.ts", "PAUSE_COMPLAINT_RATE")).toBe(0.001);
-      expect(coreNumber("deliverability.ts", "PAUSE_BOUNCE_RATE")).toBe(0.05);
-      expect(answer).toContain(pct(0.05));
+      expect(coreNumber("deliverability.ts", "PAUSE_BOUNCE_RATE")).toBe(0.02);
+      expect(answer).toContain(pct(0.02));
+      expect(answer).toMatch(locale === "en" ? /any confirmed complaint/i : /qualquer reclamação confirmada/i);
       expect(answer).toMatch(
         locale === "en" ? /no minimum sample/i : /Não há isenção por amostra mínima/i,
       );

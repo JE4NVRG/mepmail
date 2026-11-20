@@ -164,7 +164,7 @@
       },
       {
         "q": "What is your delivery rate?",
-        "a": "We do not publish a platform-wide delivery rate. For each team, complaints strictly above 0.1% or hard bounces strictly above 5% in a rolling 24-hour window suspend sending. There is no minimum sample exemption. Below these thresholds, other admission and security controls still apply. A held message is not a delivered message; suspension preserves data and requires review.",
+        "a": "We do not publish a platform-wide delivery rate. For each team, any confirmed complaint, or hard bounces strictly above 2%, in a rolling 24-hour window suspends sending. There is no minimum sample exemption. Below these thresholds, other admission and security controls still apply. A held message is not a delivered message; suspension preserves data and requires review.",
         "link": {
           "label": "Sending pauses",
           "href": "https://docs.mepmail.dev/errors#sending-pauses-and-holds"
