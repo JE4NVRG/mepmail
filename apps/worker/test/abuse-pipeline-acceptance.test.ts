@@ -500,7 +500,7 @@ it("health intent survives sink failure and restart; concurrent recovery does no
   // pinned clock: an absolute date silently expires once that day passes.
   await db
     .update(schema.monitorSamples)
-    .set({ status: "lost" })
+    .set({ status: "judged" })
     .where(eq(schema.monitorSamples.status, "unjudged"));
   const healthNow = new Date("2026-11-20T00:01:00Z");
   await db.insert(schema.monitorSamples).values({
