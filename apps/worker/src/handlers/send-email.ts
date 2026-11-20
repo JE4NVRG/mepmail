@@ -1290,7 +1290,7 @@ export async function sendEmail(
   // Customer mail stops here; system mail (verification, reset) never does,
   // because a halted platform that cannot send a reset is a dead product.
   if (deps.isCloud && !systemMail) {
-    const gate = await platformSendGate(db, { now: deps.now });
+    const gate = await platformSendGate(db, { now: deps.now?.() ?? new Date() });
     if (gate.halt) {
       await db.insert(schema.auditLog).values({
         teamId: email.teamId,
