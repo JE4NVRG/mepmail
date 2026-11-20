@@ -23,6 +23,7 @@ import {
 } from "./graduated-sending-policy.js";
 import { withMailboxSendAccess } from "./mailbox-private-store.js";
 import { monthlySendDailyRate, teamQuota } from "./plans.js";
+import { notifyReputationReview } from "./reputation-notice.js";
 import { extractAddrSpec, normalizeAddress } from "./suppressions.js";
 
 const ACTION = "sending.graduated_reserved";
@@ -1635,6 +1636,15 @@ export async function suspendTenantFromReputation(
           complained: h.pause.complained,
           minSample: REPUTATION_MIN_SAMPLE,
         },
+      });
+      // The panel warns in-app; the operator hears about it where incidents are seen.
+      notifyReputationReview({
+        teamId: team.id,
+        plan: team.plan,
+        sent: h.pause.sent,
+        hardBounced: h.pause.hardBounced,
+        complained: h.pause.complained,
+        reason: "small_sample",
       });
       return { suspended: false, suspensionId: null };
     }

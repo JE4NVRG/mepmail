@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SEND_GATE_MAX_BOUNCE_RATE,
   SEND_GATE_MAX_COMPLAINT_RATE,
+  SEND_GATE_MAX_HARD_BOUNCES_DAY,
   SEND_GATE_MIN_COMPLAINTS,
   SEND_GATE_MIN_SENT,
   sendGateDecision,
@@ -42,8 +43,18 @@ describe("account-level send gate", () => {
     expect(d.reason).toBe("bounce_ceiling");
   });
 
+  it("trips on the absolute daily ceiling that many small offenders add up to", () => {
+    const d = sendGateDecision(
+      { sent: 2000, hardBounced: SEND_GATE_MAX_HARD_BOUNCES_DAY, complained: 0 },
+      env(),
+    );
+    expect(d.bounceRate).toBeLessThan(SEND_GATE_MAX_BOUNCE_RATE);
+    expect(d.halt).toBe(true);
+    expect(d.reason).toBe("bounce_ceiling");
+  });
+
   it("leaves a healthy window open", () => {
-    const d = sendGateDecision({ sent: 5000, hardBounced: 100, complained: 2 }, env());
+    const d = sendGateDecision({ sent: 5000, hardBounced: 20, complained: 2 }, env());
     expect(d.halt).toBe(false);
     expect(d.reason).toBeNull();
   });

@@ -394,6 +394,10 @@ export const SEND_GATE_MIN_SENT = 200;
 export const SEND_GATE_MIN_COMPLAINTS = 2;
 export const SEND_GATE_MAX_COMPLAINT_RATE = 0.0008;
 export const SEND_GATE_MAX_BOUNCE_RATE = 0.04;
+/** A rate alone hides the case the owner worries about: many new accounts,
+ * each below its own floor, adding bounces to one SES account. The absolute
+ * daily count is the ceiling that catches that sum. */
+export const SEND_GATE_MAX_HARD_BOUNCES_DAY = 25;
 
 export type SendGateReason = "manual_halt" | "complaint_ceiling" | "bounce_ceiling";
 
@@ -425,7 +429,7 @@ export function sendGateDecision(
   if (sent < SEND_GATE_MIN_SENT) return { ...base, halt: false, reason: null };
   if (complained >= SEND_GATE_MIN_COMPLAINTS && complaintRate >= SEND_GATE_MAX_COMPLAINT_RATE)
     return { ...base, halt: true, reason: "complaint_ceiling" };
-  if (bounceRate >= SEND_GATE_MAX_BOUNCE_RATE)
+  if (hardBounced >= SEND_GATE_MAX_HARD_BOUNCES_DAY || bounceRate >= SEND_GATE_MAX_BOUNCE_RATE)
     return { ...base, halt: true, reason: "bounce_ceiling" };
   return { ...base, halt: false, reason: null };
 }
