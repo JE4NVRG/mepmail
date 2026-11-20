@@ -10,12 +10,13 @@ import { and, asc, eq } from "drizzle-orm";
 import { abuseProneTld } from "../../core/src/send-review.js";
 
 /**
- * Fail-closed by design: the verified-domain gate stays ON unless the deployment sets
- * SEND_CHECKOUT_ALLOW_UNVERIFIED_DOMAIN to exactly "false". Unset, empty, "true", "0"
- * or any typo keep the gate on, so a missing variable can never open the paywall.
+ * Fail-closed by design: the verified-domain gate only opens when the deployment sets
+ * SEND_CHECKOUT_ALLOW_UNVERIFIED_DOMAIN to exactly "true". Unset, empty, "false", "0"
+ * or any typo keep the gate on, so a missing or mistyped variable can never open the
+ * paywall. The variable name reads as the permission it grants, not as a negation.
  */
-const checkoutRequiresVerifiedDomain = () =>
-  process.env.SEND_CHECKOUT_ALLOW_UNVERIFIED_DOMAIN?.trim().toLowerCase() !== "false";
+const checkoutAllowsUnverifiedDomain = () =>
+  process.env.SEND_CHECKOUT_ALLOW_UNVERIFIED_DOMAIN?.trim().toLowerCase() === "true";
 
 export type PurchaseEligibilityCode =
   | "ready"
@@ -95,7 +96,7 @@ export async function getPurchaseEligibility(db: Db, teamId: string): Promise<Pu
   if (standing?.guardrail === "paused") return status("guardrail_paused");
   if ((await fetchDeliverabilityHealth(db, teamId)).status === "paused")
     return status("guardrail_paused");
-  if (!domains.length && checkoutRequiresVerifiedDomain()) return status("domain_required");
+  if (!domains.length && !checkoutAllowsUnverifiedDomain()) return status("domain_required");
   if (
     !team.sendReviewClearedAt &&
     Date.now() - team.createdAt.getTime() <= SEND_REVIEW_NEW_TEAM_DAYS * 86_400_000 &&

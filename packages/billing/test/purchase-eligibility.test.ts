@@ -247,3 +247,37 @@ describe("review before a new payment", () => {
     expect(f.posts.filter((post) => post.kind === "session")).toEqual([]);
   });
 });
+
+describe("verified-domain gate is fail-closed on SEND_CHECKOUT_ALLOW_UNVERIFIED_DOMAIN", () => {
+  const key = "SEND_CHECKOUT_ALLOW_UNVERIFIED_DOMAIN";
+  const original = process.env[key];
+
+  const codeWith = async (value: string | undefined) => {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+    return (await getPurchaseEligibility(f.db, f.input.team.id)).code;
+  };
+
+  beforeEach(async () => {
+    await f.db
+      .update(schema.domains)
+      .set({ status: "pending", verifiedAt: null })
+      .where(eq(schema.domains.teamId, f.input.team.id));
+  });
+
+  afterEach(() => {
+    if (original === undefined) delete process.env[key];
+    else process.env[key] = original;
+  });
+
+  it.each([undefined, "", "false", "0", "no", "off", "yes", "false ", "FALSE"])(
+    "keeps the paywall closed for %j",
+    async (value) => {
+      expect(await codeWith(value as string | undefined)).toBe("domain_required");
+    },
+  );
+
+  it.each(["true", "TRUE", " true ", "True"])("opens the gate only for %j", async (value) => {
+    expect(await codeWith(value)).not.toBe("domain_required");
+  });
+});
