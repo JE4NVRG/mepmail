@@ -53,6 +53,7 @@ vi.mock("@/lib/trpc", () => ({
         queryKey: () => ["billing", "purchaseEligibility"],
       },
       requestPurchaseReview: { mutationOptions: h.mutationOptions },
+      trackPurchaseBlocked: { mutationOptions: h.mutationOptions },
     },
     team: { standing: { queryFilter: () => ({ queryKey: ["team", "standing"] }) } },
   }),

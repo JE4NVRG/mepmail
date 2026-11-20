@@ -54,15 +54,14 @@ describe("flagTrigger", () => {
       detail: { metric: "complaint", rate: 0.002 },
     });
   });
-  it("hard bounces strictly above 5% flag as complaints/hard_bounce", () => {
-    expect(flagTrigger(standing({ teamId: id, hardBounceRate7d: 0.051 }))).toEqual({
+  it("hard bounces strictly above 2% flag as complaints/hard_bounce", () => {
+    expect(flagTrigger(standing({ teamId: id, hardBounceRate7d: 0.021 }))).toEqual({
       reason: "complaints",
-      detail: { metric: "hard_bounce", rate: 0.051 },
+      detail: { metric: "hard_bounce", rate: 0.021 },
     });
   });
-  it("equality at either internal pause line does not fire the strict rate trigger", () => {
-    expect(flagTrigger(standing({ teamId: id, complaintRate7d: 0.001 }))).toBeNull();
-    expect(flagTrigger(standing({ teamId: id, hardBounceRate7d: 0.05 }))).toBeNull();
+  it("equality at the internal bounce pause line does not fire the strict rate trigger", () => {
+    expect(flagTrigger(standing({ teamId: id, hardBounceRate7d: 0.02 }))).toBeNull();
     // A warning still flags independently of the strict pause comparison.
     expect(
       flagTrigger(standing({ teamId: id, guardrail: "warning", complaintRate7d: 0.001 })),
