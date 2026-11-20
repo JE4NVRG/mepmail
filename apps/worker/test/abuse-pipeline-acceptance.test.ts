@@ -508,7 +508,7 @@ it("health intent survives sink failure and restart; concurrent recovery does no
     kind: "tier",
     status: "unjudged",
     errorClass: "no_credentials",
-    createdAt: new Date(healthNow.getTime() - 60_000),
+    createdAt: healthNow,
   });
   await db.execute(
     sql`CREATE FUNCTION fail_health_fixture() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'operator.alert' THEN RAISE EXCEPTION 'fixture sink failure'; END IF; RETURN NEW; END $$`,
