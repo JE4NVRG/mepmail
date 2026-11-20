@@ -32,6 +32,7 @@ import {
   makeUnsubscribeToken,
   openAttachments,
   parseSingleSender,
+  platformSendGate,
   purgedEmailBodyColumns,
   releaseQuota,
   resolveSendingProvider,
@@ -1283,6 +1284,33 @@ export async function sendEmail(
     }
     await parkQueued(db, email, latestActorRefusal);
     return "parked";
+  }
+
+  // The account brake runs before anything else that costs a provider call.
+  // Customer mail stops here; system mail (verification, reset) never does,
+  // because a halted platform that cannot send a reset is a dead product.
+  if (deps.isCloud && !systemMail) {
+    const gate = await platformSendGate(db, { now: deps.now });
+    if (gate.halt) {
+      await db.insert(schema.auditLog).values({
+        teamId: email.teamId,
+        actorId: "system",
+        action: "sending.platform_halt",
+        target: email.id,
+        data: {
+          version: 1,
+          emailId: email.id,
+          reason: gate.reason,
+          sent: gate.sent,
+          complained: gate.complained,
+          hardBounced: gate.hardBounced,
+          complaintRate: gate.complaintRate,
+          bounceRate: gate.bounceRate,
+        },
+      });
+      await parkQueued(db, email, `platform sending halted: ${gate.reason}`);
+      return "parked";
+    }
   }
 
   // Qualify the actual transformed body, identity, envelope and final MIME.

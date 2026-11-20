@@ -830,6 +830,7 @@ export {
   holdRegion,
   type PausedRegion,
   pausedRegions,
+  platformSendGate,
   type RegionContributor,
   type RegionDecision,
   type RegionWindowCounts,
@@ -837,6 +838,11 @@ export {
   regionPause,
   regionWindowCounts,
   releaseRegion,
+  SEND_GATE_MAX_BOUNCE_RATE,
+  SEND_GATE_MAX_COMPLAINT_RATE,
+  SEND_GATE_MIN_COMPLAINTS,
+  SEND_GATE_MIN_SENT,
+  sendGateDecision,
 } from "./platform-breaker.js";
 export {
   approveProductionVolume,

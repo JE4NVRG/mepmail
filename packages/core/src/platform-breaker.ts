@@ -382,3 +382,75 @@ export async function releaseRegion(db: Db, region: string, now = new Date()): P
     .set({ paused: false, reason: null, manualReason: null, pausedAt: null, updatedAt: now })
     .where(eq(schema.regionBreakers.region, region));
 }
+
+/** The transactional path shares SES with broadcasts but is not under a region
+ * hold. This is the account-level brake: the whole platform stops sending
+ * before AWS decides for us, because losing SES costs every customer at once. */
+export const SEND_GATE_MIN_SENT = 200;
+/** One complaint at low volume is a misclick or a grudge, not a reputation
+ * trend. Two of them, or the rate alone above the line at real volume, is a
+ * trend. AWS warns at 0.1% and suspends well above it; this line sits under
+ * both so the brake lands first. */
+export const SEND_GATE_MIN_COMPLAINTS = 2;
+export const SEND_GATE_MAX_COMPLAINT_RATE = 0.0008;
+export const SEND_GATE_MAX_BOUNCE_RATE = 0.04;
+
+export type SendGateReason = "manual_halt" | "complaint_ceiling" | "bounce_ceiling";
+
+export interface SendGateDecision {
+  halt: boolean;
+  reason: SendGateReason | null;
+  sent: number;
+  complained: number;
+  hardBounced: number;
+  complaintRate: number;
+  bounceRate: number;
+}
+
+/** No sample, no verdict. The owner's own brake works at any volume. */
+export function sendGateDecision(
+  totals: { sent: number; hardBounced: number; complained: number },
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): SendGateDecision {
+  const sent = Math.max(0, Math.trunc(totals.sent));
+  const complained = Math.max(0, Math.trunc(totals.complained));
+  const hardBounced = Math.max(0, Math.trunc(totals.hardBounced));
+  const complaintRate = sent > 0 ? complained / sent : 0;
+  const bounceRate = sent > 0 ? hardBounced / sent : 0;
+  const base = { sent, complained, hardBounced, complaintRate, bounceRate };
+
+  const manual = (env.PLATFORM_SENDING_HALT ?? "").trim().toLowerCase();
+  if (manual === "1" || manual === "true" || manual === "on")
+    return { ...base, halt: true, reason: "manual_halt" };
+  if (sent < SEND_GATE_MIN_SENT) return { ...base, halt: false, reason: null };
+  if (complained >= SEND_GATE_MIN_COMPLAINTS && complaintRate >= SEND_GATE_MAX_COMPLAINT_RATE)
+    return { ...base, halt: true, reason: "complaint_ceiling" };
+  if (bounceRate >= SEND_GATE_MAX_BOUNCE_RATE)
+    return { ...base, halt: true, reason: "bounce_ceiling" };
+  return { ...base, halt: false, reason: null };
+}
+
+const gateMemo = new WeakMap<Db, { at: number; decision: SendGateDecision }>();
+const GATE_MEMO_MS = 60_000;
+
+/** Account-wide totals over the trailing 24 hours, one memoized scan per minute
+ * per process: the send path calls this, so it must never run per recipient. */
+export async function platformSendGate(
+  db: Db,
+  opts: { now: Date; env?: Record<string, string | undefined> },
+): Promise<SendGateDecision> {
+  const fresh = opts.env ? undefined : gateMemo.get(db);
+  if (fresh && opts.now.getTime() - fresh.at < GATE_MEMO_MS) return fresh.decision;
+  const counts = await regionWindowCounts(db, { now: opts.now, hours: 24 });
+  let sent = 0;
+  let hardBounced = 0;
+  let complained = 0;
+  for (const c of counts.values()) {
+    sent += c.sent;
+    hardBounced += c.hardBounced;
+    complained += c.complained;
+  }
+  const decision = sendGateDecision({ sent, hardBounced, complained }, opts.env);
+  if (!opts.env) gateMemo.set(db, { at: opts.now.getTime(), decision });
+  return decision;
+}
