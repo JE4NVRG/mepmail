@@ -1,7 +1,7 @@
 import type { Db } from "@millionsend/db";
+import { guardColdOutreach } from "./outreach-guard.js";
 import { foldText, holdTeamForReview, senderName } from "./send-review.js";
 import { parseMailbox } from "./sender-address.js";
-import { guardColdOutreach } from "./outreach-guard.js";
 
 export interface PreSendContentInput {
   from: string;
@@ -93,8 +93,7 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
     subject: input.subject,
     text: input.text ?? "",
   });
-  if (outreach.blocked)
-    return { action: "hold", code: "cold_outreach", signal: outreach.signal };
+  if (outreach.blocked) return { action: "hold", code: "cold_outreach", signal: outreach.signal };
 
   const html = input.html ?? "";
   const visible = decode(

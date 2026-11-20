@@ -14,9 +14,7 @@ export interface ColdOutreachInput {
   text?: string | null;
 }
 
-export type ColdOutreachVerdict =
-  | { blocked: false }
-  | { blocked: true; signal: string };
+export type ColdOutreachVerdict = { blocked: false } | { blocked: true; signal: string };
 
 /** Local parts reserved for prospecting. A reply from one still holds. */
 const SENDER_SIGNALS: readonly RegExp[] = [

@@ -207,7 +207,10 @@ async function contributors(
     .limit(5);
 }
 
-export function tripReason(counts: RegionWindowCounts, windowHours: number): RegionBreakerReason | null {
+export function tripReason(
+  counts: RegionWindowCounts,
+  windowHours: number,
+): RegionBreakerReason | null {
   const checks = [
     {
       metric: "bounce" as const,

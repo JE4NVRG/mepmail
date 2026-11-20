@@ -534,13 +534,18 @@ describe("broadcasts.send deliverability guard", () => {
     expect(enqueued).toEqual([]);
     expect((await broadcastRow(id))?.status).toBe("draft");
   });
-  it("warns but does not pause at exactly the complaint pause line", async () => {
+  it("pauses on a single confirmed complaint, on the old pause line too", async () => {
     vi.stubEnv("IS_CLOUD", "true");
     const teamId = await createTeam(db, "team-a");
     const { id } = await preparedDraft(teamId);
-    await seedConfirmedWindow(teamId, 2000, 2); // Exactly 0.1%, not strictly above.
-    await callerFor(teamId).broadcasts.send({ id });
-    expect((await broadcastRow(id))?.status).toBe("scheduled");
+    // 2/2000 is exactly the old 0.1% line; one complaint now pauses on its own.
+    await seedConfirmedWindow(teamId, 2000, 2);
+    const enqueueBroadcastSend = vi.fn(async () => {});
+    await expect(
+      callerFor(teamId, { enqueueBroadcastSend }).broadcasts.send({ id }),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(enqueueBroadcastSend).not.toHaveBeenCalled();
+    expect((await broadcastRow(id))?.status).toBe("draft");
   });
   it("pauses a tiny confirmed sample below the warning-only volume floor", async () => {
     vi.stubEnv("IS_CLOUD", "true");

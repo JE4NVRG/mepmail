@@ -15,11 +15,11 @@ import { type Db, schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
 import { simpleParser } from "mailparser";
 import type { AbuseJudge } from "../../../packages/core/src/abuse-judge/types.js";
+import { guardColdOutreach } from "../../../packages/core/src/outreach-guard.js";
 import {
   type DispatchContentSnapshot,
   qualifyDispatchContent,
 } from "../../../packages/core/src/pre-dispatch-content.js";
-import { guardColdOutreach } from "../../../packages/core/src/outreach-guard.js";
 import { judgeForEmail } from "./abuse-judge/index.js";
 import { mailboxCorrespondenceCampaign } from "./mailbox-correspondence.js";
 
