@@ -11,6 +11,7 @@ import {
   GUARDRAIL_WINDOW_DAYS,
   PAUSE_BOUNCE_RATE,
   PAUSE_COMPLAINT_RATE,
+  PAUSE_ON_ANY_COMPLAINT,
   utcDay,
   WARN_BOUNCE_RATE,
   WARN_COMPLAINT_RATE,
@@ -175,7 +176,7 @@ export const metricsRouter = router({
         warnBounce: WARN_BOUNCE_RATE,
         warnComplaint: WARN_COMPLAINT_RATE,
         pauseBounce: PAUSE_BOUNCE_RATE,
-        pauseComplaint: PAUSE_COMPLAINT_RATE,
+        pauseComplaint: PAUSE_ON_ANY_COMPLAINT ? 0 : PAUSE_COMPLAINT_RATE,
       },
     };
   }),

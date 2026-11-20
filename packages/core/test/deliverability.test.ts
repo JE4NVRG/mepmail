@@ -51,8 +51,8 @@ describe("MepMail internal rolling-window policy", () => {
       expect(evaluateDeliverability(windows(sent, hard, complaints)).status).toBe("paused");
     },
   );
-  it("does not suspend a low-volume bounce rate below five percent", () => {
-    expect(evaluateDeliverability(windows(25, 1, 0)).status).not.toBe("paused");
+  it("does not pause a bounce rate below two percent", () => {
+    expect(evaluateDeliverability(windows(200, 3, 0)).status).not.toBe("paused");
   });
   it.each([
     [0, 1, 0],
@@ -63,7 +63,7 @@ describe("MepMail internal rolling-window policy", () => {
   it.each([
     [20, 3, 0],
     [100, 6, 0],
-  ])("pauses a bounce rate strictly above five percent (%i/%i/%i)", (sent, hard, complaints) => {
+  ])("pauses a bounce rate strictly above two percent (%i/%i/%i)", (sent, hard, complaints) => {
     expect(evaluateDeliverability(windows(sent, hard, complaints)).status).toBe("paused");
   });
   it("applies the floor only to statistical warnings and stays zero-safe", () => {
@@ -146,7 +146,7 @@ describe("fetchDeliverabilityHealth production SQL", () => {
     const health = await fetchDeliverabilityHealth(db, team, { now });
     expect(health).toMatchObject({
       sent: 200,
-      status: "warning",
+      status: "paused",
       bounceRate: 0.025,
       complaintRate: 0,
       windowDays: 1,
