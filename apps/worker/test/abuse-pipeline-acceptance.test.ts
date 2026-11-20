@@ -521,22 +521,13 @@ it("health intent survives sink failure and restart; concurrent recovery does no
     state: { degradedMailedAt: null },
     now: healthNow,
   };
-  const diag1 = await runMonitorHealth(db, deps);
-  const diagPend = await db.select().from(schema.teamNotifications);
-  console.log(
-    "DIAG1",
-    JSON.stringify({
-      diag1,
-      pend: diagPend.map((x) => ({ k: x.kind, t: x.teamId === f.teamId, at: x.sentAt })),
-    }),
-  );
+  await runMonitorHealth(db, deps);
   await db.execute(sql`DROP TRIGGER fail_health_fixture ON audit_log`);
   await db.execute(sql`DROP FUNCTION fail_health_fixture()`);
-  const diag2 = await Promise.all([
+  await Promise.all([
     runMonitorHealth(db, { ...deps, state: { degradedMailedAt: null } }),
     runMonitorHealth(db, { ...deps, state: { degradedMailedAt: null } }),
   ]);
-  console.log("DIAG2", JSON.stringify(diag2));
   const alerts = await db
     .select()
     .from(schema.auditLog)
