@@ -9,6 +9,14 @@ import { type Db, schema } from "@millionsend/db";
 import { and, asc, eq } from "drizzle-orm";
 import { abuseProneTld } from "../../core/src/send-review.js";
 
+/**
+ * Fail-closed by design: the verified-domain gate stays ON unless the deployment sets
+ * SEND_CHECKOUT_ALLOW_UNVERIFIED_DOMAIN to exactly "false". Unset, empty, "true", "0"
+ * or any typo keep the gate on, so a missing variable can never open the paywall.
+ */
+const checkoutRequiresVerifiedDomain = () =>
+  process.env.SEND_CHECKOUT_ALLOW_UNVERIFIED_DOMAIN?.trim().toLowerCase() !== "false";
+
 export type PurchaseEligibilityCode =
   | "ready"
   | "domain_required"
@@ -87,7 +95,7 @@ export async function getPurchaseEligibility(db: Db, teamId: string): Promise<Pu
   if (standing?.guardrail === "paused") return status("guardrail_paused");
   if ((await fetchDeliverabilityHealth(db, teamId)).status === "paused")
     return status("guardrail_paused");
-  if (!domains.length) return status("domain_required");
+  if (!domains.length && checkoutRequiresVerifiedDomain()) return status("domain_required");
   if (
     !team.sendReviewClearedAt &&
     Date.now() - team.createdAt.getTime() <= SEND_REVIEW_NEW_TEAM_DAYS * 86_400_000 &&

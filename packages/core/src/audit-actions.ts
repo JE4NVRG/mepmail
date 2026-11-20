@@ -141,6 +141,8 @@ export const AUDIT_ACTIONS = [
   "operator.alert",
   "billing.checkout_started",
   "billing.portal_opened",
+  /** Funnel telemetry: paywall reached without a verified sending domain. */
+  "billing.purchase_blocked_domain_required",
   "billing.subscription_updated",
   "billing.plan_changed",
   "billing.overage_toggled",

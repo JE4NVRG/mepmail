@@ -47,7 +47,7 @@ import {
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte } from "drizzle-orm";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
@@ -203,6 +203,31 @@ export function createBillingRouter(deps: BillingDeps = { stripe: getStripe }) {
         if (error instanceof PurchaseEligibilityError) throw purchaseEligibilityError(error);
         throw error;
       }
+    }),
+
+    /**
+     * Funnel telemetry only: a team without a verified sending domain reached the paywall.
+     * Writes at most one row per team per UTC day and never gates anything.
+     */
+    trackPurchaseBlocked: teamProcedure.mutation(async ({ ctx }) => {
+      requireCloud();
+      const [seen] = await ctx.db
+        .select({ id: schema.auditLog.id })
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.teamId, ctx.teamId),
+            eq(schema.auditLog.action, "billing.purchase_blocked_domain_required"),
+            gte(schema.auditLog.createdAt, new Date(`${utcDay()}T00:00:00.000Z`)),
+          ),
+        )
+        .limit(1);
+      if (seen) return { recorded: false };
+      await recordAudit(ctx, {
+        action: "billing.purchase_blocked_domain_required",
+        target: { type: "team", id: ctx.teamId },
+      });
+      return { recorded: true };
     }),
 
     status: teamProcedure.query(async ({ ctx }) => {

@@ -311,6 +311,7 @@
     },
     "purchaseReview": {
       "title": "Revisão de segurança antes do pagamento",
+      "domainTitle": "Verifique um domínio para liberar a assinatura",
       "checking": "Conferindo se sua equipe pode usar o serviço pago antes de abrir o pagamento.",
       "failed": "Não foi possível concluir a verificação de segurança. Tente novamente antes de pagar.",
       "domains": "Domínios que precisam de revisão: {domains}",
@@ -322,7 +323,7 @@
       "support": "Falar com o suporte",
       "reasons": {
         "ready": "Sua equipe pode continuar para o pagamento.",
-        "domain_required": "Adicione e verifique um domínio de envio antes de assinar para poder usar o serviço depois do pagamento.",
+        "domain_required": "Adicione e verifique um domínio de envio para liberar a assinatura.",
         "domain_review": "Sua equipe é nova e usa uma extensão de domínio que exige revisão inicial de segurança. É uma precaução contra phishing e não significa que seu domínio seja malicioso. Preencha e envie o pedido de revisão antes de pagar.",
         "send_review": "O envio está em revisão de segurança. Conclua a análise antes de iniciar uma nova compra.",
         "signup_review": "Sua conta precisa de revisão de segurança antes de assinar. Conte como vai usar o MepMail para solicitar a aprovação.",

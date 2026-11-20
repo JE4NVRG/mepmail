@@ -311,6 +311,7 @@
     },
     "purchaseReview": {
       "title": "Safety review before payment",
+      "domainTitle": "Verify a sending domain to unlock checkout",
       "checking": "Checking whether your team can use the paid service before opening payment.",
       "failed": "We could not complete the safety check. Try again before paying.",
       "domains": "Domains requiring review: {domains}",
@@ -322,7 +323,7 @@
       "support": "Contact support",
       "reasons": {
         "ready": "Your team can continue to payment.",
-        "domain_required": "Add and verify a sending domain before subscribing so you can use the service after payment.",
+        "domain_required": "Add and verify a sending domain to unlock your subscription.",
         "domain_review": "Your new team uses a domain extension that requires an initial safety review. This is a precaution against phishing and does not mean your domain is malicious. Complete and submit the review request before paying.",
         "send_review": "Sending is under a safety review. Complete the review before starting a new purchase.",
         "signup_review": "Your account needs a safety review before subscribing. Tell us how you will use MepMail to request approval.",

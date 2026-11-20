@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useId } from "react";
+import { useEffect, useId } from "react";
 import { SignupReviewRequest } from "@/components/signup-review-request";
 import { BtnSpinner } from "@/components/spinner";
 import { purchaseDomainReviewHref } from "@/lib/purchase-return";
@@ -58,9 +58,19 @@ export function PurchaseReviewNotice({
 }) {
   const t = useTranslations("settings.billing.purchaseReview");
   const titleId = useId();
-  if (!review.enabled || review.allowed) return null;
+  const trpc = useTRPC();
   const { eligibility, request } = review;
   const code = eligibility.data?.code;
+  // domain_required is onboarding friction, not a safety review: different copy, no review form.
+  const domainRequired = code === "domain_required";
+  const trackBlocked = useMutation(trpc.billing.trackPurchaseBlocked.mutationOptions());
+  // One telemetry row per team per UTC day; the server dedupes too. Declared before the
+  // early return so hook order never depends on the query result.
+  const trackOnce = trackBlocked.mutate;
+  useEffect(() => {
+    if (domainRequired) trackOnce();
+  }, [domainRequired, trackOnce]);
+  if (!review.enabled || review.allowed) return null;
   const loading = eligibility.isPending || request.isPending;
   const failed = eligibility.isError || request.isError;
   const manualReview =
@@ -76,7 +86,7 @@ export function PurchaseReviewNotice({
       style={{ padding: 20, marginBlock: 16, borderColor: "var(--ms-warn-border)" }}
     >
       <h3 id={titleId} style={{ margin: "0 0 8px", fontSize: 16, color: "var(--ms-bone)" }}>
-        {t("title")}
+        {t(domainRequired ? "domainTitle" : "title")}
       </h3>
       <div role={failed ? "alert" : "status"} aria-live="polite">
         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--ms-bone)" }}>
@@ -88,9 +98,13 @@ export function PurchaseReviewNotice({
           </p>
         ) : null}
       </div>
-      <p style={{ margin: "8px 0 16px", fontSize: 13, lineHeight: 1.6, color: "var(--ms-muted)" }}>
-        {t("beforePayment")}
-      </p>
+      {domainRequired ? null : (
+        <p
+          style={{ margin: "8px 0 16px", fontSize: 13, lineHeight: 1.6, color: "var(--ms-muted)" }}
+        >
+          {t("beforePayment")}
+        </p>
+      )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
         {code === "domain_required" || code === "domain_review" ? (
           <Link
