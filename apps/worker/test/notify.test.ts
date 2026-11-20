@@ -833,5 +833,7 @@ it("a single confirmed complaint pauses without waiting for a rate", async () =>
   expect(sends[0]?.subject).toContain("sending paused");
   const rows = await deliveries();
   expect(rows.map((d) => d.type)).toEqual(["deliverability.paused"]);
-  expect(rows[0]?.payload).toMatchObject({ data: { metric: "complaint", limit: 0, window_days: 1 } });
+  expect(rows[0]?.payload).toMatchObject({
+    data: { metric: "complaint", limit: 0, window_days: 1 },
+  });
 });

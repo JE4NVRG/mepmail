@@ -202,7 +202,9 @@ describe("terms and wording", () => {
       expect(answer, locale).toBeDefined();
       expect(coreNumber("deliverability.ts", "PAUSE_BOUNCE_RATE")).toBe(0.02);
       expect(answer).toContain(pct(0.02));
-      expect(answer).toMatch(locale === "en" ? /any confirmed complaint/i : /qualquer reclamação confirmada/i);
+      expect(answer).toMatch(
+        locale === "en" ? /any confirmed complaint/i : /qualquer reclamação confirmada/i,
+      );
       expect(answer).toMatch(
         locale === "en" ? /no minimum sample/i : /Não há isenção por amostra mínima/i,
       );
