@@ -19,6 +19,7 @@ import {
   type DispatchContentSnapshot,
   qualifyDispatchContent,
 } from "../../../packages/core/src/pre-dispatch-content.js";
+import { guardColdOutreach } from "../../../packages/core/src/outreach-guard.js";
 import { judgeForEmail } from "./abuse-judge/index.js";
 import { mailboxCorrespondenceCampaign } from "./mailbox-correspondence.js";
 
@@ -367,6 +368,16 @@ export async function withMailboxDispatchContent<T>(
     );
     if (!decision.allowed || fingerprint(input) !== original) held();
   } catch {
+    held();
+  }
+  // Cold outreach is refused before any judge call: the risk is sending,
+  // not the verdict latency. A hold is the safe outcome.
+  if (
+    guardColdOutreach({
+      from: (input as { from?: string }).from ?? "",
+      subject: (input as { subject?: string }).subject ?? "",
+    }).blocked
+  ) {
     held();
   }
   const proof: Approval = {

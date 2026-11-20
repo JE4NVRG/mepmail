@@ -1,6 +1,7 @@
 import type { Db } from "@millionsend/db";
 import { foldText, holdTeamForReview, senderName } from "./send-review.js";
 import { parseMailbox } from "./sender-address.js";
+import { guardColdOutreach } from "./outreach-guard.js";
 
 export interface PreSendContentInput {
   from: string;
@@ -12,7 +13,8 @@ export interface PreSendContentInput {
 /** No URLs, tokens, body excerpts or recipients may enter an alert. */
 export type PreSendContentVerdict =
   | { action: "allow" }
-  | { action: "hold"; code: "brand_account_link_mismatch"; brand: string };
+  | { action: "hold"; code: "brand_account_link_mismatch"; brand: string }
+  | { action: "hold"; code: "cold_outreach"; signal: string };
 
 const BRANDS: readonly { name: string; terms: readonly string[]; domains: readonly string[] }[] = [
   { name: "Apple", terms: ["apple", "icloud"], domains: ["apple.com", "icloud.com"] },
@@ -86,6 +88,14 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
   ) {
     throw new Error("pre_send_content_unavailable");
   }
+  const outreach = guardColdOutreach({
+    from: input.from,
+    subject: input.subject,
+    text: input.text ?? "",
+  });
+  if (outreach.blocked)
+    return { action: "hold", code: "cold_outreach", signal: outreach.signal };
+
   const html = input.html ?? "";
   const visible = decode(
     html
@@ -279,7 +289,10 @@ export async function screenPreSendContent(
       teamId: input.teamId,
       reason: "content",
       now,
-      note: `Pre-send policy: ${verdict.code} (${verdict.brand})`,
+      note:
+        verdict.code === "brand_account_link_mismatch"
+          ? `Pre-send policy: ${verdict.code} (${verdict.brand})`
+          : `Pre-send policy: ${verdict.code} (${verdict.signal})`,
     });
   }
   return verdict;

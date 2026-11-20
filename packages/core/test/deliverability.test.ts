@@ -26,8 +26,8 @@ describe("MepMail internal rolling-window policy", () => {
     },
   );
   it.each([
-    [10000, 500, 0],
-    [10000, 0, 10],
+    [10000, 200, 0],
+    [5000, 100, 0],
   ])("strict equality is warning, not pause", (s, b, c) => {
     expect(evaluateDeliverability(windows(s, b, c)).status).toBe("warning");
   });

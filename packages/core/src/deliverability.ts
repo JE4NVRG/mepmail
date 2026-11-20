@@ -17,8 +17,10 @@ import { DAY_MS } from "./utc-day.js";
  */
 export const WARN_BOUNCE_RATE = 0.015;
 export const WARN_COMPLAINT_RATE = 0.0005;
-export const PAUSE_BOUNCE_RATE = 0.05;
+export const PAUSE_BOUNCE_RATE = 0.02;
 export const PAUSE_COMPLAINT_RATE = 0.001;
+/** Any confirmed complaint pauses the tenant, whatever the denominator. */
+export const PAUSE_ON_ANY_COMPLAINT = true;
 /** Warning-only anti-noise floor. It must not exempt trial senders from pauses. */
 export const MIN_GUARDRAIL_VOLUME = 100;
 export const MIN_PAUSE_COMPLAINTS = 1;
@@ -110,11 +112,15 @@ export function evaluateDeliverability(
   ) => {
     const events = metric === "bounce" ? "hardBounced" : "complained";
     const pauseRate = rateOf(pause[events], pause.sent);
-    if (
-      pause.sent >= lines.minPauseSends &&
-      pauseRate > lines.pause &&
-      pause[events] >= lines.minPauseEvents
-    ) {
+    // A confirmed complaint pauses on its own: there is no rate that makes a
+    // complaint acceptable while the account is one strike from losing SES.
+    const anyComplaint = metric === "complaint" && PAUSE_ON_ANY_COMPLAINT;
+    const pauseLineTripped = anyComplaint
+      ? pause[events] >= MIN_PAUSE_COMPLAINTS
+      : pause.sent >= lines.minPauseSends &&
+        pauseRate > lines.pause &&
+        pause[events] >= lines.minPauseEvents;
+    if (pauseLineTripped) {
       reasons.push({ metric, rate: pauseRate, tier: "paused", windowDays: PAUSE_WINDOW_DAYS });
       return;
     }

@@ -14,10 +14,14 @@ import { DAY_MS, utcDay } from "./utc-day.js";
  */
 // 80% of SES's review lines (5% / 0.1%), written as literals: 0.8 * 0.05 is
 // 0.04000000000000001 in floating point, and 40 bounces in 1000 must trip.
-export const BREAKER_BOUNCE_RATE = 0.04;
-export const BREAKER_COMPLAINT_RATE = 0.0008;
+export const BREAKER_BOUNCE_RATE = 0.02;
+/** Any confirmed complaint trips: one complaint now risks the whole account. */
+export const BREAKER_COMPLAINT_RATE = 0;
+/** Bounce needs a real denominator; low-volume regions still get judged. */
+export const BREAKER_MIN_SENT = 100;
+/** A complaint has no volume floor: one is enough at any sample size. */
+export const BREAKER_COMPLAINT_MIN_SENT = 1;
 /** Sends a region needs in a window before its aggregate rate means anything. */
-export const BREAKER_MIN_SENT = 1000;
 export const BREAKER_WINDOWS_HOURS = [24, 24 * 7] as const;
 
 export interface RegionWindowCounts {
@@ -203,23 +207,25 @@ async function contributors(
     .limit(5);
 }
 
-function tripReason(counts: RegionWindowCounts, windowHours: number): RegionBreakerReason | null {
-  if (counts.sent < BREAKER_MIN_SENT) return null;
+export function tripReason(counts: RegionWindowCounts, windowHours: number): RegionBreakerReason | null {
   const checks = [
     {
       metric: "bounce" as const,
       events: counts.hardBounced,
       limit: BREAKER_BOUNCE_RATE,
       min: MIN_PAUSE_HARD_BOUNCES,
+      minSent: BREAKER_MIN_SENT,
     },
     {
       metric: "complaint" as const,
       events: counts.complained,
       limit: BREAKER_COMPLAINT_RATE,
       min: MIN_PAUSE_COMPLAINTS,
+      minSent: BREAKER_COMPLAINT_MIN_SENT,
     },
   ];
   for (const c of checks) {
+    if (counts.sent < c.minSent) continue;
     const rate = c.events / counts.sent;
     if (rate >= c.limit && c.events >= c.min) {
       return {
