@@ -495,14 +495,21 @@ it("dead-letter lost transition is atomic, idempotent and notified by the existi
 it("health intent survives sink failure and restart; concurrent recovery does not duplicate", async () => {
   vi.stubEnv("OPERATOR_ALERTS_SINK", "audit");
   const f = await seed("health-durable");
+  // The alert is attributed to the newest unjudged sample globally, so this
+  // fixture must be the only candidate and its age must be relative to the
+  // pinned clock: an absolute date silently expires once that day passes.
+  await db
+    .update(schema.monitorSamples)
+    .set({ status: "lost" })
+    .where(eq(schema.monitorSamples.status, "unjudged"));
+  const healthNow = new Date("2026-11-20T00:01:00Z");
   await db.insert(schema.monitorSamples).values({
     teamId: f.teamId,
     kind: "tier",
     status: "unjudged",
     errorClass: "no_credentials",
-    createdAt: new Date("2026-11-20T00:00:00Z"),
+    createdAt: new Date(healthNow.getTime() - 60_000),
   });
-  const healthNow = new Date("2026-11-20T00:01:00Z");
   await db.execute(
     sql`CREATE FUNCTION fail_health_fixture() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'operator.alert' THEN RAISE EXCEPTION 'fixture sink failure'; END IF; RETURN NEW; END $$`,
   );
