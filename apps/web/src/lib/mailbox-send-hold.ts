@@ -23,6 +23,7 @@ const REASONS: Record<MailboxSendHoldReason, string> = {
   configuration_unavailable: "sendHold.reasons.configuration_unavailable",
   content_review: "sendHold.reasons.content_review",
   semantic_content_review: "sendHold.reasons.semantic_content_review",
+  cold_outreach: "sendHold.reasons.cold_outreach",
   preflight_unavailable: "sendHold.reasons.preflight_unavailable",
 };
 const ACTIONS: Record<MailboxSendHold["actionRequired"], string> = {

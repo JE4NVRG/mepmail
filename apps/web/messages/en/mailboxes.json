@@ -1328,6 +1328,7 @@
       "configuration_unavailable": "Sending setup could not be checked.",
       "content_review": "This message is awaiting a content review.",
       "semantic_content_review": "Awaiting security review",
+      "cold_outreach": "Cold outreach cannot be sent through this account",
       "preflight_unavailable": "Pre-send checks are temporarily unavailable."
     },
     "actions": {

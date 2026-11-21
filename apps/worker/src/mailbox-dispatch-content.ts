@@ -62,6 +62,10 @@ function valid(input: Input, proof: Approval): boolean {
 function held(): never {
   throw new MailboxSendDeferredError("semantic_content_review");
 }
+/** A policy stop, not a judgment on the copy: never released by approving content. */
+function heldColdOutreach(): never {
+  throw new MailboxSendDeferredError("cold_outreach");
+}
 
 /** Trusted router copies only; spreading/serializing an input does not carry approval. */
 export function copyMailboxDispatchInput(input: Input, wire = false): Input {
@@ -256,9 +260,13 @@ export async function withMailboxDispatchContent<T>(
   }
   const original = fingerprint(input);
   let wire: Buffer;
+  // The outbox input has no subject field: the raw message is the only authority
+  // for what the recipient will actually read.
+  let sourceSubject = "";
   try {
     wire = stripMailboxPrivateHeaders(Buffer.from(input.raw));
     const [source, final] = await Promise.all([inspect(input.raw), inspect(wire)]);
+    sourceSubject = source.parsed.subject ?? "";
     if (source.parsed.from!.value[0]!.address!.toLowerCase() !== input.from.toLowerCase()) held();
     const [team] = await db
       .select({
@@ -370,15 +378,15 @@ export async function withMailboxDispatchContent<T>(
   } catch {
     held();
   }
-  // Cold outreach is refused before any judge call: the risk is sending,
-  // not the verdict latency. A hold is the safe outcome.
+  // Cold outreach never leaves through SES, whatever the judge said about the
+  // copy: the trigger that paused the account was sending, not wording.
   if (
     guardColdOutreach({
       from: (input as { from?: string }).from ?? "",
-      subject: (input as { subject?: string }).subject ?? "",
+      subject: (input as { subject?: string }).subject ?? sourceSubject,
     }).blocked
   ) {
-    held();
+    heldColdOutreach();
   }
   const proof: Approval = {
     active: true,

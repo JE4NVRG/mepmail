@@ -1328,6 +1328,7 @@
       "configuration_unavailable": "Não foi possível verificar a configuração de envio.",
       "content_review": "Esta mensagem aguarda uma análise de conteúdo.",
       "semantic_content_review": "Aguardando análise de segurança",
+      "cold_outreach": "Prospecção fria não pode ser enviada por esta conta",
       "preflight_unavailable": "As verificações anteriores ao envio estão temporariamente indisponíveis."
     },
     "actions": {
