@@ -116,15 +116,15 @@ beforeAll(async () => {
   const a = await domainIn(teamA, "a.dev", "sa-east-1");
   const b = await domainIn(teamB, "b.dev", "sa-east-1");
   const c = await domainIn(teamC, "c.dev", "us-east-1");
-  // sa-east-1: 1000 sends, 5 complaints (0.5% ≥ 80% of the 0.1% line).
+  // sa-east-1: 1000 sends, 5 complaints; any confirmed complaint trips.
   await seedTraffic(teamA, a, 700, [{ type: "complained", n: 3 }]);
   await seedTraffic(teamB, b, 300, [{ type: "complained", n: 2 }]);
-  // us-east-1: a worse rate, but under the 1000-send floor.
-  await seedTraffic(teamC, c, 500, [{ type: "complained", n: 5 }]);
+  // us-east-1: traffic only, nothing adverse, so it must stay out of the decision.
+  await seedTraffic(teamC, c, 500, []);
 });
 afterAll(() => close());
 
-it("trips a region on the 24h complaint rate, names contributors worst first, and skips under the floor", async () => {
+it("trips a region on the 24h complaint rate, names contributors worst first, and leaves a clean region alone", async () => {
   const decisions = await evaluateRegionBreakers(db, { now: NOW });
   const sa = decisions.find((d) => d.region === "sa-east-1");
   const us = decisions.find((d) => d.region === "us-east-1");
@@ -188,15 +188,15 @@ it("judges the 7-day window too: old events still trip it when the 24h window is
   expect(us?.contributors.map((c) => [c.teamId, c.complained])).toEqual([[teamC, 5]]);
 });
 
-it("exactly 4.00% hard bounces (40 in 1000) trips the bounce line", async () => {
+it("exactly 2.00% hard bounces (20 in 1000) trips the bounce line", async () => {
   await clearTraffic();
   const [dom] = await db.select().from(schema.domains).where(eq(schema.domains.teamId, teamA));
   if (!dom) throw new Error("no domain");
-  await seedTraffic(teamA, dom.id, 1000, [{ type: "bounced", bounceType: "Permanent", n: 40 }]);
+  await seedTraffic(teamA, dom.id, 1000, [{ type: "bounced", bounceType: "Permanent", n: 20 }]);
   const decisions = await evaluateRegionBreakers(db, { now: NOW });
   expect(decisions.find((d) => d.region === "sa-east-1")).toMatchObject({
     trip: true,
-    reason: { metric: "bounce", events: 40, rate: 0.04, limit: 0.04 },
+    reason: { metric: "bounce", events: 20, rate: 0.02, limit: 0.02 },
   });
 });
 
@@ -210,7 +210,7 @@ it("a paused region with no traffic left in either window still gets a resume de
         reason: {
           metric: "complaint",
           rate: 0.01,
-          limit: 0.0008,
+          limit: 0,
           windowHours: 24,
           sent: 1000,
           events: 10,
