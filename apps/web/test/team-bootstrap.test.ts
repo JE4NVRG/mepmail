@@ -21,7 +21,8 @@ afterEach(async () => {
 });
 
 async function insertUser(id: string, email: string): Promise<void> {
-  await db.insert(schema.user).values({ id, name: id, email });
+  // D: a team only exists for a verified address, so every fixture verifies.
+  await db.insert(schema.user).values({ id, name: id, email, emailVerified: true });
 }
 
 function callerFor(userId: string, overrides: Partial<Context> = {}) {

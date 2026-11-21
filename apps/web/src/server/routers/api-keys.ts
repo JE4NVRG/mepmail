@@ -51,7 +51,9 @@ export const apiKeysRouter = router({
           code:
             issued.reason === "invalid_domain"
               ? "BAD_REQUEST"
-              : issued.reason === "active_key_limit" || issued.reason === "signup_sandbox_key_limit"
+              : issued.reason === "active_key_limit" ||
+                  issued.reason === "signup_sandbox_key_limit" ||
+                  issued.reason === "no_verified_domain"
                 ? "PRECONDITION_FAILED"
                 : issued.reason === "team_missing"
                   ? "NOT_FOUND"

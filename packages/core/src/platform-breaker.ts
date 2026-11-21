@@ -1,7 +1,7 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import type { RegionBreakerReason } from "@millionsend/db/schema";
-import { and, asc, desc, eq, gte, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { MIN_PAUSE_COMPLAINTS, MIN_PAUSE_HARD_BOUNCES } from "./deliverability.js";
 import { DAY_MS, utcDay } from "./utc-day.js";
@@ -585,4 +585,61 @@ export async function planTenantFirstRegionBreakers(
     }
   }
   return { decisions: out, tenantPauses, regionHolds, regionHoldsDeferred };
+}
+
+/**
+ * A reputation pause stops broadcasts and the broadcast half of a send, never
+ * pure transactional mail: password resets and receipts keep flowing for the
+ * team that tripped, because `send-email` only honours this column when the
+ * email carries a broadcast id. The flag and the audit row are what tell an
+ * operator the pause came from the breaker rather than from a human.
+ */
+export interface TenantBroadcastPauseInput {
+  teamId: string;
+  region: string;
+  metric: "bounce" | "complaint";
+  events: number;
+  sent: number;
+  windowHours: number;
+  now?: Date;
+}
+
+export async function pauseTenantBroadcastsForRegionTrip(
+  db: Db,
+  input: TenantBroadcastPauseInput,
+): Promise<boolean> {
+  const now = input.now ?? new Date();
+  const paused = await db
+    .update(schema.teams)
+    .set({
+      broadcastsPausedByOperatorAt: sql`coalesce(${schema.teams.broadcastsPausedByOperatorAt}, ${now})`,
+    })
+    .where(
+      and(eq(schema.teams.id, input.teamId), isNull(schema.teams.broadcastsPausedByOperatorAt)),
+    )
+    .returning({ id: schema.teams.id });
+  if (paused.length === 0) return false;
+  const metric = input.metric === "complaint" ? "reclamacao" : "bounce duro";
+  const note = `Pausa automatica de broadcast: regiao ${input.region} acima da linha por ${metric} (${input.events}/${input.sent} envios em ${input.windowHours}h). Transacional preservado.`;
+  await db
+    .insert(schema.teamFlags)
+    .values({
+      teamId: input.teamId,
+      reason: input.metric === "complaint" ? "complaints" : "guardrail",
+      note: note.slice(0, 500),
+    })
+    .onConflictDoNothing();
+  await db.insert(schema.auditLog).values({
+    teamId: input.teamId,
+    actorId: "platform.breaker",
+    action: "team.broadcasts_paused_reputation",
+    target: input.region,
+    data: {
+      metric: input.metric,
+      events: input.events,
+      sent: input.sent,
+      windowHours: input.windowHours,
+    },
+  });
+  return true;
 }

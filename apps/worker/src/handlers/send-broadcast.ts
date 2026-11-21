@@ -49,6 +49,7 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import type { EmailSendRequest, EnqueueEmailSends } from "@millionsend/queue";
 import { and, asc, eq, gt, inArray, isNotNull, type SQL, sql } from "drizzle-orm";
+import { screenPreSendContent } from "../../../../packages/core/src/pre-send-content-policy.js";
 import { mailOwners, type SystemMailer } from "../system-mail.js";
 
 /**
@@ -253,6 +254,23 @@ export async function sendBroadcast(
   // imitating a bank, a carrier or a security notice, holds the team for
   // review, and the fan-out waits below like any other hold.
   if (deps.isCloud) {
+    // The same content gate the mailbox and transactional paths run. A campaign
+    // is the surface a purchased list reaches, so prospecting copy holds here
+    // too: the fan-out parks and the team lands in the review queue.
+    const content = await screenPreSendContent(db, {
+      teamId: broadcast.teamId,
+      from: broadcast.from,
+      subject: broadcast.subject,
+      html: broadcast.html,
+      text: broadcast.text,
+    });
+    if (content.action === "hold") {
+      console.warn(
+        `send-broadcast: content policy hold (${content.code}) on ${broadcast.id}; fan-out parked`,
+      );
+      await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
+      return "deferred";
+    }
     const disguise = findDisguise(broadcast);
     if (disguise) {
       await holdTeamForReview(db, {

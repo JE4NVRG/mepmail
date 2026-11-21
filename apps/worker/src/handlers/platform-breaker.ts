@@ -3,7 +3,7 @@ import {
   evaluateRegionBreakers,
   fetchTeamStanding,
   findInstanceOperator,
-  holdTeamForReview,
+  pauseTenantBroadcastsForRegionTrip,
   planTenantFirstRegionBreakers,
   type RegionDecision,
   type TenantRegionPause,
@@ -29,27 +29,29 @@ export interface PlatformBreakerDeps {
 }
 
 /**
- * Hold the tenant that produced the events, not the whole region. A reputation
- * hold stops every surface for that team and lands in the review queue, which is
- * the documented way back: an operator clears the review and the team resumes.
+ * Pause the tenant that produced the events, not the whole region — and pause
+ * only its broadcasts. Pure transactional mail keeps flowing (A151): the gate
+ * honours this column only for emails that carry a broadcast id.
  */
-async function holdTenantForReputation(
+async function pauseTenantBroadcasts(
   db: Db,
   pause: TenantRegionPause,
   now: Date,
 ): Promise<boolean> {
-  const metric = pause.metric === "complaint" ? "reclamacao" : "bounce duro";
   try {
-    return await holdTeamForReview(db, {
+    return await pauseTenantBroadcastsForRegionTrip(db, {
       teamId: pause.teamId,
-      reason: "reputation",
-      note: `Regiao ${pause.region} acima da linha por ${metric} (${pause.events}/${pause.sent} envios em ${pause.windowHours}h). Pausa do time antes da regiao.`,
+      region: pause.region,
+      metric: pause.metric,
+      events: pause.events,
+      sent: pause.sent,
+      windowHours: pause.windowHours,
       now,
     });
   } catch (err) {
-    // A failed tenant hold must not silently turn into a cleared region: the
+    // A failed tenant pause must not silently turn into a cleared region: the
     // caller keeps the region hold for that team's region below.
-    console.error(`platform.breaker: tenant hold for ${pause.teamId} failed`, err);
+    console.error(`platform.breaker: tenant broadcast pause for ${pause.teamId} failed`, err);
     return false;
   }
 }
@@ -70,17 +72,17 @@ export async function runPlatformBreaker(
   const failed = new Set<string>();
   const tenantsPaused: TenantRegionPause[] = [];
   for (const pause of plan.tenantPauses) {
-    if (await holdTenantForReputation(db, pause, now)) tenantsPaused.push(pause);
+    if (await pauseTenantBroadcasts(db, pause, now)) tenantsPaused.push(pause);
     else failed.add(pause.teamId);
   }
 
-  // "Nothing changed" is not "not held": a team already under review from the
-  // previous run is just as stopped as one this run held. Only a team that ends
-  // the run without a review hold keeps its region paused.
+  // "Nothing changed" is not "not paused": a team already paused by the previous
+  // run is just as stopped as one this run paused. Only a team that ends the run
+  // with broadcasts flowing keeps its region paused.
   for (const pause of plan.tenantPauses) {
     if (!failed.has(pause.teamId)) continue;
     const standing = await fetchTeamStanding(db, pause.teamId);
-    if (standing?.sendReview) failed.delete(pause.teamId);
+    if (standing?.broadcastsPausedByOperatorAt) failed.delete(pause.teamId);
   }
 
   // A region only loses its hold when the tenant pause it relied on actually

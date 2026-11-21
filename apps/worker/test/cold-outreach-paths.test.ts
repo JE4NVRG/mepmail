@@ -1,37 +1,64 @@
-import { randomBytes } from "node:crypto";
-import { deriveUnsubscribeKey, EnvKeyring, findDisguise } from "@millionsend/core";
+import { randomBytes, randomUUID } from "node:crypto";
+import { deriveUnsubscribeKey, EnvKeyring } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it } from "vitest";
+import {
+  reviewCampaignConsent,
+  submitCampaignConsent,
+} from "../../../packages/core/src/campaign-consent.js";
 import { screenPreSendContent } from "../../../packages/core/src/pre-send-content-policy.js";
 import { type BroadcastDeps, sendBroadcast } from "../src/handlers/send-broadcast.js";
 
 /**
- * The cold-outreach gate on the two fan-out surfaces, with real rows rather than
- * mocks: a real team, a verified domain, real contacts, a real broadcast row.
+ * The cold-outreach gate on the campaign surface, with real rows: a real team,
+ * a verified domain with DNS proof, real contacts, a real consent dossier and a
+ * real broadcast row. No mocks, no send.
  *
- * What it pins today:
- *  - the policy itself holds prospecting copy (`cold_outreach`) before any send;
- *  - the broadcast path never consults that policy, so the same copy reaches the
- *    fan-out. That is the gap A148 names: the gate is wired for mailbox and
- *    transactional sends, not for campaigns.
+ * What it pins: a campaign whose copy is prospecting is refused before a single
+ * row fans out, and the team lands in the review queue. Before A148 the campaign
+ * path ran only disguise, brand and new-sender screens, so the same copy went
+ * straight to the fan-out.
  */
 let db: Db;
 let close: () => Promise<void>;
 const keyring = EnvKeyring.fromBase64(randomBytes(32).toString("base64"));
 const secretKey = deriveUnsubscribeKey(randomBytes(32));
+const OPERATOR_ID = "operator-fixture";
 
-const PROSPECT_FROM = "Parcerias <parcerias@sender.dev>";
 const PROSPECT_SUBJECT = "Sponsorship opportunity for your blog";
 const PROSPECT_TEXT =
   "Hi, we would love a paid placement on your site. Unsubscribe: {{{UNSUBSCRIBE_URL}}}";
 
-async function seedTeam(label: string): Promise<string> {
+function campaignDns(name: string) {
+  const now = new Date();
+  return {
+    dkimSelector: "fixture",
+    mailFromSubdomain: "send",
+    dmarcPolicy: "none" as const,
+    dmarcCheckedAt: now,
+    lastCheckedAt: now,
+    dnsRecords: [
+      { group: "verification", type: "TXT", name: `fixture._domainkey.${name}`, status: "found" },
+      { group: "sending", type: "TXT", name: `send.${name}`, status: "found" },
+      { group: "sending", type: "MX", name: `send.${name}`, status: "found" },
+      { group: "dmarc", type: "TXT", name: `_dmarc.${name}`, status: "found" },
+    ],
+  };
+}
+
+async function seedTeam(label: string): Promise<{ teamId: string; from: string }> {
   const teamId = await createTeam(db, label);
-  // Past the new-sender screen, so what this file observes is the content gate
-  // and nothing else: the operator already cleared a review for this team.
+  const ownerId = randomUUID();
+  await db.insert(schema.user).values({
+    id: ownerId,
+    name: "Owner",
+    email: `${ownerId}@example.test`,
+    emailVerified: true,
+  });
+  await db.insert(schema.teamMembers).values({ teamId, userId: ownerId, role: "owner" });
   await db
     .update(schema.teams)
     .set({ sendReviewClearedAt: new Date(Date.now() - 60_000) })
@@ -43,22 +70,51 @@ async function seedTeam(label: string): Promise<string> {
     status: "verified",
     verifiedAt: new Date(),
     sesConfigurationSet: "ms-set",
+    ...campaignDns(`${label}.dev`),
   });
   await db.insert(schema.contacts).values([
     { teamId, email: `a@${label}.example.com` },
     { teamId, email: `b@${label}.example.com` },
   ]);
-  return teamId;
+  // A campaign only reaches the fan-out with approved consent; without it the
+  // handler parks earlier and the content gate would never be exercised.
+  const dossier = await submitCampaignConsent(db, {
+    teamId,
+    actorId: ownerId,
+    evidence: {
+      listReference: "synthetic-opt-in-list",
+      source: "First party public registration form",
+      method: "Explicit unchecked opt-in checkbox",
+      formUrl: "https://example.test/signup",
+      permissionText: "I agree to receive Example product messages.",
+      permissionScope: "Example product updates",
+      samples: [
+        {
+          reference: "masked-registration-1",
+          registeredAt: "2026-01-01T12:00:00.000Z",
+          ipAvailable: false,
+        },
+      ],
+    },
+  });
+  await reviewCampaignConsent(db, {
+    teamId,
+    dossierId: dossier.id,
+    operatorId: OPERATOR_ID,
+    decision: "approved",
+    reason: "Independent operator verified synthetic first-party opt-in evidence",
+  });
+  return { teamId, from: `parcerias@${label}.dev` };
 }
 
-async function insertBroadcast(teamId: string): Promise<string> {
+async function insertBroadcast(teamId: string, from: string): Promise<string> {
   const [row] = await db
     .insert(schema.broadcasts)
     .values({
       teamId,
-      from: PROSPECT_FROM,
+      from,
       subject: PROSPECT_SUBJECT,
-      html: `<p>Hi</p><a href="{{{UNSUBSCRIBE_URL}}}">bye</a>`,
+      html: '<p>Hi</p><a href="{{{UNSUBSCRIBE_URL}}}">bye</a>',
       text: PROSPECT_TEXT,
       status: "scheduled",
       scheduledAt: new Date(Date.now() - 1000),
@@ -68,66 +124,57 @@ async function insertBroadcast(teamId: string): Promise<string> {
   return row.id;
 }
 
-function makeDeps(): { deps: BroadcastDeps; enqueued: string[] } {
-  const enqueued: string[] = [];
-  const deps: BroadcastDeps = {
+function makeDeps(): BroadcastDeps {
+  return {
     keyring,
     unsubscribeSecretKey: secretKey,
     unsubscribeBaseUrl: "https://app.example.com",
     isCloud: true,
-    enqueueEmailSends: async (batch) => {
-      for (const job of batch) enqueued.push(job.emailId);
-    },
+    enqueueEmailSends: async () => undefined,
     reschedule: async () => undefined,
   };
-  return { deps, enqueued };
 }
 
 beforeAll(async () => {
   ({ db, close } = await createTestDb());
+  await db.insert(schema.user).values({
+    id: OPERATOR_ID,
+    name: "Operator",
+    email: "op@example.test",
+    emailVerified: true,
+  });
 });
 afterAll(() => close());
 
 it("a politica segura a copy de prospeccao fria antes de qualquer envio", async () => {
-  const teamId = await seedTeam("gate-policy");
+  const { teamId, from } = await seedTeam("gate-policy");
   const verdict = await screenPreSendContent(db, {
     teamId,
-    from: PROSPECT_FROM,
+    from,
     subject: PROSPECT_SUBJECT,
-    html: `<p>Hi</p>`,
+    html: "<p>Hi</p>",
     text: PROSPECT_TEXT,
   });
   expect(verdict).toMatchObject({ action: "hold", code: "cold_outreach" });
-  // The hold parks the team, which is the documented way back to it.
   const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
   expect(team?.sendReviewAt).not.toBeNull();
 });
 
-it("o caminho de broadcast nao consulta o gate de prospeccao fria", async () => {
-  const teamId = await seedTeam("gate-broadcast");
-  const broadcastId = await insertBroadcast(teamId);
-  const { deps } = makeDeps();
+it("o caminho de broadcast segura a copy de prospeccao fria antes do fan-out", async () => {
+  const { teamId, from } = await seedTeam("gate-broadcast");
+  const broadcastId = await insertBroadcast(teamId, from);
 
-  // O handler roda de verdade sobre a linha real do broadcast...
-  const outcome = await sendBroadcast(db, deps, { broadcastId });
-  expect(["sent", "deferred"]).toContain(outcome);
+  expect(await sendBroadcast(db, makeDeps(), { broadcastId })).toBe("deferred");
 
-  // ...e nada nele vem da politica de conteudo: nenhum hold com motivo de
-  // conteudo, nenhuma flag dessa politica. O que o broadcast consulta hoje e
-  // disfarce, imitacao de marca e remetente novo, e a copy de prospeccao passa
-  // por todos os tres.
+  // Nada fanou: nenhuma linha de e-mail nasceu para este broadcast.
+  const rows = await db
+    .select({ id: schema.emails.id })
+    .from(schema.emails)
+    .where(eq(schema.emails.broadcastId, broadcastId));
+  expect(rows).toHaveLength(0);
+
+  // E o time fica retido com o motivo do conteudo, que e a fila de revisao.
   const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
-  expect(team?.sendReviewReason ?? null).not.toBe("content");
-  expect(findDisguise({ from: PROSPECT_FROM, subject: PROSPECT_SUBJECT })).toBeNull();
-
-  // A mesma copy no gate que o correio e o transacional usam: hold.
-  expect(
-    await screenPreSendContent(db, {
-      teamId,
-      from: PROSPECT_FROM,
-      subject: PROSPECT_SUBJECT,
-      html: "<p>Hi</p>",
-      text: PROSPECT_TEXT,
-    }),
-  ).toMatchObject({ action: "hold", code: "cold_outreach" });
+  expect(team?.sendReviewAt).not.toBeNull();
+  expect(team?.sendReviewReason).toBe("content");
 });

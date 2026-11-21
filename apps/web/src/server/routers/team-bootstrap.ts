@@ -274,7 +274,22 @@ export const teamBootstrapRouter = router({
     .input(z.object({ name: z.string().trim().min(1).max(80) }))
     .mutation(async ({ ctx, input }) => {
       if (env.IS_CLOUD) {
+        // D: an unverified address never becomes a team. The 19/11 wave created
+        // 81 teams on throwaway mailboxes; a team that cannot exist until the
+        // address answers removes the whole payoff of mass signup. Read from the
+        // row, not the session: a session minted before verification carries the
+        // old answer.
         const userId = ctx.session.user.id;
+        const [principal] = await ctx.db
+          .select({ verified: schema.user.emailVerified })
+          .from(schema.user)
+          .where(eq(schema.user.id, userId));
+        if (!principal?.verified) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Verify your e-mail address before creating a team.",
+          });
+        }
         const [memberships, bestPlan] = await Promise.all([
           listMemberships(ctx.db, userId),
           fetchBestOwnedPlan(ctx.db, userId),

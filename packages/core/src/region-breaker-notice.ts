@@ -45,7 +45,7 @@ export function tenantPauseText(n: TenantPauseNotice): string {
     `regiao ${n.region} · ${n.metric === "complaint" ? "reclamacao" : "bounce duro"}`,
     `time ${n.teamName} (${n.teamId})`,
     `eventos ${n.events} em ${n.sent} envios (${n.windowHours}h)`,
-    "envio do time retido para revisao; a regiao segue liberada",
+    "broadcasts do time pausados; transacional e first-party seguem",
   ].join("\n");
 }
 

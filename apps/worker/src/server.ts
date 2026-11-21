@@ -104,6 +104,7 @@ import { warnEndingMailboxTrials } from "./handlers/mailbox-trial-ending.js";
 import { runMonitorHealth } from "./handlers/monitor-health.js";
 import { reportPlanMove, sweepNotifications } from "./handlers/notify.js";
 import { remindPixInvoices } from "./handlers/pix-invoices.js";
+import { alertSignupWave } from "./handlers/signup-wave.js";
 import { runPlatformBreaker } from "./handlers/platform-breaker.js";
 import { processSesEvent } from "./handlers/process-ses-event.js";
 import { runRevealNotices } from "./handlers/reveal-notices.js";
@@ -591,6 +592,8 @@ await queue.scheduleCrons(
         if (keys.sent > 0) console.log(`notifications.sweep: agentKeysExpiring=${keys.sent}`);
         const trials = await warnEndingMailboxTrials(db, { mailer, appBaseUrl: env.APP_BASE_URL });
         if (trials.sent > 0) console.log(`notifications.sweep: trialsEnding=${trials.sent}`);
+        const wave = await alertSignupWave(db);
+        if (wave.alerted) console.log(`notifications.sweep: signupWave teams=${wave.wave.teams} domains=${wave.wave.emailDomains}`);
         const plans = await warnMailboxPlanUsage(db, { mailer, appBaseUrl: env.APP_BASE_URL });
         if (plans.near || plans.reached || plans.paused)
           console.log(

@@ -831,6 +831,7 @@ export {
   holdRegion,
   type PausedRegion,
   pausedRegions,
+  pauseTenantBroadcastsForRegionTrip,
   planTenantFirstRegionBreakers,
   platformSendGate,
   type RegionContributor,
@@ -845,6 +846,7 @@ export {
   SEND_GATE_MIN_COMPLAINTS,
   SEND_GATE_MIN_SENT,
   sendGateDecision,
+  type TenantBroadcastPauseInput,
   type TenantFirstPlan,
   type TenantRegionPause,
 } from "./platform-breaker.js";

@@ -77,7 +77,9 @@ beforeEach(async () => {
   await db.delete(schema.usageCounters);
   await db.delete(schema.teamFlags);
   await db.delete(schema.regionBreakers);
-  await db.update(schema.teams).set({ sendReviewAt: null, sendReviewClearedAt: null });
+  await db
+    .update(schema.teams)
+    .set({ sendReviewAt: null, sendReviewClearedAt: null, broadcastsPausedByOperatorAt: null });
 });
 afterAll(() => close());
 
@@ -95,13 +97,18 @@ it("pausa o time reclamado e deixa a regiao liberada", async () => {
 
   expect(result.tripped).toEqual([]);
   expect(result.tenantsPaused).toEqual([noisy]);
-  // The tenant is held for review with the reputation reason, and the flag the
-  // console lists is what brings an operator back to it.
+  // A151: the tenant loses broadcasts, not transactional mail. The appreciation
+  // hold stays untouched, so a password reset from that team still leaves.
   const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, noisy));
-  expect(team?.sendReviewAt).not.toBeNull();
-  expect(team?.sendReviewReason).toBe("reputation");
+  expect(team?.broadcastsPausedByOperatorAt).not.toBeNull();
+  expect(team?.sendReviewAt).toBeNull();
   const flags = await db.select().from(schema.teamFlags).where(eq(schema.teamFlags.teamId, noisy));
-  expect(flags.map((f) => f.reason)).toEqual(["review"]);
+  expect(flags.map((f) => f.reason)).toEqual(["complaints"]);
+  const audit = await db
+    .select({ action: schema.auditLog.action })
+    .from(schema.auditLog)
+    .where(eq(schema.auditLog.teamId, noisy));
+  expect(audit.map((a) => a.action)).toContain("team.broadcasts_paused_reputation");
   // No region hold, so no region mail to the operator.
   expect(await db.select().from(schema.regionBreakers)).toHaveLength(0);
   expect(sends).toHaveLength(0);

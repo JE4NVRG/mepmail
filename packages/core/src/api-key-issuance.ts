@@ -12,7 +12,8 @@ export type ApiKeyIssuanceRefusal =
   | "signup_api_key_restricted"
   | "signup_sandbox_key_limit"
   | "active_key_limit"
-  | "invalid_domain";
+  | "invalid_domain"
+  | "no_verified_domain";
 
 export type ApiKeyIssuanceResult =
   | { allowed: true; id: string; token: string }
@@ -70,6 +71,16 @@ export async function issueApiKey(
     }
     // Every minter holds the team row until insert/commit, so concurrent
     // requests cannot exceed either the normal cap or the sandbox test cap.
+    // A key without a verified sending domain is the exact artifact the 19/11
+    // signup wave produced: 75 keys and zero domains. Refuse before the cap
+    // checks, so no path (dashboard, onboarding, REST, OAuth/MCP) can mint one.
+    const [verifiedDomain] = await tx
+      .select({ id: schema.domains.id })
+      .from(schema.domains)
+      .where(and(eq(schema.domains.teamId, input.teamId), eq(schema.domains.status, "verified")))
+      .limit(1);
+    if (!verifiedDomain) return { allowed: false, reason: "no_verified_domain" };
+
     const [active] = await tx
       .select({ n: count() })
       .from(schema.apiKeys)
@@ -133,6 +144,8 @@ export function apiKeyIssuanceMessage(reason: ApiKeyIssuanceRefusal): string {
       return `A team can have at most ${MAX_ACTIVE_API_KEYS} active API keys; revoke one first.`;
     case "invalid_domain":
       return "domain_id must be a verified domain of this team";
+    case "no_verified_domain":
+      return "Add and verify a sending domain before creating an API key. A key only makes sense once a domain can send.";
     case "team_missing":
       return "Team not found";
   }
