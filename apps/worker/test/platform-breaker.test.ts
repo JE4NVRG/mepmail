@@ -2,80 +2,138 @@ import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
 import { runPlatformBreaker } from "../src/handlers/platform-breaker.js";
 
+/**
+ * Tenant before region. A team's bad day pauses that team; the region is only
+ * held when the traffic that would remain is still over the line.
+ */
 let db: Db;
 let close: () => Promise<void>;
 let sends: { to: string; subject: string; text: string }[];
 
 const NOW = new Date("2026-09-03T12:00:00Z");
+const SENT_AT = new Date(NOW.getTime() - 3_600_000);
 const mailer = {
   send: async (to: string, m: { subject: string; text: string }) => {
     sends.push({ to, subject: m.subject, text: m.text });
   },
 };
 
-beforeAll(async () => {
-  ({ db, close } = await createTestDb());
-  sends = [];
-  await db.insert(schema.user).values([
-    { id: "op", name: "Operator", email: "op@example.com", createdAt: new Date(0) },
-    { id: "later", name: "Later", email: "later@example.com", createdAt: new Date(1) },
-  ]);
-  const teamId = await createTeam(db, "Noisy Sender");
-  const [domain] = await db
+async function seedTeam(
+  name: string,
+  domain: string,
+  region: string,
+  sent: number,
+  events: { type: "complained" | "bounced"; bounceType?: string; n: number },
+): Promise<string> {
+  const teamId = await createTeam(db, name);
+  const [row] = await db
     .insert(schema.domains)
-    .values({ teamId, name: "noisy.dev", region: "sa-east-1", status: "verified" })
+    .values({ teamId, name: domain, region, status: "verified" })
     .returning({ id: schema.domains.id });
-  if (!domain) throw new Error("seed failed");
-  const sentAt = new Date(NOW.getTime() - 3_600_000);
+  if (!row) throw new Error("seed failed");
   const rows = await db
     .insert(schema.emails)
     .values(
-      Array.from({ length: 1000 }, (_, i) => ({
+      Array.from({ length: sent }, (_, i) => ({
         teamId,
-        domainId: domain.id,
-        from: "f@noisy.dev",
+        domainId: row.id,
+        from: `f@${domain}`,
         to: [`r${i}@b.com`],
         subject: "s",
-        sentAt,
+        sentAt: SENT_AT,
       })),
     )
     .returning({ id: schema.emails.id });
-  for (const email of rows.slice(0, 5)) {
+  let cursor = 0;
+  for (let i = 0; i < events.n; i++) {
+    const email = rows[cursor++];
+    if (!email) throw new Error("more events than emails");
     await db.insert(schema.emailEvents).values({
       emailId: email.id,
-      type: "complained",
-      occurredAt: sentAt,
-      createdAt: sentAt,
+      type: events.type,
+      occurredAt: SENT_AT,
+      createdAt: SENT_AT,
       snsMessageId: `sns-${email.id}`,
-      data: {},
+      bounceType: events.type === "bounced" ? (events.bounceType ?? null) : null,
+      data: events.type === "bounced" ? { bounce: { bounceType: events.bounceType } } : {},
     });
   }
+  return teamId;
+}
+
+beforeAll(async () => {
+  ({ db, close } = await createTestDb());
+  await db
+    .insert(schema.user)
+    .values([{ id: "op", name: "Operator", email: "op@example.com", createdAt: new Date(0) }]);
+});
+beforeEach(async () => {
+  sends = [];
+  await db.delete(schema.emailEvents);
+  await db.delete(schema.emails);
+  await db.delete(schema.usageCounters);
+  await db.delete(schema.teamFlags);
+  await db.delete(schema.regionBreakers);
+  await db.update(schema.teams).set({ sendReviewAt: null, sendReviewClearedAt: null });
 });
 afterAll(() => close());
 
-it("trips the region, mails the operator with the contributors, and stays quiet until it clears", async () => {
-  expect(
-    await runPlatformBreaker(db, { mailer, appBaseUrl: "https://app.example.test", now: NOW }),
-  ).toEqual({
-    tripped: ["sa-east-1"],
-    resumed: [],
+it("pausa o time reclamado e deixa a regiao liberada", async () => {
+  const noisy = await seedTeam("Noisy Sender", "noisy.dev", "sa-east-1", 1000, {
+    type: "complained",
+    n: 5,
   });
-  expect(sends).toHaveLength(1);
-  expect(sends[0]).toMatchObject({ to: "op@example.com" });
-  expect(sends[0]?.subject).toContain("paused in sa-east-1");
-  expect(sends[0]?.text).toContain("Noisy Sender: 0 hard bounces, 5 complaints");
 
-  expect(await runPlatformBreaker(db, { mailer, now: NOW })).toEqual({ tripped: [], resumed: [] });
-  expect(sends).toHaveLength(1);
-
-  await db.delete(schema.emailEvents).where(eq(schema.emailEvents.type, "complained"));
-  expect(await runPlatformBreaker(db, { mailer, now: NOW })).toEqual({
-    tripped: [],
-    resumed: ["sa-east-1"],
+  const result = await runPlatformBreaker(db, {
+    mailer,
+    appBaseUrl: "https://app.example.test",
+    now: NOW,
   });
-  expect(sends[1]?.subject).toContain("resumed in sa-east-1");
-  expect((await db.select().from(schema.regionBreakers))[0]?.paused).toBe(false);
+
+  expect(result.tripped).toEqual([]);
+  expect(result.tenantsPaused).toEqual([noisy]);
+  // The tenant is held for review with the reputation reason, and the flag the
+  // console lists is what brings an operator back to it.
+  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, noisy));
+  expect(team?.sendReviewAt).not.toBeNull();
+  expect(team?.sendReviewReason).toBe("reputation");
+  const flags = await db.select().from(schema.teamFlags).where(eq(schema.teamFlags.teamId, noisy));
+  expect(flags.map((f) => f.reason)).toEqual(["review"]);
+  // No region hold, so no region mail to the operator.
+  expect(await db.select().from(schema.regionBreakers)).toHaveLength(0);
+  expect(sends).toHaveLength(0);
+
+  // Same state twice: the second run pauses nothing new and mails nobody.
+  const again = await runPlatformBreaker(db, { mailer, now: NOW });
+  expect(again.tenantsPaused).toEqual([]);
+  expect(sends).toHaveLength(0);
+});
+
+it("ainda segura a regiao quando a taxa sem os times pausados continua acima da linha", async () => {
+  const teams: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    teams.push(
+      await seedTeam(`Bouncer ${i}`, `bouncer-${i}.dev`, "ap-south-1", 400, {
+        type: "bounced",
+        bounceType: "Permanent",
+        n: 10,
+      }),
+    );
+  }
+
+  const result = await runPlatformBreaker(db, {
+    mailer,
+    appBaseUrl: "https://app.example.test",
+    now: NOW,
+  });
+
+  expect(result.tripped).toEqual(["ap-south-1"]);
+  expect(result.tenantsPaused).toHaveLength(5);
+  const [region] = await db.select().from(schema.regionBreakers);
+  expect(region).toMatchObject({ region: "ap-south-1", paused: true });
+  expect(sends).toHaveLength(1);
+  expect(sends[0]?.subject).toContain("paused in ap-south-1");
 });

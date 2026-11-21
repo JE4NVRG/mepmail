@@ -831,6 +831,7 @@ export {
   holdRegion,
   type PausedRegion,
   pausedRegions,
+  planTenantFirstRegionBreakers,
   platformSendGate,
   type RegionContributor,
   type RegionDecision,
@@ -844,6 +845,8 @@ export {
   SEND_GATE_MIN_COMPLAINTS,
   SEND_GATE_MIN_SENT,
   sendGateDecision,
+  type TenantFirstPlan,
+  type TenantRegionPause,
 } from "./platform-breaker.js";
 export {
   approveProductionVolume,

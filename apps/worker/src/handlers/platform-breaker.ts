@@ -1,10 +1,20 @@
 import {
   applyRegionBreakers,
   evaluateRegionBreakers,
+  fetchTeamStanding,
   findInstanceOperator,
+  holdTeamForReview,
+  planTenantFirstRegionBreakers,
   type RegionDecision,
+  type TenantRegionPause,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
+import {
+  notifyRegionBreaker,
+  regionDeferredText,
+  regionHoldText,
+  tenantPauseText,
+} from "../../../../packages/core/src/region-breaker-notice.js";
 import {
   type MailContent,
   regionPausedMail,
@@ -19,17 +29,82 @@ export interface PlatformBreakerDeps {
 }
 
 /**
- * Evaluate the per-region breakers, persist the flips, and tell the operator
- * about each one with the teams behind it. Returns the regions that changed.
+ * Hold the tenant that produced the events, not the whole region. A reputation
+ * hold stops every surface for that team and lands in the review queue, which is
+ * the documented way back: an operator clears the review and the team resumes.
+ */
+async function holdTenantForReputation(
+  db: Db,
+  pause: TenantRegionPause,
+  now: Date,
+): Promise<boolean> {
+  const metric = pause.metric === "complaint" ? "reclamacao" : "bounce duro";
+  try {
+    return await holdTeamForReview(db, {
+      teamId: pause.teamId,
+      reason: "reputation",
+      note: `Regiao ${pause.region} acima da linha por ${metric} (${pause.events}/${pause.sent} envios em ${pause.windowHours}h). Pausa do time antes da regiao.`,
+      now,
+    });
+  } catch (err) {
+    // A failed tenant hold must not silently turn into a cleared region: the
+    // caller keeps the region hold for that team's region below.
+    console.error(`platform.breaker: tenant hold for ${pause.teamId} failed`, err);
+    return false;
+  }
+}
+
+/**
+ * Evaluate the per-region breakers, pause the teams behind the events first, and
+ * hold the region only when the traffic that would remain is still over the
+ * line. Every tenant pause and every flip reaches the operator on Telegram.
  */
 export async function runPlatformBreaker(
   db: Db,
   deps: PlatformBreakerDeps,
-): Promise<{ tripped: string[]; resumed: string[] }> {
+): Promise<{ tripped: string[]; resumed: string[]; tenantsPaused: string[] }> {
   const now = deps.now ?? new Date();
   const decisions = await evaluateRegionBreakers(db, { now });
-  const changed = await applyRegionBreakers(db, decisions, now);
-  if (changed.tripped.length === 0 && changed.resumed.length === 0) return changed;
+  const plan = await planTenantFirstRegionBreakers(db, decisions, { now });
+
+  const failed = new Set<string>();
+  const tenantsPaused: TenantRegionPause[] = [];
+  for (const pause of plan.tenantPauses) {
+    if (await holdTenantForReputation(db, pause, now)) tenantsPaused.push(pause);
+    else failed.add(pause.teamId);
+  }
+
+  // "Nothing changed" is not "not held": a team already under review from the
+  // previous run is just as stopped as one this run held. Only a team that ends
+  // the run without a review hold keeps its region paused.
+  for (const pause of plan.tenantPauses) {
+    if (!failed.has(pause.teamId)) continue;
+    const standing = await fetchTeamStanding(db, pause.teamId);
+    if (standing?.sendReview) failed.delete(pause.teamId);
+  }
+
+  // A region only loses its hold when the tenant pause it relied on actually
+  // landed; otherwise the original decision stands and the region stays held.
+  const toApply: RegionDecision[] = plan.decisions.map((d) => {
+    if (d.trip || !plan.regionHoldsDeferred.includes(d.region)) return d;
+    const unlanded = plan.tenantPauses.some((p) => p.region === d.region && failed.has(p.teamId));
+    if (!unlanded) return d;
+    return decisions.find((o) => o.region === d.region) ?? d;
+  });
+
+  const changed = await applyRegionBreakers(db, toApply, now);
+  for (const pause of tenantsPaused) {
+    console.warn(
+      `platform.breaker: tenant ${pause.teamId} paused — ${pause.metric} ${pause.events}/${pause.sent} in ${pause.region} over ${pause.windowHours}h`,
+    );
+    notifyRegionBreaker(tenantPauseText(pause));
+  }
+  for (const region of plan.regionHoldsDeferred) {
+    if (changed.tripped.includes(region)) continue;
+    const teams = tenantsPaused.filter((p) => p.region === region).length;
+    notifyRegionBreaker(regionDeferredText({ region, teams }));
+  }
+
   const operator = await findInstanceOperator(db);
   const url = deps.appBaseUrl ?? "";
   // The flip is already persisted (the banner shows it); a failing mail is
@@ -46,7 +121,7 @@ export async function runPlatformBreaker(
       console.error(`platform.breaker: operator mail for ${region} failed`, err);
     }
   };
-  const byRegion = new Map(decisions.map((d) => [d.region, d]));
+  const byRegion = new Map(toApply.map((d) => [d.region, d]));
   for (const region of changed.tripped) {
     const d = byRegion.get(region) as RegionDecision & {
       reason: NonNullable<RegionDecision["reason"]>;
@@ -57,6 +132,7 @@ export async function runPlatformBreaker(
     console.warn(
       `platform.breaker: broadcasts paused in ${region} — ${d.reason.metric} rate ${(d.reason.rate * 100).toFixed(2)}% over ${d.reason.windowHours}h (${d.reason.events}/${d.reason.sent}); top contributors: ${top || "none"}`,
     );
+    notifyRegionBreaker(regionHoldText({ region, ...d.reason }));
     await mail(
       region,
       "region.paused",
@@ -76,5 +152,5 @@ export async function runPlatformBreaker(
     console.log(`platform.breaker: broadcasts resumed in ${region}`);
     await mail(region, "region.resumed", regionResumedMail({ region, url }));
   }
-  return changed;
+  return { ...changed, tenantsPaused: tenantsPaused.map((p) => p.teamId) };
 }

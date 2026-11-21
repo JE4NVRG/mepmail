@@ -33,6 +33,8 @@ export interface RegionWindowCounts {
 export interface RegionContributor {
   teamId: string;
   teamName: string;
+  /** Accepted sends by this team in the window, for the operator's notice. */
+  sent: number;
   hardBounced: number;
   complained: number;
 }
@@ -58,16 +60,28 @@ const complaintFilter = sql`${schema.emailEvents.type} = 'complained'`;
  */
 export async function regionWindowCounts(
   db: Db,
-  opts: { now: Date; hours: number; teamIds?: string[]; since?: Date },
+  opts: {
+    now: Date;
+    hours: number;
+    teamIds?: string[] | undefined;
+    excludeTeamIds?: string[] | undefined;
+    since?: Date;
+  },
 ): Promise<Map<string, RegionWindowCounts>> {
   const since = opts.since ?? new Date(opts.now.getTime() - opts.hours * HOUR_MS);
   const teamFilter = opts.teamIds ? inArray(schema.emails.teamId, opts.teamIds) : undefined;
+  // Tenant-first: the same window with the already-quarantined teams taken
+  // out, so a tripped region can be judged on the traffic that would remain.
+  const excludeFilter =
+    opts.excludeTeamIds && opts.excludeTeamIds.length > 0
+      ? notInArray(schema.emails.teamId, opts.excludeTeamIds)
+      : undefined;
   const out = new Map<string, RegionWindowCounts>();
   const sent = await db
     .select({ region: schema.domains.region, n: sql<number>`count(*)::int` })
     .from(schema.emails)
     .innerJoin(schema.domains, eq(schema.domains.id, schema.emails.domainId))
-    .where(and(gte(schema.emails.sentAt, since), teamFilter))
+    .where(and(gte(schema.emails.sentAt, since), teamFilter, excludeFilter))
     .groupBy(schema.domains.region);
   for (const row of sent) out.set(row.region, { sent: row.n, hardBounced: 0, complained: 0 });
   const events = await db
@@ -84,6 +98,7 @@ export async function regionWindowCounts(
         gte(schema.emailEvents.createdAt, since),
         isNotNull(schema.emailEvents.snsMessageId),
         teamFilter,
+        excludeFilter,
       ),
     )
     .groupBy(schema.domains.region);
@@ -106,7 +121,7 @@ export async function regionWindowCounts(
  */
 export async function regionCounterTotals(
   db: Db,
-  opts: { now: Date; days: number },
+  opts: { now: Date; days: number; excludeTeamIds?: string[] | undefined },
 ): Promise<Map<string, RegionWindowCounts>> {
   const since = utcDay(opts.now.getTime() - (opts.days - 1) * DAY_MS);
   const c = schema.usageCounters;
@@ -127,6 +142,7 @@ export async function regionCounterTotals(
   // ::bigint — a region's weekly sum can overflow int4; the driver returns
   // bigint as a string, exact through Number() up to 2^53.
   const total = (col: AnyPgColumn) => sql<string>`coalesce(sum(${col}), 0)::bigint`;
+  const excludedFromCounters = [...multiRegion, ...(opts.excludeTeamIds ?? [])];
   const rows = await db
     .select({
       region: teamRegion.region,
@@ -139,7 +155,7 @@ export async function regionCounterTotals(
     .where(
       and(
         gte(c.day, since),
-        multiRegion.length > 0 ? notInArray(c.teamId, multiRegion) : undefined,
+        excludedFromCounters.length > 0 ? notInArray(c.teamId, excludedFromCounters) : undefined,
       ),
     )
     .groupBy(teamRegion.region);
@@ -161,6 +177,7 @@ export async function regionCounterTotals(
       // Same span as the counters: whole UTC days, not a trailing window.
       since: new Date(`${since}T00:00:00Z`),
       teamIds: multiRegion,
+      excludeTeamIds: opts.excludeTeamIds,
     });
     for (const [region, counts] of raw) {
       const base = out.get(region) ?? { sent: 0, hardBounced: 0, complained: 0 };
@@ -175,7 +192,7 @@ export async function regionCounterTotals(
 }
 
 /** Teams behind a region's events over the tripping window, worst first. */
-async function contributors(
+export async function contributors(
   db: Db,
   region: string,
   now: Date,
@@ -184,10 +201,14 @@ async function contributors(
   const since = new Date(now.getTime() - hours * HOUR_MS);
   const hardBounced = sql<number>`count(*) filter (where ${hardBounceFilter})::int`;
   const complained = sql<number>`count(*) filter (where ${complaintFilter})::int`;
+  // The team's own send volume in the window (emails_team_sent_window), not the
+  // handful of rows that carry an event: the operator reads "1 em 400 envios".
+  const sent = sql<number>`(select count(*)::int from emails se where se.team_id = ${schema.teams.id} and se.sent_at >= ${since})`;
   return db
     .select({
       teamId: schema.teams.id,
       teamName: schema.teams.name,
+      sent,
       hardBounced,
       complained,
     })
@@ -252,7 +273,7 @@ export function tripReason(
  */
 export async function evaluateRegionBreakers(
   db: Db,
-  opts: { now?: Date } = {},
+  opts: { now?: Date; excludeTeamIds?: string[] | undefined } = {},
 ): Promise<RegionDecision[]> {
   const now = opts.now ?? new Date();
   // The day window reads raw rows to the minute; the week window reads the
@@ -262,8 +283,22 @@ export async function evaluateRegionBreakers(
   // cannot place, whose rows are read over the trailing 168 hours.
   const [dayHours, weekHours] = BREAKER_WINDOWS_HOURS;
   const windows = [
-    { hours: dayHours, counts: await regionWindowCounts(db, { now, hours: dayHours }) },
-    { hours: weekHours, counts: await regionCounterTotals(db, { now, days: weekHours / 24 }) },
+    {
+      hours: dayHours,
+      counts: await regionWindowCounts(db, {
+        now,
+        hours: dayHours,
+        excludeTeamIds: opts.excludeTeamIds,
+      }),
+    },
+    {
+      hours: weekHours,
+      counts: await regionCounterTotals(db, {
+        now,
+        days: weekHours / 24,
+        excludeTeamIds: opts.excludeTeamIds,
+      }),
+    },
   ];
   // Paused regions stay in the set even with no traffic in either window:
   // a decision with nothing tripping is what lets them resume.
@@ -466,4 +501,88 @@ export async function platformSendGate(
   const decision = sendGateDecision({ sent, hardBounced, complained }, opts.env);
   if (!opts.env) gateMemo.set(db, { at: opts.now.getTime(), decision });
   return decision;
+}
+
+/**
+ * Tenant before region. A complaint or a bounce run belongs to a team before it
+ * belongs to a region, and one tenant's bad day must not park every customer in
+ * us-east-1. The plan quarantines the teams behind the events, re-reads the
+ * region without them, and keeps a region hold only when the traffic that would
+ * remain is still over the line.
+ *
+ * Reads only: the caller persists the tenant pauses and the region flips, so a
+ * slow or failed write cannot leave the two halves disagreeing.
+ */
+export interface TenantRegionPause {
+  teamId: string;
+  teamName: string;
+  region: string;
+  metric: "bounce" | "complaint";
+  events: number;
+  sent: number;
+  windowHours: number;
+}
+
+export interface TenantFirstPlan {
+  /** Decisions to persist: a cleared region comes back as `trip: false`. */
+  decisions: RegionDecision[];
+  tenantPauses: TenantRegionPause[];
+  /** Regions that still trip once their contributing teams are out. */
+  regionHolds: string[];
+  /** Regions whose hold the tenant pauses clear. */
+  regionHoldsDeferred: string[];
+}
+
+export async function planTenantFirstRegionBreakers(
+  db: Db,
+  decisions: RegionDecision[],
+  opts: { now?: Date } = {},
+): Promise<TenantFirstPlan> {
+  const now = opts.now ?? new Date();
+  const out: RegionDecision[] = [];
+  const tenantPauses: TenantRegionPause[] = [];
+  const regionHolds: string[] = [];
+  const regionHoldsDeferred: string[] = [];
+  for (const d of decisions) {
+    const reason = d.reason;
+    if (!d.trip || !reason) {
+      out.push(d);
+      continue;
+    }
+    const contribs = await contributors(db, d.region, now, reason.windowHours);
+    const culprits = contribs.filter((c) =>
+      reason.metric === "complaint" ? c.complained > 0 : c.hardBounced > 0,
+    );
+    if (culprits.length === 0) {
+      // Nothing to attribute: the region carries the decision alone.
+      out.push(d);
+      regionHolds.push(d.region);
+      continue;
+    }
+    for (const c of culprits) {
+      tenantPauses.push({
+        teamId: c.teamId,
+        teamName: c.teamName,
+        region: d.region,
+        metric: reason.metric,
+        events: reason.metric === "complaint" ? c.complained : c.hardBounced,
+        sent: c.sent,
+        windowHours: reason.windowHours,
+      });
+    }
+    const residual = (
+      await evaluateRegionBreakers(db, {
+        now,
+        excludeTeamIds: culprits.map((c) => c.teamId),
+      })
+    ).find((r) => r.region === d.region);
+    if (residual?.trip) {
+      out.push({ ...d, contributors: residual.contributors });
+      regionHolds.push(d.region);
+    } else {
+      out.push({ region: d.region, trip: false, contributors: [] });
+      regionHoldsDeferred.push(d.region);
+    }
+  }
+  return { decisions: out, tenantPauses, regionHolds, regionHoldsDeferred };
 }
