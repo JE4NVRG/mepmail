@@ -45,7 +45,7 @@ function campaignDns(name: string) {
       { group: "sending", type: "TXT", name: `send.${name}`, status: "found" },
       { group: "sending", type: "MX", name: `send.${name}`, status: "found" },
       { group: "dmarc", type: "TXT", name: `_dmarc.${name}`, status: "found" },
-    ],
+    ] satisfies schema.DomainDnsRecord[],
   };
 }
 

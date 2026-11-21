@@ -13,6 +13,8 @@ export interface TeamStanding {
   /** Sending held for review (see send-review): accepted mail parks until released. */
   sendReview: { at: Date; reason: SendReviewReason } | null;
   broadcastsPausedByOperatorAt: Date | null;
+  /** Set by the platform breaker (team_monitor), never by the operator. */
+  broadcastsPausedByMonitorAt: Date | null;
   dailySendCeiling: number | null;
 }
 
@@ -53,6 +55,7 @@ export function teamStandingOf(row: {
         ? { at: row.sendReviewAt, reason: row.sendReviewReason }
         : null,
     broadcastsPausedByOperatorAt: row.broadcastsPausedByOperatorAt,
+    broadcastsPausedByMonitorAt: null,
     dailySendCeiling: row.dailySendCeiling,
   };
 }
@@ -63,7 +66,17 @@ export async function fetchTeamStanding(db: Db, teamId: string): Promise<TeamSta
     .select(STANDING_COLUMNS)
     .from(schema.teams)
     .where(eq(schema.teams.id, teamId));
-  return row ? teamStandingOf(row) : null;
+  if (!row) return null;
+  // The breaker's broadcast pause lives on the monitor row, so releasing it can
+  // never clear an operator's pause (and the reverse).
+  const [monitor] = await db
+    .select({ pausedAt: schema.teamMonitor.broadcastsPausedAt })
+    .from(schema.teamMonitor)
+    .where(eq(schema.teamMonitor.teamId, teamId));
+  return {
+    ...teamStandingOf(row),
+    broadcastsPausedByMonitorAt: monitor?.pausedAt ?? null,
+  };
 }
 
 /**

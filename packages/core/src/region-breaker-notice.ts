@@ -17,6 +17,8 @@ export interface TenantPauseNotice {
   events: number;
   sent: number;
   windowHours: number;
+  /** first-party keeps transactional mail; a third party loses every surface. */
+  kind?: "broadcast_only" | "full_review";
 }
 
 export interface RegionHoldNotice {
@@ -45,7 +47,9 @@ export function tenantPauseText(n: TenantPauseNotice): string {
     `regiao ${n.region} · ${n.metric === "complaint" ? "reclamacao" : "bounce duro"}`,
     `time ${n.teamName} (${n.teamId})`,
     `eventos ${n.events} em ${n.sent} envios (${n.windowHours}h)`,
-    "broadcasts do time pausados; transacional e first-party seguem",
+    n.kind === "full_review"
+      ? "envio do time retido para revisao (todas as superficies)"
+      : "broadcasts do time pausados; transacional e first-party seguem",
   ].join("\n");
 }
 

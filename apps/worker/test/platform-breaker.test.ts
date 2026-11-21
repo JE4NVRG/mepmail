@@ -1,13 +1,19 @@
+import { resumeBreakerBroadcasts } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { runPlatformBreaker } from "../src/handlers/platform-breaker.js";
 
 /**
- * Tenant before region. A team's bad day pauses that team; the region is only
- * held when the traffic that would remain is still over the line.
+ * A1/A2: who loses what when a region trips.
+ *
+ * - first party: broadcasts paused, transactional untouched, one alert;
+ * - third party: full review hold, every surface stopped;
+ * - first party twice in a day: treated as a third party;
+ * - the breaker's pause and the operator's pause are different columns, so
+ *   releasing one never releases the other.
  */
 let db: Db;
 let close: () => Promise<void>;
@@ -27,8 +33,10 @@ async function seedTeam(
   region: string,
   sent: number,
   events: { type: "complained" | "bounced"; bounceType?: string; n: number },
+  slug?: string,
 ): Promise<string> {
   const teamId = await createTeam(db, name);
+  if (slug) await db.update(schema.teams).set({ slug }).where(eq(schema.teams.id, teamId));
   const [row] = await db
     .insert(schema.domains)
     .values({ teamId, name: domain, region, status: "verified" })
@@ -71,76 +79,112 @@ beforeAll(async () => {
     .values([{ id: "op", name: "Operator", email: "op@example.com", createdAt: new Date(0) }]);
 });
 beforeEach(async () => {
+  vi.stubEnv("FIRST_PARTY_TEAM_SLUGS", "first-party-test,first-party-test-2");
   sends = [];
   await db.delete(schema.emailEvents);
   await db.delete(schema.emails);
   await db.delete(schema.usageCounters);
   await db.delete(schema.teamFlags);
+  await db.delete(schema.teamMonitor);
   await db.delete(schema.regionBreakers);
-  await db
-    .update(schema.teams)
-    .set({ sendReviewAt: null, sendReviewClearedAt: null, broadcastsPausedByOperatorAt: null });
+  await db.update(schema.teams).set({
+    sendReviewAt: null,
+    sendReviewClearedAt: null,
+    broadcastsPausedByOperatorAt: null,
+  });
 });
-afterAll(() => close());
+afterAll(() => {
+  vi.unstubAllEnvs();
+  return close();
+});
 
-it("pausa o time reclamado e deixa a regiao liberada", async () => {
-  const noisy = await seedTeam("Noisy Sender", "noisy.dev", "sa-east-1", 1000, {
+it("time de terceiro com reclamacao perde todas as superficies", async () => {
+  const third = await seedTeam("Third Party", "third.dev", "sa-east-1", 1000, {
     type: "complained",
     n: 5,
   });
 
-  const result = await runPlatformBreaker(db, {
-    mailer,
-    appBaseUrl: "https://app.example.test",
-    now: NOW,
-  });
+  const result = await runPlatformBreaker(db, { mailer, now: NOW });
 
   expect(result.tripped).toEqual([]);
-  expect(result.tenantsPaused).toEqual([noisy]);
-  // A151: the tenant loses broadcasts, not transactional mail. The appreciation
-  // hold stays untouched, so a password reset from that team still leaves.
-  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, noisy));
-  expect(team?.broadcastsPausedByOperatorAt).not.toBeNull();
-  expect(team?.sendReviewAt).toBeNull();
-  const flags = await db.select().from(schema.teamFlags).where(eq(schema.teamFlags.teamId, noisy));
-  expect(flags.map((f) => f.reason)).toEqual(["complaints"]);
-  const audit = await db
-    .select({ action: schema.auditLog.action })
-    .from(schema.auditLog)
-    .where(eq(schema.auditLog.teamId, noisy));
-  expect(audit.map((a) => a.action)).toContain("team.broadcasts_paused_reputation");
-  // No region hold, so no region mail to the operator.
+  expect(result.tenantsPaused).toEqual([third]);
+  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, third));
+  expect(team?.sendReviewAt).not.toBeNull();
+  expect(team?.sendReviewReason).toBe("reputation");
+  expect(team?.broadcastsPausedByOperatorAt).toBeNull();
+  // Nenhuma região foi pausada, e o operador recebeu um aviso do time, não da região.
   expect(await db.select().from(schema.regionBreakers)).toHaveLength(0);
-  expect(sends).toHaveLength(0);
-
-  // Same state twice: the second run pauses nothing new and mails nobody.
-  const again = await runPlatformBreaker(db, { mailer, now: NOW });
-  expect(again.tenantsPaused).toEqual([]);
   expect(sends).toHaveLength(0);
 });
 
-it("ainda segura a regiao quando a taxa sem os times pausados continua acima da linha", async () => {
-  const teams: string[] = [];
-  for (let i = 0; i < 6; i++) {
-    teams.push(
-      await seedTeam(`Bouncer ${i}`, `bouncer-${i}.dev`, "ap-south-1", 400, {
-        type: "bounced",
-        bounceType: "Permanent",
-        n: 10,
-      }),
-    );
-  }
+it("time first-party mantem o transacional e perde so o broadcast", async () => {
+  const first = await seedTeam(
+    "First Party",
+    "first.dev",
+    "us-east-1",
+    400,
+    { type: "complained", n: 1 },
+    "first-party-test",
+  );
 
-  const result = await runPlatformBreaker(db, {
-    mailer,
-    appBaseUrl: "https://app.example.test",
-    now: NOW,
+  const result = await runPlatformBreaker(db, { mailer, now: NOW });
+
+  expect(result.tenantsPaused).toEqual([first]);
+  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, first));
+  // A151: nenhum review hold, entao /emails continua saindo.
+  expect(team?.sendReviewAt).toBeNull();
+  expect(team?.broadcastsPausedByOperatorAt).toBeNull();
+  const [monitor] = await db
+    .select()
+    .from(schema.teamMonitor)
+    .where(eq(schema.teamMonitor.teamId, first));
+  expect(monitor?.broadcastsPausedAt).not.toBeNull();
+});
+
+it("first-party que repete em 24h recebe o review completo", async () => {
+  const first = await seedTeam(
+    "First Party",
+    "first2.dev",
+    "us-east-1",
+    400,
+    { type: "complained", n: 1 },
+    "first-party-test-2",
+  );
+  // Ocorrencia anterior no mesmo dia: a segunda nao e um clique errado.
+  await db.insert(schema.teamFlags).values({
+    teamId: first,
+    reason: "complaints",
+    note: "episodio anterior",
   });
+  await db
+    .update(schema.teamFlags)
+    .set({ openedAt: new Date(NOW.getTime() - 3_600_000) })
+    .where(eq(schema.teamFlags.teamId, first));
 
-  expect(result.tripped).toEqual(["ap-south-1"]);
-  expect(result.tenantsPaused).toHaveLength(5);
-  const [region] = await db.select().from(schema.regionBreakers);
-  expect(region).toMatchObject({ region: "ap-south-1", paused: true });
-  expect(sends).toHaveLength(1);
-  expect(sends[0]?.subject).toContain("paused in ap-south-1");
+  await runPlatformBreaker(db, { mailer, now: NOW });
+
+  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, first));
+  expect(team?.sendReviewAt).not.toBeNull();
+  expect(team?.sendReviewReason).toBe("reputation");
+});
+
+it("soltar a pausa do breaker nao solta a pausa manual", async () => {
+  const teamId = await createTeam(db, "Both Pauses");
+  const manualAt = new Date(NOW.getTime() - 7_200_000);
+  await db
+    .update(schema.teams)
+    .set({ broadcastsPausedByOperatorAt: manualAt })
+    .where(eq(schema.teams.id, teamId));
+  await db.insert(schema.teamMonitor).values({ teamId, broadcastsPausedAt: NOW });
+
+  // Release do breaker: limpa so a coluna do breaker.
+  await resumeBreakerBroadcasts(db, { teamId, now: NOW });
+
+  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+  const [monitor] = await db
+    .select()
+    .from(schema.teamMonitor)
+    .where(eq(schema.teamMonitor.teamId, teamId));
+  expect(monitor?.broadcastsPausedAt).toBeNull();
+  expect(team?.broadcastsPausedByOperatorAt?.getTime()).toBe(manualAt.getTime());
 });

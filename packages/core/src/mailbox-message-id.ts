@@ -13,7 +13,7 @@ export function mailboxMessageId(value: unknown): string | null {
     id.length > 512 ||
     !/^[\x21-\x7e]+$/.test(id) ||
     !/^<[^<>\s@]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?>$/.test(id) ||
-    /["(),:;\\\[\]]/.test(id)
+    /["(),:;\\[\]]/.test(id)
   )
     return null;
   return id;

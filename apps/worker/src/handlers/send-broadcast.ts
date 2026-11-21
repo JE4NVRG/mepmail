@@ -311,6 +311,7 @@ export async function sendBroadcast(
     standing?.suspended ||
     standing?.sendReview ||
     standing?.broadcastsPausedByOperatorAt ||
+    standing?.broadcastsPausedByMonitorAt ||
     signupRestriction.kind !== "none"
   ) {
     await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
@@ -519,6 +520,7 @@ export async function sendBroadcast(
         standingNow?.suspended ||
         standingNow?.sendReview ||
         standingNow?.broadcastsPausedByOperatorAt ||
+        standingNow?.broadcastsPausedByMonitorAt ||
         signupNow.kind !== "none"
       ) {
         await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));

@@ -3,12 +3,15 @@ import {
   evaluateRegionBreakers,
   fetchTeamStanding,
   findInstanceOperator,
+  holdTeamForReview,
   pauseTenantBroadcastsForRegionTrip,
   planTenantFirstRegionBreakers,
   type RegionDecision,
   type TenantRegionPause,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
+import { schema } from "@millionsend/db";
+import { and, eq, gte, inArray } from "drizzle-orm";
 import {
   notifyRegionBreaker,
   regionDeferredText,
@@ -28,31 +31,59 @@ export interface PlatformBreakerDeps {
   now?: Date;
 }
 
+/** Has this team already tripped a reputation line in the last 24 hours? */
+async function repeatedWithinDay(db: Db, teamId: string, now: Date): Promise<boolean> {
+  const [row] = await db
+    .select({ id: schema.teamFlags.id })
+    .from(schema.teamFlags)
+    .where(
+      and(
+        eq(schema.teamFlags.teamId, teamId),
+        inArray(schema.teamFlags.reason, ["complaints", "guardrail", "review"]),
+        gte(schema.teamFlags.openedAt, new Date(now.getTime() - 24 * 3_600_000)),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+export type TenantPauseKind = "broadcast_only" | "full_review" | "none";
+
 /**
- * Pause the tenant that produced the events, not the whole region — and pause
- * only its broadcasts. Pure transactional mail keeps flowing (A151): the gate
- * honours this column only for emails that carry a broadcast id.
+ * A1: first-party teams keep their transactional mail; a third party loses every
+ * surface until a human looks, because their complaints cost the account, not
+ * just their own reputation. A first-party team that repeats inside 24h is
+ * treated as a third party: a second trip in a day is not a misclick.
  */
-async function pauseTenantBroadcasts(
+async function pauseTenantForTrip(
   db: Db,
   pause: TenantRegionPause,
   now: Date,
-): Promise<boolean> {
+): Promise<TenantPauseKind> {
+  const repeated = await repeatedWithinDay(db, pause.teamId, now);
   try {
-    return await pauseTenantBroadcastsForRegionTrip(db, {
+    if (pause.firstParty && !repeated) {
+      const paused = await pauseTenantBroadcastsForRegionTrip(db, {
+        teamId: pause.teamId,
+        region: pause.region,
+        metric: pause.metric,
+        events: pause.events,
+        sent: pause.sent,
+        windowHours: pause.windowHours,
+        now,
+      });
+      return paused ? "broadcast_only" : "none";
+    }
+    const held = await holdTeamForReview(db, {
       teamId: pause.teamId,
-      region: pause.region,
-      metric: pause.metric,
-      events: pause.events,
-      sent: pause.sent,
-      windowHours: pause.windowHours,
+      reason: "reputation",
+      note: `Regiao ${pause.region} acima da linha por ${pause.metric === "complaint" ? "reclamacao" : "bounce duro"} (${pause.events}/${pause.sent} envios em ${pause.windowHours}h). ${pause.firstParty ? "Segunda ocorrencia em 24h." : "Time de terceiro."}`,
       now,
     });
+    return held ? "full_review" : "none";
   } catch (err) {
-    // A failed tenant pause must not silently turn into a cleared region: the
-    // caller keeps the region hold for that team's region below.
-    console.error(`platform.breaker: tenant broadcast pause for ${pause.teamId} failed`, err);
-    return false;
+    console.error(`platform.breaker: tenant pause for ${pause.teamId} failed`, err);
+    return "none";
   }
 }
 
@@ -70,10 +101,11 @@ export async function runPlatformBreaker(
   const plan = await planTenantFirstRegionBreakers(db, decisions, { now });
 
   const failed = new Set<string>();
-  const tenantsPaused: TenantRegionPause[] = [];
+  const tenantsPaused: { pause: TenantRegionPause; kind: "broadcast_only" | "full_review" }[] = [];
   for (const pause of plan.tenantPauses) {
-    if (await pauseTenantBroadcasts(db, pause, now)) tenantsPaused.push(pause);
-    else failed.add(pause.teamId);
+    const kind = await pauseTenantForTrip(db, pause, now);
+    if (kind === "none") failed.add(pause.teamId);
+    else tenantsPaused.push({ pause, kind });
   }
 
   // "Nothing changed" is not "not paused": a team already paused by the previous
@@ -95,15 +127,15 @@ export async function runPlatformBreaker(
   });
 
   const changed = await applyRegionBreakers(db, toApply, now);
-  for (const pause of tenantsPaused) {
+  for (const { pause, kind } of tenantsPaused) {
     console.warn(
-      `platform.breaker: tenant ${pause.teamId} paused — ${pause.metric} ${pause.events}/${pause.sent} in ${pause.region} over ${pause.windowHours}h`,
+      `platform.breaker: tenant ${pause.teamId} ${kind} — ${pause.metric} ${pause.events}/${pause.sent} in ${pause.region} over ${pause.windowHours}h`,
     );
-    notifyRegionBreaker(tenantPauseText(pause));
+    notifyRegionBreaker(tenantPauseText({ ...pause, kind }));
   }
   for (const region of plan.regionHoldsDeferred) {
     if (changed.tripped.includes(region)) continue;
-    const teams = tenantsPaused.filter((p) => p.region === region).length;
+    const teams = tenantsPaused.filter((t) => t.pause.region === region).length;
     notifyRegionBreaker(regionDeferredText({ region, teams }));
   }
 
@@ -154,5 +186,5 @@ export async function runPlatformBreaker(
     console.log(`platform.breaker: broadcasts resumed in ${region}`);
     await mail(region, "region.resumed", regionResumedMail({ region, url }));
   }
-  return { ...changed, tenantsPaused: tenantsPaused.map((p) => p.teamId) };
+  return { ...changed, tenantsPaused: tenantsPaused.map((t) => t.pause.teamId) };
 }

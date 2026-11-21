@@ -33,6 +33,7 @@ export interface RegionWindowCounts {
 export interface RegionContributor {
   teamId: string;
   teamName: string;
+  teamSlug: string;
   /** Accepted sends by this team in the window, for the operator's notice. */
   sent: number;
   hardBounced: number;
@@ -208,6 +209,7 @@ export async function contributors(
     .select({
       teamId: schema.teams.id,
       teamName: schema.teams.name,
+      teamSlug: schema.teams.slug,
       sent,
       hardBounced,
       complained,
@@ -455,6 +457,64 @@ export interface SendGateDecision {
   bounceRate: number;
 }
 
+/**
+ * First-party teams are the instance owner's own products. Their transactional
+ * mail (password resets, receipts) is not collateral we accept: a reputation
+ * trip pauses only their broadcasts and tells the operator. A third party that
+ * lands in the same place loses every surface until a human looks.
+ *
+ * Fail-closed: an empty or missing list means nobody is first-party.
+ */
+export function firstPartySlugs(
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): Set<string> {
+  const raw = env.FIRST_PARTY_TEAM_SLUGS ?? "je4ndev";
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s.length > 0),
+  );
+}
+
+export function isFirstPartyTeam(
+  teamSlug: string,
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): boolean {
+  return firstPartySlugs(env).has(teamSlug.toLowerCase());
+}
+
+/**
+ * Release the breaker's own pause and nothing else. The operator's pause lives
+ * on a different column (teams.broadcasts_paused_by_operator_at) and survives
+ * this on purpose: a human hold is not the rate's to undo.
+ */
+export async function resumeBreakerBroadcasts(
+  db: Db,
+  input: { teamId: string; now?: Date },
+): Promise<boolean> {
+  const now = input.now ?? new Date();
+  const resumed = await db
+    .update(schema.teamMonitor)
+    .set({ broadcastsPausedAt: null, broadcastsResumedAt: now })
+    .where(
+      and(
+        eq(schema.teamMonitor.teamId, input.teamId),
+        isNotNull(schema.teamMonitor.broadcastsPausedAt),
+      ),
+    )
+    .returning({ teamId: schema.teamMonitor.teamId });
+  if (resumed.length === 0) return false;
+  await db.insert(schema.auditLog).values({
+    teamId: input.teamId,
+    actorId: "platform.breaker",
+    action: "team.broadcasts_resumed_reputation",
+    target: "breaker",
+    data: {},
+  });
+  return true;
+}
+
 /** No sample, no verdict. The owner's own brake works at any volume. */
 export function sendGateDecision(
   totals: { sent: number; hardBounced: number; complained: number },
@@ -516,6 +576,9 @@ export async function platformSendGate(
 export interface TenantRegionPause {
   teamId: string;
   teamName: string;
+  teamSlug: string;
+  /** First-party teams keep transactional mail; third parties lose everything. */
+  firstParty: boolean;
   region: string;
   metric: "bounce" | "complaint";
   events: number;
@@ -563,6 +626,8 @@ export async function planTenantFirstRegionBreakers(
       tenantPauses.push({
         teamId: c.teamId,
         teamName: c.teamName,
+        teamSlug: c.teamSlug,
+        firstParty: isFirstPartyTeam(c.teamSlug),
         region: d.region,
         metric: reason.metric,
         events: reason.metric === "complaint" ? c.complained : c.hardBounced,
@@ -609,15 +674,18 @@ export async function pauseTenantBroadcastsForRegionTrip(
   input: TenantBroadcastPauseInput,
 ): Promise<boolean> {
   const now = input.now ?? new Date();
+  // team_monitor is the breaker's own column: releasing the breaker's pause can
+  // never clear an operator's pause, and an operator's release leaves ours be.
   const paused = await db
-    .update(schema.teams)
-    .set({
-      broadcastsPausedByOperatorAt: sql`coalesce(${schema.teams.broadcastsPausedByOperatorAt}, ${now})`,
+    .insert(schema.teamMonitor)
+    .values({ teamId: input.teamId, broadcastsPausedAt: now })
+    .onConflictDoUpdate({
+      target: schema.teamMonitor.teamId,
+      set: {
+        broadcastsPausedAt: sql`coalesce(${schema.teamMonitor.broadcastsPausedAt}, ${now})`,
+      },
     })
-    .where(
-      and(eq(schema.teams.id, input.teamId), isNull(schema.teams.broadcastsPausedByOperatorAt)),
-    )
-    .returning({ id: schema.teams.id });
+    .returning({ teamId: schema.teamMonitor.teamId });
   if (paused.length === 0) return false;
   const metric = input.metric === "complaint" ? "reclamacao" : "bounce duro";
   const note = `Pausa automatica de broadcast: regiao ${input.region} acima da linha por ${metric} (${input.events}/${input.sent} envios em ${input.windowHours}h). Transacional preservado.`;

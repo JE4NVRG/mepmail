@@ -24,6 +24,36 @@ export interface SignupWaveThresholds {
   maxEmailDomains: number;
 }
 
+/**
+ * Consumer providers are not evidence of a wave: a legitimate launch can bring
+ * twenty gmail signups in an hour. Only domain variety that costs the farm
+ * something (its own registered domains) counts toward the domain threshold.
+ */
+export const CONSUMER_EMAIL_DOMAINS: ReadonlySet<string> = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "outlook.com",
+  "outlook.com.br",
+  "hotmail.com",
+  "hotmail.com.br",
+  "live.com",
+  "msn.com",
+  "yahoo.com",
+  "yahoo.com.br",
+  "ymail.com",
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  "proton.me",
+  "protonmail.com",
+  "pm.me",
+  "gmx.com",
+  "zoho.com",
+  "bol.com.br",
+  "uol.com.br",
+  "terra.com.br",
+]);
+
 /** Deliberately low: a healthy day is a handful of signups per hour, not ten. */
 export const SIGNUP_WAVE_DEFAULT: SignupWaveThresholds = {
   windowMinutes: 60,
@@ -41,7 +71,9 @@ export async function detectSignupWave(
   const [row] = await db
     .select({
       teams: sql<number>`count(*)::int`,
-      domains: sql<number>`count(distinct split_part(${schema.user.email}, '@', 2))::int`,
+      // Consumer providers are collapsed into one bucket so they can never
+      // trip the domain threshold on their own.
+      domains: sql<number>`count(distinct case when lower(split_part(${schema.user.email}, '@', 2)) in ('gmail.com','googlemail.com','outlook.com','outlook.com.br','hotmail.com','hotmail.com.br','live.com','msn.com','yahoo.com','yahoo.com.br','ymail.com','icloud.com','me.com','mac.com','proton.me','protonmail.com','pm.me','gmx.com','zoho.com','bol.com.br','uol.com.br','terra.com.br') then '__consumer__' else lower(split_part(${schema.user.email}, '@', 2)) end)::int`,
       first: sql<Date | null>`min(${schema.teams.createdAt})`,
     })
     .from(schema.teams)

@@ -458,7 +458,7 @@ export class MailboxPilot {
 }
 function address(value: string) {
   const normalized = value.trim().toLowerCase();
-  if (!/^[a-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-z0-9.-]+$/.test(normalized) || normalized.length > 254)
+  if (!/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+$/.test(normalized) || normalized.length > 254)
     throw new MailboxPilotError("invalid");
   return normalized;
 }
