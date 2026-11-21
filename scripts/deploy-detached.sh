@@ -7,34 +7,36 @@
 # with them. This script runs detached, copies the old containers' logs to disk
 # BEFORE compose replaces them, and refuses to move on until each role answers.
 #
-# It never deletes the previous image: the rollback digest stays tagged and the
+# It never deletes the previous image: the rollback digest stays tagged and every
 # compose file keeps a timestamped backup for the whole run.
 #
-# usage:
-#   setsid nohup scripts/deploy-detached.sh \
-#     --digest sha256:<new-image-id> --revision <git-sha> \
-#     >/var/log/mepmail/deploy-$(date +%s).boot 2>&1 &
+# The project runs with FOUR compose files (base + three overlays that carry
+# secrets and product switches). The list is read from the running container's
+# own labels, so this script can never recreate a role with a partial config.
 #
-# Then watch: tail -f /var/log/mepmail/deploy-<ts>.log
+# usage:
+#   scripts/deploy-detached.sh --digest sha256:<id> --revision <git-sha> --check
+#   setsid nohup scripts/deploy-detached.sh --digest sha256:<id> --revision <git-sha> \
+#     >/dev/null 2>&1 &
+#   tail -f /home/jean/mepmail-builds/deploy-<ts>.log
 set -Eeuo pipefail
 
 ROOT="${MEPMAIL_DEPLOY_ROOT:-/home/jean/millionsend}"
-LOGDIR="${MEPMAIL_DEPLOY_LOGDIR:-/var/log/mepmail}"
-COMPOSE_FILES=(
-  "$ROOT/docker-compose.yml"
-  "$ROOT/.private/azure-email-events.compose.json"
-)
+LOGDIR="${MEPMAIL_DEPLOY_LOGDIR:-/home/jean/mepmail-builds}"
+ANCHOR_SERVICE="millionsend"
 SERVICES=(smtp mailclients millionsend)
 
 DIGEST=""
 REVISION=""
-for arg in "$@"; do
-  case "$arg" in
-    --digest=*) DIGEST="${arg#*=}" ;;
-    --digest) shift; DIGEST="${1:-}" ;;
-    --revision=*) REVISION="${arg#*=}" ;;
-    --revision) shift; REVISION="${1:-}" ;;
-    *) echo "unknown argument: $arg" >&2; exit 2 ;;
+CHECK="false"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --digest=*) DIGEST="${1#*=}"; shift ;;
+    --digest) DIGEST="${2:-}"; shift 2 ;;
+    --revision=*) REVISION="${1#*=}"; shift ;;
+    --revision) REVISION="${2:-}"; shift 2 ;;
+    --check) CHECK="true"; shift ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
 [[ -n "$DIGEST" ]] || { echo "--digest sha256:<id> is required" >&2; exit 2; }
@@ -42,113 +44,142 @@ done
 mkdir -p "$LOGDIR"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 LOG="$LOGDIR/deploy-$TS.log"
+echo "$LOG" >"$LOGDIR/LATEST-DEPLOY"
 exec > >(tee -a "$LOG") 2>&1
 say() { printf '%s %s\n' "$(date -u +%H:%M:%SZ)" "$*"; }
 fail() { say "FAIL: $*"; exit 1; }
 
-say "deploy start digest=$DIGEST revision=${REVISION:-unknown} root=$ROOT"
+say "deploy start digest=$DIGEST revision=${REVISION:-unknown} check=$CHECK root=$ROOT"
 docker image inspect "$DIGEST" >/dev/null 2>&1 || fail "digest $DIGEST not present locally"
 
-# 1. What is serving right now, and its evidence. The logs of the containers
-#    about to be replaced are the only record of their last minutes.
-declare -A OLD_DIGEST
+# 1. The exact compose stack this project is running, straight from the
+#    container's own labels: base file first, overlays in their original order.
+ANCHOR="$(docker ps -q --filter "label=com.docker.compose.service=$ANCHOR_SERVICE" | head -1)"
+[[ -n "$ANCHOR" ]] || fail "no running $ANCHOR_SERVICE container to read the compose files from"
+mapfile -t FILES < <(docker inspect "$ANCHOR" --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}' | tr ',' '\n')
+[[ ${#FILES[@]} -gt 0 ]] || fail "could not read compose config files from $ANCHOR_SERVICE"
+for f in "${FILES[@]}"; do
+  [[ -f "$f" ]] || fail "compose file missing: $f"
+  say "compose file: $f"
+done
+COMPOSE_ARGS=()
+for f in "${FILES[@]}"; do COMPOSE_ARGS+=(-f "$f"); done
+# smtp, mailclients, docs and backup live behind compose profiles; without them
+# the resolved model does not even contain the services this script recreates.
+compose() { docker compose "${COMPOSE_ARGS[@]}" --profile "*" --project-directory "$ROOT" "$@"; }
+compose config --quiet || fail "compose config is invalid before any change"
+SERVICES_PRESENT="$(compose config --services | tr '\n' ' ')"
+say "compose config valid; services: $SERVICES_PRESENT"
 for svc in "${SERVICES[@]}"; do
-  cid="$(docker compose --project-directory "$ROOT" ps -q "$svc" 2>/dev/null || true)"
-  [[ -n "$cid" ]] || { say "no running container for $svc (first deploy?)"; continue; }
-  OLD_DIGEST[$svc]="$(docker inspect "$cid" --format '{{.Image}}')"
-  docker logs --timestamps "$cid" >"$LOGDIR/$TS-$svc-old.log" 2>&1 || true
-  say "captured $svc ($cid) image ${OLD_DIGEST[$svc]} logs=$LOGDIR/$TS-$svc-old.log"
+  case " $SERVICES_PRESENT " in
+    *" $svc "*) ;;
+    *) fail "service $svc is not in the resolved compose model; refusing to touch anything" ;;
+  esac
 done
 
-PREVIOUS="$(printf '%s\n' "${OLD_DIGEST[@]}" | sort -u | head -1)"
-[[ -n "$PREVIOUS" ]] || fail "could not read the running image; refusing to deploy blind"
+PREVIOUS="$(docker inspect "$ANCHOR" --format '{{.Image}}')"
+say "currently serving image $PREVIOUS"
 
-# 2. Point every compose file that pins the old digest at the new one, keeping a
-#    timestamped copy so the rollback is a file move, not a guess.
-for f in "${COMPOSE_FILES[@]}"; do
-  [[ -f "$f" ]] || continue
-  cp -a "$f" "$f.bak-$TS"
-  if grep -q "$PREVIOUS" "$f"; then
-    sed -i "s/$PREVIOUS/$DIGEST/g" "$f"
-    say "rewrote $f ($PREVIOUS -> $DIGEST), backup $f.bak-$TS"
+# 2. Rewrite the digest and the revision everywhere they are pinned. Every file
+#    touched keeps a timestamped backup, so the rollback is a file move.
+declare -a TOUCHED=()
+for f in "${FILES[@]}"; do
+  if grep -q "$PREVIOUS" "$f" || [[ -n "$REVISION" ]] && grep -q "MEPMAIL_REVISION" "$f"; then
+    cp -a "$f" "$f.bak-$TS"
+    TOUCHED+=("$f")
   fi
 done
-if [[ -n "$REVISION" ]]; then
-  for f in "${COMPOSE_FILES[@]}"; do
-    [[ -f "$f" ]] || continue
-    sed -i "s/\"MEPMAIL_REVISION\": \"[0-9a-f]\{7,\}\"/\"MEPMAIL_REVISION\": \"$REVISION\"/" "$f" || true
-  done
-fi
+[[ ${#TOUCHED[@]} -gt 0 ]] || say "no compose file pins the current digest; nothing to rewrite"
+for f in "${TOUCHED[@]}"; do
+  sed -i "s/$PREVIOUS/$DIGEST/g" "$f"
+  if [[ -n "$REVISION" ]]; then
+    sed -i -E "s/(MEPMAIL_REVISION[\"']?:[[:space:]]*[\"'])[0-9a-f]{7,}([\"'])/\1$REVISION\2/g" "$f"
+    sed -i -E "s/(MILLIONSEND_REVISION[\"']?:[[:space:]]*[\"'])[0-9a-f]{7,}([\"'])/\1$REVISION\2/g" "$f"
+  fi
+  say "rewrote $f (backup $f.bak-$TS)"
+done
 
-compose_up() {
-  local svc="$1"
-  docker compose --project-directory "$ROOT" up -d --no-deps --force-recreate "$svc"
-}
-compose_down_to_rollback() {
-  local svc="$1"
-  say "rolling $svc back to $PREVIOUS"
-  for f in "${COMPOSE_FILES[@]}"; do
+restore() {
+  for f in "${TOUCHED[@]:-}"; do
     [[ -f "$f.bak-$TS" ]] && cp -a "$f.bak-$TS" "$f"
   done
-  compose_up "$svc" || true
 }
 
-# 3. One role at a time, each gated on its own readiness answer.
+if ! compose config --quiet; then
+  restore
+  fail "compose config became invalid after the rewrite; restored the originals"
+fi
+if [[ "$CHECK" == "true" ]]; then
+  # Only the two lines this script is allowed to touch. Printing the diff with
+  # context would spill every secret the overlays carry into the log.
+  say "CHECK MODE — lines that would change (no values):"
+  for f in "${TOUCHED[@]:-}"; do
+    printf '  %s: image=%s revision=%s
+' "$f"       "$(grep -c "^[[:space:]]*image: $DIGEST" "$f" || true)"       "$(grep -c "MEPMAIL_REVISION.*$REVISION" "$f" || true)"
+  done
+  restore
+  say "check done, originals restored, nothing recreated"
+  exit 0
+fi
+
+# 3. The logs of the containers about to be replaced are the only record of
+#    their last minutes: copy them before compose takes the containers away.
+for svc in "${SERVICES[@]}"; do
+  cid="$(compose ps -q "$svc" 2>/dev/null | head -1)"
+  [[ -n "$cid" ]] || { say "no running container for $svc"; continue; }
+  docker logs --timestamps "$cid" >"$LOGDIR/$TS-$svc-old.log" 2>&1 || true
+  say "captured $svc ($cid) logs=$LOGDIR/$TS-$svc-old.log"
+done
+
 wait_http() {
-  local url="$1" tries=60
-  for _ in $(seq "$tries"); do
-    if curl -fsS -o /dev/null --max-time 3 "$url"; then return 0; fi
+  local url="$1"
+  for _ in $(seq 60); do
+    curl -fsS -o /dev/null --max-time 3 "$url" && return 0
     sleep 2
   done
   return 1
 }
 wait_port() {
-  local port="$1" tries=60
-  for _ in $(seq "$tries"); do
-    if ss -ltn 2>/dev/null | grep -q ":$port "; then return 0; fi
+  local port="$1"
+  for _ in $(seq 60); do
+    ss -ltn 2>/dev/null | grep -q ":$port " && return 0
     sleep 2
   done
   return 1
 }
+rollback() {
+  local svc="$1"
+  say "rolling $svc back to $PREVIOUS"
+  restore
+  compose up -d --no-deps --force-recreate "$svc" || say "rollback of $svc failed too — manual action needed"
+}
 
+# 4. One role at a time, each gated on its own readiness answer.
 for svc in "${SERVICES[@]}"; do
   say "recreating $svc"
-  if ! compose_up "$svc"; then
-    compose_down_to_rollback "$svc"
-    fail "$svc did not recreate; rolled back"
-  fi
+  compose up -d --no-deps --force-recreate "$svc" || { rollback "$svc"; fail "$svc did not recreate"; }
   case "$svc" in
     millionsend)
       if ! wait_http "http://127.0.0.1:3000/health"; then
-        docker logs --tail 200 "$(docker compose --project-directory "$ROOT" ps -q "$svc")" || true
-        compose_down_to_rollback "$svc"
-        fail "web /health never answered; rolled back"
+        docker logs --tail 120 "$(compose ps -q "$svc" | head -1)" 2>&1 | tail -40 || true
+        rollback "$svc"
+        fail "web /health never answered"
       fi
       ;;
-    smtp)
-      if ! wait_port 2587; then
-        compose_down_to_rollback "$svc"
-        fail "smtp 2587 never listened; rolled back"
-      fi
-      ;;
-    mailclients)
-      if ! wait_port 1465; then
-        compose_down_to_rollback "$svc"
-        fail "mailclients 1465 never listened; rolled back"
-      fi
-      ;;
+    smtp) wait_port 2587 || { rollback "$svc"; fail "smtp 2587 never listened"; } ;;
+    mailclients) wait_port 1465 || { rollback "$svc"; fail "mailclients 1465 never listened"; } ;;
   esac
   say "$svc healthy"
 done
 
-# 4. The new set is serving: only now is anything old removed. The previous
-#    image stays in place as the rollback artefact.
+# 5. The new set is serving. Nothing old is removed here: the previous image
+#    stays as the rollback artefact.
 for svc in "${SERVICES[@]}"; do
-  cid="$(docker compose --project-directory "$ROOT" ps -q "$svc")"
+  cid="$(compose ps -q "$svc" | head -1)"
   [[ -n "$cid" ]] || continue
-  say "$svc -> $(docker inspect "$cid" --format '{{.Image}}') revision=$(docker inspect "$cid" --format '{{index .Config.Labels "com.docker.compose.service"}}')"
+  say "$svc -> image=$(docker inspect "$cid" --format '{{.Image}}') revision=$(docker inspect "$cid" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -m1 '^MEPMAIL_REVISION=' | cut -d= -f2)"
   docker logs --timestamps "$cid" >"$LOGDIR/$TS-$svc-new.log" 2>&1 || true
 done
 
-say "delete nothing: rollback image $PREVIOUS, compose backups *.bak-$TS"
+say "rollback artefact kept: $PREVIOUS; compose backups: *.bak-$TS"
 say "DEPLOY OK digest=$DIGEST log=$LOG"
