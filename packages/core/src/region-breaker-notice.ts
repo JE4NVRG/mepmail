@@ -18,7 +18,7 @@ export interface TenantPauseNotice {
   sent: number;
   windowHours: number;
   /** first-party keeps transactional mail; a third party loses every surface. */
-  kind?: "broadcast_only" | "full_review";
+  kind?: "broadcast_only" | "broadcast_only_urgent" | "full_review";
 }
 
 export interface RegionHoldNotice {
@@ -43,13 +43,17 @@ function rate(value: number): string {
 /** No URLs, tokens or recipients: the operator only needs who stopped and why. */
 export function tenantPauseText(n: TenantPauseNotice): string {
   return [
-    "MepMail: time pausado antes da regiao",
+    n.kind === "broadcast_only_urgent"
+      ? "MepMail: URGENTE - reincidencia em 24h"
+      : "MepMail: time pausado antes da regiao",
     `regiao ${n.region} · ${n.metric === "complaint" ? "reclamacao" : "bounce duro"}`,
     `time ${n.teamName} (${n.teamId})`,
     `eventos ${n.events} em ${n.sent} envios (${n.windowHours}h)`,
     n.kind === "full_review"
       ? "envio do time retido para revisao (todas as superficies)"
-      : "broadcasts do time pausados; transacional e first-party seguem",
+      : n.kind === "broadcast_only_urgent"
+        ? "broadcasts pausados de novo em 24h; transacional segue por decisao explicita"
+        : "broadcasts do time pausados; transacional e first-party seguem",
   ].join("\n");
 }
 

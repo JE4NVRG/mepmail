@@ -47,13 +47,15 @@ async function repeatedWithinDay(db: Db, teamId: string, now: Date): Promise<boo
   return Boolean(row);
 }
 
-export type TenantPauseKind = "broadcast_only" | "full_review" | "none";
+export type TenantPauseKind = "broadcast_only" | "broadcast_only_urgent" | "full_review" | "none";
 
 /**
- * A1: first-party teams keep their transactional mail; a third party loses every
- * surface until a human looks, because their complaints cost the account, not
- * just their own reputation. A first-party team that repeats inside 24h is
- * treated as a third party: a second trip in a day is not a misclick.
+ * A1 + A155: who loses what when a region trips.
+ *
+ * - first party: broadcasts paused, transactional untouched. A second complaint
+ *   inside 24h keeps the same scope and only escalates the alert to urgent:
+ *   password resets never stop because of a first-party recurrence.
+ * - third party: full review hold, every surface stopped.
  */
 async function pauseTenantForTrip(
   db: Db,
@@ -62,7 +64,7 @@ async function pauseTenantForTrip(
 ): Promise<TenantPauseKind> {
   const repeated = await repeatedWithinDay(db, pause.teamId, now);
   try {
-    if (pause.firstParty && !repeated) {
+    if (pause.firstParty) {
       const paused = await pauseTenantBroadcastsForRegionTrip(db, {
         teamId: pause.teamId,
         region: pause.region,
@@ -72,12 +74,13 @@ async function pauseTenantForTrip(
         windowHours: pause.windowHours,
         now,
       });
-      return paused ? "broadcast_only" : "none";
+      if (!paused) return "none";
+      return repeated ? "broadcast_only_urgent" : "broadcast_only";
     }
     const held = await holdTeamForReview(db, {
       teamId: pause.teamId,
       reason: "reputation",
-      note: `Regiao ${pause.region} acima da linha por ${pause.metric === "complaint" ? "reclamacao" : "bounce duro"} (${pause.events}/${pause.sent} envios em ${pause.windowHours}h). ${pause.firstParty ? "Segunda ocorrencia em 24h." : "Time de terceiro."}`,
+      note: `Regiao ${pause.region} acima da linha por ${pause.metric === "complaint" ? "reclamacao" : "bounce duro"} (${pause.events}/${pause.sent} envios em ${pause.windowHours}h). Time de terceiro.`,
       now,
     });
     return held ? "full_review" : "none";
@@ -101,7 +104,7 @@ export async function runPlatformBreaker(
   const plan = await planTenantFirstRegionBreakers(db, decisions, { now });
 
   const failed = new Set<string>();
-  const tenantsPaused: { pause: TenantRegionPause; kind: "broadcast_only" | "full_review" }[] = [];
+  const tenantsPaused: { pause: TenantRegionPause; kind: Exclude<TenantPauseKind, "none"> }[] = [];
   for (const pause of plan.tenantPauses) {
     const kind = await pauseTenantForTrip(db, pause, now);
     if (kind === "none") failed.add(pause.teamId);

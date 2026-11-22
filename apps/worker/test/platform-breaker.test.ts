@@ -141,16 +141,16 @@ it("time first-party mantem o transacional e perde so o broadcast", async () => 
   expect(monitor?.broadcastsPausedAt).not.toBeNull();
 });
 
-it("first-party que repete em 24h recebe o review completo", async () => {
+it("first-party que repete em 24h continua sem perder o transacional (A155)", async () => {
   const first = await seedTeam(
-    "First Party",
+    "First Party Repeat",
     "first2.dev",
     "us-east-1",
     400,
     { type: "complained", n: 1 },
     "first-party-test-2",
   );
-  // Ocorrencia anterior no mesmo dia: a segunda nao e um clique errado.
+  // Ocorrencia anterior no mesmo dia: reincidencia, nao um clique errado.
   await db.insert(schema.teamFlags).values({
     teamId: first,
     reason: "complaints",
@@ -164,8 +164,13 @@ it("first-party que repete em 24h recebe o review completo", async () => {
   await runPlatformBreaker(db, { mailer, now: NOW });
 
   const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, first));
-  expect(team?.sendReviewAt).not.toBeNull();
-  expect(team?.sendReviewReason).toBe("reputation");
+  // A155: reincidencia first-party NAO vira review hold, nem mesmo na segunda vez.
+  expect(team?.sendReviewAt).toBeNull();
+  const [monitor] = await db
+    .select()
+    .from(schema.teamMonitor)
+    .where(eq(schema.teamMonitor.teamId, first));
+  expect(monitor?.broadcastsPausedAt).not.toBeNull();
 });
 
 it("soltar a pausa do breaker nao solta a pausa manual", async () => {
