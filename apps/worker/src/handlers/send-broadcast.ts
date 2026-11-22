@@ -44,6 +44,7 @@ import {
   screenNewSender,
   segmentContactsWhere,
   substituteUnsubscribeUrl,
+  validateSubjectMergeFields,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
@@ -150,6 +151,17 @@ const REGION_HOLD_RETRY_MS = 15 * 60 * 1000;
 // reach them through this handler.
 export { applyMergeFields, injectPreheader, type MergeContact } from "@millionsend/core";
 
+export /**
+ * A148 follow-up (15.3): refuse to fan out a subject carrying merge fields the
+ * content gate cannot screen. Enforced here as well as at the router so a row
+ * written before the rule, or by another path, still cannot slip through.
+ */
+function blockedSubject(broadcast: { subject: string | null }): string[] | null {
+  if (!broadcast.subject) return null;
+  const verdict = validateSubjectMergeFields(broadcast.subject);
+  return verdict.ok ? null : verdict.rejected;
+}
+
 export async function sendBroadcast(
   db: Db,
   deps: BroadcastDeps,
@@ -162,6 +174,19 @@ export async function sendBroadcast(
   // Only scheduled/sending proceed: draft, canceled, and sent are no-ops no
   // matter how the job arrived. (The sending-claim CAS below re-checks this
   // atomically — that, not this read, is what makes a racing cancel safe.)
+  const blockedMerge = broadcast ? blockedSubject(broadcast) : null;
+  if (broadcast && blockedMerge) {
+    // Fail closed: a subject the content gate cannot screen never fans out.
+    console.warn(
+      `send-broadcast: subject merge fields blocked (${blockedMerge.join(",")}) on ${broadcast.id}; fan-out parked`,
+    );
+    await holdTeamForReview(db, {
+      teamId: broadcast.teamId,
+      reason: "content",
+      note: `Assunto com merge field nao permitido: ${blockedMerge.join(", ")}`,
+    });
+    return "deferred";
+  }
   if (!broadcast || (broadcast.status !== "scheduled" && broadcast.status !== "sending")) {
     return "skipped";
   }

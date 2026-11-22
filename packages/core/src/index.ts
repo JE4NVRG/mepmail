@@ -177,6 +177,8 @@ export {
   applyMergeFields,
   injectPreheader,
   type MergeContact,
+  SUBJECT_MERGE_ALLOWLIST,
+  validateSubjectMergeFields,
 } from "./broadcast-content.js";
 export {
   bulkSentBySlot,

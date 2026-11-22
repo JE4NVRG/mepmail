@@ -132,9 +132,13 @@ for svc in "${SERVICES[@]}"; do
 done
 
 wait_http() {
-  local url="$1"
+  # Only a 200 from the app itself counts. -f alone was not enough: the check
+  # ran against whatever answered on the host port, so a wrong service or a 404
+  # still read as "healthy".
+  local url="$1" code
   for _ in $(seq 60); do
-    curl -fsS -o /dev/null --max-time 3 "$url" && return 0
+    code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 3 "$url" 2>/dev/null || true)
+    [ "$code" = "200" ] && return 0
     sleep 2
   done
   return 1
@@ -160,7 +164,7 @@ for svc in "${SERVICES[@]}"; do
   compose up -d --no-deps --force-recreate "$svc" || { rollback "$svc"; fail "$svc did not recreate"; }
   case "$svc" in
     millionsend)
-      if ! wait_http "http://127.0.0.1:3000/health"; then
+      if ! wait_http "http://127.0.0.1:3011/health"; then
         docker logs --tail 120 "$(compose ps -q "$svc" | head -1)" 2>&1 | tail -40 || true
         rollback "$svc"
         fail "web /health never answered"
