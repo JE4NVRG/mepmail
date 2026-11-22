@@ -180,6 +180,17 @@ export function AuthForm({
       return;
     }
 
+    // A suppressed TLD is refused by the server, but the signup endpoint
+    // answers generically, so the screen would promise an e-mail that never
+    // arrives. Say it here, with the way out.
+    if (mode === "signup" && /@[^@]*\.shop$/i.test(email.trim())) {
+      setErrorMessage(
+        "Cadastros de domínios .shop não são aceitos. Se você é uma empresa real, escreva para support@mepmail.dev e abrimos a porta manualmente.",
+      );
+      setPending(null);
+      return;
+    }
+
     setPending("email");
     setErrorMessage(null);
     keepScreenLocale();

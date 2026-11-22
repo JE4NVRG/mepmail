@@ -657,7 +657,7 @@ export function createAuth(
               console.warn(
                 JSON.stringify({
                   event: "signup.blocked_suppressed_tld",
-                  tld: user.email.slice(user.email.lastIndexOf("@")).toLowerCase(),
+                  tld: ".shop",
                   at: new Date().toISOString(),
                 }),
               );
