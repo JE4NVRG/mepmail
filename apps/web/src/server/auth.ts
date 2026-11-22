@@ -652,8 +652,18 @@ export function createAuth(
             // A suppressed TLD never becomes an account. Checked here, before
             // the row exists, so the refusal needs no cleanup afterwards.
             if (!canary.admitted && suppressedSignupDomain(user.email)) {
+              // One line, no address: the operator needs the pattern and the
+              // hour, not another copy of the identity.
+              console.warn(
+                JSON.stringify({
+                  event: "signup.blocked_suppressed_tld",
+                  tld: user.email.slice(user.email.lastIndexOf("@")).toLowerCase(),
+                  at: new Date().toISOString(),
+                }),
+              );
               throw new APIError("FORBIDDEN", {
-                message: "Signups from this domain are not accepted.",
+                message:
+                  "Signups from this domain are not accepted. If you are a real business, write to support@mepmail.dev and we will open the door by hand.",
               });
             }
             await assertSignupAllowed(
