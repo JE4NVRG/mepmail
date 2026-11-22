@@ -54,13 +54,20 @@ async function createDomain(
   return row.id;
 }
 
+/** A: no key without a verified sending domain, so every fixture gets one. */
+async function teamWithVerifiedDomain(label: string): Promise<string> {
+  const teamId = await createTeam(db, label);
+  await createDomain(teamId, `${label}-${randomUUID().slice(0, 8)}.test`, "verified");
+  return teamId;
+}
+
 describe("apiKeys.create", () => {
   it.each(["hold", "sandbox"] as const)(
     "enforces cloud %s before a dashboard full-key response",
     async (level) => {
       vi.stubEnv("IS_CLOUD", "true");
       vi.stubEnv("SIGNUP_BOT_PROTECTION", "true");
-      const teamId = await createTeam(db, `restricted-${randomUUID()}`);
+      const teamId = await teamWithVerifiedDomain(`restricted-${randomUUID()}`);
       const userId = randomUUID();
       await db.insert(schema.user).values({
         id: userId,
@@ -111,7 +118,7 @@ describe("apiKeys.create", () => {
     },
   );
   it("forbids ordinary members from minting privileged API keys", async () => {
-    const teamId = await createTeam(db, "team-a");
+    const teamId = await teamWithVerifiedDomain("team-a");
     await expect(
       callerFor(teamId, "member").apiKeys.create({ name: "escalation" }),
     ).rejects.toMatchObject({
@@ -119,7 +126,7 @@ describe("apiKeys.create", () => {
     });
   });
   it("returns an ms_-prefixed token that verifies against the stored hash", async () => {
-    const teamId = await createTeam(db, "team-a");
+    const teamId = await teamWithVerifiedDomain("team-a");
     const { id, token } = await callerFor(teamId).apiKeys.create({ name: "Production" });
 
     expect(token).toMatch(/^ms_[A-Za-z0-9_-]/);
@@ -134,7 +141,7 @@ describe("apiKeys.create", () => {
   });
 
   it("refuses to mint past the active-key cap until one is revoked", async () => {
-    const teamId = await createTeam(db, "team-a");
+    const teamId = await teamWithVerifiedDomain("team-a");
     await db.insert(schema.apiKeys).values(
       Array.from({ length: MAX_ACTIVE_API_KEYS - 1 }, (_, i) => {
         const key = generateApiKey();
@@ -158,13 +165,13 @@ describe("apiKeys.create", () => {
   });
 
   it("mints tokens in the ms_ scheme", async () => {
-    const teamId = await createTeam(db, "team-a");
+    const teamId = await teamWithVerifiedDomain("team-a");
     const { token } = await callerFor(teamId).apiKeys.create({ name: "CI" });
     expect(token).toMatch(/^ms_[A-Za-z0-9_-]{32}$/);
   });
 
   it("defaults to full access and any domain", async () => {
-    const teamId = await createTeam(db, "team-a");
+    const teamId = await teamWithVerifiedDomain("team-a");
     const { id } = await callerFor(teamId).apiKeys.create({ name: "default" });
     const row = await keyRow(id);
     expect(row.permission).toBe("full_access");
@@ -172,7 +179,7 @@ describe("apiKeys.create", () => {
   });
 
   it("persists sending-only permission scoped to a verified domain", async () => {
-    const teamId = await createTeam(db, "team-a");
+    const teamId = await teamWithVerifiedDomain("team-a");
     const domainId = await createDomain(teamId, "mail.a.example", "verified");
     const { id } = await callerFor(teamId).apiKeys.create({
       name: "sender",
@@ -185,7 +192,7 @@ describe("apiKeys.create", () => {
   });
 
   it("rejects an unverified domain", async () => {
-    const teamId = await createTeam(db, "team-a");
+    const teamId = await teamWithVerifiedDomain("team-a");
     const domainId = await createDomain(teamId, "mail.a.example", "pending");
     await expect(callerFor(teamId).apiKeys.create({ name: "x", domainId })).rejects.toMatchObject({
       code: "BAD_REQUEST",
@@ -193,8 +200,8 @@ describe("apiKeys.create", () => {
   });
 
   it("rejects a domain owned by another team", async () => {
-    const teamA = await createTeam(db, "team-a");
-    const teamB = await createTeam(db, "team-b");
+    const teamA = await teamWithVerifiedDomain("team-a");
+    const teamB = await teamWithVerifiedDomain("team-b");
     const foreign = await createDomain(teamB, "mail.b.example", "verified");
     await expect(
       callerFor(teamA).apiKeys.create({ name: "x", domainId: foreign }),
@@ -204,8 +211,8 @@ describe("apiKeys.create", () => {
 
 describe("apiKeys.list", () => {
   it("excludes revoked keys and other teams' keys", async () => {
-    const teamA = await createTeam(db, "team-a");
-    const teamB = await createTeam(db, "team-b");
+    const teamA = await teamWithVerifiedDomain("team-a");
+    const teamB = await teamWithVerifiedDomain("team-b");
     const a = callerFor(teamA);
     const kept = await a.apiKeys.create({ name: "kept" });
     const revoked = await a.apiKeys.create({ name: "revoked" });
@@ -217,7 +224,7 @@ describe("apiKeys.list", () => {
   });
 
   it("surfaces each key's permission and scoped domain name", async () => {
-    const teamId = await createTeam(db, "team-a");
+    const teamId = await teamWithVerifiedDomain("team-a");
     const domainId = await createDomain(teamId, "mail.a.example", "verified");
     const caller = callerFor(teamId);
     await caller.apiKeys.create({ name: "scoped", permission: "sending_access", domainId });
@@ -235,7 +242,7 @@ describe("apiKeys.list", () => {
 
 describe("apiKeys.revoke", () => {
   it("forbids ordinary members from revoking keys", async () => {
-    const teamId = await createTeam(db, "team-a");
+    const teamId = await teamWithVerifiedDomain("team-a");
     const { id } = await callerFor(teamId).apiKeys.create({ name: "Production" });
     await expect(callerFor(teamId, "member").apiKeys.revoke({ id })).rejects.toMatchObject({
       code: "FORBIDDEN",
@@ -243,8 +250,8 @@ describe("apiKeys.revoke", () => {
     expect((await keyRow(id)).revokedAt).toBeNull();
   });
   it("blocks cross-team revocation", async () => {
-    const teamA = await createTeam(db, "team-a");
-    const teamB = await createTeam(db, "team-b");
+    const teamA = await teamWithVerifiedDomain("team-a");
+    const teamB = await teamWithVerifiedDomain("team-b");
     const { id } = await callerFor(teamA).apiKeys.create({ name: "Production" });
 
     await expect(callerFor(teamB).apiKeys.revoke({ id })).rejects.toMatchObject({
@@ -254,7 +261,7 @@ describe("apiKeys.revoke", () => {
   });
 
   it("soft-revokes: the row survives with revokedAt set", async () => {
-    const teamId = await createTeam(db, "team-a");
+    const teamId = await teamWithVerifiedDomain("team-a");
     const caller = callerFor(teamId);
     const { id } = await caller.apiKeys.create({ name: "Production" });
 
@@ -267,7 +274,7 @@ describe("apiKeys.revoke", () => {
 
 describe("apiKeys.rename", () => {
   it("renames an active key (trimmed) and refuses a revoked one", async () => {
-    const teamId = await createTeam(db);
+    const teamId = await teamWithVerifiedDomain(`team-${randomUUID()}`);
     const { id } = await callerFor(teamId).apiKeys.create({ name: "old" });
     await expect(callerFor(teamId).apiKeys.rename({ id, name: " new " })).resolves.toMatchObject({
       name: "new",

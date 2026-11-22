@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import { createTeam, createTestDb } from "@millionsend/test-utils";
@@ -36,7 +37,21 @@ function callerFor(userId: string, teamId: string, role: TeamRole) {
 describe("audit.list", () => {
   it("records admin mutations with the acting user and lists them team-scoped, newest first", async () => {
     const teamId = await createTeam(db, "acme");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const other = await createTeam(db, "other");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: other,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     await addMember(teamId, "alice", "owner");
     await addMember(other, "carol", "owner");
     const alice = callerFor("alice", teamId, "owner");
@@ -61,6 +76,13 @@ describe("audit.list", () => {
 
   it("paginates by cursor", async () => {
     const teamId = await createTeam(db, "acme");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     await addMember(teamId, "alice", "owner");
     const alice = callerFor("alice", teamId, "owner");
     for (const name of ["a", "b", "c"]) await alice.apiKeys.create({ name });
@@ -78,6 +100,13 @@ describe("audit.list", () => {
 
   it("is forbidden for members", async () => {
     const teamId = await createTeam(db, "acme");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     await addMember(teamId, "bob", "member");
     await expect(callerFor("bob", teamId, "member").audit.list({})).rejects.toMatchObject({
       code: "FORBIDDEN",

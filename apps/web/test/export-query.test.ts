@@ -43,6 +43,13 @@ function callerFor(teamId: string) {
 describe("contact export", () => {
   it("returns the expected columns scoped to the team", async () => {
     const teamId = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const caller = callerFor(teamId);
     await caller.audience.contacts.add({
       email: "a@example.com",
@@ -74,6 +81,13 @@ describe("contact export", () => {
 
   it("honors the search filter", async () => {
     const teamId = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const caller = callerFor(teamId);
     await caller.audience.contacts.add({ email: "match@example.com" });
     await caller.audience.contacts.add({ email: "other@example.com" });
@@ -84,6 +98,13 @@ describe("contact export", () => {
 
   it("honors the status filter", async () => {
     const teamId = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const caller = callerFor(teamId);
     await caller.audience.contacts.add({ email: "in@example.com" });
     const { id: out } = await caller.audience.contacts.add({ email: "out@example.com" });
@@ -103,7 +124,21 @@ describe("contact export", () => {
 
   it("never exports another team's contacts", async () => {
     const teamA = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamA,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const teamB = await createTeam(db, "team-b");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamB,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     await callerFor(teamA).audience.contacts.add({ email: "a@example.com" });
 
     // The caller's team is B — the teamId gate returns no rows.
@@ -115,11 +150,25 @@ describe("contact export", () => {
 describe("buildExport dispatch", () => {
   it("returns null for an unknown resource", async () => {
     const teamId = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     expect(await buildExport(db, teamId, "nope", new URLSearchParams())).toBeNull();
   });
 
   it("builds a whole-team contacts export with no params", async () => {
     const teamId = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     await callerFor(teamId).audience.contacts.add({ email: "a@example.com" });
     const result = await buildExport(db, teamId, "contacts", new URLSearchParams());
     expect(result?.filename).toBe("contacts.csv");
@@ -128,6 +177,13 @@ describe("buildExport dispatch", () => {
 
   it("builds a scoped api-keys export without leaking the full secret", async () => {
     const teamId = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const { token } = await callerFor(teamId).apiKeys.create({ name: "Production" });
     const result = await buildExport(db, teamId, "api-keys", new URLSearchParams());
     expect(result?.filename).toBe("api-keys.csv");
@@ -140,6 +196,13 @@ describe("buildExport dispatch", () => {
 describe("contact export with segment and topic filters", () => {
   it("exports exactly the segment's contacts, matching the live filtered count", async () => {
     const teamId = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const caller = callerFor(teamId);
     await caller.audience.contacts.add({ email: "keep@x.com" });
     await caller.audience.contacts.add({ email: "drop@y.com" });
@@ -157,6 +220,13 @@ describe("contact export with segment and topic filters", () => {
 
   it("exports only contacts subscribed to the topic", async () => {
     const teamId = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const caller = callerFor(teamId);
     const { id: inId } = await caller.audience.contacts.add({ email: "in@x.com" });
     const { id: outId } = await caller.audience.contacts.add({ email: "out@x.com" });
@@ -177,7 +247,21 @@ describe("contact export with segment and topic filters", () => {
 
   it("yields no rows for a foreign or unknown segment/topic", async () => {
     const teamA = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamA,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const teamB = await createTeam(db, "team-b");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamB,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const callerA = callerFor(teamA);
     const callerB = callerFor(teamB);
     await callerA.audience.contacts.add({ email: "a@x.com" });
@@ -197,6 +281,13 @@ describe("contact export with segment and topic filters", () => {
 
   it("still neutralizes a formula payload in a segment-filtered export", async () => {
     const teamId = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const caller = callerFor(teamId);
     // Direct insert: the formula lives in a stored field, not user add() input.
     await db.insert(schema.contacts).values({
@@ -220,6 +311,13 @@ describe("contact export with segment and topic filters", () => {
 describe("buildExport carries the segment/topic query params", () => {
   it("applies segmentId from the query string, mirroring the export link", async () => {
     const teamId = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const caller = callerFor(teamId);
     await caller.audience.contacts.add({ email: "keep@x.com" });
     await caller.audience.contacts.add({ email: "drop@y.com" });
@@ -236,6 +334,13 @@ describe("buildExport carries the segment/topic query params", () => {
 
   it("ignores a non-uuid segment param instead of erroring", async () => {
     const teamId = await createTeam(db, "team-a");
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: teamId,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const caller = callerFor(teamId);
     await caller.audience.contacts.add({ email: "a@x.com" });
 
