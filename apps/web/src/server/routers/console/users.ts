@@ -98,7 +98,10 @@ export const consoleUsersRouter = router({
           .offset(input.offset),
         ctx.db
           .select({
-            total: sql<number>`count(*)::int`,
+            // Flagged accounts (internal, scanners, suspected abuse) exist for
+            // the operator but are not part of what the numbers describe.
+            total: sql<number>`count(*) filter (where ${u.metricsExcludedAt} is null)::int`,
+            excluded: sql<number>`count(*) filter (where ${u.metricsExcludedAt} is not null)::int`,
             verified: sql<number>`count(*) filter (where ${u.emailVerified})::int`,
           })
           .from(u)

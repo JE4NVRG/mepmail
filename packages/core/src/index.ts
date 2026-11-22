@@ -181,6 +181,10 @@ export {
   validateSubjectMergeFields,
 } from "./broadcast-content.js";
 export {
+  SUPPRESSED_SIGNUP_TLDS,
+  suppressedSignupDomain,
+} from "./signup-risk-signals.js";
+export {
   bulkSentBySlot,
   cancelBroadcastRows,
   planRegionSend,

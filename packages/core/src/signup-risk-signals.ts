@@ -8,6 +8,22 @@ import rdapBootstrap from "./signup-risk-data/rdap-dns.json" with { type: "json"
 import type { SignupRiskSignals } from "./signup-risk-policy.js";
 
 const DISPOSABLE = new Set(disposableData.domains);
+
+/**
+ * TLDs that only ever produced disposable identities here. The 19/11 wave
+ * created 84 accounts on random locals under .shop, none of which ever sent a
+ * message or verified by hand. A TLD-wide door is blunt on purpose: a real
+ * business on .shop can ask to be admitted by hand.
+ */
+export const SUPPRESSED_SIGNUP_TLDS = [".shop"] as const;
+
+/** True when the address belongs to a TLD the signup door refuses. */
+export function suppressedSignupDomain(email: string): boolean {
+  const at = email.lastIndexOf("@");
+  if (at < 0) return false;
+  const domain = email.slice(at + 1).toLowerCase();
+  return SUPPRESSED_SIGNUP_TLDS.some((tld) => domain.endsWith(tld));
+}
 const MAX_RDAP_BYTES = 128 * 1024;
 const BUDGET_MS = 2_000;
 const DAY_MS = 86_400_000;
