@@ -182,14 +182,9 @@ export function AuthForm({
 
     // A suppressed TLD is refused by the server, but the signup endpoint
     // answers generically, so the screen would promise an e-mail that never
-    // arrives. Say it here, with the way out.
-    if (mode === "signup" && /@[^@]*\.shop$/i.test(email.trim())) {
-      setErrorMessage(
-        "Cadastros de domínios .shop não são aceitos. Se você é uma empresa real, escreva para support@mepmail.dev e abrimos a porta manualmente.",
-      );
-      setPending(null);
-      return;
-    }
+    // arrives. The request still goes out — that is what records the attempt
+    // in the server log — and the answer is corrected below.
+    const suppressedTld = mode === "signup" && /@[^@]*\.shop$/i.test(email.trim());
 
     setPending("email");
     setErrorMessage(null);
@@ -234,6 +229,13 @@ export function AuthForm({
             (error.code === "VERIFICATION_FAILED" || error.code === "MISSING_RESPONSE"
               ? t("captcha")
               : (mode === "signup" && error.message) || t("error")),
+        );
+        setPending(null);
+        return;
+      }
+      if (suppressedTld) {
+        setErrorMessage(
+          "Cadastros de domínios .shop não são aceitos. Se você é uma empresa real, escreva para support@mepmail.dev e abrimos a porta manualmente.",
         );
         setPending(null);
         return;
