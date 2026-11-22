@@ -176,14 +176,25 @@ export async function sendBroadcast(
   // atomically — that, not this read, is what makes a racing cancel safe.)
   const blockedMerge = broadcast ? blockedSubject(broadcast) : null;
   if (broadcast && blockedMerge) {
-    // Fail closed: a subject the content gate cannot screen never fans out.
+    // Fail closed on THIS broadcast only. Holding the team would stop its
+    // transactional mail and every other campaign for one bad subject; the
+    // owner gets a visible reason on the row and the rest keeps flowing.
     console.warn(
-      `send-broadcast: subject merge fields blocked (${blockedMerge.join(",")}) on ${broadcast.id}; fan-out parked`,
+      `send-broadcast: subject merge fields blocked (${blockedMerge.join(",")}) on ${broadcast.id}; only this broadcast waits`,
     );
-    await holdTeamForReview(db, {
+    await db
+      .update(schema.broadcasts)
+      .set({
+        heldReason: `Assunto com merge field nao permitido: ${blockedMerge.join(", ")}. Use apenas FIRST_NAME e EMAIL.`,
+        heldAt: new Date(),
+      })
+      .where(eq(schema.broadcasts.id, broadcast.id));
+    await db.insert(schema.auditLog).values({
       teamId: broadcast.teamId,
-      reason: "content",
-      note: `Assunto com merge field nao permitido: ${blockedMerge.join(", ")}`,
+      actorId: "platform.content_gate",
+      action: "broadcast.held_content",
+      target: JSON.stringify({ type: "broadcast", id: broadcast.id }),
+      data: { tokens: blockedMerge },
     });
     return "deferred";
   }

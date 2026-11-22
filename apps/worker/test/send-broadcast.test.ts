@@ -1003,7 +1003,9 @@ it("fan-out personalizes merge fields per contact in html and text", async () =>
   const broadcastId = await insertBroadcast({
     teamId: mergeTeamId,
     from: "Acme <hi@merge.dev>",
-    subject: "{{{FIRST_NAME|there}}}, your {{{plan}}} plan{{{NOPE}}}",
+    // 15.3: the subject may personalize only FIRST_NAME/EMAIL; the rest of the
+    // merge surface is exercised in the body below.
+    subject: "{{{FIRST_NAME|there}}}, your report",
     html: '<p>Hi {{{FIRST_NAME|there}}} {{{LAST_NAME|friend}}} on {{{plan}}}</p>{{{NOPE}}}<a href="{{{UNSUBSCRIBE_URL}}}">bye</a>',
     text: "Hi {{{FIRST_NAME|there}}} {{{LAST_NAME|friend}}} on {{{plan}}} {{{NOPE}}}",
   });
@@ -1030,7 +1032,7 @@ it("fan-out personalizes merge fields per contact in html and text", async () =>
   expect(body.html).not.toContain("{{{UNSUBSCRIBE_URL}}}");
   expect(body.text).toBe("Hi <b>Ada</b> friend on <b>pro</b> ");
   // The subject is a header, not markup: merged per recipient, never escaped.
-  expect(email.subject).toBe("<b>Ada</b>, your <b>pro</b> plan");
+  expect(email.subject).toBe("<b>Ada</b>, your report");
 });
 
 async function seedTopicTeam(
@@ -1328,4 +1330,38 @@ it("defers the fan-out while the sender domain's region is held by the platform 
     .where(eq(schema.broadcasts.id, broadcastId));
   expect(row?.status).toBe("scheduled");
   await db.delete(schema.regionBreakers);
+});
+
+it("segura so o broadcast do assunto invalido, nunca o time", async () => {
+  const { teamId } = await seedTeam("holdone", [
+    { email: "ok@example.com", firstName: "Ada", lastName: "Lovelace", properties: {} },
+  ]);
+  const broadcastId = await insertBroadcast({
+    teamId,
+    from: "Acme <hi@holdone.dev>",
+    // LAST_NAME is outside the subject allowlist: this row must wait alone.
+    subject: "{{{LAST_NAME}}}, uma novidade",
+    html: "<p>Oi {{{FIRST_NAME}}}</p>",
+    text: "Oi {{{FIRST_NAME}}}",
+  });
+
+  expect(await sendBroadcast(db, makeDeps().deps, { broadcastId })).toBe("deferred");
+
+  const [row] = await db
+    .select({ heldReason: schema.broadcasts.heldReason, heldAt: schema.broadcasts.heldAt })
+    .from(schema.broadcasts)
+    .where(eq(schema.broadcasts.id, broadcastId));
+  expect(row?.heldReason).toContain("LAST_NAME");
+  expect(row?.heldAt).not.toBeNull();
+
+  // The team keeps its transactional mail: no review hold, no broadcast pause.
+  const [team] = await db
+    .select({ sendReviewAt: schema.teams.sendReviewAt })
+    .from(schema.teams)
+    .where(eq(schema.teams.id, teamId));
+  expect(team?.sendReviewAt).toBeNull();
+
+  // Nothing was fanned out for this station.
+  const sent = await emailsOf(broadcastId);
+  expect(sent).toHaveLength(0);
 });
