@@ -147,7 +147,9 @@
     "tryOkNoId": "Saiu — confira a sua caixa.",
     "tryError": "A API recusou (HTTP {status}).",
     "tryNeedsToken": "A chave completa só existe logo depois de criada. Crie outra para testar aqui.",
-    "tryNoDomain": "Falta verificar um domínio: a API só envia de um domínio verificado deste time."
+    "tryNoDomain": "Falta verificar um domínio: a API só envia de um domínio verificado deste time.",
+    "tryTitle": "Prove a sua chave de API",
+    "tryBody": "Envia um e-mail para você mesmo usando a chave que você acabou de criar, exatamente como o seu código faria."
   },
   "step3": {
     "title": "Veja chegar",

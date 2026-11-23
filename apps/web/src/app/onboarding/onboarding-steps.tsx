@@ -450,6 +450,39 @@ function ApiQuickstartContent({
       </section>
     ) : null;
 
+  // The same block serves the first-send flow and the state after a delivery:
+  // a team that already sends still needs to prove a freshly minted key.
+  const keyTestBlock = (
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}
+    >
+      <button
+        type="button"
+        className="ms-btn"
+        data-testid="onboarding-try-with-key"
+        disabled={!token || keySend.state === "sending"}
+        onClick={() => void sendWithOwnKey()}
+      >
+        {keySend.state === "sending" ? t("step2.trySending") : t("step2.tryWithKey")}
+      </button>
+      {!token ? (
+        <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-muted)" }}>
+          {t("step2.tryNeedsToken")}
+        </span>
+      ) : null}
+      {keySend.state === "ok" ? (
+        <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-bone)" }}>
+          {keySend.message}
+        </span>
+      ) : null}
+      {keySend.state === "error" ? (
+        <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-warn, #b45309)" }}>
+          {keySend.message}
+        </span>
+      ) : null}
+    </div>
+  );
+
   const explore = (
     <div style={{ marginTop: 56 }}>
       <div className="ms-microlabel" style={{ marginBottom: 10 }}>
@@ -873,43 +906,7 @@ function ApiQuickstartContent({
               locked={!hasKey}
             >
               {codePanel}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  marginTop: 12,
-                  flexWrap: "wrap",
-                }}
-              >
-                <button
-                  type="button"
-                  className="ms-btn"
-                  data-testid="onboarding-try-with-key"
-                  disabled={!token || keySend.state === "sending"}
-                  onClick={() => void sendWithOwnKey()}
-                >
-                  {keySend.state === "sending" ? t("step2.trySending") : t("step2.tryWithKey")}
-                </button>
-                {!token ? (
-                  <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-muted)" }}>
-                    {t("step2.tryNeedsToken")}
-                  </span>
-                ) : null}
-                {keySend.state === "ok" ? (
-                  <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-bone)" }}>
-                    {keySend.message}
-                  </span>
-                ) : null}
-                {keySend.state === "error" ? (
-                  <span
-                    className="ms-mono"
-                    style={{ fontSize: 12, color: "var(--ms-warn, #b45309)" }}
-                  >
-                    {keySend.message}
-                  </span>
-                ) : null}
-              </div>
+              {keyTestBlock}
               {showInstanceHint && lang !== "curl" ? (
                 <p
                   className="ms-mono"
@@ -968,6 +965,21 @@ function ApiQuickstartContent({
           <Link href="/emails" className="ms-btn ms-btn-secondary" style={{ marginTop: 12 }}>
             {t("attempt.history")}
           </Link>
+        </section>
+      ) : null}
+
+      {success ? (
+        <section
+          aria-label={t("step2.tryTitle")}
+          style={{ marginTop: 40, paddingTop: 24, borderTop: "1px solid var(--ms-line)" }}
+        >
+          <p className="ms-microlabel" style={{ margin: 0 }}>
+            {t("step2.tryTitle")}
+          </p>
+          <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+            {t("step2.tryBody")}
+          </p>
+          {keyTestBlock}
         </section>
       ) : null}
 

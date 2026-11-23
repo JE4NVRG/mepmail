@@ -147,7 +147,9 @@
     "tryOkNoId": "Sent — check your inbox.",
     "tryError": "The API refused (HTTP {status}).",
     "tryNeedsToken": "The full key only exists right after it is created. Create another to test here.",
-    "tryNoDomain": "A verified domain is missing: the API only sends from a domain this team verified."
+    "tryNoDomain": "A verified domain is missing: the API only sends from a domain this team verified.",
+    "tryTitle": "Prove your API key",
+    "tryBody": "Sends an email to yourself using the key you just created, exactly like your code would."
   },
   "step3": {
     "title": "Watch it arrive",
