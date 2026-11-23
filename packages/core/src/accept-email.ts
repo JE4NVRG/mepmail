@@ -322,7 +322,8 @@ export type AcceptEmailResult =
       /** The cap the reservation ran against, for callers that reserve in bulk. */
       quota: TeamQuota;
     }
-  | { ok: false; reason: "all_suppressed" }
+  /** Every recipient was suppressed; `suppressed` names them so the sender can act. */
+  | { ok: false; reason: "all_suppressed"; suppressed: string[] }
   /** Every recipient domain that could receive mail was stripped, or too much of the batch was invalid. */
   | { ok: false; reason: "recipient_domain_invalid" }
   /** Look-alike letters or hidden characters in the sender name or subject (send-review). */
@@ -383,11 +384,14 @@ export async function acceptEmail(
       payload.to,
       deps.isCloud ?? false,
     );
-    if (refusal)
-      return {
-        ok: false,
-        reason: refusal === "all_suppressed" ? "all_suppressed" : "team_restricted",
-      };
+    if (refusal) {
+      // The invitation path already knows the refusal; carry the addresses so
+      // the API error can name them instead of just saying "suppressed".
+      if (refusal === "all_suppressed") {
+        return { ok: false, reason: "all_suppressed", suppressed: [...new Set(payload.to)] };
+      }
+      return { ok: false, reason: "team_restricted" };
+    }
   }
   const consent = await checkCampaignMessage(opts.tx ?? deps.db, {
     ...payload,
@@ -461,7 +465,12 @@ export async function acceptEmail(
   }
   const keep = (list: string[] | undefined) => list?.filter((r) => !suppressed.has(r));
   let to = keep(payload.to) ?? [];
-  if (to.length === 0) return { ok: false, reason: "all_suppressed" };
+  if (to.length === 0) {
+    // Name them: "all suppressed" without a list sends people to support
+    // instead of to the suppression list they can clear themselves.
+    const refused = allRecipients.filter((r) => suppressed.has(r));
+    return { ok: false, reason: "all_suppressed", suppressed: refused };
+  }
   let cc = keep(payload.cc);
   let bcc = keep(payload.bcc);
 
