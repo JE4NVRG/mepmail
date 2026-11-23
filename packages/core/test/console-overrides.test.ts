@@ -193,6 +193,8 @@ describe("team standing", () => {
     expect(await fetchTeamStanding(db, teamId)).toEqual({
       suspended: null,
       broadcastsPausedByOperatorAt: null,
+      // A2: the breaker writes its own column, exposed alongside the operator one.
+      broadcastsPausedByMonitorAt: null,
       dailySendCeiling: null,
       sendReview: null,
     });
@@ -214,6 +216,7 @@ describe("team standing", () => {
     expect(await fetchTeamStanding(db, teamId)).toEqual({
       suspended: { at, reason: "reputation", note: "spiky" },
       broadcastsPausedByOperatorAt: at,
+      broadcastsPausedByMonitorAt: null,
       dailySendCeiling: 300,
       sendReview: { at, reason: "impersonation" },
     });

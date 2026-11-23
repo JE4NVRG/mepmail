@@ -4,6 +4,29 @@ import { escapeHtml } from "./html.js";
 // builtin (FIRST_NAME/LAST_NAME/EMAIL) or a custom-property key; a name with no
 // matching value falls back (or resolves to "") so no raw token reaches an inbox.
 const MERGE_TOKEN = /\{\{\{([A-Za-z0-9_]+)(?:\|([^{}]*))?\}\}\}/g;
+// 15.3: the pre-send content gate reads the subject as stored, before merge
+// fields run, so a tag that expands into the banned word arrives uncaught. The
+// subject may therefore personalize only the two harmless builtins; anything
+// else has to be literal text a human reads and the gate can screen.
+export const SUBJECT_MERGE_ALLOWLIST = ["FIRST_NAME", "EMAIL", "first_name", "email"] as const;
+
+export interface SubjectMergeVerdict {
+  ok: boolean;
+  /** Disallowed token names found, without braces; empty when ok. */
+  rejected: string[];
+}
+
+/** Checks the raw subject for merge tokens the content gate cannot screen. */
+export function validateSubjectMergeFields(subject: string): SubjectMergeVerdict {
+  const allowed = new Set<string>(SUBJECT_MERGE_ALLOWLIST);
+  const rejected: string[] = [];
+  for (const match of subject.matchAll(MERGE_TOKEN)) {
+    const name = match[1] ?? "";
+    if (!allowed.has(name)) rejected.push(name);
+  }
+  return { ok: rejected.length === 0, rejected };
+}
+
 // A token opening an href/src value: the contact value becomes the link's
 // scheme, so only web/mail URLs may land there (a javascript:/data: link
 // from an imported property is a phishing primitive, not personalization).

@@ -49,5 +49,21 @@
     "bodyTruncated": "Corpo acima de 64 KB não armazenado ({size}).",
     "membersHint": "Requisição e resposta ficam visíveis só para proprietários e administradores.",
     "supportViewHint": "Os corpos da requisição e da resposta ficam ocultos no modo de suporte."
+  },
+  "diagnosis": {
+    "title": "Onde você está",
+    "counts": "{requests} chamadas · {failures} com erro",
+    "step": {
+      "reach": "Sua chave chegou até nós",
+      "domain": "Um domínio verificado",
+      "send": "Um envio aceito"
+    },
+    "next": {
+      "reach": "Nada chegou ainda: nenhuma chamada foi registrada com a sua chave.",
+      "domain": "Falta verificar um domínio para poder enviar.",
+      "send": "Sua chave já chama a API; falta o primeiro envio aceito.",
+      "link": "Abrir"
+    },
+    "errorsTitle": "Erros que se repetem"
   }
 }

@@ -147,10 +147,15 @@ describe("send edge cases", () => {
     });
     const res = await post({ ...validBody, to: ["dead@example.com"] });
     expect(res.status).toBe(422);
-    expect(await res.json()).toMatchObject({
+    // The error names the address and the screen that clears it: 347 of the
+    // 371 production 422s were this case, answered without either.
+    const body = (await res.json()) as { suppressed?: string[]; message?: string };
+    expect(body).toMatchObject({
       name: "all_recipients_suppressed",
-      message: "All recipients are suppressed",
+      suppressed: ["dead@example.com"],
     });
+    expect(body.message).toContain("dead@example.com");
+    expect(body.message).toContain("/suppressions");
   });
 
   it("replays an idempotent send and conflicts on payload drift", async () => {
@@ -1249,7 +1254,7 @@ describe("a recipient's own unsubscribe and transactional mail", () => {
 
     const topical = await post({ ...item, topic_id: topic.id });
     expect(topical.status).toBe(422);
-    expect(((await topical.json()) as { message: string }).message).toBe(
+    expect(((await topical.json()) as { message: string }).message).toContain(
       "All recipients are suppressed",
     );
     const topicalBatch = await app.request("/emails/batch", {

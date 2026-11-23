@@ -598,7 +598,8 @@ export async function sendEmail(
   if (
     standing?.suspended ||
     standing?.sendReview ||
-    (email.broadcastId && standing?.broadcastsPausedByOperatorAt)
+    (email.broadcastId &&
+      (standing?.broadcastsPausedByOperatorAt || standing?.broadcastsPausedByMonitorAt))
   ) {
     await parkQueued(
       db,

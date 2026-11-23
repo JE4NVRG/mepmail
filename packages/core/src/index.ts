@@ -177,7 +177,13 @@ export {
   applyMergeFields,
   injectPreheader,
   type MergeContact,
+  SUBJECT_MERGE_ALLOWLIST,
+  validateSubjectMergeFields,
 } from "./broadcast-content.js";
+export {
+  SUPPRESSED_SIGNUP_TLDS,
+  suppressedSignupDomain,
+} from "./signup-risk-signals.js";
 export {
   bulkSentBySlot,
   cancelBroadcastRows,
@@ -828,9 +834,13 @@ export {
   BREAKER_MIN_SENT,
   BREAKER_WINDOWS_HOURS,
   evaluateRegionBreakers,
+  firstPartySlugs,
   holdRegion,
+  isFirstPartyTeam,
   type PausedRegion,
   pausedRegions,
+  pauseTenantBroadcastsForRegionTrip,
+  planTenantFirstRegionBreakers,
   platformSendGate,
   type RegionContributor,
   type RegionDecision,
@@ -839,11 +849,15 @@ export {
   regionPause,
   regionWindowCounts,
   releaseRegion,
+  resumeBreakerBroadcasts,
   SEND_GATE_MAX_BOUNCE_RATE,
   SEND_GATE_MAX_COMPLAINT_RATE,
   SEND_GATE_MIN_COMPLAINTS,
   SEND_GATE_MIN_SENT,
   sendGateDecision,
+  type TenantBroadcastPauseInput,
+  type TenantFirstPlan,
+  type TenantRegionPause,
 } from "./platform-breaker.js";
 export {
   approveProductionVolume,

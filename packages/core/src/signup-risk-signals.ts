@@ -8,6 +8,20 @@ import rdapBootstrap from "./signup-risk-data/rdap-dns.json" with { type: "json"
 import type { SignupRiskSignals } from "./signup-risk-policy.js";
 
 const DISPOSABLE = new Set(disposableData.domains);
+
+/**
+ * TLDs temporarily blocked at signup due to high disposable/automated abuse.
+ * Legitimate businesses on these TLDs can request manual onboarding via support.
+ */
+export const SUPPRESSED_SIGNUP_TLDS = [".shop"] as const;
+
+/** True when the address belongs to a TLD the signup door refuses. */
+export function suppressedSignupDomain(email: string): boolean {
+  const at = email.lastIndexOf("@");
+  if (at < 0) return false;
+  const domain = email.slice(at + 1).toLowerCase();
+  return SUPPRESSED_SIGNUP_TLDS.some((tld) => domain.endsWith(tld));
+}
 const MAX_RDAP_BYTES = 128 * 1024;
 const BUDGET_MS = 2_000;
 const DAY_MS = 86_400_000;

@@ -49,5 +49,21 @@
     "bodyTruncated": "Body over 64 KB not stored ({size}).",
     "membersHint": "Bodies are visible to owners and admins.",
     "supportViewHint": "Request and response bodies are hidden in support view."
+  },
+  "diagnosis": {
+    "title": "Where you stand",
+    "counts": "{requests} calls · {failures} failed",
+    "step": {
+      "reach": "Your key reached us",
+      "domain": "A verified domain",
+      "send": "An accepted send"
+    },
+    "next": {
+      "reach": "Nothing arrived yet: no call was recorded with your key.",
+      "domain": "A domain still needs verifying before you can send.",
+      "send": "Your key already reaches the API; the first accepted send is missing.",
+      "link": "Open"
+    },
+    "errorsTitle": "Errors that repeat"
   }
 }

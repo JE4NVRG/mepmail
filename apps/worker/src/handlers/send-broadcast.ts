@@ -44,11 +44,13 @@ import {
   screenNewSender,
   segmentContactsWhere,
   substituteUnsubscribeUrl,
+  validateSubjectMergeFields,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import type { EmailSendRequest, EnqueueEmailSends } from "@millionsend/queue";
 import { and, asc, eq, gt, inArray, isNotNull, type SQL, sql } from "drizzle-orm";
+import { screenPreSendContent } from "../../../../packages/core/src/pre-send-content-policy.js";
 import { mailOwners, type SystemMailer } from "../system-mail.js";
 
 /**
@@ -149,6 +151,17 @@ const REGION_HOLD_RETRY_MS = 15 * 60 * 1000;
 // reach them through this handler.
 export { applyMergeFields, injectPreheader, type MergeContact } from "@millionsend/core";
 
+export /**
+ * A148 follow-up (15.3): refuse to fan out a subject carrying merge fields the
+ * content gate cannot screen. Enforced here as well as at the router so a row
+ * written before the rule, or by another path, still cannot slip through.
+ */
+function blockedSubject(broadcast: { subject: string | null }): string[] | null {
+  if (!broadcast.subject) return null;
+  const verdict = validateSubjectMergeFields(broadcast.subject);
+  return verdict.ok ? null : verdict.rejected;
+}
+
 export async function sendBroadcast(
   db: Db,
   deps: BroadcastDeps,
@@ -161,6 +174,30 @@ export async function sendBroadcast(
   // Only scheduled/sending proceed: draft, canceled, and sent are no-ops no
   // matter how the job arrived. (The sending-claim CAS below re-checks this
   // atomically — that, not this read, is what makes a racing cancel safe.)
+  const blockedMerge = broadcast ? blockedSubject(broadcast) : null;
+  if (broadcast && blockedMerge) {
+    // Fail closed on THIS broadcast only. Holding the team would stop its
+    // transactional mail and every other campaign for one bad subject; the
+    // owner gets a visible reason on the row and the rest keeps flowing.
+    console.warn(
+      `send-broadcast: subject merge fields blocked (${blockedMerge.join(",")}) on ${broadcast.id}; only this broadcast waits`,
+    );
+    await db
+      .update(schema.broadcasts)
+      .set({
+        heldReason: `Assunto com merge field nao permitido: ${blockedMerge.join(", ")}. Use apenas FIRST_NAME e EMAIL.`,
+        heldAt: new Date(),
+      })
+      .where(eq(schema.broadcasts.id, broadcast.id));
+    await db.insert(schema.auditLog).values({
+      teamId: broadcast.teamId,
+      actorId: "platform.content_gate",
+      action: "broadcast.held_content",
+      target: JSON.stringify({ type: "broadcast", id: broadcast.id }),
+      data: { tokens: blockedMerge },
+    });
+    return "deferred";
+  }
   if (!broadcast || (broadcast.status !== "scheduled" && broadcast.status !== "sending")) {
     return "skipped";
   }
@@ -253,6 +290,23 @@ export async function sendBroadcast(
   // imitating a bank, a carrier or a security notice, holds the team for
   // review, and the fan-out waits below like any other hold.
   if (deps.isCloud) {
+    // The same content gate the mailbox and transactional paths run. A campaign
+    // is the surface a purchased list reaches, so prospecting copy holds here
+    // too: the fan-out parks and the team lands in the review queue.
+    const content = await screenPreSendContent(db, {
+      teamId: broadcast.teamId,
+      from: broadcast.from,
+      subject: broadcast.subject,
+      html: broadcast.html,
+      text: broadcast.text,
+    });
+    if (content.action === "hold") {
+      console.warn(
+        `send-broadcast: content policy hold (${content.code}) on ${broadcast.id}; fan-out parked`,
+      );
+      await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
+      return "deferred";
+    }
     const disguise = findDisguise(broadcast);
     if (disguise) {
       await holdTeamForReview(db, {
@@ -293,6 +347,7 @@ export async function sendBroadcast(
     standing?.suspended ||
     standing?.sendReview ||
     standing?.broadcastsPausedByOperatorAt ||
+    standing?.broadcastsPausedByMonitorAt ||
     signupRestriction.kind !== "none"
   ) {
     await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));
@@ -501,6 +556,7 @@ export async function sendBroadcast(
         standingNow?.suspended ||
         standingNow?.sendReview ||
         standingNow?.broadcastsPausedByOperatorAt ||
+        standingNow?.broadcastsPausedByMonitorAt ||
         signupNow.kind !== "none"
       ) {
         await deps.reschedule?.(broadcast.id, new Date(Date.now() + REGION_HOLD_RETRY_MS));

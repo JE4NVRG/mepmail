@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
   EnvKeyring,
   encryptEmailBody,
@@ -88,6 +88,13 @@ beforeAll(async () => {
   ]);
   teamId = await createTeam(db, "acme");
   ownTeamId = await createTeam(db, "ops");
+  // A: a key needs a verified sending domain on the team that mints it.
+  await db.insert(schema.domains).values({
+    teamId,
+    name: "acme-sending.test",
+    region: "us-east-1",
+    status: "verified",
+  });
   await db.insert(schema.teamMembers).values([
     { teamId, userId: OWNER, role: "owner" },
     { teamId, userId: MEMBER, role: "member" },
@@ -279,6 +286,13 @@ describe("console.teams.startSupportView", () => {
 
   it("leaves notified_at null when the team has no owner to write to", async () => {
     const orphan = await createTeam(db, `orphan-${Date.now()}`);
+    // A: a key needs a verified sending domain. no_key_without_domain
+    await db.insert(schema.domains).values({
+      teamId: orphan,
+      name: `${randomUUID().slice(0, 8)}.test`,
+      region: "us-east-1",
+      status: "verified",
+    });
     const result = await operator().console.teams.startSupportView({
       id: orphan,
       reason: "other",

@@ -16,6 +16,7 @@ import {
   markSignupEmailVerified,
   recordSignupRisk,
   removeSystemContact,
+  suppressedSignupDomain,
   userFunnelProps,
 } from "@millionsend/core";
 import { type Db, getDb, schema } from "@millionsend/db";
@@ -648,6 +649,23 @@ export function createAuth(
             // a social sign-in, a different address or an expired canary all
             // fall back to the ordinary closed door.
             const canary = canarySignupAdmissionFor(ctx, user.email);
+            // A suppressed TLD never becomes an account. Checked here, before
+            // the row exists, so the refusal needs no cleanup afterwards.
+            if (!canary.admitted && suppressedSignupDomain(user.email)) {
+              // One line, no address: the operator needs the pattern and the
+              // hour, not another copy of the identity.
+              console.warn(
+                JSON.stringify({
+                  event: "signup.blocked_suppressed_tld",
+                  tld: ".shop",
+                  at: new Date().toISOString(),
+                }),
+              );
+              throw new APIError("FORBIDDEN", {
+                message:
+                  "Signups from this domain are not accepted. If you are a real business, write to support@mepmail.dev and we will open the door by hand.",
+              });
+            }
             await assertSignupAllowed(
               db,
               signupOpen(),

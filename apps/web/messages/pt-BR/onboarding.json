@@ -140,7 +140,14 @@
     "sendError": "Não foi possível enviar. Tente de novo.",
     "selfHostBase": "Auto-hospedado: configure a URL base do seu SDK para {url}.",
     "captchaFailed": "Não conseguimos validar seu navegador. Desative VPN ou proxy e recarregue a página. Suporte: mepmail.dev/support",
-    "sendLimited": "Alguns e-mails de onboarding já saíram deste time. Tente de novo em uma hora."
+    "sendLimited": "Alguns e-mails de onboarding já saíram deste time. Tente de novo em uma hora.",
+    "tryWithKey": "Enviar um teste com a minha chave",
+    "trySending": "Enviando…",
+    "tryOk": "Saiu. id {id} — confira a sua caixa.",
+    "tryOkNoId": "Saiu — confira a sua caixa.",
+    "tryError": "A API recusou (HTTP {status}).",
+    "tryNeedsToken": "A chave completa só existe logo depois de criada. Crie outra para testar aqui.",
+    "tryNoDomain": "Falta verificar um domínio: a API só envia de um domínio verificado deste time."
   },
   "step3": {
     "title": "Veja chegar",

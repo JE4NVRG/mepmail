@@ -22,6 +22,7 @@ import { statusCodeColor } from "@/lib/status-code-color";
 import { useTRPC } from "@/lib/trpc";
 import { oneOf, useUrlState } from "@/lib/url-state";
 import { ListFooter, SearchBox, StateCard } from "../emails/list-parts";
+import { DiagnosisCard } from "./diagnosis-card";
 
 const STATUS_CLASSES = ["2xx", "4xx", "5xx"] as const;
 type StatusClass = (typeof STATUS_CLASSES)[number];
@@ -172,6 +173,8 @@ export default function LogsPage() {
   return (
     <>
       <PageHeader title={t("list.title")} />
+
+      <DiagnosisCard />
 
       <div
         className="ms-filter-row"

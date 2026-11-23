@@ -115,6 +115,7 @@ import {
   canRunSignupRiskDigest,
   sendSignupRiskDailyDigest,
 } from "./handlers/signup-risk-digest.js";
+import { alertSignupWave } from "./handlers/signup-wave.js";
 import { createCustomerSmtpRelay, createSmtpFallback } from "./handlers/smtp-fallback.js";
 import { syncTenants, watchTenants } from "./handlers/tenants.js";
 import { createMailboxAzureSender } from "./mailbox-azure-sender.js";
@@ -591,6 +592,11 @@ await queue.scheduleCrons(
         if (keys.sent > 0) console.log(`notifications.sweep: agentKeysExpiring=${keys.sent}`);
         const trials = await warnEndingMailboxTrials(db, { mailer, appBaseUrl: env.APP_BASE_URL });
         if (trials.sent > 0) console.log(`notifications.sweep: trialsEnding=${trials.sent}`);
+        const wave = await alertSignupWave(db);
+        if (wave.alerted)
+          console.log(
+            `notifications.sweep: signupWave teams=${wave.wave.teams} domains=${wave.wave.emailDomains}`,
+          );
         const plans = await warnMailboxPlanUsage(db, { mailer, appBaseUrl: env.APP_BASE_URL });
         if (plans.near || plans.reached || plans.paused)
           console.log(

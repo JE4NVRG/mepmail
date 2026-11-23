@@ -29,6 +29,14 @@ export const user = pgTable("user", {
   mailOptOuts: jsonb("mail_opt_outs").$type<string[]>().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  /**
+   * Operator-set marker. A flagged account stays usable, but the admin
+   * metrics stop counting it: internal/test accounts, scanners and suspected
+   * abuse pollute signup, funnel and MAU numbers while proving nothing.
+   */
+  metricsExcludedAt: timestamp("metrics_excluded_at", { withTimezone: true }),
+  /** internal | test | suspected_abuse — free text, for the operator's report. */
+  metricsExcludedReason: text("metrics_excluded_reason"),
 });
 
 export const session = pgTable("session", {

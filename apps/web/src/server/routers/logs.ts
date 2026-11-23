@@ -149,4 +149,70 @@ export const logsRouter = router({
     }
     return { ...row, ...caller, hiddenBySupportView };
   }),
+
+  /**
+   * "Where do I stand?" in one read: has this team ever called the API, did a
+   * send ever succeed, and which errors repeat. Built from the same
+   * api_requests rows the list shows, so it can never flatter the raw log.
+   */
+  diagnosis: teamProcedure.query(async ({ ctx }) => {
+    const t = schema.apiRequests;
+    const send = and(eq(t.method, "POST"), eq(t.path, "/emails"));
+
+    const [totals] = await ctx.db
+      .select({
+        requests: sql<number>`count(*)::int`,
+        failures: sql<number>`count(*) filter (where ${t.statusCode} >= 400)::int`,
+        firstAt: sql<Date | null>`min(${t.createdAt})`,
+        lastAt: sql<Date | null>`max(${t.createdAt})`,
+      })
+      .from(t)
+      .where(eq(t.teamId, ctx.teamId));
+
+    const [firstSend] = await ctx.db
+      .select({ at: sql<Date | null>`min(${t.createdAt})` })
+      .from(t)
+      .where(and(eq(t.teamId, ctx.teamId), send, gte(t.statusCode, 200), lt(t.statusCode, 300)));
+
+    const errors = await ctx.db
+      .select({
+        path: t.path,
+        statusCode: t.statusCode,
+        message: sql<
+          string | null
+        >`coalesce(${t.responseBody}->>'message', ${t.responseBody}->>'error')`,
+        count: sql<number>`count(*)::int`,
+        lastAt: sql<Date>`max(${t.createdAt})`,
+      })
+      .from(t)
+      .where(and(eq(t.teamId, ctx.teamId), gte(t.statusCode, 400)))
+      .groupBy(t.path, t.statusCode, sql`3`)
+      .orderBy(sql`4 desc`)
+      .limit(5);
+
+    // Same ledger the onboarding writes, so the two views cannot disagree.
+    const steps = await ctx.db
+      .select({
+        step: sql<string>`${schema.funnelEvents.props}->>'step'`,
+        at: sql<Date>`min(${schema.funnelEvents.createdAt})`,
+      })
+      .from(schema.funnelEvents)
+      .where(
+        and(
+          eq(schema.funnelEvents.teamId, ctx.teamId),
+          eq(schema.funnelEvents.name, "onboarding_step"),
+        ),
+      )
+      .groupBy(sql`1`);
+
+    return {
+      requests: totals?.requests ?? 0,
+      failures: totals?.failures ?? 0,
+      firstAt: totals?.firstAt ?? null,
+      lastAt: totals?.lastAt ?? null,
+      firstSendAt: firstSend?.at ?? null,
+      errors,
+      onboarding: steps,
+    };
+  }),
 });

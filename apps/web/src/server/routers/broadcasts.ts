@@ -23,6 +23,7 @@ import {
   signupSendMessage,
   splitPersonName,
   substituteUnsubscribeUrl,
+  validateSubjectMergeFields,
   verifySenderDomain,
 } from "@millionsend/core";
 import type { Db } from "@millionsend/db";
@@ -171,7 +172,22 @@ const fromSchema = z
   .refine((v) => parseSingleSender(v) !== null, {
     message: "From must be a single address like ada@example.com or Ada <ada@example.com>",
   });
-const subjectSchema = z.string().trim().min(1).max(998);
+const subjectSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(998)
+  // 15.3: the content gate screens the stored subject, and merge fields run
+  // later in the fan-out, so a tag could smuggle a banned word past it.
+  .superRefine((value, ctx) => {
+    const verdict = validateSubjectMergeFields(value);
+    if (!verdict.ok) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Remove these merge fields from the subject: ${verdict.rejected.join(", ")}. Only first_name and email are allowed there.`,
+      });
+    }
+  });
 // "" clears the field — stored as null, never as an empty string.
 const nameSchema = z.string().trim().max(200);
 const bodySchema = z.string().max(500_000);

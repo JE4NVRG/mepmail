@@ -11,6 +11,18 @@ import type { SignupRiskSignals } from "../src/signup-risk-policy.js";
 
 import { verifiedDns } from "./antiabuse-contract-fixture.js";
 
+
+/** The key gate now requires a verified sending domain; every fixture gets one. */
+async function verifiedSendingDomain(teamId: string): Promise<void> {
+  await db.insert(schema.domains).values({
+    teamId,
+    name: `send-${teamId.slice(0, 8)}.test`,
+    region: "us-east-1",
+    status: "verified",
+    verifiedAt: now,
+  });
+}
+
 let db: Db;
 let close: () => Promise<void>;
 const now = new Date("2026-10-17T15:00:00.000Z");
@@ -30,6 +42,7 @@ async function fixture(
   verified = true,
 ) {
   const teamId = await createTeam(db, `key-${randomUUID()}`);
+  await verifiedSendingDomain(teamId);
   await db.update(schema.teams).set({ createdAt: now }).where(eq(schema.teams.id, teamId));
   const userId = randomUUID();
   const email = `${userId}@fixture.test`;
@@ -80,6 +93,7 @@ const rows = (teamId: string) =>
 
 it("preserves legacy teams without captured risk, including full-access rotation", async () => {
   const teamId = await createTeam(db, `legacy-${randomUUID()}`);
+  await verifiedSendingDomain(teamId);
   const result = await mint(teamId);
   expect(result.allowed).toBe(true);
   if (!result.allowed) throw new Error("expected key");
@@ -278,6 +292,7 @@ it("serializes concurrent sandbox key creation so only one request succeeds", as
 
 it("serializes the last normal slot across minters and keeps the existing cap", async () => {
   const teamId = await createTeam(db, `normal-cap-${randomUUID()}`);
+  await verifiedSendingDomain(teamId);
   await db.insert(schema.apiKeys).values(
     Array.from({ length: keys.MAX_ACTIVE_API_KEYS - 1 }, () => {
       const key = keys.generateApiKey();

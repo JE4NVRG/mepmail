@@ -175,7 +175,7 @@ describe("topic opt-out suppression at accept", () => {
     expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({
       name: "all_recipients_suppressed",
-      message: "All recipients are suppressed",
+      message: expect.stringContaining("All recipients are suppressed"),
     });
   });
 
@@ -200,7 +200,9 @@ describe("topic opt-out suppression at accept", () => {
       topic_id: optOutTopicId,
     });
     expect(res.status).toBe(422);
-    expect(await res.json()).toMatchObject({ message: "All recipients are suppressed" });
+    expect(await res.json()).toMatchObject({
+      message: expect.stringContaining("All recipients are suppressed"),
+    });
   });
 
   it("an explicit opt-in overrides an opt-out default", async () => {

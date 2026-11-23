@@ -54,6 +54,12 @@ export const broadcasts = pgTable(
     // The last contact id of the fan-out's last committed page, so a walk
     // interrupted by a crash resumes from it instead of rescanning the team.
     // Cleared when the walk ends.
+    /**
+     * Set when this one broadcast cannot fan out (e.g. a subject merge tag the
+     * content gate cannot screen). The team keeps sending; only this row waits.
+     */
+    heldReason: text("held_reason"),
+    heldAt: timestamp("held_at", { withTimezone: true }),
     fanOutCursor: uuid("fan_out_cursor"),
     // Results recorded once the broadcast's emails are about to age out of
     // the metadata window, so a campaign keeps its numbers after its rows

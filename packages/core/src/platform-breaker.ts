@@ -1,7 +1,7 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 import type { RegionBreakerReason } from "@millionsend/db/schema";
-import { and, asc, desc, eq, gte, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { MIN_PAUSE_COMPLAINTS, MIN_PAUSE_HARD_BOUNCES } from "./deliverability.js";
 import { DAY_MS, utcDay } from "./utc-day.js";
@@ -33,6 +33,9 @@ export interface RegionWindowCounts {
 export interface RegionContributor {
   teamId: string;
   teamName: string;
+  teamSlug: string;
+  /** Accepted sends by this team in the window, for the operator's notice. */
+  sent: number;
   hardBounced: number;
   complained: number;
 }
@@ -58,16 +61,28 @@ const complaintFilter = sql`${schema.emailEvents.type} = 'complained'`;
  */
 export async function regionWindowCounts(
   db: Db,
-  opts: { now: Date; hours: number; teamIds?: string[]; since?: Date },
+  opts: {
+    now: Date;
+    hours: number;
+    teamIds?: string[] | undefined;
+    excludeTeamIds?: string[] | undefined;
+    since?: Date;
+  },
 ): Promise<Map<string, RegionWindowCounts>> {
   const since = opts.since ?? new Date(opts.now.getTime() - opts.hours * HOUR_MS);
   const teamFilter = opts.teamIds ? inArray(schema.emails.teamId, opts.teamIds) : undefined;
+  // Tenant-first: the same window with the already-quarantined teams taken
+  // out, so a tripped region can be judged on the traffic that would remain.
+  const excludeFilter =
+    opts.excludeTeamIds && opts.excludeTeamIds.length > 0
+      ? notInArray(schema.emails.teamId, opts.excludeTeamIds)
+      : undefined;
   const out = new Map<string, RegionWindowCounts>();
   const sent = await db
     .select({ region: schema.domains.region, n: sql<number>`count(*)::int` })
     .from(schema.emails)
     .innerJoin(schema.domains, eq(schema.domains.id, schema.emails.domainId))
-    .where(and(gte(schema.emails.sentAt, since), teamFilter))
+    .where(and(gte(schema.emails.sentAt, since), teamFilter, excludeFilter))
     .groupBy(schema.domains.region);
   for (const row of sent) out.set(row.region, { sent: row.n, hardBounced: 0, complained: 0 });
   const events = await db
@@ -84,6 +99,7 @@ export async function regionWindowCounts(
         gte(schema.emailEvents.createdAt, since),
         isNotNull(schema.emailEvents.snsMessageId),
         teamFilter,
+        excludeFilter,
       ),
     )
     .groupBy(schema.domains.region);
@@ -106,7 +122,7 @@ export async function regionWindowCounts(
  */
 export async function regionCounterTotals(
   db: Db,
-  opts: { now: Date; days: number },
+  opts: { now: Date; days: number; excludeTeamIds?: string[] | undefined },
 ): Promise<Map<string, RegionWindowCounts>> {
   const since = utcDay(opts.now.getTime() - (opts.days - 1) * DAY_MS);
   const c = schema.usageCounters;
@@ -127,6 +143,7 @@ export async function regionCounterTotals(
   // ::bigint — a region's weekly sum can overflow int4; the driver returns
   // bigint as a string, exact through Number() up to 2^53.
   const total = (col: AnyPgColumn) => sql<string>`coalesce(sum(${col}), 0)::bigint`;
+  const excludedFromCounters = [...multiRegion, ...(opts.excludeTeamIds ?? [])];
   const rows = await db
     .select({
       region: teamRegion.region,
@@ -139,7 +156,7 @@ export async function regionCounterTotals(
     .where(
       and(
         gte(c.day, since),
-        multiRegion.length > 0 ? notInArray(c.teamId, multiRegion) : undefined,
+        excludedFromCounters.length > 0 ? notInArray(c.teamId, excludedFromCounters) : undefined,
       ),
     )
     .groupBy(teamRegion.region);
@@ -161,6 +178,7 @@ export async function regionCounterTotals(
       // Same span as the counters: whole UTC days, not a trailing window.
       since: new Date(`${since}T00:00:00Z`),
       teamIds: multiRegion,
+      excludeTeamIds: opts.excludeTeamIds,
     });
     for (const [region, counts] of raw) {
       const base = out.get(region) ?? { sent: 0, hardBounced: 0, complained: 0 };
@@ -175,7 +193,7 @@ export async function regionCounterTotals(
 }
 
 /** Teams behind a region's events over the tripping window, worst first. */
-async function contributors(
+export async function contributors(
   db: Db,
   region: string,
   now: Date,
@@ -184,10 +202,15 @@ async function contributors(
   const since = new Date(now.getTime() - hours * HOUR_MS);
   const hardBounced = sql<number>`count(*) filter (where ${hardBounceFilter})::int`;
   const complained = sql<number>`count(*) filter (where ${complaintFilter})::int`;
+  // The team's own send volume in the window (emails_team_sent_window), not the
+  // handful of rows that carry an event: the operator reads "1 em 400 envios".
+  const sent = sql<number>`(select count(*)::int from emails se where se.team_id = ${schema.teams.id} and se.sent_at >= ${since})`;
   return db
     .select({
       teamId: schema.teams.id,
       teamName: schema.teams.name,
+      teamSlug: schema.teams.slug,
+      sent,
       hardBounced,
       complained,
     })
@@ -252,7 +275,7 @@ export function tripReason(
  */
 export async function evaluateRegionBreakers(
   db: Db,
-  opts: { now?: Date } = {},
+  opts: { now?: Date; excludeTeamIds?: string[] | undefined } = {},
 ): Promise<RegionDecision[]> {
   const now = opts.now ?? new Date();
   // The day window reads raw rows to the minute; the week window reads the
@@ -262,8 +285,22 @@ export async function evaluateRegionBreakers(
   // cannot place, whose rows are read over the trailing 168 hours.
   const [dayHours, weekHours] = BREAKER_WINDOWS_HOURS;
   const windows = [
-    { hours: dayHours, counts: await regionWindowCounts(db, { now, hours: dayHours }) },
-    { hours: weekHours, counts: await regionCounterTotals(db, { now, days: weekHours / 24 }) },
+    {
+      hours: dayHours,
+      counts: await regionWindowCounts(db, {
+        now,
+        hours: dayHours,
+        excludeTeamIds: opts.excludeTeamIds,
+      }),
+    },
+    {
+      hours: weekHours,
+      counts: await regionCounterTotals(db, {
+        now,
+        days: weekHours / 24,
+        excludeTeamIds: opts.excludeTeamIds,
+      }),
+    },
   ];
   // Paused regions stay in the set even with no traffic in either window:
   // a decision with nothing tripping is what lets them resume.
@@ -420,6 +457,64 @@ export interface SendGateDecision {
   bounceRate: number;
 }
 
+/**
+ * First-party teams are the instance owner's own products. Their transactional
+ * mail (password resets, receipts) is not collateral we accept: a reputation
+ * trip pauses only their broadcasts and tells the operator. A third party that
+ * lands in the same place loses every surface until a human looks.
+ *
+ * Fail-closed: an empty or missing list means nobody is first-party.
+ */
+export function firstPartySlugs(
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): Set<string> {
+  const raw = env.FIRST_PARTY_TEAM_SLUGS ?? "je4ndev";
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s.length > 0),
+  );
+}
+
+export function isFirstPartyTeam(
+  teamSlug: string,
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): boolean {
+  return firstPartySlugs(env).has(teamSlug.toLowerCase());
+}
+
+/**
+ * Release the breaker's own pause and nothing else. The operator's pause lives
+ * on a different column (teams.broadcasts_paused_by_operator_at) and survives
+ * this on purpose: a human hold is not the rate's to undo.
+ */
+export async function resumeBreakerBroadcasts(
+  db: Db,
+  input: { teamId: string; now?: Date },
+): Promise<boolean> {
+  const now = input.now ?? new Date();
+  const resumed = await db
+    .update(schema.teamMonitor)
+    .set({ broadcastsPausedAt: null, broadcastsResumedAt: now })
+    .where(
+      and(
+        eq(schema.teamMonitor.teamId, input.teamId),
+        isNotNull(schema.teamMonitor.broadcastsPausedAt),
+      ),
+    )
+    .returning({ teamId: schema.teamMonitor.teamId });
+  if (resumed.length === 0) return false;
+  await db.insert(schema.auditLog).values({
+    teamId: input.teamId,
+    actorId: "platform.breaker",
+    action: "team.broadcasts_resumed_reputation",
+    target: "breaker",
+    data: {},
+  });
+  return true;
+}
+
 /** No sample, no verdict. The owner's own brake works at any volume. */
 export function sendGateDecision(
   totals: { sent: number; hardBounced: number; complained: number },
@@ -466,4 +561,153 @@ export async function platformSendGate(
   const decision = sendGateDecision({ sent, hardBounced, complained }, opts.env);
   if (!opts.env) gateMemo.set(db, { at: opts.now.getTime(), decision });
   return decision;
+}
+
+/**
+ * Tenant before region. A complaint or a bounce run belongs to a team before it
+ * belongs to a region, and one tenant's bad day must not park every customer in
+ * us-east-1. The plan quarantines the teams behind the events, re-reads the
+ * region without them, and keeps a region hold only when the traffic that would
+ * remain is still over the line.
+ *
+ * Reads only: the caller persists the tenant pauses and the region flips, so a
+ * slow or failed write cannot leave the two halves disagreeing.
+ */
+export interface TenantRegionPause {
+  teamId: string;
+  teamName: string;
+  teamSlug: string;
+  /** First-party teams keep transactional mail; third parties lose everything. */
+  firstParty: boolean;
+  region: string;
+  metric: "bounce" | "complaint";
+  events: number;
+  sent: number;
+  windowHours: number;
+}
+
+export interface TenantFirstPlan {
+  /** Decisions to persist: a cleared region comes back as `trip: false`. */
+  decisions: RegionDecision[];
+  tenantPauses: TenantRegionPause[];
+  /** Regions that still trip once their contributing teams are out. */
+  regionHolds: string[];
+  /** Regions whose hold the tenant pauses clear. */
+  regionHoldsDeferred: string[];
+}
+
+export async function planTenantFirstRegionBreakers(
+  db: Db,
+  decisions: RegionDecision[],
+  opts: { now?: Date } = {},
+): Promise<TenantFirstPlan> {
+  const now = opts.now ?? new Date();
+  const out: RegionDecision[] = [];
+  const tenantPauses: TenantRegionPause[] = [];
+  const regionHolds: string[] = [];
+  const regionHoldsDeferred: string[] = [];
+  for (const d of decisions) {
+    const reason = d.reason;
+    if (!d.trip || !reason) {
+      out.push(d);
+      continue;
+    }
+    const contribs = await contributors(db, d.region, now, reason.windowHours);
+    const culprits = contribs.filter((c) =>
+      reason.metric === "complaint" ? c.complained > 0 : c.hardBounced > 0,
+    );
+    if (culprits.length === 0) {
+      // Nothing to attribute: the region carries the decision alone.
+      out.push(d);
+      regionHolds.push(d.region);
+      continue;
+    }
+    for (const c of culprits) {
+      tenantPauses.push({
+        teamId: c.teamId,
+        teamName: c.teamName,
+        teamSlug: c.teamSlug,
+        firstParty: isFirstPartyTeam(c.teamSlug),
+        region: d.region,
+        metric: reason.metric,
+        events: reason.metric === "complaint" ? c.complained : c.hardBounced,
+        sent: c.sent,
+        windowHours: reason.windowHours,
+      });
+    }
+    const residual = (
+      await evaluateRegionBreakers(db, {
+        now,
+        excludeTeamIds: culprits.map((c) => c.teamId),
+      })
+    ).find((r) => r.region === d.region);
+    if (residual?.trip) {
+      out.push({ ...d, contributors: residual.contributors });
+      regionHolds.push(d.region);
+    } else {
+      out.push({ region: d.region, trip: false, contributors: [] });
+      regionHoldsDeferred.push(d.region);
+    }
+  }
+  return { decisions: out, tenantPauses, regionHolds, regionHoldsDeferred };
+}
+
+/**
+ * A reputation pause stops broadcasts and the broadcast half of a send, never
+ * pure transactional mail: password resets and receipts keep flowing for the
+ * team that tripped, because `send-email` only honours this column when the
+ * email carries a broadcast id. The flag and the audit row are what tell an
+ * operator the pause came from the breaker rather than from a human.
+ */
+export interface TenantBroadcastPauseInput {
+  teamId: string;
+  region: string;
+  metric: "bounce" | "complaint";
+  events: number;
+  sent: number;
+  windowHours: number;
+  now?: Date;
+}
+
+export async function pauseTenantBroadcastsForRegionTrip(
+  db: Db,
+  input: TenantBroadcastPauseInput,
+): Promise<boolean> {
+  const now = input.now ?? new Date();
+  // team_monitor is the breaker's own column: releasing the breaker's pause can
+  // never clear an operator's pause, and an operator's release leaves ours be.
+  const paused = await db
+    .insert(schema.teamMonitor)
+    .values({ teamId: input.teamId, broadcastsPausedAt: now })
+    .onConflictDoUpdate({
+      target: schema.teamMonitor.teamId,
+      set: {
+        broadcastsPausedAt: sql`coalesce(${schema.teamMonitor.broadcastsPausedAt}, ${now})`,
+      },
+    })
+    .returning({ teamId: schema.teamMonitor.teamId });
+  if (paused.length === 0) return false;
+  const metric = input.metric === "complaint" ? "reclamacao" : "bounce duro";
+  const note = `Pausa automatica de broadcast: regiao ${input.region} acima da linha por ${metric} (${input.events}/${input.sent} envios em ${input.windowHours}h). Transacional preservado.`;
+  await db
+    .insert(schema.teamFlags)
+    .values({
+      teamId: input.teamId,
+      reason: input.metric === "complaint" ? "complaints" : "guardrail",
+      note: note.slice(0, 500),
+    })
+    .onConflictDoNothing();
+  await db.insert(schema.auditLog).values({
+    teamId: input.teamId,
+    actorId: "platform.breaker",
+    action: "team.broadcasts_paused_reputation",
+    target: input.region,
+    data: {
+      metric: input.metric,
+      events: input.events,
+      sent: input.sent,
+      windowHours: input.windowHours,
+    },
+  });
+  return true;
 }
