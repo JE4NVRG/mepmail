@@ -435,6 +435,20 @@
       "when": 1795008266773,
       "tag": "0061_sending_judge_team_history",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1795008266774,
+      "tag": "0062_metrics_exclusion",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1795008266775,
+      "tag": "0063_broadcast_hold",
+      "breakpoints": true
     }
   ]
 }
