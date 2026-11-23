@@ -140,7 +140,14 @@
     "sendError": "Could not send. Try again.",
     "selfHostBase": "Self-hosted: set your SDK's base URL to {url}.",
     "captchaFailed": "We could not verify your browser. Turn off any VPN or proxy and reload the page. Support: mepmail.dev/support",
-    "sendLimited": "A few onboarding emails already went out from this team. Try again in an hour."
+    "sendLimited": "A few onboarding emails already went out from this team. Try again in an hour.",
+    "tryWithKey": "Send a test with my key",
+    "trySending": "Sending…",
+    "tryOk": "Sent. id {id} — check your inbox.",
+    "tryOkNoId": "Sent — check your inbox.",
+    "tryError": "The API refused (HTTP {status}).",
+    "tryNeedsToken": "The full key only exists right after it is created. Create another to test here.",
+    "tryNoDomain": "A verified domain is missing: the API only sends from a domain this team verified."
   },
   "step3": {
     "title": "Watch it arrive",

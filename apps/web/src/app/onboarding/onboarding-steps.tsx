@@ -217,6 +217,12 @@ function ApiQuickstartContent({
   const [verifying, setVerifying] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
+  // Sending through the API with the key that was just minted is the only
+  // honest proof the integration works; the platform demo does not use it.
+  const [keySend, setKeySend] = useState<{
+    state: "idle" | "sending" | "ok" | "error";
+    message?: string;
+  }>({ state: "idle" });
 
   // Self-host: sending needs SES connected, so the stepper leads with that
   // when credentials are absent. Polls until connected (the SES settings
@@ -341,6 +347,46 @@ function ApiQuickstartContent({
   const copyParams: SnippetParams = token ? { ...snippetBase, apiKey: token } : displayParams;
   const displayCode = onboardingSnippet(lang, displayParams);
   const copyCode = onboardingSnippet(lang, copyParams);
+
+  /**
+   * POST /emails with the reveal-once token, exactly like a customer would.
+   * The answer is shown verbatim: a 422 that names the suppressed address is
+   * more useful here than a friendly paraphrase.
+   */
+  const sendWithOwnKey = async () => {
+    if (!token) return;
+    if (!verifiedDomain) {
+      setKeySend({ state: "error", message: t("step2.tryNoDomain") });
+      return;
+    }
+    setKeySend({ state: "sending" });
+    try {
+      const res = await fetch(`${apiUrl}/emails`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          from: `onboarding@${verifiedDomain}`,
+          to: userEmail,
+          subject: t("step2.subject"),
+          html: t.raw("step2.html"),
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
+      setKeySend(
+        res.ok
+          ? {
+              state: "ok",
+              message: body.id ? t("step2.tryOk", { id: body.id }) : t("step2.tryOkNoId"),
+            }
+          : {
+              state: "error",
+              message: body.message ?? t("step2.tryError", { status: res.status }),
+            },
+      );
+    } catch (error) {
+      setKeySend({ state: "error", message: String(error) });
+    }
+  };
 
   // Wait for the real milestone and current attempt on reload/team navigation.
   const progressQueries = [
@@ -827,6 +873,43 @@ function ApiQuickstartContent({
               locked={!hasKey}
             >
               {codePanel}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  marginTop: 12,
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  type="button"
+                  className="ms-btn"
+                  data-testid="onboarding-try-with-key"
+                  disabled={!token || keySend.state === "sending"}
+                  onClick={() => void sendWithOwnKey()}
+                >
+                  {keySend.state === "sending" ? t("step2.trySending") : t("step2.tryWithKey")}
+                </button>
+                {!token ? (
+                  <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-muted)" }}>
+                    {t("step2.tryNeedsToken")}
+                  </span>
+                ) : null}
+                {keySend.state === "ok" ? (
+                  <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-bone)" }}>
+                    {keySend.message}
+                  </span>
+                ) : null}
+                {keySend.state === "error" ? (
+                  <span
+                    className="ms-mono"
+                    style={{ fontSize: 12, color: "var(--ms-warn, #b45309)" }}
+                  >
+                    {keySend.message}
+                  </span>
+                ) : null}
+              </div>
               {showInstanceHint && lang !== "curl" ? (
                 <p
                   className="ms-mono"
