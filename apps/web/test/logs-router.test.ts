@@ -312,3 +312,48 @@ describe("logs.get", () => {
     });
   });
 });
+
+describe("logs.diagnosis", () => {
+  it("answers the three questions from the same rows the list shows", async () => {
+    const teamId = await createTeam(db, "diag");
+    const c = caller(teamId);
+
+    // Nothing yet: the card must say so instead of inventing progress.
+    const before = await c.logs.diagnosis();
+    expect(before.requests).toBe(0);
+    expect(before.firstAt).toBeNull();
+    expect(before.firstSendAt).toBeNull();
+    expect(before.errors).toHaveLength(0);
+
+    await insertRequest({ teamId, path: "/emails", statusCode: 422, responseBody: { message: "All recipients are suppressed: dead@example.com. Remove the suppression at /suppressions to send again." } });
+    await insertRequest({ teamId, path: "/emails", statusCode: 422, responseBody: { message: "All recipients are suppressed: dead@example.com. Remove the suppression at /suppressions to send again." } });
+    await insertRequest({ teamId, path: "/domains", statusCode: 403, responseBody: { message: "forbidden" } });
+    await insertRequest({ teamId, path: "/emails", statusCode: 202 });
+
+    await db.insert(schema.funnelEvents).values({
+      name: "onboarding_step",
+      dedupeKey: `onboarding:${teamId}:domain_verified`,
+      teamId,
+      props: { step: "domain_verified" },
+    });
+
+    const after = await c.logs.diagnosis();
+    expect(after.requests).toBe(4);
+    expect(after.failures).toBe(3);
+    expect(after.firstSendAt).not.toBeNull();
+    // Ranked by repetition, and the message travels with the count.
+    expect(after.errors[0]).toMatchObject({ path: "/emails", statusCode: 422, count: 2 });
+    expect(after.errors[0]?.message).toContain("dead@example.com");
+    expect(after.onboarding.map((row) => row.step)).toContain("domain_verified");
+  });
+
+  it("never counts another team's traffic", async () => {
+    const teamId = await createTeam(db, "diag-mine");
+    const other = await createTeam(db, "diag-other");
+    await insertRequest({ teamId: other, path: "/emails", statusCode: 500 });
+
+    const mine = await caller(teamId).logs.diagnosis();
+    expect(mine.requests).toBe(0);
+    expect(mine.errors).toHaveLength(0);
+  });
+});
