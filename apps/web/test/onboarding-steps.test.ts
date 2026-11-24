@@ -7,6 +7,7 @@ import {
   deriveOnboardingState,
   OnboardingSteps,
 } from "@/app/onboarding/onboarding-steps";
+import { inboxQuickstartSnippet } from "@/app/onboarding/snippets";
 import en from "../messages/en/onboarding.json";
 import pt from "../messages/pt-BR/onboarding.json";
 
@@ -125,7 +126,10 @@ vi.mock("@/components/turnstile", () => ({
 vi.mock("@/components/code-highlight", () => ({
   CodeHighlight: ({ code }: { code: string }) => createElement("code", null, code),
 }));
-vi.mock("@/components/copy-chip", () => ({ CopyGlyph: () => null }));
+vi.mock("@/components/copy-chip", () => ({
+  CopyGlyph: () => null,
+  CopyChip: ({ value }: { value: string }) => createElement("span", { "data-copy": value }, value),
+}));
 vi.mock("@/components/status-badge", () => ({
   StatusBadge: ({ status }: { status: string }) =>
     createElement("span", { "data-status": status }, status),
@@ -495,6 +499,25 @@ for (const [locale, copy] of [
       expect(hooks.mutate).not.toHaveBeenCalled();
       expect(hooks.invalidateQueries).not.toHaveBeenCalled();
       expect(hooks.getToken).not.toHaveBeenCalled();
+    });
+
+    it("renders the 30s agent quickstart with MCP URL and POST /v1/inboxes snippets", () => {
+      hooks.fixture.verifiedDomain = true;
+      const html = render(locale);
+      expect(html).toContain('id="agent-quickstart"');
+      expect(html).toContain(copy.agentQuickstart.title);
+      expect(html).toContain("https://api.example.com/mcp");
+      expect(html).toContain("Claude Code");
+      expect(html).toContain('href="/mail/settings?tab=agents"');
+
+      const curl = inboxQuickstartSnippet("curl", {
+        apiUrl: "https://api.example.com",
+        apiKey: "ms_live_1234",
+        domain: "example.com",
+      });
+      expect(curl).toContain("https://api.example.com/v1/inboxes");
+      expect(curl).toContain('"domain":"example.com"');
+      expect(curl).toContain('"create_key":true');
     });
   });
 }

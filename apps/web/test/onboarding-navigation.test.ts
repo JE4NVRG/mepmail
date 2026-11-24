@@ -31,7 +31,10 @@ vi.mock("@/server/membership", () => ({
   getActiveMembership: async () => h.membership,
 }));
 vi.mock("@/server/storage", () => ({ uploadsEnabled: () => false }));
-vi.mock("@/lib/api-base-url", () => ({ apiBaseUrl: () => "http://localhost:3001" }));
+vi.mock("@/lib/api-base-url", () => ({
+  apiBaseUrl: () => "http://localhost:3001",
+  mcpServerUrl: () => "http://localhost:3001/mcp",
+}));
 vi.mock("@/components/app-shell", () => ({ AppShell: () => null }));
 vi.mock("@/app/onboarding/onboarding-form", () => ({ OnboardingForm: () => null }));
 vi.mock("@/app/onboarding/onboarding-steps", () => ({ OnboardingSteps: () => null }));

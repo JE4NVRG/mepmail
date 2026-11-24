@@ -767,12 +767,25 @@
   }
   .gtm-nav {
     min-width: 0;
+    flex: 0 1 auto;
   }
   .gtm-nav-links {
     gap: 4px;
   }
   .gtm-nav-links a {
     padding: 0 10px;
+  }
+  .gtm-header:has(.gtm-account-signout) .gtm-wordmark img {
+    width: 124px;
+  }
+  .gtm-header:has(.gtm-account-signout) .gtm-nav {
+    gap: 8px;
+  }
+  .gtm-header:has(.gtm-account-signout) .gtm-nav-links {
+    gap: 2px;
+  }
+  .gtm-header:has(.gtm-account-signout) .gtm-nav-links a {
+    padding: 0 8px;
   }
 }
 @media (min-width: 1320px) {
@@ -1596,8 +1609,12 @@
     margin-inline: 0;
     justify-content: center;
   }
+  .gtm-header .gtm-header-cta:has(.is-pending) {
+    display: none;
+  }
   .gtm-header .gtm-public-account {
     width: auto;
+    min-width: 0;
     max-width: 100%;
     flex-wrap: wrap;
     justify-content: center;

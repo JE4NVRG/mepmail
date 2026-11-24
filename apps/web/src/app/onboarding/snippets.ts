@@ -174,3 +174,76 @@ client = Resend.client(
     }
   }
 }
+
+export const INBOX_LANGS = ["curl", "node", "python"] as const;
+export type InboxLang = (typeof INBOX_LANGS)[number];
+
+export const INBOX_LABELS: Record<InboxLang, string> = {
+  curl: "cURL",
+  node: "Node.js",
+  python: "Python",
+};
+
+export const INBOX_HLJS: Record<InboxLang, HighlightLanguage> = {
+  curl: "bash",
+  node: "javascript",
+  python: "python",
+};
+
+export interface InboxSnippetParams {
+  apiUrl: string;
+  apiKey: string;
+  domain: string;
+  localPart?: string;
+  label?: string;
+  comment?: string | undefined;
+}
+
+/**
+ * First programmatic agent mailbox creation call targeting POST /v1/inboxes.
+ * Provisions the inbox and returns its scoped `mmb_` token in a single call.
+ */
+export function inboxQuickstartSnippet(lang: InboxLang, p: InboxSnippetParams): string {
+  const payload = {
+    local_part: p.localPart ?? "agent",
+    domain: p.domain,
+    label: p.label ?? "Support Agent",
+    kind: "agent",
+    create_key: true,
+  };
+  const endpoint = `${p.apiUrl.replace(/\/+$/, "")}/v1/inboxes`;
+  switch (lang) {
+    case "curl": {
+      const body = JSON.stringify(payload);
+      return `${p.comment ? `# ${p.comment}\n` : ""}curl -X POST ${endpoint} \\
+  -H ${shellSingleQuote(`Authorization: Bearer ${p.apiKey}`)} \\
+  -H 'Content-Type: application/json' \\
+  -d ${shellSingleQuote(body)}`;
+    }
+    case "node":
+      return `const res = await fetch(${q(endpoint)}, {
+  method: "POST",
+  headers: {
+    Authorization: ${q(`Bearer ${p.apiKey}`)},${slashNote(p.comment)}
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(${JSON.stringify(payload, null, 2)}),
+});
+const inbox = await res.json();`;
+    case "python":
+      return `import requests
+
+res = requests.post(
+    ${q(endpoint)},
+    headers={"Authorization": ${q(`Bearer ${p.apiKey}`)}},${hashNote(p.comment)}
+    json={
+        "local_part": ${q(payload.local_part)},
+        "domain": ${q(payload.domain)},
+        "label": ${q(payload.label)},
+        "kind": "agent",
+        "create_key": True,
+    },
+)
+inbox = res.json()`;
+  }
+}

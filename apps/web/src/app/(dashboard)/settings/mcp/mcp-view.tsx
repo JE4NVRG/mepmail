@@ -9,73 +9,20 @@ import { Table } from "@/components/table";
 import { trackEvent } from "@/lib/analytics";
 import { codeRichTags } from "@/lib/code-rich-tags";
 import { MCP_DOCS_URL } from "@/lib/docs-links";
+import {
+  MCP_CLIENT_LABELS,
+  MCP_CLIENTS,
+  type McpClient,
+  mcpClientSnippet,
+  mcpCopyEvent,
+} from "@/lib/mcp-clients";
 import { MCP_TOOLS } from "./mcp-tools";
 
-/* Pinned: `npx -y mcp-remote` would run whatever version npm serves next. */
-const MCP_REMOTE = "mcp-remote@0.8.2";
-
-/* Client names are product names, not translatable copy. */
-const CLIENTS = ["claudeCode", "claudeDesktop", "cursor", "vscode"] as const;
-type Client = (typeof CLIENTS)[number];
-const CLIENT_LABELS: Record<Client, string> = {
-  claudeCode: "Claude Code",
-  claudeDesktop: "Claude Desktop",
-  cursor: "Cursor",
-  vscode: "VS Code",
-};
-
-function clientSnippet(client: Client, url: string): { code: string; language: HighlightLanguage } {
-  switch (client) {
-    case "claudeCode":
-      return { code: `claude mcp add --transport http mepmail ${url}`, language: "bash" };
-    // Claude Desktop's config file only launches stdio servers; mcp-remote
-    // bridges it to the Streamable HTTP endpoint.
-    case "claudeDesktop":
-      return {
-        code: `{
-  "mcpServers": {
-    "mepmail": {
-      "command": "npx",
-      "args": ["-y", "${MCP_REMOTE}", "${url}"]
-    }
-  }
-}`,
-        language: "json",
-      };
-    case "cursor":
-      return {
-        code: `{
-  "mcpServers": {
-    "mepmail": {
-      "url": "${url}"
-    }
-  }
-}`,
-        language: "json",
-      };
-    case "vscode":
-      return {
-        code: `{
-  "servers": {
-    "mepmail": {
-      "type": "http",
-      "url": "${url}"
-    }
-  }
-}`,
-        language: "json",
-      };
-  }
-}
-
-/**
- * Whether copying a snippet is the `claude mcp add …` install command or the
- * client's config block — the launch plan measures the two separately
- * (launch-ops.md §3.2: `mcp_add_click` vs `mcp_copy`).
- */
-function copyEvent(code: string): string {
-  return code.startsWith("claude mcp add") ? "mcp_add_click" : "mcp_copy";
-}
+type Client = McpClient;
+const CLIENTS = MCP_CLIENTS;
+const CLIENT_LABELS = MCP_CLIENT_LABELS;
+const clientSnippet = mcpClientSnippet;
+const copyEvent = mcpCopyEvent;
 
 function SnippetBlock({
   code,

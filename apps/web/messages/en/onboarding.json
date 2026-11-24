@@ -99,7 +99,8 @@
       "title": "Connect an agent (optional)",
       "body": "Give an AI agent (Claude, Codex, Cursor and others) access to the mailbox over MCP, with a key you can revoke any time.",
       "locked": "After your first mailbox.",
-      "cta": "Connect an agent"
+      "cta": "Connect an agent",
+      "quickCta": "30s quick connect (MCP / API)"
     },
     "api": {
       "title": "Rather start with the API?",
@@ -234,5 +235,19 @@
     "title": "Connect your AWS SES",
     "body": "MepMail sends through your own AWS SES account. Connect it once in settings — the wizard creates everything and tests the connection.",
     "cta": "Open SES setup"
+  },
+  "agentQuickstart": {
+    "badge": "30s",
+    "title": "Connect your first agent in 30 seconds",
+    "subtitle": "Connect Claude, Cursor, or Codex over MCP in one click, or provision programmatic agent inboxes via POST /v1/inboxes.",
+    "tabMcp": "MCP (Claude · Cursor · VS Code)",
+    "tabApi": "API · POST /v1/inboxes",
+    "serverUrl": "MCP server URL",
+    "mcpHint": "On first connect your client opens an OAuth consent screen where you pick which tools and scopes to grant.",
+    "domainFallback": "yourdomain.com",
+    "apiHint": "Creates an agent mailbox on your domain and returns its scoped mmb_ token in the same response.",
+    "mintKey": "Generate API key to copy",
+    "manageAgents": "Manage agent permissions in Correio",
+    "mcpSettings": "Browse all MCP tools"
   }
 }

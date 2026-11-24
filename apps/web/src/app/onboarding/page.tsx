@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
-import { apiBaseUrl } from "@/lib/api-base-url";
+import { apiBaseUrl, mcpServerUrl } from "@/lib/api-base-url";
 import { postAuthNext, withNext } from "@/lib/nav";
 import { syncAccountMailLocale } from "@/server/account-locale";
 import { getAuth } from "@/server/auth";
@@ -42,6 +42,7 @@ export default async function OnboardingPage({
         <OnboardingSteps
           userEmail={session.user.email}
           apiUrl={apiBaseUrl()}
+          mcpUrl={mcpServerUrl()}
           showInstanceHint={!env.IS_CLOUD}
           turnstileSiteKey={env.TURNSTILE_SITE_KEY ?? null}
         />

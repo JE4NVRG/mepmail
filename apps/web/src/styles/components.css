@@ -850,7 +850,7 @@ table.ms-table {
    ring inside the scroll clip. */
 .ms-tabs {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   overflow-x: auto;
   scrollbar-width: none;
   padding: 2px 2px 10px;
@@ -867,7 +867,7 @@ table.ms-table {
   color: var(--ms-muted);
   background: none;
   border: 0;
-  padding: 7px 12px;
+  padding: 7px 10px;
   border-radius: var(--ms-r-input);
   cursor: pointer;
   transition:

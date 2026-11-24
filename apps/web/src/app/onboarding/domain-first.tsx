@@ -596,6 +596,9 @@ function AgentStep({ active, track }: { active: boolean; track: Track }) {
   return (
     <Step marker="04" state="active" title={t("agent.title")} body={t("agent.body")}>
       <div className={styles.actions}>
+        <a href="#agent-quickstart" className="ms-btn ms-btn-primary">
+          {t("agent.quickCta")}
+        </a>
         <Link
           href="/mail/settings?tab=agents"
           className="ms-btn ms-btn-secondary"

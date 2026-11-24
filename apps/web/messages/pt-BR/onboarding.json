@@ -99,7 +99,8 @@
       "title": "Conecte um agente (opcional)",
       "body": "Dê a um agente de IA (Claude, Codex, Cursor e outros) acesso à caixa pelo MCP, com uma chave que você revoga quando quiser.",
       "locked": "Depois da primeira caixa.",
-      "cta": "Conectar um agente"
+      "cta": "Conectar um agente",
+      "quickCta": "Guia rápido 30s (MCP / API)"
     },
     "api": {
       "title": "Prefere começar pela API?",
@@ -234,5 +235,19 @@
     "title": "Conecte seu AWS SES",
     "body": "O MepMail envia pela sua própria conta AWS SES. Conecte uma vez nas configurações — o assistente cria tudo e testa a conexão.",
     "cta": "Abrir configuração do SES"
+  },
+  "agentQuickstart": {
+    "badge": "30s",
+    "title": "Conecte seu primeiro agente em 30 segundos",
+    "subtitle": "Plugue Claude, Cursor ou Codex via MCP em um clique, ou provisione caixas de agente programáticas via POST /v1/inboxes.",
+    "tabMcp": "MCP (Claude · Cursor · VS Code)",
+    "tabApi": "API · POST /v1/inboxes",
+    "serverUrl": "URL do servidor MCP",
+    "mcpHint": "Na primeira conexão o cliente abre a tela de consentimento OAuth para você escolher quais ferramentas e escopos liberar.",
+    "domainFallback": "seudominio.com.br",
+    "apiHint": "Cria uma caixa @seu-domínio e retorna o token mmb_ exclusivo dessa caixa na mesma resposta.",
+    "mintKey": "Gerar chave API para copiar",
+    "manageAgents": "Gerenciar permissões de agentes no Correio",
+    "mcpSettings": "Ver todas as ferramentas MCP"
   }
 }

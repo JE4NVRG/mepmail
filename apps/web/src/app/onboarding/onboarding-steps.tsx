@@ -6,19 +6,32 @@ import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { LANG_META, LangIcon } from "@/components/api-sheet";
 import { CodeHighlight } from "@/components/code-highlight";
-import { CopyGlyph } from "@/components/copy-chip";
+import { CopyChip, CopyGlyph } from "@/components/copy-chip";
 import { DeliveredOdometer } from "@/components/delivered-odometer";
 import { Skeleton } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { StatusBadge } from "@/components/status-badge";
 import { useTurnstile } from "@/components/turnstile";
+import { trackEvent } from "@/lib/analytics";
 import { MIGRATE_DOCS_URL } from "@/lib/docs-links";
 import { formatDayTime, formatUtcTimestamp, maskApiKey } from "@/lib/format";
+import {
+  MCP_CLIENT_LABELS,
+  MCP_CLIENTS,
+  type McpClient,
+  mcpClientSnippet,
+  mcpCopyEvent,
+} from "@/lib/mcp-clients";
 import { statusGlow } from "@/lib/status-glow";
 import { useTRPC } from "@/lib/trpc";
 import { DomainFirst } from "./domain-first";
 import { useOnboardingTrack } from "./onboarding-track";
 import {
+  INBOX_HLJS,
+  INBOX_LABELS,
+  INBOX_LANGS,
+  type InboxLang,
+  inboxQuickstartSnippet,
   onboardingSnippet,
   SNIPPET_HLJS,
   SNIPPET_LABELS,
@@ -160,6 +173,7 @@ function StampRow({ children, at }: { children: React.ReactNode; at?: Date | str
 type OnboardingStepsProps = {
   userEmail: string;
   apiUrl: string;
+  mcpUrl?: string;
   /** Instance settings exist only on self-host; cloud hides the pointer. */
   showInstanceHint: boolean;
   /** Set when the instance verifies a Turnstile token on the send. */
@@ -203,6 +217,7 @@ export function ApiQuickstart(props: OnboardingStepsProps) {
 function ApiQuickstartContent({
   userEmail,
   apiUrl,
+  mcpUrl,
   showInstanceHint,
   turnstileSiteKey,
 }: OnboardingStepsProps) {
@@ -214,6 +229,9 @@ function ApiQuickstartContent({
   const queryClient = useQueryClient();
 
   const [lang, setLang] = useState<SnippetLang>("node");
+  const [agentTab, setAgentTab] = useState<"mcp" | "api">("mcp");
+  const [mcpClient, setMcpClient] = useState<McpClient>("claudeCode");
+  const [inboxLang, setInboxLang] = useState<InboxLang>("curl");
   const turnstile = useTurnstile(turnstileSiteKey);
   const [captchaFailed, setCaptchaFailed] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -863,6 +881,222 @@ function ApiQuickstartContent({
     </StepCard>
   ) : null;
 
+  const resolvedMcpUrl = mcpUrl ?? `${apiUrl.replace(/\/+$/, "")}/mcp`;
+  const mcpSnippet = mcpClientSnippet(mcpClient, resolvedMcpUrl);
+  const inboxDomain = verifiedDomain ?? t("agentQuickstart.domainFallback");
+  const inboxDisplayCode = inboxQuickstartSnippet(inboxLang, {
+    apiUrl,
+    apiKey: maskedKey,
+    domain: inboxDomain,
+    comment,
+  });
+  const inboxCopyCode = inboxQuickstartSnippet(inboxLang, {
+    apiUrl,
+    apiKey: token ?? maskedKey,
+    domain: inboxDomain,
+    ...(token ? {} : { comment }),
+  });
+
+  const agentQuickstartPanel = (
+    <section
+      id="agent-quickstart"
+      className="ms-card"
+      aria-label={t("agentQuickstart.title")}
+      style={{ marginTop: 32, padding: 22, scrollMarginTop: 24 }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: "var(--ms-bone)" }}>
+          {t("agentQuickstart.title")}
+        </h2>
+        <span className="ms-badge ms-badge-success">{t("agentQuickstart.badge")}</span>
+      </div>
+      <p style={{ margin: "6px 0 16px", fontSize: 13.5, color: "var(--ms-muted)" }}>
+        {t("agentQuickstart.subtitle")}
+      </p>
+
+      <div role="tablist" aria-label={t("agentQuickstart.title")} className="ms-tabs">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={agentTab === "mcp"}
+          className={agentTab === "mcp" ? "active" : ""}
+          onClick={() => setAgentTab("mcp")}
+        >
+          {t("agentQuickstart.tabMcp")}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={agentTab === "api"}
+          className={agentTab === "api" ? "active" : ""}
+          onClick={() => setAgentTab("api")}
+        >
+          {t("agentQuickstart.tabApi")}
+        </button>
+      </div>
+
+      {agentTab === "mcp" ? (
+        <div style={{ marginTop: 16 }}>
+          <div className="ms-microlabel" style={{ marginBottom: 6 }}>
+            {t("agentQuickstart.serverUrl")}
+          </div>
+          <CopyChip value={resolvedMcpUrl} />
+          <div
+            style={{
+              background: "var(--ms-inset)",
+              border: "1px solid var(--ms-line)",
+              borderRadius: 10,
+              overflow: "hidden",
+              marginTop: 14,
+            }}
+          >
+            <div
+              role="tablist"
+              aria-label={t("agentQuickstart.tabMcp")}
+              className="ms-scroll-x"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "7px 8px",
+                borderBottom: "1px solid var(--ms-line)",
+                overflowX: "auto",
+              }}
+            >
+              {MCP_CLIENTS.map((clientKey) => (
+                <button
+                  key={clientKey}
+                  type="button"
+                  role="tab"
+                  aria-selected={mcpClient === clientKey}
+                  className={mcpClient === clientKey ? "ms-code-tab active" : "ms-code-tab"}
+                  onClick={() => setMcpClient(clientKey)}
+                >
+                  {MCP_CLIENT_LABELS[clientKey]}
+                </button>
+              ))}
+              <span style={{ marginLeft: "auto", padding: "0 4px", flex: "none" }}>
+                <CopyGlyph
+                  value={mcpSnippet.code}
+                  onCopy={() =>
+                    trackEvent(mcpCopyEvent(mcpSnippet.code), {
+                      mode: "http",
+                      source: "onboarding",
+                    })
+                  }
+                />
+              </span>
+            </div>
+            <pre
+              className="ms-mono ms-hl"
+              style={{
+                margin: 0,
+                padding: "14px 16px",
+                fontSize: 12.5,
+                lineHeight: 1.65,
+                color: "var(--ms-bone)",
+                overflowX: "auto",
+              }}
+            >
+              <CodeHighlight code={mcpSnippet.code} language={mcpSnippet.language} />
+            </pre>
+          </div>
+          <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "var(--ms-muted)" }}>
+            {t("agentQuickstart.mcpHint")}
+          </p>
+        </div>
+      ) : (
+        <div style={{ marginTop: 16 }}>
+          {!token ? (
+            <div
+              className="ms-wrap-row"
+              style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}
+            >
+              <button
+                type="button"
+                className="ms-btn ms-btn-secondary ms-btn-sm"
+                disabled={createKey.isPending}
+                onClick={() => {
+                  track("api_opened");
+                  createKey.mutate({ name: t("step1.keyName") });
+                }}
+              >
+                <BtnSpinner on={createKey.isPending} />
+                {t("agentQuickstart.mintKey")}
+              </button>
+            </div>
+          ) : null}
+          <div
+            style={{
+              background: "var(--ms-inset)",
+              border: "1px solid var(--ms-line)",
+              borderRadius: 10,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              role="tablist"
+              aria-label={t("agentQuickstart.tabApi")}
+              className="ms-scroll-x"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "7px 8px",
+                borderBottom: "1px solid var(--ms-line)",
+                overflowX: "auto",
+              }}
+            >
+              {INBOX_LANGS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={key === inboxLang}
+                  className={key === inboxLang ? "ms-code-tab active" : "ms-code-tab"}
+                  onClick={() => setInboxLang(key)}
+                >
+                  {INBOX_LABELS[key]}
+                </button>
+              ))}
+              <span style={{ marginLeft: "auto", padding: "0 4px", flex: "none" }}>
+                <CopyGlyph value={inboxCopyCode} />
+              </span>
+            </div>
+            <pre
+              className="ms-mono ms-hl"
+              style={{
+                margin: 0,
+                padding: "14px 16px",
+                fontSize: 12.5,
+                lineHeight: 1.65,
+                color: "var(--ms-bone)",
+                overflowX: "auto",
+              }}
+            >
+              <CodeHighlight code={inboxDisplayCode} language={INBOX_HLJS[inboxLang]} />
+            </pre>
+          </div>
+          <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "var(--ms-muted)" }}>
+            {t("agentQuickstart.apiHint")}
+          </p>
+        </div>
+      )}
+
+      <div
+        className="ms-wrap-row"
+        style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 16 }}
+      >
+        <Link href="/mail/settings?tab=agents" className="ms-btn ms-btn-secondary ms-btn-sm">
+          {t("agentQuickstart.manageAgents")}
+        </Link>
+        <Link href="/settings/mcp" style={{ fontSize: 13, color: "var(--ms-muted)" }}>
+          {t("agentQuickstart.mcpSettings")}
+        </Link>
+      </div>
+    </section>
+  );
+
   return (
     <div style={{ overflow: "hidden" }}>
       <h2 className="ms-display" style={{ fontSize: "var(--ms-fs-h2)", margin: 0 }}>
@@ -1094,6 +1328,8 @@ function ApiQuickstartContent({
           {keyTestBlock}
         </section>
       ) : null}
+
+      {agentQuickstartPanel}
 
       {explore}
     </div>
