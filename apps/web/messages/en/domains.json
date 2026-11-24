@@ -73,6 +73,7 @@
       }
     },
     "submit": "Add domain",
+    "fillDomainHint": "Enter a domain name above to continue.",
     "conflict": "This domain is already added.",
     "reserved": "This domain can't be used as a sender.",
     "planLimit": "Your plan's domain limit is reached.",

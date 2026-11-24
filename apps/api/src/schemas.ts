@@ -1759,3 +1759,130 @@ export const listTemplatesResponseSchema = z
 export const removeTemplateResponseSchema = z
   .object({ object: z.literal("template"), id: z.uuid(), deleted: z.literal(true) })
   .openapi("RemoveTemplateResponse");
+
+/** Programmatic Correio inboxes — provision agent/human mailboxes via API key. */
+export const inboxScopeEnum = z.enum(["read", "draft", "send"]);
+export const inboxKindEnum = z.enum(["agent", "person"]);
+
+export const createInboxRequestSchema = z
+  .object({
+    address: z
+      .email()
+      .optional()
+      .describe("Full email address (local_part@domain). Overrides local_part and domain."),
+    local_part: z
+      .string()
+      .trim()
+      .min(1)
+      .max(64)
+      .optional()
+      .describe("Mailbox local part before @; required unless address is provided."),
+    domain_id: z
+      .uuid()
+      .optional()
+      .describe("Domain ID; omitted resolves domain or first verified domain."),
+    domain: z
+      .string()
+      .trim()
+      .min(1)
+      .max(255)
+      .optional()
+      .describe("Domain name when domain_id is omitted."),
+    label: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .optional()
+      .describe("Display name; defaults to local_part."),
+    kind: inboxKindEnum.default("agent"),
+    signature_text: z.string().max(4000).optional(),
+    create_key: z
+      .boolean()
+      .default(true)
+      .describe("Provision an initial mmb_ mailbox agent key alongside the inbox."),
+    key_label: z.string().trim().min(1).max(80).optional(),
+    key_scopes: z.array(inboxScopeEnum).min(1).max(3).optional(),
+  })
+  .openapi("CreateInboxRequest");
+
+export const updateInboxRequestSchema = z
+  .object({
+    label: z.string().trim().min(1).max(80).optional(),
+    status: z.enum(["planned", "suspended"]).optional(),
+    signature_text: z.string().max(4000).optional(),
+  })
+  .openapi("UpdateInboxRequest");
+
+export const createInboxKeyRequestSchema = z
+  .object({
+    label: z.string().trim().min(1).max(80).default("Agent API key"),
+    scopes: z.array(inboxScopeEnum).min(1).max(3).default(["read", "draft", "send"]),
+    expires_at: z.iso.datetime({ offset: true }).nullable().optional(),
+  })
+  .openapi("CreateInboxKeyRequest");
+
+const inboxItemSchema = z.object({
+  id: z.uuid(),
+  address: z.email(),
+  label: z.string(),
+  kind: inboxKindEnum,
+  domain_id: z.uuid().nullable(),
+  status: z.enum(["planned", "suspended"]),
+  created_at: z.string(),
+});
+
+export const inboxKeyResponseSchema = z
+  .object({
+    object: z.literal("inbox_key"),
+    id: z.uuid(),
+    inbox_id: z.uuid(),
+    label: z.string(),
+    scopes: z.array(inboxScopeEnum),
+    token: z.string(),
+    expires_at: z.string().nullable(),
+  })
+  .openapi("InboxKeyResponse");
+
+export const createInboxResponseSchema = inboxItemSchema
+  .extend({
+    object: z.literal("inbox"),
+    signature_text: z.string(),
+    key: z
+      .object({
+        id: z.uuid(),
+        token: z.string(),
+        scopes: z.array(inboxScopeEnum),
+      })
+      .nullable(),
+  })
+  .openapi("CreateInboxResponse");
+
+export const getInboxResponseSchema = inboxItemSchema
+  .extend({
+    object: z.literal("inbox"),
+    signature_text: z.string(),
+    delete_after: z.string().nullable(),
+  })
+  .openapi("GetInboxResponse");
+
+export const listInboxesResponseSchema = z
+  .object({
+    object: z.literal("list"),
+    data: z.array(inboxItemSchema),
+    has_more: z.boolean(),
+  })
+  .openapi("ListInboxesResponse");
+
+export const inboxIdResponseSchema = z
+  .object({ object: z.literal("inbox"), id: z.uuid() })
+  .openapi("InboxIdResponse");
+
+export const removeInboxResponseSchema = z
+  .object({
+    object: z.literal("inbox"),
+    id: z.uuid(),
+    deleted: z.literal(true),
+    delete_after: z.string(),
+  })
+  .openapi("RemoveInboxResponse");

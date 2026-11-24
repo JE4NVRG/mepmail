@@ -1,9 +1,13 @@
 import type { Db } from "@millionsend/db";
 import { schema } from "@millionsend/db";
 
-import { AUDIT_ACTIONS, type AuditAction } from "./audit-actions.js";
+import {
+  AUDIT_ACTIONS,
+  type AuditAction,
+  INTERNAL_SENDING_LEDGER_ACTIONS,
+} from "./audit-actions.js";
 
-export { AUDIT_ACTIONS, type AuditAction };
+export { AUDIT_ACTIONS, type AuditAction, INTERNAL_SENDING_LEDGER_ACTIONS };
 
 /** Who did it: a signed-in user, an API key, an OAuth (MCP) token, Stripe, or the platform itself. */
 export type AuditActor = { userId: string } | { apiKeyId: string } | "oauth" | "stripe" | "system";

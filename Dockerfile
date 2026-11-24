@@ -6,20 +6,23 @@ RUN corepack enable pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # pnpm fetch populates the store from the lockfile alone, so this layer only
 # invalidates when dependencies change, not on every source edit.
-RUN pnpm fetch
+RUN --mount=type=cache,id=mepmail-pnpm-store,target=/root/.local/share/pnpm/store \
+  pnpm fetch --store-dir=/root/.local/share/pnpm/store
 
 FROM deps AS build
 COPY . .
-RUN pnpm install --frozen-lockfile --offline
-RUN pnpm --filter @millionsend/web build
-RUN pnpm --filter @millionsend/docs build
-# The webpack cache is build-only (hundreds of MB), and the runtime never
-# needs dev tooling (drizzle-kit, vitest, biome, typescript): a fresh
-# prod-only install from the same store leaves none of it behind. (`pnpm
-# prune --prod` is not workspace-aware — it empties the packages' own
-# node_modules — and a re-link over the existing tree keeps the orphans.)
-RUN rm -rf apps/*/.next/cache node_modules apps/*/node_modules packages/*/node_modules \
-  && CI=true pnpm install --prod --frozen-lockfile --offline \
+RUN --mount=type=cache,id=mepmail-pnpm-store,target=/root/.local/share/pnpm/store \
+  pnpm install --frozen-lockfile --offline --store-dir=/root/.local/share/pnpm/store
+RUN --mount=type=cache,id=mepmail-web-next,target=/app/apps/web/.next/cache \
+  pnpm --filter @millionsend/web build
+RUN --mount=type=cache,id=mepmail-docs-next,target=/app/apps/docs/.next/cache \
+  pnpm --filter @millionsend/docs build
+# The webpack cache is build-only (mounted above so none remains in the layer),
+# and the runtime never needs dev tooling (drizzle-kit, vitest, biome, typescript):
+# a fresh prod-only install from the same cached store leaves none of it behind.
+RUN --mount=type=cache,id=mepmail-pnpm-store,target=/root/.local/share/pnpm/store \
+  rm -rf node_modules apps/*/node_modules packages/*/node_modules \
+  && CI=true pnpm install --prod --frozen-lockfile --offline --store-dir=/root/.local/share/pnpm/store \
   && node scripts/prune-runtime-tooling.mjs
 
 # The runtime keeps the full workspace (source + node_modules): api and worker

@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Fragment, useCallback, useState } from "react";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { CopyChip } from "@/components/copy-chip";
+import { ChevronGlyph } from "@/components/icons/nav-icons";
 import { LoadError } from "@/components/load-error";
 import { MetaItem } from "@/components/meta-item";
 import { Modal } from "@/components/modal";
@@ -41,6 +42,7 @@ function DeliveriesTableHead() {
         <th>{t("deliveryTable.response")}</th>
         <th>{t("deliveryTable.attempts")}</th>
         <th>{t("deliveryTable.time")}</th>
+        <th className="right" style={{ width: 32 }} aria-label={t("deliveryTable.toggle")} />
       </tr>
     </thead>
   );
@@ -70,6 +72,7 @@ function DeliveriesSkeleton() {
             <td>
               <Skeleton width={72} />
             </td>
+            <td />
           </tr>
         ))}
       </tbody>
@@ -77,11 +80,20 @@ function DeliveriesSkeleton() {
   );
 }
 
-/** Expanded row body: payload JSON plus whatever response was recorded. */
+/** Expanded row body: payload JSON, response body/code and 1-click redeliver. */
 function DeliveryExpanded({ id }: { id: string }) {
   const t = useTranslations("webhooks");
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const delivery = useQuery(trpc.webhooks.deliveries.get.queryOptions({ id }));
+  const replay = useMutation(
+    trpc.webhooks.deliveries.replay.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.webhooks.deliveries.pathFilter());
+        queryClient.invalidateQueries(trpc.webhooks.pathFilter());
+      },
+    }),
+  );
 
   if (delivery.isPending) {
     // Mirrors the loaded expanded row (payload block, response, message id).
@@ -179,8 +191,39 @@ function DeliveryExpanded({ id }: { id: string }) {
           </p>
         )}
       </div>
-      <div className="ms-mono" style={{ fontSize: 11, color: "var(--ms-muted)" }}>
-        {t("detail.messageId")}: {data.messageId}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div className="ms-mono" style={{ fontSize: 11, color: "var(--ms-muted)" }}>
+          {t("detail.messageId")}: {data.messageId}
+        </div>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+          {replay.isSuccess ? (
+            <span className={`ms-badge ${replay.data.ok ? "ms-badge-success" : "ms-badge-danger"}`}>
+              {t(replay.data.ok ? "detail.redeliverOk" : "detail.redeliverFail", {
+                code: replay.data.responseCode ?? "—",
+              })}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className="ms-btn ms-btn-secondary ms-btn-sm"
+            disabled={replay.isPending}
+            onClick={(event) => {
+              event.stopPropagation();
+              replay.mutate({ id });
+            }}
+          >
+            <BtnSpinner on={replay.isPending} />
+            {t("detail.redeliver")}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -564,10 +607,21 @@ export function WebhookDetail({ id }: { id: string }) {
                         <td>
                           <RelativeTime date={delivery.createdAt} />
                         </td>
+                        <td className="right" style={{ color: "var(--ms-muted)" }}>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              transform: expandedId === delivery.id ? "rotate(90deg)" : "none",
+                              transition: "transform var(--ms-dur-fast) var(--ms-ease)",
+                            }}
+                          >
+                            <ChevronGlyph size={12} />
+                          </span>
+                        </td>
                       </tr>
                       {expandedId === delivery.id ? (
                         <tr>
-                          <td colSpan={5}>
+                          <td colSpan={6}>
                             <DeliveryExpanded id={delivery.id} />
                           </td>
                         </tr>

@@ -20,6 +20,16 @@ export const MAILBOX_ACTIVITY_ACTIONS = [
 ] as const;
 export type MailboxActivityAction = (typeof MAILBOX_ACTIVITY_ACTIONS)[number];
 
+/** Internal capacity-ledger & pre-dispatch telemetry rows reserved for operator console audit. */
+export const INTERNAL_SENDING_LEDGER_ACTIONS = [
+  "sending.judge_attempt_reserved",
+  "sending.judge_attempt_reconciled",
+  "sending.graduated_reserved",
+  "sending.graduated_recipient_seen",
+  "sending.content_pre_dispatch",
+  "sending.restoration_campaign_claimed",
+] as const;
+
 export const AUDIT_ACTIONS = [
   "api_key.created",
   "api_key.revoked",

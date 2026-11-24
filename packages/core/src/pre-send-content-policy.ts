@@ -1,4 +1,6 @@
-import type { Db } from "@millionsend/db";
+import { type Db, schema } from "@millionsend/db";
+import { eq } from "drizzle-orm";
+import { recordOperatorAlert } from "./operator-alerts.js";
 import { guardColdOutreach } from "./outreach-guard.js";
 import { foldText, holdTeamForReview, senderName } from "./send-review.js";
 import { parseMailbox } from "./sender-address.js";
@@ -284,14 +286,30 @@ export async function screenPreSendContent(
   const now = input.now ?? new Date();
   const verdict = evaluatePreSendContent(input);
   if (verdict.action === "hold") {
+    const note =
+      verdict.code === "brand_account_link_mismatch"
+        ? `Pre-send policy: ${verdict.code} (${verdict.brand})`
+        : `Pre-send policy: ${verdict.code} (${verdict.signal})`;
+    const [team] = await db
+      .select({ plan: schema.teams.plan })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, input.teamId));
+    // Protect the operator's system tenant from a collateral tenant-wide lock
+    // when a single cold_outreach payload is parked; phishing still holds the team.
+    if (team?.plan === "system" && verdict.code === "cold_outreach") {
+      await recordOperatorAlert(db, {
+        kind: "review.system_payload_parked",
+        subject: "System team payload parked by pre-send policy",
+        text: note,
+        teamId: input.teamId,
+      });
+      return verdict;
+    }
     await holdTeamForReview(db, {
       teamId: input.teamId,
       reason: "content",
       now,
-      note:
-        verdict.code === "brand_account_link_mismatch"
-          ? `Pre-send policy: ${verdict.code} (${verdict.brand})`
-          : `Pre-send policy: ${verdict.code} (${verdict.signal})`,
+      note,
     });
   }
   return verdict;

@@ -149,7 +149,10 @@
     "next": "Próxima",
     "pageOf": "{from}–{to}",
     "notFound": "Webhook não encontrado.",
-    "previousSecret": "O segredo anterior também assina até {date}"
+    "previousSecret": "O segredo anterior também assina até {date}",
+    "redeliver": "Reenviar entrega",
+    "redeliverOk": "Reenviado ({code})",
+    "redeliverFail": "Falhou ({code})"
   },
   "deliveryTable": {
     "event": "Evento",

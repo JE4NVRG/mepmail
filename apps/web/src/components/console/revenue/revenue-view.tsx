@@ -172,9 +172,16 @@ export function RevenueView() {
                     : t("status.ended");
                 return (
                   <tr key={`${r.teamId}-${r.product}`}>
-                    <td>
+                    <td
+                      style={{
+                        maxWidth: 190,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
                       <Link
                         href={`/console/teams?status=all&q=${encodeURIComponent(r.team)}`}
+                        title={r.team}
                         style={{ color: "inherit" }}
                       >
                         {r.team}
@@ -185,7 +192,7 @@ export function RevenueView() {
                         </span>
                       ) : null}
                     </td>
-                    <td>
+                    <td style={{ whiteSpace: "normal", minWidth: 140 }}>
                       {t(`product.${r.product}`)}
                       {r.plan && r.plan !== "free" ? (
                         <span style={{ color: "var(--ms-muted)" }}> · {r.plan}</span>
@@ -209,7 +216,7 @@ export function RevenueView() {
                         <span style={{ color: "var(--ms-muted)" }}>{common("none")}</span>
                       )}
                     </td>
-                    <td style={{ color: "var(--ms-muted)" }}>
+                    <td style={{ color: "var(--ms-muted)", whiteSpace: "normal", minWidth: 120 }}>
                       {r.cancelAt
                         ? t("cancelsOn", { date: day.format(new Date(r.cancelAt)) })
                         : r.periodEnd
@@ -217,17 +224,24 @@ export function RevenueView() {
                           : common("none")}
                     </td>
                     <td>
-                      <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          gap: 6,
+                          alignItems: "center",
+                          flexWrap: "nowrap",
+                        }}
+                      >
                         <Link
                           className="ms-chip"
-                          style={{ textDecoration: "none", fontSize: 12 }}
+                          style={{ textDecoration: "none", fontSize: 12, whiteSpace: "nowrap" }}
                           href={`/console/audit?team=${r.teamId}`}
                         >
                           {t("audit")}
                         </Link>
                         <Link
                           className="ms-chip"
-                          style={{ textDecoration: "none", fontSize: 12 }}
+                          style={{ textDecoration: "none", fontSize: 12, whiteSpace: "nowrap" }}
                           href={`/console/safety/${r.teamId}`}
                         >
                           {t("review")}

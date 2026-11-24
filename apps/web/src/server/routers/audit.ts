@@ -1,4 +1,8 @@
-import { MAILBOX_ACTIVITY_ACTIONS, parseAuditActor } from "@millionsend/core";
+import {
+  INTERNAL_SENDING_LEDGER_ACTIONS,
+  MAILBOX_ACTIVITY_ACTIONS,
+  parseAuditActor,
+} from "@millionsend/core";
 import { schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, notInArray } from "drizzle-orm";
@@ -36,7 +40,7 @@ export const auditRouter = router({
         .where(
           and(
             eq(t.teamId, ctx.teamId),
-            notInArray(t.action, [...MAILBOX_ACTIVITY_ACTIONS]),
+            notInArray(t.action, [...MAILBOX_ACTIVITY_ACTIONS, ...INTERNAL_SENDING_LEDGER_ACTIONS]),
             input.cursor ? beforeCursor(t, input.cursor) : undefined,
           ),
         )

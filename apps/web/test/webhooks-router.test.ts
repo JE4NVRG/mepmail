@@ -381,3 +381,27 @@ describe("webhooks.rotateSecret", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });
+
+describe("webhooks.deliveries.replay", () => {
+  it("re-delivers an existing delivery synchronously and increments attempts", async () => {
+    const teamId = await createTeam(db, "team-replay");
+    const caller = callerFor(teamId);
+    const { id } = await caller.webhooks.create({ url: "https://10.0.0.1/replay" });
+
+    const first = await caller.webhooks.testDelivery({ id });
+    expect(first.ok).toBe(false);
+
+    const replayed = await caller.webhooks.deliveries.replay({ id: first.id });
+    expect(replayed.ok).toBe(false);
+    expect(replayed.id).toBe(first.id);
+
+    const updated = await caller.webhooks.deliveries.get({ id: first.id });
+    expect(updated.status).toBe("failed");
+    expect(updated.attempts).toBe(2);
+    expect(updated.lastResponseBody).toBe("url_rejected");
+
+    await expect(
+      callerFor(teamId, "member").webhooks.deliveries.replay({ id: first.id }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});

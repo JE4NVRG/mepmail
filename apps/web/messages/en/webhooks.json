@@ -149,7 +149,10 @@
     "next": "Next",
     "pageOf": "{from}–{to}",
     "notFound": "Webhook not found.",
-    "previousSecret": "The previous secret also signs until {date}"
+    "previousSecret": "The previous secret also signs until {date}",
+    "redeliver": "Redeliver",
+    "redeliverOk": "Redelivered ({code})",
+    "redeliverFail": "Failed ({code})"
   },
   "deliveryTable": {
     "event": "Event",

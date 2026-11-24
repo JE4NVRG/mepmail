@@ -38,31 +38,58 @@ export function TeamReputation() {
     <div style={{ marginBottom: 16 }}>
       <div className="ms-field" style={{ marginBottom: 6 }}>
         <label htmlFor={id}>{t.domainSelector}</label>
-        <select
-          id={id}
-          className="ms-input"
-          value={domainId ?? ""}
-          disabled={!domains.isSuccess}
-          aria-describedby={`${id}-scope`}
-          style={{
-            display: "block",
-            width: "min(100%, 580px)",
-            height: 36,
-            paddingRight: 32,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            cursor: "pointer",
-          }}
-          onChange={(event) => setDomainId(event.target.value || null)}
-        >
-          <option value="">{t.principalScope}</option>
-          {domains.data?.map((domain) => (
-            <option key={domain.id} value={domain.id}>
-              {domain.name} · {domain.status === "verified" ? t.domainVerified : t.domainPending}
-            </option>
-          ))}
-        </select>
+        <div style={{ position: "relative", width: "min(100%, 580px)" }}>
+          <select
+            id={id}
+            className="ms-input"
+            value={domainId ?? ""}
+            disabled={!domains.isSuccess}
+            aria-describedby={`${id}-scope`}
+            style={{
+              display: "block",
+              width: "100%",
+              height: 36,
+              paddingRight: 34,
+              appearance: "none",
+              WebkitAppearance: "none",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              cursor: domains.isSuccess ? "pointer" : "default",
+            }}
+            onChange={(event) => setDomainId(event.target.value || null)}
+          >
+            <option value="">{t.principalScope}</option>
+            {domains.data?.map((domain) => (
+              <option key={domain.id} value={domain.id}>
+                {domain.name} · {domain.status === "verified" ? t.domainVerified : t.domainPending}
+              </option>
+            ))}
+          </select>
+          <svg
+            aria-hidden="true"
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            style={{
+              position: "absolute",
+              right: 11,
+              top: "50%",
+              transform: "translateY(-50%)",
+              pointerEvents: "none",
+              color: "var(--ms-muted)",
+            }}
+          >
+            <path
+              d="m4 6 4 4 4-4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
       </div>
       <p
         id={`${id}-scope`}

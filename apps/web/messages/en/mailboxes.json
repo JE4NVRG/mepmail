@@ -1370,5 +1370,11 @@
       "verify_domain": "Check your sending domain verification in Settings.",
       "contact_support": "Contact support for help with this hold."
     }
+  },
+  "apiSheet": {
+    "title": "Inboxes API",
+    "create": "Provision an agent inbox (POST /inboxes)",
+    "list": "List inboxes (GET /inboxes)",
+    "key": "Mint mmb_ agent key (POST /inboxes/{id}/keys)"
   }
 }

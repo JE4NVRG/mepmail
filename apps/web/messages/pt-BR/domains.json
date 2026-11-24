@@ -73,6 +73,7 @@
       }
     },
     "submit": "Adicionar domínio",
+    "fillDomainHint": "Digite um domínio acima para habilitar o envio.",
     "conflict": "Este domínio já foi adicionado.",
     "reserved": "Este domínio não pode ser usado como remetente.",
     "planLimit": "O limite de domínios do seu plano foi atingido.",

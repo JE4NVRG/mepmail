@@ -297,7 +297,7 @@ export function AddDomainForm({ userEmail }: { userEmail: string }) {
         <form
           onSubmit={onSubmit}
           style={{
-            width: 520,
+            width: "min(100%, 520px)",
             flex: "none",
             background: "var(--ms-panel)",
             border: "1px solid var(--ms-line-strong)",
@@ -343,6 +343,7 @@ export function AddDomainForm({ userEmail }: { userEmail: string }) {
               id="domain-region"
               width="100%"
               value={region}
+              placeholder={served ? t("new.region") : "…"}
               disabled={create.isPending || !served}
               onChange={setRegion}
               ariaLabel={t("new.region")}
@@ -428,6 +429,7 @@ export function AddDomainForm({ userEmail }: { userEmail: string }) {
             <BtnSpinner on={create.isPending} />
             {t("new.submit")}
           </button>
+          {name.length === 0 ? <p style={hintStyle}>{t("new.fillDomainHint")}</p> : null}
         </form>
 
         <div className="ms-stepper-side" style={{ flex: 1, minWidth: 0 }}>

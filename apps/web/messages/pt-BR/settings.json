@@ -636,7 +636,14 @@
       "team_signup_risk_enrolled": "Equipe incluída na política de cadastro",
       "team_signup_risk_escalated": "Restrição de cadastro elevada",
       "team_signup_risk_review_requested": "Revisão de cadastro solicitada",
-      "team_signup_risk_review_resolved": "Pedido de revisão atendido"
+      "team_signup_risk_review_resolved": "Pedido de revisão atendido",
+      "sending_reputation_review_required": "Revisão de reputação de envio solicitada",
+      "sending_judge_attempt_reserved": "Reserva do avaliador de envio",
+      "sending_judge_attempt_reconciled": "Reconciliação do avaliador de envio",
+      "sending_graduated_reserved": "Reserva de envio gradual",
+      "sending_graduated_recipient_seen": "Destinatário contabilizado no envio gradual",
+      "sending_content_pre_dispatch": "Inspeção de conteúdo pré-envio",
+      "sending_restoration_campaign_claimed": "Campanha registrada na rota de restauração"
     },
     "empty": "Nada registrado ainda.",
     "loadMore": "Carregar mais",

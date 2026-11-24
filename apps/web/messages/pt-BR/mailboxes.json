@@ -1370,5 +1370,11 @@
       "verify_domain": "Confira a verificação do domínio de envio em Configurações.",
       "contact_support": "Fale com o suporte para obter ajuda com este envio retido."
     }
+  },
+  "apiSheet": {
+    "title": "API de caixas",
+    "create": "Criar caixa para agente (POST /inboxes)",
+    "list": "Listar caixas (GET /inboxes)",
+    "key": "Gerar chave de agente mmb_ (POST /inboxes/{id}/keys)"
   }
 }

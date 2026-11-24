@@ -176,3 +176,21 @@ it("screens old, reviewed and system teams again for new forged identities", asy
     ).toBe(true);
   }
 });
+
+it("parks cold_outreach payload on a system team without locking the entire tenant", async () => {
+  const { db } = fixture;
+  const teamId = await createTeam(db, "system-outreach-no-lock");
+  await db
+    .update(schema.teams)
+    .set({ plan: "system", sendReviewClearedAt: new Date("2026-01-01") })
+    .where(eq(schema.teams.id, teamId));
+  const verdict = await screenPreSendContent(db, {
+    teamId,
+    from: "parcerias@system.example",
+    subject: "Proposta de parceria",
+    text: "Vamos conversar sobre parceria?",
+  });
+  expect(verdict).toMatchObject({ action: "hold", code: "cold_outreach" });
+  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+  expect(team?.sendReviewAt).toBeNull();
+});

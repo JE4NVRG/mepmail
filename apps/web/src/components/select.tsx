@@ -56,6 +56,7 @@ export function Select({
   onChange,
   options,
   ariaLabel,
+  placeholder,
   width,
   disabled = false,
   id,
@@ -65,6 +66,7 @@ export function Select({
   onChange: (value: string) => void;
   options: SelectOption[];
   ariaLabel: string;
+  placeholder?: string;
   width?: number | string;
   disabled?: boolean;
   /** Forwarded to the trigger so an ms-field <label htmlFor> can target it. */
@@ -275,8 +277,15 @@ export function Select({
           }}
         >
           {selected?.adornment}
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {selected?.label ?? ""}
+          <span
+            style={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              ...(selected ? {} : { color: "var(--ms-muted)" }),
+            }}
+          >
+            {selected?.label ?? placeholder ?? ""}
           </span>
           {selected?.badge ? (
             <span

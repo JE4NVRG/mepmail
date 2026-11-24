@@ -15,6 +15,7 @@ import {
 } from "@/components/icons/nav-icons";
 import { useDismiss } from "@/components/popover-menu";
 import { QueryRecoveryNotice } from "@/components/query-recovery";
+import { Skeleton } from "@/components/skeleton";
 import { TeamSwitcher } from "@/components/team-switcher";
 import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
@@ -275,7 +276,20 @@ export function Sidebar({
             />
           </section>
         ) : null}
-        {navigation.recoveryPhase ? (
+        {navigation.recoveryPhase === "loading" ? (
+          <section className={styles.navSection} aria-hidden="true">
+            <div className={styles.navHeading}>{t("products.send")}</div>
+            {[84, 112, 92, 96, 78, 72].map((width) => (
+              <div
+                key={width}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px" }}
+              >
+                <Skeleton width={15} height={15} radius={4} />
+                <Skeleton width={width} height={13} />
+              </div>
+            ))}
+          </section>
+        ) : navigation.recoveryPhase ? (
           <section className={styles.navSection}>
             <QueryRecoveryNotice
               phase={navigation.recoveryPhase}

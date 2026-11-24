@@ -109,7 +109,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 0;
+  flex-shrink: 0;
+  min-width: max-content;
 }
 .gtm-brand-badge {
   display: none;
@@ -764,6 +765,17 @@
   .gtm-header-inner {
     gap: 12px;
   }
+  .gtm-nav {
+    min-width: 0;
+  }
+  .gtm-nav-links {
+    gap: 4px;
+  }
+  .gtm-nav-links a {
+    padding: 0 10px;
+  }
+}
+@media (min-width: 1320px) {
   .gtm-nav-links {
     gap: 8px;
   }

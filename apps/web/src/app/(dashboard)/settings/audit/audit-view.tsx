@@ -1,6 +1,6 @@
 "use client";
 
-import { AUDIT_ACTIONS, type AuditAction } from "@millionsend/core/audit-actions";
+import { AUDIT_ACTIONS, INTERNAL_SENDING_LEDGER_ACTIONS } from "@millionsend/core/audit-actions";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { RelativeTime } from "@/components/relative-time";
@@ -11,8 +11,13 @@ import { ListFooter, StateCard } from "../../emails/list-parts";
 
 const COL = { when: "16%", who: "24%", action: "28%" } as const;
 
-const isKnownAction = (action: string): action is AuditAction =>
-  (AUDIT_ACTIONS as readonly string[]).includes(action);
+const KNOWN_AUDIT_LABELS: ReadonlySet<string> = new Set([
+  ...AUDIT_ACTIONS,
+  ...INTERNAL_SENDING_LEDGER_ACTIONS,
+  "sending.reputation_review_required",
+]);
+
+const isKnownAction = (action: string): boolean => KNOWN_AUDIT_LABELS.has(action);
 
 /** The one identifying fact the row carries, if any: a name, an address, a URL, a plan. */
 function targetLabel(data: Record<string, unknown> | null, target: string | null): string {
@@ -20,7 +25,10 @@ function targetLabel(data: Record<string, unknown> | null, target: string | null
     const value = data?.[key];
     if (typeof value === "string" && value) return value;
   }
-  return target ?? "";
+  if (!target) return "";
+  const colon = target.indexOf(":");
+  if (colon > 0) return target.slice(colon + 1, colon + 9);
+  return target;
 }
 
 function AuditSkeleton({ headers }: { headers: [string, string, string, string] }) {

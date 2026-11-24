@@ -116,6 +116,7 @@ import { loggedBody, maskEmailPathSegments } from "./request-log.js";
 import { registerApiKeyRoutes } from "./routes/api-keys.js";
 import { registerContactPropertyRoutes } from "./routes/contact-properties.js";
 import { type DomainsSesDeps, registerDomainRoutes } from "./routes/domains.js";
+import { registerInboxRoutes } from "./routes/inboxes.js";
 import { registerSuppressionRoutes } from "./routes/suppressions.js";
 import { registerTemplateRoutes } from "./routes/templates.js";
 import { registerUsageRoutes } from "./routes/usage.js";
@@ -3625,6 +3626,18 @@ export function createApi(deps: ApiDeps): OpenAPIHono<Env> {
   app.use("/domains", requireApiKey, enforceRateLimit, requireFullAccess);
   app.use("/domains/*", requireApiKey, enforceRateLimit, requireFullAccess);
   if (deps.ses) registerDomainRoutes(app, deps, deps.ses);
+
+  app.use("/inboxes", requireApiKey, enforceRateLimit, requireFullAccess);
+  app.use("/inboxes/*", requireApiKey, enforceRateLimit, requireFullAccess);
+  registerInboxRoutes(app, deps.db);
+  // AgentMail-style /v1/inboxes compatibility prefix forwarding to /inboxes.
+  const forwardInboxesV1 = (c: Context<Env>) => {
+    const url = new URL(c.req.url);
+    url.pathname = url.pathname.replace(/^\/v1(?=\/inboxes\b)/, "");
+    return app.fetch(new Request(url, c.req.raw));
+  };
+  app.all("/v1/inboxes", forwardInboxesV1);
+  app.all("/v1/inboxes/*", forwardInboxesV1);
 
   app.use("/api-keys", requireApiKey, enforceRateLimit, requireFullAccess);
   app.use("/api-keys/*", requireApiKey, enforceRateLimit, requireFullAccess);

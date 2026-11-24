@@ -3619,17 +3619,17 @@
 }
 
 @container (max-width: 620px) {
-  /* Compose floats over the list, as on every phone mail app; reading hides it. */
+  /* Compose floats over the list, compact enough to stay clear of row stars. */
   .contentToolbar .composeButton {
     position: fixed;
-    right: calc(16px + env(safe-area-inset-right, 0px));
-    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    right: calc(14px + env(safe-area-inset-right, 0px));
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     z-index: 20;
-    min-height: 54px;
-    padding: 0 20px;
-    border-radius: 16px;
-    font-size: 14px;
-    box-shadow: 0 10px 28px rgb(0 0 0 / 0.35);
+    min-height: 44px;
+    padding: 0 15px;
+    border-radius: 14px;
+    font-size: 13.5px;
+    box-shadow: 0 10px 26px rgb(0 0 0 / 0.35);
   }
   .contentWorkspace:has(.contentDetail[data-reading="true"]) .composeButton {
     display: none;

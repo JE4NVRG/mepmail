@@ -23,6 +23,10 @@ const TAGS = {
   broadcasts: { name: "Broadcasts", description: "One email to a whole segment." },
   topics: { name: "Topics", description: "Subscription topics contacts can opt in and out of." },
   domains: { name: "Domains", description: "Sending domains and their DNS records." },
+  inboxes: {
+    name: "Inboxes",
+    description: "Programmatic Mail mailboxes for AI agents and people.",
+  },
   apiKeys: { name: "API keys", description: "Keys that authenticate API calls." },
   webhooks: { name: "Webhooks", description: "Signed event deliveries to your endpoints." },
   suppressions: {
@@ -459,6 +463,42 @@ export const OPERATION_META: Readonly<Record<string, OperationMeta>> = {
     "Update a template",
     "Changes a template; the change is live immediately.",
   ),
+  "POST /inboxes": op(
+    "createInbox",
+    "inboxes",
+    "Create an inbox",
+    "Provisions a Mail inbox on a team domain and optionally returns a scoped mmb_ agent key.",
+  ),
+  "GET /inboxes": op(
+    "listInboxes",
+    "inboxes",
+    "List inboxes",
+    "Lists the team's domain inboxes, newest first.",
+  ),
+  "GET /inboxes/{id}": op(
+    "getInbox",
+    "inboxes",
+    "Retrieve an inbox",
+    "Returns one inbox's address, label, kind, status and signature.",
+  ),
+  "PATCH /inboxes/{id}": op(
+    "updateInbox",
+    "inboxes",
+    "Update an inbox",
+    "Updates an inbox's label, kind or signature.",
+  ),
+  "DELETE /inboxes/{id}": op(
+    "deleteInbox",
+    "inboxes",
+    "Delete an inbox",
+    "Suspends the inbox immediately and schedules deletion after the recovery window.",
+  ),
+  "POST /inboxes/{id}/keys": op(
+    "createInboxKey",
+    "inboxes",
+    "Create an inbox agent key",
+    "Mints a scoped mmb_ bearer token for agents and MCP access on this inbox.",
+  ),
   "DELETE /templates/{id}": op(
     "deleteTemplate",
     "templates",
@@ -639,6 +679,19 @@ const EXAMPLES: Readonly<Record<string, { request?: unknown; response?: unknown 
     },
   },
   "PATCH /templates/{id}": { request: { subject: "Your order is on its way" } },
+  "POST /inboxes": {
+    request: {
+      local_part: "support-agent",
+      domain: "yourdomain.com",
+      label: "Support Agent",
+      kind: "agent",
+      create_key: true,
+    },
+  },
+  "PATCH /inboxes/{id}": { request: { label: "Support Concierge" } },
+  "POST /inboxes/{id}/keys": {
+    request: { label: "Runtime agent key", scopes: ["read", "draft", "send"] },
+  },
 };
 
 /** Values for well-known field names, so a synthesized example reads like real data. */

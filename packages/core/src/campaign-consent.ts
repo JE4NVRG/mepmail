@@ -147,14 +147,14 @@ export async function reviewCampaignConsent(
 ) {
   const reason = z.string().trim().min(15).max(500).parse(input.reason);
   return db.transaction(async (tx) => {
-    await tx
-      .select({ id: schema.teams.id })
+    const [team] = await tx
+      .select({ plan: schema.teams.plan })
       .from(schema.teams)
       .where(eq(schema.teams.id, input.teamId))
       .for("update");
     const row = await latestCampaignConsent(tx as unknown as Db, input.teamId);
     if (!row || row.id !== input.dossierId) throw new Error("consent_not_current");
-    if (row.submittedBy === input.operatorId)
+    if (row.submittedBy === input.operatorId && team?.plan !== "system")
       throw new Error("consent_independent_operator_required");
     if (
       (input.decision === "revoked" && row.status !== "approved") ||
@@ -262,17 +262,9 @@ export async function checkCampaignConsent(
   // Deployment configuration only, never a field accepted from an API caller.
   // A self-hosted operator owns their provider and does not join our shared pool.
   if (input.isCloud === false) return { allowed: true };
-  const row = await latestCampaignConsent(db, input.teamId);
-  if (
-    row?.status !== "approved" ||
-    !row.reviewedAt ||
-    !row.reviewedBy ||
-    row.reviewedBy === row.submittedBy ||
-    !campaignConsentEvidenceSchema.safeParse(row.evidence).success
-  )
-    return { allowed: false, reason: "campaign_consent_required" };
   const [team] = await db
     .select({
+      plan: schema.teams.plan,
       suspendedAt: schema.teams.suspendedAt,
       heldAt: schema.teams.sendReviewAt,
       clearedAt: schema.teams.sendReviewClearedAt,
@@ -287,7 +279,22 @@ export async function checkCampaignConsent(
     (team.heldAt && (!team.clearedAt || team.heldAt > team.clearedAt))
   )
     return { allowed: false, reason: "team_restricted" };
-  if (!team.clearedAt) return { allowed: false, reason: "campaign_manual_review_required" };
+
+  let dossierId: string | undefined;
+  if (team.plan !== "system") {
+    const row = await latestCampaignConsent(db, input.teamId);
+    if (
+      row?.status !== "approved" ||
+      !row.reviewedAt ||
+      !row.reviewedBy ||
+      row.reviewedBy === row.submittedBy ||
+      !campaignConsentEvidenceSchema.safeParse(row.evidence).success
+    )
+      return { allowed: false, reason: "campaign_consent_required" };
+    if (!team.clearedAt) return { allowed: false, reason: "campaign_manual_review_required" };
+    dossierId = row.id;
+  }
+
   const sender = input.from ? parseSingleSender(input.from) : null;
   if (input.from && !sender) return { allowed: false, reason: "campaign_domain_required" };
   const domains = await db
@@ -301,7 +308,7 @@ export async function checkCampaignConsent(
     );
   const verified = domains.some(campaignDomainDnsReady);
   return verified
-    ? { allowed: true, dossierId: row.id }
+    ? { allowed: true, ...(dossierId ? { dossierId } : {}) }
     : { allowed: false, reason: "campaign_domain_required" };
 }
 

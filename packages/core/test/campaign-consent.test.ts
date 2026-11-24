@@ -343,3 +343,35 @@ it("tenant isolation, rejection, verified DNS and manual onboarding are independ
     { reason: "campaign_domain_required" },
   );
 });
+
+it("system teams keep verified-domain & active-hold guards without third-party dossier ceremony", async () => {
+  const f = await fixture();
+  await db
+    .update(schema.teams)
+    .set({ plan: "system", sendReviewClearedAt: null })
+    .where(eq(schema.teams.id, f.teamId));
+
+  // Sole-founder operator on a system team can run campaigns/imports on verified domains.
+  expect(
+    await checkCampaignConsent(db, {
+      teamId: f.teamId,
+      from: f.from,
+      operation: "campaign",
+      isCloud: true,
+    }),
+  ).toEqual({ allowed: true });
+
+  // Active suspension or hold still blocks system campaigns safely.
+  await db
+    .update(schema.teams)
+    .set({ sendReviewAt: new Date(), sendReviewReason: "content", sendReviewNote: "hold" })
+    .where(eq(schema.teams.id, f.teamId));
+  expect(
+    await checkCampaignConsent(db, {
+      teamId: f.teamId,
+      from: f.from,
+      operation: "campaign",
+      isCloud: true,
+    }),
+  ).toMatchObject({ allowed: false, reason: "team_restricted" });
+});

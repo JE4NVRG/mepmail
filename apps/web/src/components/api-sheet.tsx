@@ -507,6 +507,15 @@ export const RESOURCE_SHEETS = {
   -d '{ "status": "disabled" }'`,
     },
   },
+  inboxes: {
+    ns: "mailboxes",
+    sections: ["create", "list", "key"],
+    curl: {
+      create: `curl -X POST "${API_BASE}/inboxes" \\\n  ${AUTH} \\\n  ${JSON_CT} \\\n  -d '{ "local_part": "agent-1", "kind": "agent", "create_key": true }'`,
+      list: `curl "${API_BASE}/inboxes" \\\n  ${AUTH}`,
+      key: `curl -X POST "${API_BASE}/inboxes/${SAMPLE_ID}/keys" \\\n  ${AUTH} \\\n  ${JSON_CT} \\\n  -d '{ "label": "Worker", "scopes": ["read", "draft", "send"] }'`,
+    },
+  },
 } satisfies Record<string, ResourceSheet>;
 
 type Resource = keyof typeof RESOURCE_SHEETS;
@@ -527,12 +536,13 @@ export function ResourceApiButton({ resource }: { resource: Resource }) {
     <>
       <button
         type="button"
-        className="ms-btn ms-btn-icon"
+        className="ms-btn ms-btn-secondary"
         aria-label={title}
         title={title}
         onClick={() => setOpen(true)}
       >
         <CodeGlyph size={14} />
+        <span>API</span>
       </button>
       <Drawer open={open} onClose={() => setOpen(false)} title={title}>
         {sheet.sections.map((section) => (
@@ -647,11 +657,13 @@ export function ApiDocsButton() {
     <>
       <button
         type="button"
-        className="ms-btn ms-btn-icon"
+        className="ms-btn ms-btn-secondary"
         aria-label={t("list.apiDocs")}
+        title={t("list.apiDocs")}
         onClick={() => setOpen(true)}
       >
         <CodeGlyph size={14} />
+        <span>API</span>
       </button>
       <Drawer open={open} onClose={() => setOpen(false)} title={t("apiSheet.title")}>
         <LangTabs label={t("apiSheet.title")} value={lang} onChange={setLang} />

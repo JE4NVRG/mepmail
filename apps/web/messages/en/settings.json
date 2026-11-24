@@ -636,7 +636,14 @@
       "team_signup_risk_enrolled": "Team enrolled in signup policy",
       "team_signup_risk_escalated": "Signup restriction escalated",
       "team_signup_risk_review_requested": "Signup review requested",
-      "team_signup_risk_review_resolved": "Review request addressed"
+      "team_signup_risk_review_resolved": "Review request addressed",
+      "sending_reputation_review_required": "Sending reputation review requested",
+      "sending_judge_attempt_reserved": "Sending judge attempt reserved",
+      "sending_judge_attempt_reconciled": "Sending judge attempt reconciled",
+      "sending_graduated_reserved": "Graduated send capacity reserved",
+      "sending_graduated_recipient_seen": "Recipient counted in graduated sending",
+      "sending_content_pre_dispatch": "Pre-dispatch content check",
+      "sending_restoration_campaign_claimed": "Campaign claimed under restoration route"
     },
     "empty": "Nothing recorded yet.",
     "loadMore": "Load more",

@@ -1,6 +1,6 @@
 "use client";
 
-import { AUDIT_ACTIONS, type AuditAction } from "@millionsend/core/audit-actions";
+import { AUDIT_ACTIONS, INTERNAL_SENDING_LEDGER_ACTIONS } from "@millionsend/core/audit-actions";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
@@ -15,14 +15,17 @@ import { auditDetail } from "./detail";
 
 const COL = { when: "10%", actor: "16%", action: "24%", target: "16%", ip: "10%" } as const;
 
-const isKnownAction = (action: string): action is AuditAction =>
-  (AUDIT_ACTIONS as readonly string[]).includes(action);
+const KNOWN_AUDIT_LABELS: ReadonlySet<string> = new Set([
+  ...AUDIT_ACTIONS,
+  ...INTERNAL_SENDING_LEDGER_ACTIONS,
+  "sending.reputation_review_required",
+]);
 
 /** The catalogue keys carry "_" where the action has "." (next-intl reads "." as nesting). */
 export function useActionLabel() {
   const t = useTranslations("settings");
   return (action: string) =>
-    isKnownAction(action) ? t(`audit.actions.${action.replace(".", "_")}`) : action;
+    KNOWN_AUDIT_LABELS.has(action) ? t(`audit.actions.${action.replace(".", "_")}`) : action;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -164,12 +167,26 @@ export function AuditView({
                     )}
                   </td>
                   <td>
-                    <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        gap: 6,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        maxWidth: 280,
+                      }}
+                    >
                       {actionLabel(row.action)}
                       <span className="ms-chip">{row.action}</span>
                     </span>
                   </td>
-                  <td>
+                  <td
+                    style={{
+                      maxWidth: 180,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
                     {row.teamName && row.teamId ? (
                       <Link
                         href={`/console/audit?team=${row.teamId}`}
@@ -181,12 +198,25 @@ export function AuditView({
                     ) : row.teamId === null ? (
                       <span style={{ color: "var(--ms-muted)" }}>{t("instance")}</span>
                     ) : (
-                      <span className="ms-mono" style={{ fontSize: 13 }}>
+                      <span
+                        className="ms-mono"
+                        style={{ fontSize: 13 }}
+                        title={row.target ?? undefined}
+                      >
                         {row.target ?? common("none")}
                       </span>
                     )}
                   </td>
-                  <td style={{ color: "var(--ms-muted)", fontSize: 13 }}>
+                  <td
+                    style={{
+                      color: "var(--ms-muted)",
+                      fontSize: 13,
+                      maxWidth: 260,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                    title={detail || undefined}
+                  >
                     {detail || common("none")}
                   </td>
                   <td className="ms-mono" style={{ fontSize: 13, whiteSpace: "nowrap" }}>

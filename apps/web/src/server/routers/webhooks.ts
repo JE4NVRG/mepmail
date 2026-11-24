@@ -74,6 +74,54 @@ async function recentTestDeliveries(db: Db, teamId: string): Promise<number> {
   return row?.n ?? 0;
 }
 
+/** Signs and posts a webhook delivery payload synchronously, updating attempt telemetry. */
+async function deliverSignedWebhookNow(
+  db: Db,
+  endpoint: typeof schema.webhookEndpoints.$inferSelect,
+  delivery: { id: string; messageId: string; payload: unknown; attempts: number },
+  incrementAttempts: boolean,
+): Promise<{ id: string; ok: boolean; responseCode: number | null }> {
+  const secrets = await decryptWebhookSigningSecrets(endpoint, getKeyring());
+  const payloadJson = JSON.stringify(delivery.payload);
+  const headers = signWebhook(secrets, {
+    msgId: delivery.messageId,
+    timestamp: Math.floor(Date.now() / 1000),
+    payload: payloadJson,
+  });
+  let responseCode: number | null = null;
+  let body = "";
+  let ok = false;
+  if (!testPortAllowed(endpoint.url)) {
+    body = "port_not_allowed";
+  } else {
+    try {
+      const res = await postJson(endpoint.url, {
+        body: payloadJson,
+        headers: { ...headers, "content-type": "application/json" },
+        allowLocalhost: env.WEBHOOK_ALLOW_LOCALHOST,
+      });
+      responseCode = res.status;
+      body = res.body;
+      ok = res.status >= 200 && res.status < 300;
+    } catch (err) {
+      // Fixed codes only: the raw socket message is a host fingerprint.
+      body = postFailureCode(err);
+    }
+  }
+  await db
+    .update(schema.webhookDeliveries)
+    .set({
+      status: ok ? "success" : "failed",
+      attempts: incrementAttempts ? delivery.attempts + 1 : 1,
+      lastAttemptAt: new Date(),
+      lastResponseCode: responseCode,
+      lastResponseBody: body.slice(0, 1024),
+      nextAttemptAt: null,
+    })
+    .where(eq(schema.webhookDeliveries.id, delivery.id));
+  return { id: delivery.id, ok, responseCode };
+}
+
 function toEnabled(status: (typeof schema.webhookEndpoints.$inferSelect)["status"]): boolean {
   return status === "enabled";
 }
@@ -408,45 +456,12 @@ export const webhooksRouter = router({
         .from(schema.webhookEndpoints)
         .where(eq(schema.webhookEndpoints.id, input.id));
       if (!endpoint) throw new TRPCError({ code: "NOT_FOUND" });
-      const secrets = await decryptWebhookSigningSecrets(endpoint, getKeyring());
-      const payloadJson = JSON.stringify(payload);
-      const headers = signWebhook(secrets, {
-        msgId: messageId,
-        timestamp: Math.floor(Date.now() / 1000),
-        payload: payloadJson,
-      });
-      let responseCode: number | null = null;
-      let body = "";
-      let ok = false;
-      if (!testPortAllowed(endpoint.url)) {
-        body = "port_not_allowed";
-      } else {
-        try {
-          const res = await postJson(endpoint.url, {
-            body: payloadJson,
-            headers: { ...headers, "content-type": "application/json" },
-            allowLocalhost: env.WEBHOOK_ALLOW_LOCALHOST,
-          });
-          responseCode = res.status;
-          body = res.body;
-          ok = res.status >= 200 && res.status < 300;
-        } catch (err) {
-          // Fixed codes only: the raw socket message is a host fingerprint.
-          body = postFailureCode(err);
-        }
-      }
-      await ctx.db
-        .update(schema.webhookDeliveries)
-        .set({
-          status: ok ? "success" : "failed",
-          attempts: 1,
-          lastAttemptAt: new Date(),
-          lastResponseCode: responseCode,
-          lastResponseBody: body.slice(0, 1024),
-          nextAttemptAt: null,
-        })
-        .where(eq(schema.webhookDeliveries.id, row.id));
-      return { id: row.id, ok, responseCode };
+      return deliverSignedWebhookNow(
+        ctx.db,
+        endpoint,
+        { id: row.id, messageId, payload, attempts: 0 },
+        false,
+      );
     }),
 
   deliveries: router({
@@ -489,6 +504,29 @@ export const webhooksRouter = router({
         .where(and(eq(d.id, input.id), eq(t.teamId, ctx.teamId)));
       if (!row) throw new TRPCError({ code: "NOT_FOUND" });
       return row;
+    }),
+
+    replay: adminProcedure.input(z.object({ id: z.uuid() })).mutation(async ({ ctx, input }) => {
+      if ((await recentTestDeliveries(ctx.db, ctx.teamId)) >= TEST_DELIVERY_PER_MINUTE) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS" });
+      }
+      const d = schema.webhookDeliveries;
+      const t = schema.webhookEndpoints;
+      const [row] = await ctx.db
+        .select({
+          delivery: {
+            id: d.id,
+            messageId: d.messageId,
+            payload: d.payload,
+            attempts: d.attempts,
+          },
+          endpoint: t,
+        })
+        .from(d)
+        .innerJoin(t, eq(d.endpointId, t.id))
+        .where(and(eq(d.id, input.id), eq(t.teamId, ctx.teamId)));
+      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      return deliverSignedWebhookNow(ctx.db, row.endpoint, row.delivery, true);
     }),
   }),
 });

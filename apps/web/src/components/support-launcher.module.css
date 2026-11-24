@@ -33,13 +33,22 @@
   color: var(--ms-violet);
 }
 
-/* Phones: just the icon, so it never covers a row's actions. */
-@media (max-width: 620px) {
+/* Desktop dashboard (>900px) already displays Support in the persistent sidebar;
+   hiding the floating pill prevents occluding right-aligned table action menus (•••).
+   On mobile/tablet (<=900px), tuck it bottom-left so it clears right-edge actions. */
+@media (min-width: 901px) {
   .launcher {
-    right: max(14px, env(safe-area-inset-right));
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .launcher {
+    left: max(14px, env(safe-area-inset-left));
+    right: auto;
     bottom: max(14px, env(safe-area-inset-bottom));
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     padding: 0;
     justify-content: center;
   }
