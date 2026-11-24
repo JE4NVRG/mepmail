@@ -45,7 +45,7 @@ for (const [locale, common, consoleMessages, label] of [
         );
         // This same sidebar is the desktop nav and the off-canvas mobile drawer.
         expect(html).toMatch(/<aside class="ms-sidebar"/);
-        expect(html).toMatch(new RegExp(`<a[^>]*href="/emails"[^>]*>[^<]*${label}</a>`));
+        expect(html).toMatch(new RegExp(`<a[^>]*href="/emails"[^>]*>[\\s\\S]*?${label}</a>`));
         expect(html).not.toContain('role="menu"');
         expect(html).not.toContain('href="/login"');
         expect(signOut).not.toHaveBeenCalled();

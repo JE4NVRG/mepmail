@@ -346,22 +346,36 @@ describe("sampling against the database", () => {
     expect(queued.length - before).toBe(results.length);
   });
 
-  it("stops at the team cap, and at the instance cap except for first sends and anomalies", async () => {
+  it("stops tier sampling at the team and instance caps while sparing first sends and anomalies", async () => {
     const [count] = await db
       .select({ n: schema.monitorSamples.id })
       .from(schema.monitorSamples)
       .where(eq(schema.monitorSamples.teamId, teamId));
     expect(count).toBeDefined();
     settings = { ...S, teamDailyCap: 1 };
-    const capped = await sampleAcceptedEmail(db, deps, {
+    const tierTeamCapped = await sampleAcceptedEmail(
+      db,
+      { ...deps, settings: async () => ({ ...settings, probationRate: 1 }) },
+      {
+        teamId,
+        emailId: await email(uuid(10)),
+        broadcast: false,
+        anomalies: 0,
+        now: NOW,
+      },
+    );
+    expect(tierTeamCapped.decision?.kind).toBe("tier");
+    expect(tierTeamCapped.sampleId).toBeNull();
+    const anomalyOverTeamCap = await sampleAcceptedEmail(db, deps, {
       teamId,
-      emailId: await email(uuid(10)),
+      emailId: await email(uuid(13)),
       broadcast: false,
       anomalies: 2,
       now: NOW,
     });
-    expect(capped.decision?.rate).toBe(1);
-    expect(capped.sampleId).toBeNull();
+    expect(anomalyOverTeamCap.decision?.kind).toBe("anomaly");
+    expect(anomalyOverTeamCap.sampleId).not.toBeNull();
+
     settings = { ...S, teamDailyCap: 600, instanceDailyCap: 1 };
     const tier = await sampleAcceptedEmail(
       db,

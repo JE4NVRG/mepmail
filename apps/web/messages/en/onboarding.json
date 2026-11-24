@@ -147,7 +147,15 @@
     "tryOkNoId": "Sent — check your inbox.",
     "tryError": "The API refused (HTTP {status}).",
     "tryNeedsToken": "The full key only exists right after it is created. Create another to test here.",
-    "tryNoDomain": "A verified domain is missing: the API only sends from a domain this team verified."
+    "tryNoDomain": "A verified domain is missing: the API only sends from a domain this team verified.",
+    "tryTitle": "API send playground",
+    "tryBody": "Send a live test email using your key — the snippet below updates as you edit.",
+    "playgroundFrom": "From",
+    "playgroundTo": "To",
+    "playgroundSubject": "Subject",
+    "playgroundHtml": "HTML",
+    "playgroundMintKey": "Create quick test key",
+    "playgroundViewEmail": "Open sent email"
   },
   "step3": {
     "title": "Watch it arrive",

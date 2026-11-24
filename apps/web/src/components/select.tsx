@@ -199,7 +199,8 @@ export function Select({
         break;
       }
       case "Escape":
-        // Do not let a parent modal's Escape handler also fire.
+        // Prevent both browser dialog cancel (modal Esc) and parent handlers.
+        event.preventDefault();
         event.stopPropagation();
         closeMenu();
         break;
@@ -228,7 +229,9 @@ export function Select({
       ref={rootRef}
       style={{
         position: "relative",
-        display: "inline-block",
+        display: width === "100%" ? "block" : "inline-block",
+        minWidth: 0,
+        maxWidth: "100%",
         flexShrink: 0,
         ...(width !== undefined ? { width } : {}),
       }}
@@ -253,6 +256,9 @@ export function Select({
           justifyContent: "space-between",
           gap: 8,
           width: "100%",
+          minWidth: 0,
+          maxWidth: "100%",
+          overflow: "hidden",
           cursor: disabled ? "default" : "pointer",
           textAlign: "left",
           opacity: disabled ? 0.4 : 1,
@@ -263,6 +269,7 @@ export function Select({
             display: "inline-flex",
             alignItems: "center",
             gap: 8,
+            flex: "1 1 auto",
             overflow: "hidden",
             minWidth: 0,
           }}
@@ -280,7 +287,7 @@ export function Select({
             </span>
           ) : null}
         </span>
-        <span style={{ flexShrink: 0, display: "flex", color: "var(--ms-faint)" }}>
+        <span style={{ flexShrink: 0, display: "flex", color: "var(--ms-muted)" }}>
           <ChevronGlyph />
         </span>
       </button>
@@ -297,12 +304,13 @@ export function Select({
                 right: placement.right,
                 minWidth: placement.minWidth,
                 width: "max-content",
-                maxWidth: MENU_MAX_WIDTH,
+                maxWidth: Math.max(MENU_MAX_WIDTH, placement.minWidth),
                 zIndex: "var(--ms-z-menu)",
                 // Rows must scroll to the panel edge and clip on the radius —
                 // panel padding would crop them mid-item at the scroll boundary.
                 padding: 0,
                 overflow: "hidden",
+                animation: "none",
               }}
             >
               {searchable ? (
@@ -350,7 +358,7 @@ export function Select({
                 )}
               </div>
             </div>,
-            document.body,
+            rootRef.current?.closest("dialog") ?? document.body,
           )
         : null}
     </div>

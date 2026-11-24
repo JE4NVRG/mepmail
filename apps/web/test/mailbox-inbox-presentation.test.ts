@@ -27,6 +27,9 @@ describe("mailbox list preview", () => {
         "Oi\u200c \u034f\u200b Jean, veja https://example.invalid/a?b=1 [mailto:a@b.invalid] [cid:logo]",
       ),
     ).toBe("Oi Jean, veja");
+    expect(
+      mailboxPreview("&zwnj;&shy;&nbsp;Olá &amp; bem-vindo&#8204;&#x00AD;&nbsp;ao Correio"),
+    ).toBe("Olá & bem-vindo ao Correio");
   });
 
   it("keeps bracketed words that are not targets and cuts on characters, not code units", () => {

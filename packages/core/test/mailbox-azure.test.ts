@@ -124,7 +124,12 @@ describe("NativeR2 cloud and blocking-boundary regressions", () => {
         .select()
         .from(schema.mailboxOutbox)
         .where(eq(schema.mailboxOutbox.id, q.id));
-      expect(after?.errorCode).toBe("mailbox_deferred:semantic_content_review");
+      // O anexo recusado pela policy tem motivo proprio; os outros continuam revisao.
+      expect(after?.errorCode).toBe(
+        kind === "unsupported-attachment"
+          ? "mailbox_deferred:attachment_type_blocked"
+          : "mailbox_deferred:semantic_content_review",
+      );
       expect(after?.ciphertext).toEqual(before?.ciphertext);
     },
   );

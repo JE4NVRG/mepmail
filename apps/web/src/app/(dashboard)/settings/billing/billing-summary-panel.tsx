@@ -102,7 +102,7 @@ export function BillingSummaryPanel({
               type="button"
               className="ms-btn ms-btn-secondary"
               onClick={onRetry}
-              style={{ marginTop: 14, minHeight: 44, whiteSpace: "normal" }}
+              style={{ marginTop: 14, height: "auto", minHeight: 44, whiteSpace: "normal" }}
             >
               {t("retry")}
             </button>
@@ -179,7 +179,14 @@ export function BillingSummaryPanel({
                   {t("baseDiscount", { amount: money(invoice.baseDiscountCents) })}
                 </p>
               ) : null}
-              <dl style={{ margin: "18px 0 0", display: "grid", gap: 18 }}>
+              <dl
+                style={{
+                  margin: "18px 0 0",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                  gap: 18,
+                }}
+              >
                 <Detail label={t("chargePeriod")}>
                   {period(invoice.periodStart, invoice.periodEnd)}
                 </Detail>

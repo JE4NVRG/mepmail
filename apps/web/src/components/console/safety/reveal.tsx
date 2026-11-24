@@ -208,7 +208,14 @@ function RevealDialog({
           submit();
         }}
       >
-        <p style={{ margin: "6px 0 16px", color: "var(--ms-muted)", fontSize: 13.5 }}>
+        <p
+          style={{
+            margin: "6px 0 16px",
+            color: "var(--ms-muted)",
+            fontSize: 13.5,
+            overflowWrap: "anywhere",
+          }}
+        >
           {email
             ? t("lead", {
                 team: request.team.name,
@@ -429,7 +436,7 @@ function RevealedView({
           <div className="ms-microlabel" style={{ marginBottom: 4 }}>
             {t("subject")}
           </div>
-          <div style={{ fontWeight: 600, marginBottom: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 12, overflowWrap: "anywhere" }}>
             {keyedSpans(query.data.subject).map(({ key, span }) => (
               <span key={key} className={span.redacted ? "ms-redact" : undefined}>
                 {span.text}

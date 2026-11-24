@@ -134,10 +134,34 @@ export function LineChart({
   const y = (v: number) => PAD.top + plotH * (1 - v / top);
   const point = (i: number, v: number) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`;
 
-  // Thin from the right so the newest day always keeps its label. The slot
-  // width follows the widest label: hourly grains print far wider than days.
-  const labelW = 12 + Math.max(0, ...days.map((d) => formatDay(d).length)) * 6.2;
+  // Build non-overlapping X-axis ticks from right to left so the newest day
+  // keeps its end-anchored label, while interior/leftmost ticks never collide
+  // or clip past x = 0 regardless of locale date width.
+  const labelCharW = 6.6;
+  const labelMinGap = 10;
+  const labelW = 14 + Math.max(0, ...days.map((d) => formatDay(d).length)) * labelCharW;
   const labelStep = Math.max(1, Math.ceil((n * labelW) / Math.max(1, plotW)));
+  const visibleTicks = new Set<number>();
+  if (n > 0 && plotW > 0) {
+    visibleTicks.add(n - 1);
+    const lastW = formatDay(days[n - 1] ?? "").length * labelCharW;
+    let prevLeft = n === 1 ? x(0) + lastW / 2 : x(n - 1) - lastW;
+    for (let i = n - 1 - labelStep; i >= 0; i -= labelStep) {
+      const w = formatDay(days[i] ?? "").length * labelCharW;
+      const left = i === 0 ? x(i) : x(i) - w / 2;
+      const right = i === 0 ? x(i) + w : x(i) + w / 2;
+      if (left >= 0 && right + labelMinGap <= prevLeft) {
+        visibleTicks.add(i);
+        prevLeft = left;
+      }
+    }
+    if (!visibleTicks.has(0) && n > 1) {
+      const firstW = formatDay(days[0] ?? "").length * labelCharW;
+      if (x(0) + firstW + labelMinGap <= prevLeft) {
+        visibleTicks.add(0);
+      }
+    }
+  }
 
   function track(event: React.PointerEvent<HTMLDivElement>) {
     if (n === 0 || plotW <= 0) return;
@@ -190,9 +214,9 @@ export function LineChart({
               <text
                 x={width}
                 y={y(tick) + 3}
-                fontSize={10}
+                fontSize={10.5}
                 fontFamily="var(--ms-font-mono)"
-                fill="var(--ms-faint)"
+                fill="var(--ms-muted)"
                 textAnchor="end"
               >
                 {formatValue(tick)}
@@ -207,17 +231,17 @@ export function LineChart({
             stroke="var(--ms-line-strong)"
           />
           {days.map((day, i) =>
-            (n - 1 - i) % labelStep === 0 ? (
+            visibleTicks.has(i) ? (
               <text
                 key={day}
                 x={x(i)}
                 y={height - 6}
-                fontSize={10}
+                fontSize={10.5}
                 fontFamily="var(--ms-font-mono)"
-                fill="var(--ms-faint)"
+                fill="var(--ms-muted)"
                 // Edge labels anchor inward so the full-bleed plot never
                 // clips them at the card padding.
-                textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}
+                textAnchor={n === 1 ? "middle" : i === 0 ? "start" : i === n - 1 ? "end" : "middle"}
               >
                 {formatDay(day)}
               </text>

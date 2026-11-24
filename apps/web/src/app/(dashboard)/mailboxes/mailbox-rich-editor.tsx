@@ -4,7 +4,8 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { forwardRef, useId, useImperativeHandle, useState } from "react";
+import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState } from "react";
+import { clipboardAttachments } from "@/lib/mailbox-composer-attachments";
 import {
   type EditorNode,
   editorDocIsFormatted,
@@ -48,6 +49,7 @@ export const MailboxRichEditor = forwardRef<
     initialText: string;
     initialHtml?: string | null | undefined;
     onChange: (value: RichValue) => void;
+    onPasteFiles?: (files: File[]) => void;
     disabled?: boolean;
     placeholder: string;
     ariaLabel: string;
@@ -60,6 +62,7 @@ export const MailboxRichEditor = forwardRef<
     initialText,
     initialHtml,
     onChange,
+    onPasteFiles,
     disabled = false,
     placeholder,
     ariaLabel,
@@ -71,6 +74,10 @@ export const MailboxRichEditor = forwardRef<
   const linkId = useId();
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkValue, setLinkValue] = useState("");
+  const pasteFilesRef = useRef(onPasteFiles);
+  useEffect(() => {
+    pasteFilesRef.current = onPasteFiles;
+  }, [onPasteFiles]);
   const report = (doc: EditorNode, html: string) =>
     onChange({ text: editorDocToPlain(doc), html, formatted: editorDocIsFormatted(doc) });
   const editor = useEditor({
@@ -103,6 +110,14 @@ export const MailboxRichEditor = forwardRef<
         role: "textbox",
         spellcheck: "true",
         class: styles.body ?? "",
+      },
+      handlePaste: (_view, event) => {
+        if (!pasteFilesRef.current || !event.clipboardData) return false;
+        const files = clipboardAttachments(event.clipboardData);
+        if (!files.length) return false;
+        event.preventDefault();
+        pasteFilesRef.current(files);
+        return true;
       },
     },
     onCreate: ({ editor: current }) => {

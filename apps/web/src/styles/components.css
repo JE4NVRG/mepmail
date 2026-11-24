@@ -26,7 +26,9 @@
   font: 600 var(--ms-fs-ui) var(--ms-font-sans);
   border-radius: var(--ms-r-input);
   padding: 6px 10px;
-  border: 1px solid transparent;
+  border: 1px solid var(--ms-line-strong);
+  background: transparent;
+  color: var(--ms-bone);
   cursor: pointer;
   transition: opacity var(--ms-dur-fast) var(--ms-ease);
   display: inline-flex;
@@ -100,7 +102,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--ms-faint);
+  color: var(--ms-muted);
   border-radius: 8px;
   cursor: pointer;
   transition:
@@ -200,29 +202,78 @@
 }
 .ms-nav a,
 .ms-nav button.ms-nav-item {
+  position: relative;
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 10px 12px;
-  border-radius: var(--ms-r-input);
+  padding: 8px 10px;
+  border-radius: 9px;
   color: var(--ms-muted);
   font: 400 var(--ms-fs-ui) var(--ms-font-sans);
   text-decoration: none;
   background: none;
-  border: 0;
+  border: 1px solid transparent;
   cursor: pointer;
   text-align: left;
   width: 100%;
   box-sizing: border-box;
-  transition: color var(--ms-dur-fast) var(--ms-ease);
+  transition:
+    background var(--ms-dur-fast) var(--ms-ease),
+    border-color var(--ms-dur-fast) var(--ms-ease),
+    color var(--ms-dur-fast) var(--ms-ease);
 }
 .ms-nav a:hover,
 .ms-nav button.ms-nav-item:hover {
+  background: color-mix(in srgb, var(--ms-panel-raised) 70%, transparent);
+  border-color: color-mix(in srgb, var(--ms-line) 80%, transparent);
   color: var(--ms-bone);
 }
 .ms-nav a.active,
 .ms-nav button.ms-nav-item.active {
-  background: var(--ms-panel-raised);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ms-violet) 11%, var(--ms-panel-raised)),
+    var(--ms-panel-raised)
+  );
+  border-color: color-mix(in srgb, var(--ms-violet) 26%, var(--ms-line-strong));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--ms-bone) 7%, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.16);
+  color: var(--ms-bone);
+  font-weight: 500;
+}
+.ms-nav a.active::before,
+.ms-nav button.ms-nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  transform: translateY(-50%);
+  border-radius: 0 3px 3px 0;
+  background: var(--ms-violet);
+}
+.ms-nav-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  transition:
+    background var(--ms-dur-fast) var(--ms-ease),
+    border-color var(--ms-dur-fast) var(--ms-ease),
+    color var(--ms-dur-fast) var(--ms-ease);
+}
+.ms-nav a:hover .ms-nav-icon {
+  background: color-mix(in srgb, var(--ms-line-strong) 45%, transparent);
+}
+.ms-nav a.active .ms-nav-icon {
+  background: color-mix(in srgb, var(--ms-violet) 18%, var(--ms-inset));
+  border-color: color-mix(in srgb, var(--ms-violet) 32%, var(--ms-line-strong));
   color: var(--ms-bone);
 }
 
@@ -799,12 +850,15 @@ table.ms-table {
    ring inside the scroll clip. */
 .ms-tabs {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ms-line-strong) transparent;
-  padding: 2px;
-  margin: -2px;
+  scrollbar-width: none;
+  padding: 2px 2px 10px;
+  margin: -2px -2px 0;
+  border-bottom: 1px solid var(--ms-line);
+}
+.ms-tabs::-webkit-scrollbar {
+  display: none;
 }
 .ms-tabs button {
   flex: none;
@@ -816,7 +870,9 @@ table.ms-table {
   padding: 7px 12px;
   border-radius: var(--ms-r-input);
   cursor: pointer;
-  transition: color var(--ms-dur-fast) var(--ms-ease);
+  transition:
+    color var(--ms-dur-fast) var(--ms-ease),
+    background var(--ms-dur-fast) var(--ms-ease);
 }
 .ms-tabs button:hover {
   color: var(--ms-bone);
@@ -824,6 +880,7 @@ table.ms-table {
 .ms-tabs button.active {
   background: var(--ms-panel-raised);
   color: var(--ms-bone);
+  box-shadow: inset 0 0 0 1px var(--ms-line-strong);
 }
 
 /* Toast — near-black ground with a faint status-tinted glow (the system's one gradient) */
@@ -1233,6 +1290,9 @@ table.ms-table {
 .ms-grid-6 {
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
+.ms-grid-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
 .ms-grid-4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -1349,10 +1409,17 @@ table.ms-table {
   border: 1px solid var(--ms-line);
   border-radius: var(--ms-r-input);
   cursor: pointer;
+  transition:
+    border-color var(--ms-dur-fast) var(--ms-ease),
+    background var(--ms-dur-fast) var(--ms-ease);
+}
+.ms-radio-card:has(input:checked) {
+  border-color: var(--ms-bone);
+  background: var(--ms-panel-raised);
 }
 .ms-radio-card input {
   margin-top: 3px;
-  accent-color: var(--ms-steel);
+  accent-color: var(--ms-bone);
 }
 .ms-radio-card .sub {
   color: var(--ms-muted);
@@ -1971,9 +2038,9 @@ summary:focus-visible,
     transition: transform var(--ms-dur-drawer) var(--ms-ease);
   }
 
-  /* Content column: canvas 32px 40px collapses to 16px. */
+  /* Content column: canvas 32px 40px collapses to 16px, with bottom room for Support FAB. */
   .ms-main {
-    padding: 16px !important;
+    padding: 16px 16px 84px !important;
   }
 
   /* Page header: the title keeps the first line to itself; the actions take
@@ -2051,6 +2118,7 @@ summary:focus-visible,
   .ms-grid-6 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .ms-grid-5,
   .ms-grid-4,
   .ms-grid-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2259,6 +2327,12 @@ summary:focus-visible,
 }
 
 @media (max-width: 479px) {
+  .ms-tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 8px;
+  }
+  .ms-grid-5,
   .ms-grid-4,
   .ms-grid-3,
   .ms-grid-2 {
@@ -3096,4 +3170,17 @@ summary:focus-visible,
 .ms-attn-row:hover,
 .ms-attn-row:focus-visible {
   background: var(--ms-panel-raised);
+}
+
+@keyframes ms-delayed-reveal {
+  from {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  to {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
 }

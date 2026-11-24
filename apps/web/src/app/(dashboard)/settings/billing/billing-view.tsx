@@ -90,6 +90,7 @@ function Card({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          flexWrap: "wrap",
           gap: 12,
           margin: "0 0 18px",
         }}
@@ -326,7 +327,9 @@ export function BillingView({
 
   if (!status.data) {
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
+      <div
+        style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20, maxWidth: 920 }}
+      >
         {notice}
         {status.isError ? (
           <WarnCard
@@ -366,17 +369,21 @@ export function BillingView({
   } = status.data;
   if (plan === "system") {
     return (
-      <Card title={t("plan")}>
-        <span
-          className="ms-display"
-          style={{ fontSize: "var(--ms-fs-h1)", color: "var(--ms-bone)", lineHeight: 1 }}
-        >
-          {planLabel(plan, planQuota)}
-        </span>
-        <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
-          {t("systemNotice")}
-        </p>
-      </Card>
+      <div
+        style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20, maxWidth: 920 }}
+      >
+        <Card title={t("plan")}>
+          <span
+            className="ms-display"
+            style={{ fontSize: "var(--ms-fs-h1)", color: "var(--ms-bone)", lineHeight: 1 }}
+          >
+            {planLabel(plan, planQuota)}
+          </span>
+          <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+            {t("systemNotice")}
+          </p>
+        </Card>
+      </div>
     );
   }
   // Android app (Google Play payments policy): the current plan, its status and period, and
@@ -388,58 +395,62 @@ export function BillingView({
     const paidPlan = plan !== "free";
     const canCancelRenewal = canManage && paidPlan && hasLiveSubscription && !cancelAt;
     return (
-      <Card title={t("plan")}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span
-            className="ms-display"
-            style={{ fontSize: "var(--ms-fs-h1)", color: "var(--ms-bone)", lineHeight: 1 }}
-          >
-            {planLabel(plan, planQuota)}
-          </span>
-          <span
-            className={`ms-badge ms-badge-${STATUS_TONE[planStatus]}`}
-            style={{ position: "relative", top: 1 }}
-          >
-            {t(`status.${planStatus}`)}
-          </span>
-        </div>
-        {paidPlan && (cancelAt || currentPeriodEnd) ? (
-          <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
-            {cancelAt
-              ? t("app.endsOn", { date: formatDay(cancelAt, locale) })
-              : t("app.renewsOn", { date: formatDay(currentPeriodEnd as Date | string, locale) })}
-          </p>
-        ) : null}
-        {canCancelRenewal ? (
-          <button
-            type="button"
-            className="ms-btn ms-btn-ghost"
-            style={{ marginTop: 14 }}
-            disabled={cancelRenewal.isPending}
-            onClick={async () => {
-              const confirmed = await confirmDialog({
-                title: t("app.cancelTitle"),
-                message: t("app.cancelBody", {
-                  plan: planLabel(plan, planQuota),
-                  date: currentPeriodEnd ? formatDay(currentPeriodEnd, locale) : "",
-                }),
-                confirmLabel: t("app.cancelConfirm"),
-                cancelLabel: t("app.keep"),
-                danger: true,
-              });
-              // One identity per cancel request; the server confirms on Stripe's state.
-              if (confirmed) cancelRenewal.mutate({ operationId: crypto.randomUUID() });
-            }}
-          >
-            {t("app.cancelRenewal")}
-          </button>
-        ) : null}
-        {cancelRenewal.isError ? (
-          <p role="alert" style={{ margin: "10px 0 0", fontSize: 13 }}>
-            {t("app.cancelFailed")}
-          </p>
-        ) : null}
-      </Card>
+      <div
+        style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20, maxWidth: 920 }}
+      >
+        <Card title={t("plan")}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span
+              className="ms-display"
+              style={{ fontSize: "var(--ms-fs-h1)", color: "var(--ms-bone)", lineHeight: 1 }}
+            >
+              {planLabel(plan, planQuota)}
+            </span>
+            <span
+              className={`ms-badge ms-badge-${STATUS_TONE[planStatus]}`}
+              style={{ position: "relative", top: 1 }}
+            >
+              {t(`status.${planStatus}`)}
+            </span>
+          </div>
+          {paidPlan && (cancelAt || currentPeriodEnd) ? (
+            <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+              {cancelAt
+                ? t("app.endsOn", { date: formatDay(cancelAt, locale) })
+                : t("app.renewsOn", { date: formatDay(currentPeriodEnd as Date | string, locale) })}
+            </p>
+          ) : null}
+          {canCancelRenewal ? (
+            <button
+              type="button"
+              className="ms-btn ms-btn-ghost"
+              style={{ marginTop: 14 }}
+              disabled={cancelRenewal.isPending}
+              onClick={async () => {
+                const confirmed = await confirmDialog({
+                  title: t("app.cancelTitle"),
+                  message: t("app.cancelBody", {
+                    plan: planLabel(plan, planQuota),
+                    date: currentPeriodEnd ? formatDay(currentPeriodEnd, locale) : "",
+                  }),
+                  confirmLabel: t("app.cancelConfirm"),
+                  cancelLabel: t("app.keep"),
+                  danger: true,
+                });
+                // One identity per cancel request; the server confirms on Stripe's state.
+                if (confirmed) cancelRenewal.mutate({ operationId: crypto.randomUUID() });
+              }}
+            >
+              {t("app.cancelRenewal")}
+            </button>
+          ) : null}
+          {cancelRenewal.isError ? (
+            <p role="alert" style={{ margin: "10px 0 0", fontSize: 13 }}>
+              {t("app.cancelFailed")}
+            </p>
+          ) : null}
+        </Card>
+      </div>
     );
   }
   const current = PLAN_RUNGS.find((r) => r.key === currentKey) ?? PLAN_RUNGS[0];
@@ -518,7 +529,7 @@ export function BillingView({
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20, maxWidth: 920 }}>
       {notice}
       <PixInvoices canManage={canManage} returned={pixReturned} />
       <PurchaseReviewNotice review={purchaseReview} returnTo={reviewReturnTo} />
@@ -536,7 +547,7 @@ export function BillingView({
         title={t("plan")}
         action={canManage && hasCustomer ? portalButton(t("manage"), "ms-btn-secondary") : null}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <span
             className="ms-display"
             style={{ fontSize: "var(--ms-fs-h1)", color: "var(--ms-bone)", lineHeight: 1 }}
@@ -584,12 +595,6 @@ export function BillingView({
             </div>
           </div>
         </div>
-
-        <BillingSummaryPanel
-          summary={status.data.billingSummary}
-          locale={locale}
-          onRetry={() => void status.refetch()}
-        />
 
         {pending && currentPeriodEnd ? (
           <div
@@ -651,6 +656,12 @@ export function BillingView({
               : t("readOnly")}
         </p>
       </Card>
+
+      <BillingSummaryPanel
+        summary={status.data.billingSummary}
+        locale={locale}
+        onRetry={() => void status.refetch()}
+      />
 
       <Card title={t("usageTitle")}>
         {quota.kind === "month" ? (
@@ -735,7 +746,10 @@ export function BillingView({
                   key={interval}
                   className="ms-btn ms-btn-secondary"
                   style={{
+                    height: "auto",
                     minHeight: 44,
+                    maxWidth: "100%",
+                    whiteSpace: "normal",
                     fontSize: 16,
                     display: "inline-flex",
                     gap: 10,
@@ -869,7 +883,10 @@ export function BillingView({
                           key={tier.id}
                           className="ms-btn ms-btn-secondary"
                           style={{
+                            height: "auto",
                             minHeight: 44,
+                            maxWidth: "100%",
+                            whiteSpace: "normal",
                             fontSize: 15,
                             display: "inline-flex",
                             gap: 10,
@@ -965,35 +982,13 @@ export function BillingView({
             {t("launch.existingPreserved")}
           </p>
           {canManage ? (
-            <button
-              type="button"
-              className="ms-btn ms-btn-primary"
-              disabled={busy || !purchaseReview.allowed || (comboOn && comboSeatCount === null)}
-              onClick={() => {
-                if (!purchaseReview.allowed) return;
-                if (comboOn && comboSeatCount !== null && teamId) {
-                  saveLaunchComboIntent({
-                    teamId,
-                    tier: comboTier,
-                    seats: comboSeatCount,
-                    interval: launchInterval,
-                  });
-                } else {
-                  clearLaunchComboIntent();
-                }
-                startCheckout.mutate({ rung: newOffer.rung, interval: launchInterval });
-              }}
+            <div
+              className="ms-wrap-row"
+              style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}
             >
-              <BtnSpinner on={startCheckout.isPending} />
-              {t(comboOn ? "launch.comboContinue" : "launch.continue")}
-            </button>
-          ) : null}
-          {canManage && pixOffer ? (
-            <>
               <button
                 type="button"
-                className="ms-btn ms-btn-secondary"
-                style={{ marginLeft: 10 }}
+                className="ms-btn ms-btn-primary"
                 disabled={busy || !purchaseReview.allowed || (comboOn && comboSeatCount === null)}
                 onClick={() => {
                   if (!purchaseReview.allowed) return;
@@ -1007,23 +1002,49 @@ export function BillingView({
                   } else {
                     clearLaunchComboIntent();
                   }
-                  startPix.mutate({ rung: newOffer.rung, interval: launchInterval });
+                  startCheckout.mutate({ rung: newOffer.rung, interval: launchInterval });
                 }}
               >
-                <BtnSpinner on={startPix.isPending} />
-                {t("pix.start")}
+                <BtnSpinner on={startCheckout.isPending} />
+                {t(comboOn ? "launch.comboContinue" : "launch.continue")}
               </button>
-              <p
-                style={{
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                  color: "var(--ms-muted)",
-                  margin: "12px 0 0",
-                }}
-              >
-                {t("pix.startNote")}
-              </p>
-            </>
+              {pixOffer ? (
+                <button
+                  type="button"
+                  className="ms-btn ms-btn-secondary"
+                  disabled={busy || !purchaseReview.allowed || (comboOn && comboSeatCount === null)}
+                  onClick={() => {
+                    if (!purchaseReview.allowed) return;
+                    if (comboOn && comboSeatCount !== null && teamId) {
+                      saveLaunchComboIntent({
+                        teamId,
+                        tier: comboTier,
+                        seats: comboSeatCount,
+                        interval: launchInterval,
+                      });
+                    } else {
+                      clearLaunchComboIntent();
+                    }
+                    startPix.mutate({ rung: newOffer.rung, interval: launchInterval });
+                  }}
+                >
+                  <BtnSpinner on={startPix.isPending} />
+                  {t("pix.start")}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {canManage && pixOffer ? (
+            <p
+              style={{
+                fontSize: 13,
+                lineHeight: 1.6,
+                color: "var(--ms-muted)",
+                margin: "12px 0 0",
+              }}
+            >
+              {t("pix.startNote")}
+            </p>
           ) : null}
           {canManage ? null : (
             <p style={{ color: "var(--ms-muted)", fontSize: 14 }}>{t("readOnly")}</p>

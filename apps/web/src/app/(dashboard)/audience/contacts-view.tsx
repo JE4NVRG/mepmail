@@ -173,7 +173,13 @@ function AddContactsSplit({
 /** The team's Contacts surface, rendered at /audience. `migrateToUrl` is null on Cloud. */
 const sumCounts = (rows: { count: number }[]) => rows.reduce((n, r) => n + r.count, 0);
 
-export function AudienceContactsView({ migrateToUrl }: { migrateToUrl: string | null }) {
+export function AudienceContactsView({
+  migrateToUrl,
+  consentBanner,
+}: {
+  migrateToUrl: string | null;
+  consentBanner?: React.ReactNode;
+}) {
   const t = useTranslations("audience");
   const common = useTranslations("common");
   const locale = useLocale();
@@ -493,6 +499,7 @@ export function AudienceContactsView({ migrateToUrl }: { migrateToUrl: string | 
                 <button
                   type="button"
                   className="ms-btn ms-btn-secondary"
+                  style={{ color: "var(--ms-danger)", borderColor: "var(--ms-danger-border)" }}
                   onClick={() => setEraseOpen(true)}
                 >
                   {t("contacts.erase")}
@@ -562,6 +569,8 @@ export function AudienceContactsView({ migrateToUrl }: { migrateToUrl: string | 
         </div>
       </div>
 
+      {consentBanner}
+
       <div
         className="ms-filter-row"
         style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18 }}
@@ -587,7 +596,7 @@ export function AudienceContactsView({ migrateToUrl }: { migrateToUrl: string | 
           value={status}
           onChange={setStatus}
           ariaLabel={t("filters.status")}
-          width={156}
+          width={172}
           options={[
             { value: "", label: t("filters.anyStatus") },
             { value: "subscribed", label: t("contacts.subscribed") },

@@ -337,6 +337,7 @@
 }
 .fields label {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   font-size: var(--ms-fs-label);
   color: var(--ms-muted);
@@ -831,22 +832,22 @@
 }
 .composerBody {
   flex: 1;
-  padding: 20px 24px;
+  padding: 14px 20px;
   min-height: 0;
   min-width: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  scroll-padding-block: 20px;
+  scroll-padding-block: 14px;
 }
 .composerFields {
-  gap: 16px;
+  gap: 10px;
 }
 /* From, To and Cc each get a full row: chips need the width. */
 .composerAddressFields {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
 }
 .composerAddressFields > label {
@@ -865,6 +866,11 @@
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
+}
+.ccToggles {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 .ccToggle {
   border: 0;
@@ -1004,6 +1010,28 @@
 .composer input:not([type="file"]),
 .composer select {
   min-height: 44px;
+}
+.composer select {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer :global(button[role="combobox"]) {
+  min-height: 44px;
+  height: auto;
+  padding: 10px 12px;
+  font-size: var(--ms-fs-body);
+  line-height: 1.5;
+}
+.composer :global(.ms-menu-search) {
+  min-height: 36px;
+  height: auto;
+  padding: 8px 12px;
 }
 .composer textarea {
   box-sizing: border-box;
@@ -1174,8 +1202,10 @@
   font-size: 10px;
   line-height: 1.5;
   color: var(--ms-muted);
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rowBadges .warningBadge {
   color: var(--ms-warn);
@@ -1844,19 +1874,47 @@
 }
 .usagePanel {
   border-top: 1px solid var(--ms-line);
-  padding: 16px 4px 0;
+  padding: 10px 4px 0;
   margin-top: auto;
 }
 .usagePanel p,
 .usagePanel small {
   font-size: 11px;
   color: var(--ms-muted);
-  line-height: 1.6;
+  line-height: 1.45;
+}
+.usagePanel > small {
+  display: block;
+}
+.settingsSection .usagePanel {
+  margin-top: 4px;
+  padding: 18px 0 0;
+  display: grid;
+  gap: 10px;
+}
+.settingsSection .usagePanel h3 {
+  margin: 0;
+}
+.settingsSection .usagePanel > button {
+  justify-self: start;
+}
+.settingsSection .usageMetric {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 4px 0 2px;
+  font-size: 12.5px;
+}
+.settingsSection .usageMetric strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .usageMetric {
   display: grid;
-  gap: 6px;
-  margin: 16px 0 8px;
+  gap: 4px;
+  margin: 10px 0 5px;
   font-size: 11px;
   color: var(--ms-muted);
 }
@@ -2193,6 +2251,7 @@
   .view textarea,
   .dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
   .dialog select,
+  .dialog :global(button[role="combobox"]),
   .dialog textarea {
     font-size: 16px;
   }
@@ -2242,7 +2301,7 @@
 }
 .appTabs {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   margin-left: 8px;
 }
 .appTabs a {
@@ -2275,18 +2334,16 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  /* The padding sits inside the 100%: no sideways scroll on a phone. */
+  /* Full-width scroll track at the viewport edge while keeping content centered at 960px. */
   box-sizing: border-box;
   width: 100%;
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 24px clamp(16px, 4vw, 48px);
+  padding: 24px max(clamp(16px, 4vw, 48px), calc((100% - 960px) / 2));
   animation: mailAppIn 0.22s ease-out both;
 }
 /* On a phone the tabs scroll sideways instead of widening the page. */
 .settingsTabs {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   margin-bottom: 20px;
   border-bottom: 1px solid var(--ms-line);
   overflow-x: auto;
@@ -2312,6 +2369,13 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+.settingsSection > .serviceBadge,
+.settingsSection > a:global(.ms-btn) {
+  align-self: flex-start;
+}
+.settingsSection > .settingsRowActions {
+  justify-content: flex-start;
 }
 .settingsList {
   display: flex;
@@ -2343,6 +2407,9 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+.settingsList strong {
+  overflow-wrap: anywhere;
 }
 .settingsList span {
   color: var(--ms-muted);
@@ -2393,6 +2460,91 @@
     transition: none;
   }
 }
+
+/* Correio quick command palette (Alt+K / Comandos button). */
+.commandDialog {
+  max-width: 540px;
+  padding: 0;
+  overflow: hidden;
+}
+.commandSearchWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ms-line);
+}
+.commandSearchWrap input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ms-bone);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+.commandList {
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+.commandGroupLabel {
+  margin: 4px 8px 2px;
+  color: var(--ms-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.commandItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ms-bone);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.commandItem:hover,
+.commandItem[aria-selected="true"] {
+  background: var(--ms-panel-raised);
+}
+.commandItemMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ms-muted);
+  font-size: 11.5px;
+  flex: none;
+}
+.commandBadge {
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ms-violet) 40%, transparent);
+  background: color-mix(in srgb, var(--ms-violet) 14%, transparent);
+  color: var(--ms-violet);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.commandEmpty {
+  margin: 0;
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--ms-muted);
+  font-size: 13px;
+}
 @media (max-width: 700px) {
   .appBar {
     padding: 10px 12px;
@@ -2429,6 +2581,13 @@
   .settingsList li {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .settingsList li > div:first-child,
+  .settingsList .settingsRowActions {
+    width: 100%;
+  }
+  .settingsList .settingsRowActions {
+    justify-content: flex-start;
   }
 }
 
@@ -3529,7 +3688,7 @@
     bottom: 0;
     z-index: 15;
     display: flex;
-    gap: 4px;
+    gap: 8px;
     width: auto;
     margin: 0;
     padding: 6px calc(8px + env(safe-area-inset-right, 0px))
@@ -3558,6 +3717,14 @@
 }
 /* A notice (toast) at the bottom lifts what floats there: compose, the reply bar's room. */
 @media (max-width: 620px) {
+  .settingsTabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 8px;
+  }
+  .settingsTabs button {
+    min-height: 44px;
+  }
   :global(body):has(:global(.ms-toast)) .contentToolbar .composeButton {
     bottom: calc(86px + env(safe-area-inset-bottom, 0px));
   }
@@ -3574,4 +3741,23 @@
   padding-left: 20px;
   font-size: 13px;
   line-height: 1.55;
+}
+
+.clientsCreate input:global(.ms-input) {
+  height: auto;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: var(--ms-fs-body);
+}
+.clientsCreate button:global(.ms-btn) {
+  min-height: 44px;
+}
+.clientsList strong {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .clientsCreate button:global(.ms-btn) {
+    width: 100%;
+    justify-content: center;
+  }
 }

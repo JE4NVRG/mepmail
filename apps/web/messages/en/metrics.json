@@ -87,6 +87,6 @@
   "empty": "No metrics yet.",
   "emptyHint": "Metrics appear after your first send — <code>POST /emails</code>.",
   "guardrail": {
-    "window": "last {days} days"
+    "window": "{days, plural, one {last # day} other {last # days}}"
   }
 }

@@ -365,6 +365,7 @@ export function MailboxMigrationHistory({
                     <label className={styles.importFolderName}>
                       <input
                         type="checkbox"
+                        className="ms-checkbox"
                         checked={chosen.has(choice.name)}
                         onChange={(event) => toggle(choice.name, event.target.checked)}
                       />

@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
+import { type EmailScheme, emulateEmailScheme } from "@/lib/email-preview";
 import styles from "./mailboxes.module.css";
 
 const IMAGE_DOMAINS_KEY = "mepmail.correio.imageDomains";
@@ -49,6 +50,10 @@ export function MailboxRichBody({
   const mailtoHandler = useRef(onMailto);
   mailtoHandler.current = onMailto;
   const [formatted, setFormatted] = useState(!!html);
+  const [scheme, setScheme] = useState<EmailScheme>("light");
+  useEffect(() => {
+    setScheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+  }, []);
   // A sender's address often changes per message (no-reply-<token>@mail.example);
   // its domain is what the person recognises and trusts.
   const domain = sender.includes("@") ? (sender.split("@").pop() ?? "").toLowerCase() : "";
@@ -64,7 +69,8 @@ export function MailboxRichBody({
   const frame = useRef<HTMLIFrameElement>(null);
   const [frameHeight, setFrameHeight] = useState<number | null>(null);
   // The HTML is sanitized on the server. This frame also isolates styles and navigation.
-  const document = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:${trustedImageOrigin ? ` ${trustedImageOrigin}` : ""}${showImages ? " https:" : ""}; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'"><meta name="referrer" content="no-referrer"><style>html{color-scheme:light}body{margin:0;padding:20px;color:#202124;background:#fff;font:14px/1.6 Arial,sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}a{color:#6741c5}</style></head><body>${body ?? ""}</body></html>`;
+  const rawDocument = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:${trustedImageOrigin ? ` ${trustedImageOrigin}` : ""}${showImages ? " https:" : ""}; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'"><meta name="referrer" content="no-referrer"><style>:where(body){color:#202124;background:#fff}body{margin:0;padding:20px;font:14px/1.6 Arial,sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}a{color:#6741c5}</style></head><body>${body ?? ""}</body></html>`;
+  const renderedDocument = emulateEmailScheme(rawDocument, scheme);
   // Runs again when the formatted view mounts a new frame; a new srcdoc in the
   // same frame fires "load" on the listener already attached.
   useEffect(() => {
@@ -72,11 +78,19 @@ export function MailboxRichBody({
     const element = frame.current;
     if (!element) return;
     let observer: ResizeObserver | null = null;
+    let raf: number | null = null;
     const measure = () => {
       const page = element.contentDocument?.documentElement;
       if (!page) return;
       const height = Math.max(page.scrollHeight, element.contentDocument?.body?.scrollHeight ?? 0);
       if (height > 0) setFrameHeight(Math.min(height + 2, MAX_FRAME_HEIGHT));
+    };
+    const scheduleMeasure = () => {
+      if (raf !== null) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        raf = null;
+        measure();
+      });
     };
     // Same origin (never scripts): this page can hear a click on a mailto: link.
     const clicked = (event: MouseEvent) => {
@@ -95,8 +109,8 @@ export function MailboxRichBody({
       observer?.disconnect();
       const content = element.contentDocument?.body;
       if (content && typeof ResizeObserver !== "undefined") {
-        // Images and fonts arriving later change the height.
-        observer = new ResizeObserver(measure);
+        // Images and fonts arriving later change the height; defer to rAF to avoid loop warnings.
+        observer = new ResizeObserver(scheduleMeasure);
         observer.observe(content);
       }
     };
@@ -106,6 +120,7 @@ export function MailboxRichBody({
       element.removeEventListener("load", loaded);
       listening?.removeEventListener("click", clicked);
       observer?.disconnect();
+      if (raf !== null) cancelAnimationFrame(raf);
     };
   }, [formatted]);
   return (
@@ -130,6 +145,26 @@ export function MailboxRichBody({
               {t("plainBody")}
             </button>
           </fieldset>
+          {formatted ? (
+            <fieldset aria-label={t("previewScheme")}>
+              <button
+                type="button"
+                className="ms-btn ms-btn-ghost"
+                aria-pressed={scheme === "light"}
+                onClick={() => setScheme("light")}
+              >
+                {t("previewLight")}
+              </button>
+              <button
+                type="button"
+                className="ms-btn ms-btn-ghost"
+                aria-pressed={scheme === "dark"}
+                onClick={() => setScheme("dark")}
+              >
+                {t("previewDark")}
+              </button>
+            </fieldset>
+          ) : null}
           {formatted && externalImages > 0 && !showImages ? (
             <div className={styles.externalImages}>
               <p title={t("externalImagesHelp", { count: externalImages })}>
@@ -169,10 +204,13 @@ export function MailboxRichBody({
           title={t("formattedBody")}
           className={styles.htmlMessage}
           data-fitted={frameHeight !== null || undefined}
-          style={frameHeight !== null ? { height: frameHeight } : undefined}
+          style={{
+            background: scheme === "dark" ? "#111113" : "#ffffff",
+            ...(frameHeight !== null ? { height: frameHeight } : {}),
+          }}
           sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
           referrerPolicy="no-referrer"
-          srcDoc={document}
+          srcDoc={renderedDocument}
         />
       ) : (
         <div className={styles.messageBody}>{text || t("noText")}</div>

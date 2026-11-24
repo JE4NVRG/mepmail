@@ -25,12 +25,12 @@ export function regionName(code: string, t: (key: `regions.${DomainRegion}`) => 
   return isDomainRegion(code) ? t(`regions.${code}`) : code;
 }
 
-/** Flag emoji shown next to the localized region city name ("🇧🇷 São Paulo"). */
+/** Region country badge shown next to the localized region city name ("BR São Paulo"). */
 export const REGION_FLAGS: Record<DomainRegion, string> = {
-  "us-east-1": "🇺🇸",
-  "eu-west-1": "🇮🇪",
-  "sa-east-1": "🇧🇷",
-  "ap-northeast-1": "🇯🇵",
+  "us-east-1": "US",
+  "eu-west-1": "IE",
+  "sa-east-1": "BR",
+  "ap-northeast-1": "JP",
 };
 
 export function regionFlag(region: string): string {

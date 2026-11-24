@@ -189,8 +189,8 @@ export function StarterGallery() {
                 >
                   <span
                     style={{
-                      fontSize: 11,
-                      color: "var(--ms-faint)",
+                      fontSize: 11.5,
+                      color: "var(--ms-muted)",
                       textTransform: "uppercase",
                       letterSpacing: 0.4,
                       whiteSpace: "nowrap",

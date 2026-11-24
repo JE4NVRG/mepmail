@@ -22,9 +22,15 @@ import styles from "./mailboxes.module.css";
  */
 export function MailboxAgentsPanel({
   onConnect,
+  onNewAgentMailbox,
+  agentMailboxCount,
 }: {
   /** "Conectar agente" (the mailbox's own dialog, opened by the Correio). */
-  onConnect?: () => void;
+  onConnect?: (() => void) | undefined;
+  /** Opens "Nova caixa" focused on creating a dedicated agent mailbox. */
+  onNewAgentMailbox?: (() => void) | undefined;
+  /** Number of dedicated agent mailboxes owned/visible on this team. */
+  agentMailboxCount?: number | undefined;
 }) {
   const t = useTranslations("mailboxes-agent.panel");
   const tAgent = useTranslations("mailboxes-agent");
@@ -45,6 +51,9 @@ export function MailboxAgentsPanel({
   const [confirming, setConfirming] = useState<string | null>(null);
   const [editingCredential, setEditingCredential] = useState<string | null>(null);
   const [permissionsBusy, setPermissionsBusy] = useState(false);
+  const [agentSearch, setAgentSearch] = useState("");
+  const [expandedMailboxes, setExpandedMailboxes] = useState<ReadonlySet<string>>(new Set());
+  const [showAllActivity, setShowAllActivity] = useState(false);
   // Why the last approval of a card did not go out, shown on that card.
   const [sendError, setSendError] = useState<{
     itemId: string;
@@ -123,8 +132,56 @@ export function MailboxAgentsPanel({
       </div>
     );
 
+  const agentTerm = agentSearch.trim().toLowerCase();
+  const filteredCredentials = agentTerm
+    ? data.credentials.filter(
+        (c) =>
+          c.label.toLowerCase().includes(agentTerm) ||
+          c.mailboxes.some((m) => m.address.toLowerCase().includes(agentTerm)),
+      )
+    : data.credentials;
+  const visibleActivity = showAllActivity ? data.activity : data.activity.slice(0, 8);
+  const toggleExpandMailboxes = (credentialId: string) => {
+    setExpandedMailboxes((prev) => {
+      const next = new Set(prev);
+      if (next.has(credentialId)) next.delete(credentialId);
+      else next.add(credentialId);
+      return next;
+    });
+  };
+
+  const autonomousCount = data.credentials.filter((c) => c.scopes.includes("send")).length;
+  const copilotCount = data.credentials.filter(
+    (c) => c.scopes.includes("draft") && !c.scopes.includes("send"),
+  ).length;
+
   return (
     <div className={own.panel}>
+      <div className={own.summary}>
+        <div className={own.statCard}>
+          <span>{t("agents.autonomousCount")}</span>
+          <strong>{autonomousCount}</strong>
+        </div>
+        <div className={own.statCard}>
+          <span>{t("agents.supervisedCount")}</span>
+          <strong>{copilotCount}</strong>
+        </div>
+        <div className={own.statCard}>
+          <span>{t("approvals.title")}</span>
+          <strong>{data.approvals.length}</strong>
+        </div>
+        {typeof agentMailboxCount === "number" ? (
+          <div className={own.statCard}>
+            <span>{t("agents.dedicatedBoxes")}</span>
+            <strong>{agentMailboxCount}</strong>
+          </div>
+        ) : null}
+        <div className={own.statCard}>
+          <span>{t("activity.title")}</span>
+          <strong>{data.activity.length}</strong>
+        </div>
+      </div>
+
       <section aria-labelledby="agents-approvals">
         <header className={own.head}>
           <h3 id="agents-approvals">
@@ -311,24 +368,64 @@ export function MailboxAgentsPanel({
 
       <section aria-labelledby="agents-connected">
         <header className={own.head}>
-          <h3 id="agents-connected">{t("agents.title")}</h3>
-          {onConnect ? (
-            <button type="button" className="ms-btn ms-btn-sm" onClick={onConnect}>
-              {t("agents.connect")}
-            </button>
-          ) : null}
+          <h3 id="agents-connected">
+            {t("agents.title")}
+            {data.credentials.length ? (
+              <span className="ms-badge ms-badge-neutral ms-mono">{data.credentials.length}</span>
+            ) : null}
+          </h3>
+          <div className={own.headActions}>
+            {onNewAgentMailbox ? (
+              <button
+                type="button"
+                className="ms-btn ms-btn-secondary ms-btn-sm"
+                onClick={onNewAgentMailbox}
+              >
+                {t("agents.newAgentBox")}
+              </button>
+            ) : null}
+            {onConnect ? (
+              <button type="button" className="ms-btn ms-btn-primary ms-btn-sm" onClick={onConnect}>
+                {t("agents.connect")}
+              </button>
+            ) : null}
+          </div>
         </header>
+        {data.credentials.length > 4 ? (
+          <input
+            type="search"
+            className="ms-input"
+            style={{ width: "min(100%, 360px)" }}
+            placeholder={t("agents.search")}
+            value={agentSearch}
+            onChange={(e) => setAgentSearch(e.target.value)}
+          />
+        ) : null}
         {!data.credentials.length ? (
           <p className={styles.hint}>{t("agents.empty")}</p>
         ) : (
           <ul className={own.list}>
-            {data.credentials.map((agent) => {
+            {filteredCredentials.map((agent) => {
               const key = `revoke:${agent.credentialId}`;
+              const expanded = expandedMailboxes.has(agent.credentialId);
+              const visibleBoxes = expanded ? agent.mailboxes : agent.mailboxes.slice(0, 2);
+              const hiddenCount = Math.max(0, agent.mailboxes.length - 2);
+              const modeClass = agent.scopes.includes("send")
+                ? own.modeAutonomous
+                : agent.scopes.includes("draft")
+                  ? own.modeCopilot
+                  : own.tag;
+              const modeLabel = agent.scopes.includes("send")
+                ? t("agents.modeAutonomous")
+                : agent.scopes.includes("draft")
+                  ? t("agents.modeCopilot")
+                  : t("agents.modeReadOnly");
               return (
                 <li key={agent.credentialId}>
                   <div className={own.agent}>
                     <strong>{agent.label}</strong>
                     <span className={own.tags}>
+                      <span className={modeClass}>{modeLabel}</span>
                       <span className={own.tag}>{t(`agents.kind.${agent.kind}`)}</span>
                       {agent.scopes.map((scope) => (
                         <span key={scope} className={own.tag}>
@@ -336,7 +433,25 @@ export function MailboxAgentsPanel({
                         </span>
                       ))}
                     </span>
-                    <small>{agent.mailboxes.map((m) => m.address).join(", ")}</small>
+                    <div className={own.mailboxes}>
+                      {visibleBoxes.map((m) => (
+                        <span key={m.mailboxId} className={own.mailboxPill}>
+                          {m.address}
+                        </span>
+                      ))}
+                      {hiddenCount > 0 ? (
+                        <button
+                          type="button"
+                          className={own.mailboxToggle}
+                          aria-expanded={expanded}
+                          onClick={() => toggleExpandMailboxes(agent.credentialId)}
+                        >
+                          {expanded
+                            ? t("agents.lessMailboxes")
+                            : t("agents.moreMailboxes", { count: hiddenCount })}
+                        </button>
+                      ) : null}
+                    </div>
                     <small>
                       {agent.lastUsedAt
                         ? t("agents.used", { date: when(agent.lastUsedAt) })
@@ -352,7 +467,7 @@ export function MailboxAgentsPanel({
                       <span>{t("agents.revokeConfirm", { count: agent.mailboxes.length })}</span>
                       <button
                         type="button"
-                        className="ms-btn ms-btn-sm"
+                        className="ms-btn ms-btn-secondary ms-btn-sm"
                         disabled={busy}
                         onClick={() => setConfirming(null)}
                       >
@@ -360,13 +475,14 @@ export function MailboxAgentsPanel({
                       </button>
                       <button
                         type="button"
-                        className={own.danger}
+                        className="ms-btn ms-btn-destructive ms-btn-sm"
                         disabled={busy}
                         onClick={async () => {
                           try {
-                            if (agent.kind === "mailbox")
+                            const firstMailboxId = agent.mailboxes[0]?.mailboxId;
+                            if (agent.kind === "mailbox" && firstMailboxId)
                               await revokeKey.mutateAsync({
-                                mailboxId: agent.mailboxes[0]!.mailboxId,
+                                mailboxId: firstMailboxId,
                                 id: agent.credentialId,
                               });
                             else await revokeCredential.mutateAsync({ id: agent.credentialId });
@@ -386,7 +502,7 @@ export function MailboxAgentsPanel({
                       {agent.kind !== "mailbox" ? (
                         <button
                           type="button"
-                          className="ms-btn ms-btn-sm"
+                          className="ms-btn ms-btn-secondary ms-btn-sm"
                           disabled={busy}
                           aria-label={tAgent("perMailbox.editLabel", { label: agent.label })}
                           aria-expanded={editingCredential === agent.credentialId}
@@ -400,7 +516,7 @@ export function MailboxAgentsPanel({
                       ) : null}
                       <button
                         type="button"
-                        className="ms-btn ms-btn-ghost ms-btn-sm"
+                        className="ms-btn ms-btn-destructive ms-btn-sm"
                         disabled={busy}
                         onClick={() => setConfirming(key)}
                       >
@@ -424,13 +540,29 @@ export function MailboxAgentsPanel({
 
       <section aria-labelledby="agents-activity">
         <header className={own.head}>
-          <h3 id="agents-activity">{t("activity.title")}</h3>
+          <h3 id="agents-activity">
+            {t("activity.title")}
+            {data.activity.length ? (
+              <span className="ms-badge ms-badge-neutral ms-mono">{data.activity.length}</span>
+            ) : null}
+          </h3>
+          {data.activity.length > 8 ? (
+            <button
+              type="button"
+              className="ms-btn ms-btn-secondary ms-btn-sm"
+              onClick={() => setShowAllActivity((v) => !v)}
+            >
+              {showAllActivity
+                ? t("activity.showRecent")
+                : t("activity.showAll", { count: data.activity.length })}
+            </button>
+          ) : null}
         </header>
         {!data.activity.length ? (
           <p className={styles.hint}>{t("activity.empty")}</p>
         ) : (
           <ol className={own.timeline}>
-            {data.activity.map((event) => (
+            {visibleActivity.map((event) => (
               <li key={event.id}>
                 <time dateTime={new Date(event.createdAt).toISOString()}>
                   {when(event.createdAt)}

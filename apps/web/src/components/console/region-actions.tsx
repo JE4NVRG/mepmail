@@ -5,7 +5,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Fragment, useState } from "react";
-import { regionFlag } from "@/app/(dashboard)/domains/regions";
+import { RegionFlagSvg } from "@/app/(dashboard)/domains/region-label";
 import { PopoverMenu } from "@/components/popover-menu";
 import { Sparkline } from "@/components/sparkline";
 import { toast } from "@/components/toast";
@@ -247,7 +247,11 @@ export function RegionCard({ region, onChanged }: { region: ServedRegion; onChan
       account
         ? t("rateValue", {
             rate: f.oneDecimal(account.quota.maxSendRate),
-            bucket: f.oneDecimal(region.effectiveRate ?? 0),
+            bucket: f.oneDecimal(
+              typeof region.effectiveRate === "number" && Number.isFinite(region.effectiveRate)
+                ? region.effectiveRate
+                : 0,
+            ),
           })
         : t("planUnknown"),
     ],
@@ -351,16 +355,14 @@ export function RegionCard({ region, onChanged }: { region: ServedRegion; onChan
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 20, lineHeight: 1 }} aria-hidden="true">
-          {regionFlag(region.region)}
-        </span>
+        <RegionFlagSvg region={region.region} />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 600 }}>{domains(`regions.${region.region}`)}</div>
           <div className="ms-mono" style={{ fontSize: 12, color: "var(--ms-muted)" }}>
             {region.region} · {t(sandbox ? "sandboxLower" : "production")}
           </div>
         </div>
-        <span style={{ marginLeft: "auto" }}>
+        <span style={{ marginLeft: "auto", flexShrink: 0 }}>
           <RegionBadge status={region.status} />
         </span>
         <RegionMenu region={region} onChanged={onChanged} />
@@ -383,7 +385,7 @@ export function RegionCard({ region, onChanged }: { region: ServedRegion; onChan
               })}
             </span>
           ) : (
-            <span style={{ color: "var(--ms-danger)", fontSize: 12 }}>
+            <span style={{ color: "var(--ms-danger)", fontSize: 12, overflowWrap: "anywhere" }}>
               {t("error", { message: region.error ?? "" })}
             </span>
           )}
@@ -468,8 +470,18 @@ export function AddRegionCard({ region }: { region: string }) {
         padding: 20,
       }}
     >
-      <div style={{ fontSize: 18, letterSpacing: 4, filter: "grayscale(1)", opacity: 0.7 }}>
-        🇮🇪 🇯🇵 🇩🇪
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          justifyContent: "center",
+        }}
+        aria-hidden="true"
+      >
+        <RegionFlagSvg region="eu-west-1" />
+        <RegionFlagSvg region="ap-northeast-1" />
+        <RegionFlagSvg region="eu-central-1" />
       </div>
       <div style={{ fontWeight: 600, color: "var(--ms-bone)" }}>{t("title")}</div>
       <div style={{ fontSize: 13, maxWidth: 230 }}>{t("body")}</div>

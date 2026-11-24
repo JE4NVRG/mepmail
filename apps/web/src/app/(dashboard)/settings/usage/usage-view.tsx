@@ -8,6 +8,7 @@ import { StatusDot } from "@/components/status-badge";
 import { Table } from "@/components/table";
 import { formatDay, formatDayUtc } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
+import { StateCard } from "../../emails/list-parts";
 
 /* Ring geometry — 40px face, 4px stroke, faint full-circle track. */
 const RING_SIZE = 40;
@@ -84,7 +85,7 @@ export function QuotaRow({
           </span>
         </div>
         {limit === null ? (
-          <div style={{ fontSize: 11, color: "var(--ms-faint)", marginTop: 1 }}>
+          <div style={{ fontSize: 12, color: "var(--ms-muted)", marginTop: 1 }}>
             {t("unlimited")}
           </div>
         ) : null}
@@ -118,7 +119,7 @@ function HistoryHead() {
 function UsageSkeleton() {
   const t = useTranslations("settings.usage");
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20, maxWidth: 920 }}>
       <section className="ms-card" style={{ padding: "20px 24px" }}>
         <div className="ms-quota-row">
           <Skeleton width={RING_SIZE} height={RING_SIZE} radius="50%" />
@@ -164,15 +165,31 @@ function UsageSkeleton() {
 
 export function UsageView() {
   const t = useTranslations("settings.usage");
+  const common = useTranslations("common");
   const locale = useLocale();
   const trpc = useTRPC();
-  const { data } = useQuery(trpc.settings.usage.recent.queryOptions({}));
+  const query = useQuery(trpc.settings.usage.recent.queryOptions({}));
+  if (query.isError) {
+    return (
+      <div
+        style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20, maxWidth: 920 }}
+      >
+        <StateCard
+          tone="error"
+          headline={common("loadError.ours")}
+          actionLabel={common("loadError.retry")}
+          onAction={() => query.refetch()}
+        />
+      </div>
+    );
+  }
+  const data = query.data;
   if (!data) return <UsageSkeleton />;
 
   const { accepted, limit } = data.today;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20, maxWidth: 920 }}>
       <section className="ms-card" style={{ padding: "20px 24px" }}>
         {/* The deployment's one real quota — the plan's cap, per billing
             period on a monthly plan and per UTC day otherwise. Self-host

@@ -28,10 +28,10 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 12px 8px 16px;
+  padding: 10px 8px 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .picker {
@@ -199,6 +199,31 @@
 .boxName {
   color: var(--ms-bone);
   line-height: 1.35;
+}
+.boxNameRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
+}
+.boxNameText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agentPill {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ms-violet) 40%, transparent);
+  background: color-mix(in srgb, var(--ms-violet) 14%, transparent);
+  color: var(--ms-violet);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.45;
+  text-transform: uppercase;
 }
 .boxAddress {
   color: var(--ms-muted);
@@ -513,7 +538,7 @@
    no saved collapsed/expanded choice is changed by the window width. */
 @container (min-width: 621px) and (max-width: 1049px) {
   :global(html:not([data-rail])) .rail {
-    width: 180px;
+    width: 208px;
   }
 }
 

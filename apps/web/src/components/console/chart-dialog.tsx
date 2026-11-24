@@ -43,10 +43,12 @@ export function PeriodBar({
     border: `1px solid ${active ? "var(--ms-line-strong)" : "transparent"}`,
     borderRadius: 8,
     padding: "3px 9px",
+    fontFamily: "inherit",
+    fontWeight: 500,
     fontSize: 12,
+    lineHeight: 1.4,
     color: active ? "var(--ms-bone)" : "var(--ms-muted)",
     cursor: "pointer",
-    font: "inherit",
   });
   if (custom) {
     return (
@@ -58,7 +60,7 @@ export function PeriodBar({
           value={from}
           max={to}
           onChange={(e) => setFrom(e.target.value)}
-          style={{ height: 26, fontSize: 12, padding: "2px 8px", width: "auto" }}
+          style={{ height: 28, fontSize: 12, padding: "2px 8px", width: "auto", minWidth: 124 }}
         />
         <span style={{ fontSize: 12, color: "var(--ms-muted)" }}>{t("to")}</span>
         <input
@@ -69,7 +71,7 @@ export function PeriodBar({
           min={from}
           max={isoDay(new Date())}
           onChange={(e) => setTo(e.target.value)}
-          style={{ height: 26, fontSize: 12, padding: "2px 8px", width: "auto" }}
+          style={{ height: 28, fontSize: 12, padding: "2px 8px", width: "auto", minWidth: 124 }}
         />
         <button
           type="button"
@@ -93,7 +95,7 @@ export function PeriodBar({
     );
   }
   return (
-    <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
       {PERIOD_KEYS.map((key) => (
         <button key={key} type="button" style={btn(value === key)} onClick={() => onChange(key)}>
           {t(`periodShort.${key}`)}

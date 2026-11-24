@@ -62,7 +62,7 @@ function snapshot(input: {
     html: input.html,
     text: input.text,
     headers: {},
-    attachments: false,
+    attachments: [],
     mime: Buffer.from(`Subject: ${input.subject}\r\n\r\n${input.text}`),
   };
 }

@@ -1,11 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { env, unsubscribeBaseUrl } from "@millionsend/config";
 import {
-  countMailboxSchedules,
+  countMailboxSchedulesMany,
   countMailboxViews,
   countUnreadMailboxItemsMany,
+  getMailboxOutboundSummariesMany,
   getMailboxOutboundSummary,
   listMailboxFolders,
+  listMailboxFoldersMany,
   listMailboxItemsMany,
   listMailboxRegistry,
   listMailboxThread,
@@ -24,6 +26,13 @@ import {
   withMailboxItems,
   withMailboxListContents,
 } from "@millionsend/core";
+import {
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_MAX_COUNT,
+  COMPOSER_ATTACHMENT_MAX_TOTAL_BYTES,
+  COMPOSER_MIME_MAX_BYTES,
+  composerAttachmentContentType,
+} from "@millionsend/core/attachment-policy";
 import { type Db, schema } from "@millionsend/db";
 import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
 import { simpleParser } from "mailparser";
@@ -62,10 +71,10 @@ import { publicStorageOrigin, publicStoragePrefix } from "./storage";
 const READ_MAX_MIME = 25 * 1024 * 1024;
 const READ_MAX_ATTACHMENT = 25 * 1024 * 1024;
 const READ_MAX_ATTACHMENTS = 100;
-// Writing: what the composer sends (unchanged).
-const MAX_MIME = 1024 * 1024;
-const MAX_ATTACHMENT = 256 * 1024;
-const MAX_ATTACHMENTS = 10;
+// Writing: what the composer sends (packages/core attachment-policy).
+const MAX_MIME = COMPOSER_MIME_MAX_BYTES;
+const MAX_ATTACHMENT = ATTACHMENT_MAX_BYTES;
+const MAX_ATTACHMENTS = ATTACHMENT_MAX_COUNT;
 export const MAILBOX_PRIVATE_HEADERS = {
   "Cache-Control": "private, no-store",
   "X-Content-Type-Options": "nosniff",
@@ -73,6 +82,27 @@ export const MAILBOX_PRIVATE_HEADERS = {
   "Referrer-Policy": "no-referrer",
   Vary: "Cookie",
 };
+
+/**
+ * Canonical, padded base64 without a regex: a backtracking pattern over a
+ * multi-megabyte upload is slow and can overflow the regex stack.
+ */
+export function canonicalBase64(value: string): boolean {
+  const length = value.length;
+  if (!length || length % 4 !== 0) return false;
+  const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
+  for (let index = 0; index < length - padding; index++) {
+    const code = value.charCodeAt(index);
+    const ok =
+      (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122) ||
+      (code >= 48 && code <= 57) ||
+      code === 43 ||
+      code === 47;
+    if (!ok) return false;
+  }
+  return true;
+}
 
 function filename(value: string | undefined) {
   const original = value ?? "attachment";
@@ -523,35 +553,64 @@ async function listRowContents(
           addresses: parsed.filter((item) => item.kind === "inbox").map((item) => item.from),
         })
       : null;
-    await runLimited(parsed, 8, async ({ id, kind, revision, ...content }) => {
+    const outboxIds: string[] = [];
+    const itemOutbox = new Map<string, string>();
+    const sentInfo = new Map<
+      string,
+      { approvalKind: "human" | "agent"; agentLabel: string | null; draftedBy?: string }
+    >();
+    const draftInfo = new Map<
+      string,
+      { status: Content["sendStatus"]; sendHold: MailboxSendHold | null }
+    >();
+    for (const entry of sent) {
+      outboxIds.push(entry.id);
+      itemOutbox.set(entry.id, entry.id);
+      const draftedBy = drafted.get(entry.draftId);
+      sentInfo.set(entry.id, {
+        approvalKind: entry.approvalKind,
+        agentLabel: entry.agentLabel,
+        ...(draftedBy ? { draftedBy } : {}),
+      });
+    }
+    for (const draft of drafts) {
+      const key = `${draft.draftId}:${draft.draftRevision}`;
+      outboxIds.push(draft.id);
+      itemOutbox.set(key, draft.id);
+      draftInfo.set(key, {
+        status: draft.status,
+        sendHold: mailboxSendHold(draft),
+      });
+    }
+    const outboundSummaries = await getMailboxOutboundSummariesMany(db, {
+      teamId: actor.teamId,
+      mailboxId,
+      outboxIds,
+    });
+    for (const { id, kind, revision, ...content } of parsed) {
       let sendStatus: Content["sendStatus"] = null;
       let sendHold: MailboxSendHold | null = null;
       let sentBy: Content["sentBy"] = null;
       let outboxId: string | null = null;
       if (kind === "sent") {
-        const match = sent.find((entry) => entry.id === id);
+        const match = sentInfo.get(id);
         if (match) {
-          outboxId = match.id;
+          outboxId = itemOutbox.get(id) ?? null;
           sendStatus = "accepted";
           sentBy = {
             kind: match.approvalKind,
             label: match.approvalKind === "agent" ? match.agentLabel : null,
-            ...(drafted.get(match.draftId)
-              ? { draftedBy: drafted.get(match.draftId) as string }
-              : {}),
+            ...(match.draftedBy ? { draftedBy: match.draftedBy } : {}),
           };
         }
       } else if (kind === "draft") {
-        const match = drafts.find(
-          (entry) => entry.draftId === id && entry.draftRevision === revision,
-        );
+        const key = `${id}:${revision}`;
+        const match = draftInfo.get(key);
         sendStatus = match?.status ?? null;
-        sendHold = match ? mailboxSendHold(match) : null;
-        outboxId = match?.id ?? null;
+        sendHold = match?.sendHold ?? null;
+        outboxId = itemOutbox.get(key) ?? null;
       }
-      const results = outboxId
-        ? await getMailboxOutboundSummary(db, { teamId: actor.teamId, mailboxId, outboxId })
-        : null;
+      const results = outboxId ? (outboundSummaries.get(outboxId) ?? null) : null;
       contents.set(`${mailboxId}:${id}`, {
         ...content,
         sendStatus,
@@ -563,7 +622,7 @@ async function listRowContents(
             ? (senderDecisions.get(normalizeMailboxSender(content.from) ?? "") ?? "none")
             : null,
       });
-    });
+    }
   });
   return contents;
 }
@@ -577,10 +636,9 @@ export async function getMailboxThread(
   actor = { ...actor };
   input = { ...input };
   const members = await listMailboxThread(db, actor, input);
-  const entries = [];
-  for (const member of members) {
+  const entries = await runLimited(members, 6, async (member) => {
     const item = await getMailboxContent(db, actor, { mailboxId: member.mailboxId, id: member.id });
-    entries.push({
+    return {
       id: member.id,
       mailboxId: member.mailboxId,
       kind: member.kind,
@@ -591,8 +649,8 @@ export async function getMailboxThread(
       snippet: mailboxPreview(item.text),
       text: item.text.slice(0, 20000),
       current: member.id === input.id,
-    });
-  }
+    };
+  });
   return { entries, contentTrust: "untrusted-message" as const };
 }
 
@@ -1089,19 +1147,14 @@ export async function getMailboxScheduleCounts(
   actor = { ...actor };
   const { boxes } = await railMailboxes(db, actor, input.mailboxId);
   const total = { snoozed: 0, scheduled: 0, followUps: 0 };
-  for (const counts of await runLimited(boxes, 4, (box) =>
-    countMailboxSchedules(db, actor, box.id),
-  )) {
+  const boxIds = boxes.map((box) => box.id);
+  for (let start = 0; start < boxIds.length; start += 50) {
+    const counts = await countMailboxSchedulesMany(db, actor, boxIds.slice(start, start + 50));
     total.snoozed += counts.snoozed;
     total.scheduled += counts.scheduled;
     total.followUps += counts.followUps;
   }
-  return withMailboxContentAccess(
-    db,
-    actor,
-    boxes.map((box) => box.id),
-    async () => total,
-  );
+  return total;
 }
 
 /**
@@ -1116,16 +1169,14 @@ export async function getMailboxRailFolders(
 ) {
   actor = { ...actor };
   const { boxes } = await railMailboxes(db, actor, input.mailboxId);
-  // Each mailbox's folders in parallel; flattened in mailbox order, as before.
-  const perBox = await runLimited(boxes, 4, (box) =>
-    listMailboxFolders(db, actor, { mailboxId: box.id }),
-  );
-  return withMailboxContentAccess(
-    db,
-    actor,
-    boxes.map((box) => box.id),
-    async () => perBox.flat(),
-  );
+  const boxIds = boxes.map((box) => box.id);
+  const result = [];
+  for (let start = 0; start < boxIds.length; start += 50) {
+    const chunk = boxIds.slice(start, start + 50);
+    const grouped = await listMailboxFoldersMany(db, actor, chunk);
+    for (const id of chunk) result.push(...(grouped.get(id) ?? []));
+  }
+  return result;
 }
 
 /**
@@ -1263,20 +1314,28 @@ async function composeMailboxContentDraft(
     };
   });
   for (const upload of input.uploads) {
-    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(upload.base64))
-      throw new MailboxContentError("invalid");
+    if (!canonicalBase64(upload.base64)) throw new MailboxContentError("invalid");
     const content = Buffer.from(upload.base64, "base64");
     if (!content.length || content.length > MAX_ATTACHMENT)
       throw new MailboxContentError("invalid");
+    const name = filename(upload.filename);
+    // The worker's dispatch gate refuses a type outside the allowlist or one that
+    // disagrees with the extension: declare the right one, or refuse it now.
+    const contentType = composerAttachmentContentType(name);
+    if (!contentType) throw new MailboxContentError("invalid");
     attachments.push({
-      filename: filename(upload.filename),
+      filename: name,
       content,
-      contentType: "application/octet-stream",
+      contentType,
       cid: undefined,
       contentDisposition: "attachment",
     });
   }
   if (attachments.length > MAX_ATTACHMENTS) throw new MailboxContentError("invalid");
+  if (
+    attachments.reduce((sum, a) => sum + a.content.length, 0) > COMPOSER_ATTACHMENT_MAX_TOTAL_BYTES
+  )
+    throw new MailboxContentError("invalid");
   const reply = mode === "reply" && source && source.kind !== "draft" ? source.mime : null;
   const refs = mode === "reply" && source ? references(source.mime) : [];
   const originalId = mailboxMessageId(source?.mime.messageId) ?? undefined;

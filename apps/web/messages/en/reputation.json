@@ -1,6 +1,8 @@
 {
   "title": "Sending reputation",
   "unknown": "Unknown",
+  "systemPlan": "System",
+  "unlimited": "Unlimited",
   "loading": "Loading team reputation…",
   "unavailable": "Reputation is unavailable. No sending capacity has been confirmed.",
   "error": "Reputation could not be loaded. Reload to retry; your data is preserved.",

@@ -8,6 +8,12 @@
   padding: 12%;
   border-radius: 50%;
   object-fit: contain;
+  /* Keep initials visible until a real picture loads: no white flash on 404s. */
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.logo[data-loaded="true"] {
+  opacity: 1;
   /* Brand logos are drawn for a light ground (as Gmail shows them). */
   background: #fff;
 }

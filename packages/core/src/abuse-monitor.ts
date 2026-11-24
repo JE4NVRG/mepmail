@@ -349,8 +349,8 @@ const dayStart = (now: Date) => new Date(`${utcDay(now)}T00:00:00Z`);
 
 /**
  * Write the pending sample and hand it to the judge queue, unless a daily
- * cap says no. The team cap stops every kind; the instance cap spares the
- * first-sends and anomaly kinds, which are the ones worth the most.
+ * cap says no. Both team and instance caps spare the first-sends and
+ * anomaly kinds, which are the ones worth the most.
  */
 export async function recordMonitorSample(
   db: Db,
@@ -415,12 +415,12 @@ export async function recordMonitorSample(
       .limit(1);
     if (existing) return null;
     const since = dayStart(input.now);
-    const [team] = await t
-      .select({ n: sql<number>`count(*)::int` })
-      .from(ms)
-      .where(and(eq(ms.teamId, input.teamId), gte(ms.createdAt, since)));
-    if ((team?.n ?? 0) >= s.teamDailyCap) return null;
     if (input.kind !== "first_sends" && input.kind !== "anomaly") {
+      const [team] = await t
+        .select({ n: sql<number>`count(*)::int` })
+        .from(ms)
+        .where(and(eq(ms.teamId, input.teamId), gte(ms.createdAt, since)));
+      if ((team?.n ?? 0) >= s.teamDailyCap) return null;
       const [all] = await t
         .select({ n: sql<number>`count(*)::int` })
         .from(ms)

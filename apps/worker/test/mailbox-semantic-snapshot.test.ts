@@ -101,6 +101,96 @@ it.each([
   expect(judge.judge).toHaveBeenCalledTimes(1);
   expect(original.toString()).toContain("Hello");
 });
+
+/** MIME multipart/mixed montado a mao: cada parte e o que o teste quiser. */
+function mixed(parts: { headers: string; body: string }[], boundary = "mix"): string {
+  const body = parts
+    .map((part) => `--${boundary}\r\n${part.headers}\r\n\r\n${part.body}\r\n`)
+    .join("");
+  return `From: sender@example.invalid\r\nSubject: Synthetic\r\nContent-Type: multipart/mixed; boundary=${boundary}\r\n\r\n${body}--${boundary}--\r\n`;
+}
+const textPart = { headers: "Content-Type: text/plain; charset=utf-8", body: "Hello" };
+function attachmentPart(headers: string, body = "JVBERi0xLjQK") {
+  return { headers, body };
+}
+
+it("entrega anexo valido: o gate deixa passar e o judge ve nome e tipo", async () => {
+  const { input, db, judge } = await fixture(
+    mixed([
+      textPart,
+      attachmentPart(
+        'Content-Type: application/pdf\r\nContent-Disposition: attachment; filename="nota.pdf"\r\nContent-Transfer-Encoding: base64',
+      ),
+    ]),
+  );
+  const send = vi.fn();
+  await withMailboxDispatchContent(db, input, judge, true, async () => send());
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(judge.judge).toHaveBeenCalledTimes(1);
+  expect(judge.judge.mock.calls[0]![0]).toContain("nota.pdf");
+  expect(judge.judge.mock.calls[0]![0]).toContain("application/pdf");
+});
+
+it.each([
+  [
+    "nome malicioso",
+    'Content-Type: application/pdf\r\nContent-Disposition: attachment; filename="../../../etc/passwd.pdf"\r\nContent-Transfer-Encoding: base64',
+    "attachment_name_blocked",
+  ],
+  [
+    "executavel disfarcado",
+    'Content-Type: application/pdf\r\nContent-Disposition: attachment; filename="nota.pdf.exe"\r\nContent-Transfer-Encoding: base64',
+    "attachment_name_blocked",
+  ],
+  [
+    "content-type falso",
+    'Content-Type: application/x-msdownload\r\nContent-Disposition: attachment; filename="nota.pdf"\r\nContent-Transfer-Encoding: base64',
+    "attachment_type_blocked",
+  ],
+] as const)("recusa %s com motivo proprio", async (_label, headers, reason) => {
+  const { input, db, judge } = await fixture(mixed([textPart, attachmentPart(headers)]));
+  const send = vi.fn();
+  await expect(
+    withMailboxDispatchContent(db, input, judge, true, async () => send()),
+  ).rejects.toMatchObject({ reason });
+  expect(send).not.toHaveBeenCalled();
+  expect(judge.judge).not.toHaveBeenCalled();
+});
+
+it("recusa boundary quebrado sem adivinhar as partes", async () => {
+  const raw = mixed([
+    textPart,
+    attachmentPart(
+      'Content-Type: application/pdf\r\nContent-Disposition: attachment; filename="nota.pdf"',
+    ),
+  ]).replace("--mix--", "--outro--");
+  const { input, db, judge } = await fixture(raw);
+  const send = vi.fn();
+  await expect(
+    withMailboxDispatchContent(db, input, judge, true, async () => send()),
+  ).rejects.toMatchObject({ reason: "attachment_structure_invalid" });
+  expect(send).not.toHaveBeenCalled();
+});
+
+it("recusa anexo aninhado: anexo que e um multipart", async () => {
+  const nested = ["--inner\r\nContent-Type: text/plain\r\n\r\nHello\r\n--inner--\r\n"].join("");
+  const { input, db, judge } = await fixture(
+    mixed([
+      textPart,
+      {
+        headers:
+          'Content-Type: multipart/mixed; boundary=inner\r\nContent-Disposition: attachment; filename="pacote.txt"',
+        body: nested,
+      },
+    ]),
+  );
+  const send = vi.fn();
+  await expect(
+    withMailboxDispatchContent(db, input, judge, true, async () => send()),
+  ).rejects.toMatchObject({ reason: "attachment_structure_invalid" });
+  expect(send).not.toHaveBeenCalled();
+});
+
 it("serialized/copied objects and stale attempts have no approval; fresh retry requalifies", async () => {
   const { input, db, judge } = await fixture();
   let prior: Parameters<MailboxOutboxSender["send"]>[0] = input;
@@ -181,13 +271,29 @@ it("undefined Cloud selection cannot exempt; explicit OSS remains valid", async 
   expect(send).toHaveBeenCalledTimes(1);
 });
 it.each([
-  "Content-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=synthetic.txt\r\n\r\nsynthetic",
-  "Content-Type: text/plain\r\nContent-Type: text/html\r\n\r\nHello",
-  "Content-Type: text/plain; charset=iso-8859-1\r\n\r\nHello",
-  "Content-Type: text/plain\r\nContent-Transfer-Encoding: base64\r\n\r\n%%%bad",
-  "Content-Type: text/plain\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n=XX",
-  "Content-Type: multipart/alternative; boundary=x\r\n\r\n--x\r\nContent-Type: text/plain\r\n\r\nHello\r\n--x--\r\n",
-])("unsupported/malformed MIME has no partial allow: %s", async (part) => {
+  // A parte solta com disposition de anexo agora e nomeada: nao e revisao de texto.
+  [
+    "Content-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=synthetic.txt\r\n\r\nsynthetic",
+    "attachment_not_supported",
+  ],
+  [
+    "Content-Type: text/plain\r\nContent-Type: text/html\r\n\r\nHello",
+    "attachment_structure_invalid",
+  ],
+  ["Content-Type: text/plain; charset=iso-8859-1\r\n\r\nHello", "semantic_content_review"],
+  [
+    "Content-Type: text/plain\r\nContent-Transfer-Encoding: base64\r\n\r\n%%%bad",
+    "semantic_content_review",
+  ],
+  [
+    "Content-Type: text/plain\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n=XX",
+    "semantic_content_review",
+  ],
+  [
+    "Content-Type: multipart/alternative; boundary=x\r\n\r\n--x\r\nContent-Type: text/plain\r\n\r\nHello\r\n--x--\r\n",
+    "semantic_content_review",
+  ],
+])("unsupported/malformed MIME has no partial allow: %s", async (part, reason) => {
   const { input, db, judge } = await fixture(
     "From: sender@example.invalid\r\nSubject: Synthetic\r\n" + part,
   );
@@ -195,7 +301,7 @@ it.each([
   const original = Buffer.from(input.raw);
   await expect(
     withMailboxDispatchContent(db, input, judge, true, async () => send()),
-  ).rejects.toMatchObject({ reason: "semantic_content_review" });
+  ).rejects.toMatchObject({ reason });
   expect(send).not.toHaveBeenCalled();
   expect(judge.judge).not.toHaveBeenCalled();
   expect(input.raw).toEqual(original);

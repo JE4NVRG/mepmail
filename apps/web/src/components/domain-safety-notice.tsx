@@ -76,7 +76,7 @@ export function DomainSafetyNotice(input: DomainSafetyNoticeInput) {
     <>
       <span
         data-domain-safety={notice.state}
-        style={{ fontSize: 13.5, color: `var(--ms-${notice.variant})` }}
+        style={{ fontSize: 13.5, color: `var(--ms-${notice.variant})`, whiteSpace: "nowrap" }}
       >
         {t("bannerVerified")}
       </span>

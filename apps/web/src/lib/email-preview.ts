@@ -18,9 +18,20 @@ const SCHEME_QUERY = /prefers-color-scheme\s*:\s*(dark|light)/gi;
 const ALWAYS = "min-width: 0px";
 const NEVER = "min-width: 999999px";
 
-/** Whether the message carries its own dark-mode treatment, the way a client would detect it. */
+/** Whether the message handles dark mode on its own in the preview. */
 export function declaresColorSchemes(html: string): boolean {
-  return /prefers-color-scheme|supported-color-schemes|name=["']?color-scheme/i.test(html);
+  if (/prefers-color-scheme\s*:\s*dark/i.test(html)) return true;
+  const hasDarkMeta = /(?:supported-color-schemes|name=["']?color-scheme)[^>\n]*\bdark\b/i.test(
+    html,
+  );
+  if (!hasDarkMeta) return false;
+  // Maily templates declare "light dark" metas while keeping hardcoded #fff
+  // inline surfaces and no prefers-color-scheme: dark CSS; simulate auto-darkening.
+  const hasLightSurface =
+    /(?:background(?:-color)?\s*:\s*(?:#fff(?:fff)?|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|white)|bgcolor=["']?#?fff(?:fff)?["']?)/i.test(
+      html,
+    );
+  return !hasLightSurface;
 }
 
 /**

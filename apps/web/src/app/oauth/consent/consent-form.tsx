@@ -227,15 +227,13 @@ export function ConsentForm({
               {t("noTeam")} <Link href="/onboarding">{t("createTeam")}</Link>
             </p>
           )}
-          <span style={{ fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}>
+          <span style={{ fontSize: 12, color: "var(--ms-muted)" }}>
             {teamId === ALL_TEAMS ? t("allTeamsNote") : t("teamNote")}
           </span>
         </div>
         <div className={`ms-field ${styles.field}`}>
           <span className="ms-microlabel">{t("permissions")}</span>
-          <span
-            style={{ display: "block", fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}
-          >
+          <span style={{ display: "block", fontSize: 12, color: "var(--ms-muted)" }}>
             {t("permissionsNote")}
           </span>
           <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
@@ -289,8 +287,8 @@ export function ConsentForm({
             <span
               style={{
                 display: "block",
-                fontSize: "var(--ms-fs-micro)",
-                color: "var(--ms-faint)",
+                fontSize: 12,
+                color: "var(--ms-muted)",
               }}
             >
               {t("send.note")}
@@ -303,11 +301,9 @@ export function ConsentForm({
             style={{ border: 0, padding: 0, margin: 0 }}
           >
             <legend className="ms-microlabel">{t("mailboxes")}</legend>
-            <span style={{ fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}>
-              {t("mailboxesChoose")}
-            </span>
+            <span style={{ fontSize: 12, color: "var(--ms-muted)" }}>{t("mailboxesChoose")}</span>
             {overLimit ? (
-              <span style={{ fontSize: "var(--ms-fs-micro)", color: "var(--ms-faint)" }}>
+              <span style={{ fontSize: 12, color: "var(--ms-muted)" }}>
                 {t("mailboxesLimit", { max: MAIL_GRANT_MAX_MAILBOXES })}
               </span>
             ) : null}

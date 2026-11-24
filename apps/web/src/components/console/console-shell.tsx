@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
-import { EllipsisGlyph, MenuGlyph } from "@/components/icons/nav-icons";
+import { BackArrowGlyph, EllipsisGlyph, MenuGlyph } from "@/components/icons/nav-icons";
 import { useDismiss } from "@/components/popover-menu";
 import { AppearanceRow, LanguageRow } from "@/components/sidebar";
 import { authClient } from "@/lib/auth-client";
@@ -23,54 +23,115 @@ export const CONSOLE_NAV = [
 
 export type ConsoleNavKey = (typeof CONSOLE_NAV)[number]["key"];
 
-function ConsoleGlyph({ name }: { name: ConsoleNavKey }) {
+function ConsoleGlyph({ name, active }: { name: ConsoleNavKey; active: boolean }) {
+  const fillOpacity = active ? 0.22 : 0.09;
   const paths = {
     overview: (
       <>
-        <rect x="3" y="3" width="7" height="9" rx="1.5" />
-        <rect x="14" y="3" width="7" height="5" rx="1.5" />
-        <rect x="14" y="12" width="7" height="9" rx="1.5" />
-        <rect x="3" y="16" width="7" height="5" rx="1.5" />
+        <rect
+          x="3"
+          y="3"
+          width="7"
+          height="9"
+          rx="1.8"
+          fill="currentColor"
+          fillOpacity={fillOpacity}
+        />
+        <rect
+          x="14"
+          y="3"
+          width="7"
+          height="5"
+          rx="1.8"
+          fill="currentColor"
+          fillOpacity={fillOpacity}
+        />
+        <rect
+          x="14"
+          y="12"
+          width="7"
+          height="9"
+          rx="1.8"
+          fill="currentColor"
+          fillOpacity={fillOpacity}
+        />
+        <rect
+          x="3"
+          y="16"
+          width="7"
+          height="5"
+          rx="1.8"
+          fill="currentColor"
+          fillOpacity={fillOpacity}
+        />
       </>
     ),
     regions: (
       <>
-        <circle cx="12" cy="12" r="10" />
-        <path d="M2 12h20" />
-        <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+        <circle cx="12" cy="12" r="9.5" fill="currentColor" fillOpacity={fillOpacity} />
+        <path d="M2.5 12h19" />
+        <path d="M12 2.5a14 14 0 0 0 0 19 14 14 0 0 0 0-19" />
       </>
     ),
     teams: (
       <>
-        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <rect
+          x="3"
+          y="4"
+          width="18"
+          height="16"
+          rx="2.5"
+          fill="currentColor"
+          fillOpacity={fillOpacity}
+        />
         <path d="M3 10h18" />
         <path d="M9 10v10" />
       </>
     ),
     users: (
       <>
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        <circle cx="9" cy="7" r="3.8" fill="currentColor" fillOpacity={fillOpacity} />
+        <path
+          d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2Z"
+          fill="currentColor"
+          fillOpacity={fillOpacity}
+        />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.85" />
+        <path d="M16 3.2a3.8 3.8 0 0 1 0 7.6" />
       </>
     ),
     revenue: (
       <>
-        <path d="M12 2v20" />
-        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        <circle
+          cx="12"
+          cy="12"
+          r="9.5"
+          stroke="none"
+          fill="currentColor"
+          fillOpacity={fillOpacity * 0.85}
+        />
+        <path d="M12 2.5v19" />
+        <path d="M17 5.5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
       </>
     ),
     safety: (
       <>
-        <path d="M12 2 4 5.5v6c0 5 3.4 8.6 8 10.5 4.6-1.9 8-5.5 8-10.5v-6z" />
+        <path
+          d="M12 2 4 5.5v6c0 5 3.4 8.6 8 10.5 4.6-1.9 8-5.5 8-10.5v-6z"
+          fill="currentColor"
+          fillOpacity={fillOpacity}
+        />
         <path d="M12 8v4" />
         <path d="M12 16h.01" />
       </>
     ),
     audit: (
       <>
-        <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8l6 6v12a2 2 0 0 1-2 2z" />
+        <path
+          d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8l6 6v12a2 2 0 0 1-2 2z"
+          fill="currentColor"
+          fillOpacity={fillOpacity}
+        />
         <path d="M14 2v6h6" />
         <path d="m9 15 2 2 4-4" />
       </>
@@ -78,12 +139,12 @@ function ConsoleGlyph({ name }: { name: ConsoleNavKey }) {
   } as const;
   return (
     <svg
-      width={16}
-      height={16}
+      width={15}
+      height={15}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.4}
+      strokeWidth={1.65}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -163,7 +224,12 @@ function ConsoleSidebar({
       <nav
         className="ms-nav"
         aria-label={t("console")}
-        style={{ minHeight: 0, overflowY: "auto", padding: 3, margin: "0 -3px -3px" }}
+        style={{
+          minHeight: 0,
+          overflowY: "auto",
+          padding: 3,
+          margin: "0 -3px 8px",
+        }}
         onClick={
           onNavigate
             ? (event) => {
@@ -172,17 +238,28 @@ function ConsoleSidebar({
             : undefined
         }
       >
-        <Link href="/emails">{t("backToDashboard")}</Link>
-        {CONSOLE_NAV.map((item) => (
-          <Link
-            key={item.key}
-            href={item.href}
-            className={active === item.href ? "active" : undefined}
-          >
-            <ConsoleGlyph name={item.key} />
-            {t(item.key)}
-          </Link>
-        ))}
+        <Link href="/emails">
+          <span className="ms-nav-icon" aria-hidden="true">
+            <BackArrowGlyph size={14} />
+          </span>
+          {t("backToDashboard")}
+        </Link>
+        {CONSOLE_NAV.map((item) => {
+          const isCurrent = active === item.href;
+          return (
+            <Link
+              key={item.key}
+              href={item.href}
+              className={isCurrent ? "active" : undefined}
+              aria-current={isCurrent ? "page" : undefined}
+            >
+              <span className="ms-nav-icon" aria-hidden="true">
+                <ConsoleGlyph name={item.key} active={isCurrent} />
+              </span>
+              {t(item.key)}
+            </Link>
+          );
+        })}
       </nav>
       <div style={{ flex: 1 }} />
       <div ref={accountRef} style={{ position: "relative", borderTop: "1px solid var(--ms-line)" }}>

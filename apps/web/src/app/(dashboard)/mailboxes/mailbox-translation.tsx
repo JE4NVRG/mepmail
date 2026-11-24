@@ -34,13 +34,39 @@ export function MailboxTranslation({ text, children }: { text: string; children:
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
-    setAvailable(browserTranslation() !== null && text.trim().length > 0);
+    const api = browserTranslation();
+    const hasText = text.trim().length > 0;
+    if (!api || !hasText) {
+      setAvailable(false);
+      return;
+    }
+    setAvailable(true);
+    if (api.detector) {
+      void (async () => {
+        try {
+          const detector = await api.detector!.create();
+          const [best] = await detector.detect(text.slice(0, 1500));
+          detector.destroy?.();
+          if (
+            alive.current &&
+            best &&
+            best.confidence >= 0.55 &&
+            best.detectedLanguage !== "und" &&
+            sameLanguage(best.detectedLanguage, target)
+          ) {
+            setAvailable(false);
+          }
+        } catch {
+          // Leave the button available when passive detection is unsupported.
+        }
+      })();
+    }
     return () => {
       alive.current = false;
       translator.current?.destroy?.();
       translator.current = null;
     };
-  }, [text]);
+  }, [text, target]);
   const languageName = (code: string) => {
     try {
       return new Intl.DisplayNames([locale], { type: "language" }).of(code) ?? code;

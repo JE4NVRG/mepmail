@@ -226,7 +226,7 @@ export function GroupedMultiSelect({
           {adornment}
           <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
           {hint ? (
-            <span style={{ color: "var(--ms-faint)", fontSize: 12, flex: "none" }}>{hint}</span>
+            <span style={{ color: "var(--ms-muted)", fontSize: 12, flex: "none" }}>{hint}</span>
           ) : null}
         </span>
         {checked ? <span aria-hidden="true">✓</span> : null}

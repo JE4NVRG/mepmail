@@ -233,10 +233,14 @@ async function checkOne(record: DnsCheckRecord, resolver: DnsResolver): Promise<
     if (rows.length === 0) return { status: "missing" };
     const want = normTxt(record.value);
     const answers = rows.map((chunks) => normTxt(chunks.join("")));
-    // SPF compares as a policy (one record that authorizes SES); everything else exactly.
+    // SPF compares as a policy (one record that authorizes SES). DKIM requires a
+    // single exact record at selector._domainkey: a duplicate or double-quoted
+    // copy leaves SES PENDING even when one of the answers matches.
     const found = /^v=spf1(\s|$)/i.test(want)
       ? spfSatisfies(want, answers)
-      : answers.includes(want);
+      : /^v=DKIM1(\s|;|$)/i.test(want)
+        ? answers.length === 1 && answers[0] === want
+        : answers.includes(want);
     return found ? { status: "found" } : mismatch(answers);
   } catch (err) {
     // Never throw: NXDOMAIN/NODATA read missing, anything else unknown.

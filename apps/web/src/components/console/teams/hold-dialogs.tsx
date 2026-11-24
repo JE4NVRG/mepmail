@@ -216,7 +216,15 @@ export function SuspendDialog({
             onChange={(event) => setNote(event.target.value)}
           />
         </div>
-        <p style={{ color: "var(--ms-muted)", fontSize: 13 }}>{t("paidNotice")}</p>
+        <p
+          style={{
+            margin: phishing && !paid ? 0 : "0 0 12px",
+            color: "var(--ms-muted)",
+            fontSize: 13,
+          }}
+        >
+          {t("paidNotice")}
+        </p>
         {phishing && !paid ? null : (
           <NotifyRow
             id={`${id}-notify`}

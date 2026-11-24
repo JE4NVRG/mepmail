@@ -43,6 +43,8 @@ function Tile({
   const card = {
     display: "block",
     width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
     padding: "16px 20px",
     textAlign: "left",
     font: "inherit",
@@ -128,7 +130,7 @@ export function StatTiles({ summary }: { summary: Summary }) {
           return common(`duration.${unit}`, { n });
         })();
   return (
-    <div className="ms-grid ms-grid-4" style={{ marginBottom: 16 }}>
+    <div className="ms-grid ms-grid-5" style={{ marginBottom: 16 }}>
       <Tile
         label={t("tiles.teams")}
         value={count(teams.total)}

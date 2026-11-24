@@ -38,7 +38,7 @@ function snapshot(): DispatchContentSnapshot {
     sourceText: "Appointment confirmed: 18 November, 10:00. Reference ABC42.",
     text: "Appointment confirmed: 18 November, 10:00. Reference ABC42.",
     headers: {},
-    attachments: false,
+    attachments: [],
     mime: Buffer.from("Synthetic immutable MIME"),
   };
 }
@@ -159,7 +159,11 @@ for (const slot of ["sourceHtml", "html", "sourceText", "text"] as const) {
 
 it("uninspectable alternatives never reach the judge", async () => {
   for (const changes of [
-    { attachments: true },
+    {
+      attachments: [
+        { filename: "amostra.exe", contentType: "application/x-msdownload", size: 16 },
+      ],
+    },
     { sourceText: "x".repeat(6001) },
     { html: '<img src="https://image.example.invalid/x">' },
   ]) {

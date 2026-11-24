@@ -356,7 +356,7 @@ it("hard deadline refuses even a dependency ignoring cancellation", async () => 
     html: null,
     text: "receipt",
     headers: {},
-    attachments: false,
+    attachments: [],
     mime: Buffer.from("fixture"),
   };
   const result = await qualifyDispatchContent(
@@ -388,12 +388,37 @@ it("tracking cannot conceal the original hostile destination from the judge", as
   expect(judge.judge).toHaveBeenCalledTimes(1);
   expect(judge.judge.mock.calls[0]![0]).toContain("audit.invalid");
 });
-it("real sealed attachments are held rather than represented as a clean filename", async () => {
+it("real sealed attachments reach the judge with their name, never as invisible content", async () => {
   const f = await seed({ text: "Requested receipt" });
   const attachments = await sealAttachments(
     [
       {
         filename: "invoice.pdf",
+        content: Buffer.from("synthetic fixture").toString("base64"),
+        contentType: "application/pdf",
+      },
+    ],
+    keyring,
+    { teamId: f.teamId, rowId: f.id },
+  );
+  await fixture.db.update(schema.emails).set({ attachments }).where(eq(schema.emails.id, f.id));
+  const calls = vi.fn(async (_block: string, _opts: { signal: AbortSignal }) => ({
+    ...syntheticCleanVerdict,
+  }));
+  const d = deps({ ...syntheticCleanContentJudge, judge: calls });
+  expect(await sendEmail(fixture.db, d.value, { emailId: f.id })).toBe("sent");
+  expect(calls).toHaveBeenCalledTimes(1);
+  // O anexo valido nao pode viajar invisivel: o judge ve nome e tipo.
+  expect(String(calls.mock.calls[0]![0])).toContain("invoice.pdf");
+  expect(String(calls.mock.calls[0]![0])).toContain("application/pdf");
+});
+
+it("a sealed attachment the policy refuses parks without calling the judge", async () => {
+  const f = await seed({ text: "Requested receipt" });
+  const attachments = await sealAttachments(
+    [
+      {
+        filename: "fatura.pdf.exe",
         content: Buffer.from("synthetic fixture").toString("base64"),
         contentType: "application/pdf",
       },
@@ -672,7 +697,7 @@ it("tracking exemption is private, exact-regeneration-bound and source-image ref
     html: rewriteForTracking(before, options),
     text: null,
     headers: {},
-    attachments: false,
+    attachments: [],
     mime: Buffer.from("exact final MIME fixture"),
   };
   const context = {
@@ -760,4 +785,86 @@ it("actual HTTP adapter complete clean control reaches only the capturing transp
   expect(await sendEmail(fixture.db, d.value, { emailId: f.id })).toBe("sent");
   expect(d.sendRaw).toHaveBeenCalledTimes(1);
   expect((await row(f.id)).sentAt).toBeInstanceOf(Date);
+});
+
+/**
+ * O caminho da API publica monta o snapshot e chama este gate; anexo nao pode
+ * ser "invisivel" nem recusado pela mensagem inteira sem motivo.
+ */
+function attachmentSnapshot(
+  attachments: { filename: string; contentType: string; size: number }[],
+) {
+  return {
+    teamId: "fixture-team",
+    emailId: "fixture-email",
+    from: "a@sender.example",
+    to: ["r@example.com"],
+    cc: null,
+    bcc: null,
+    replyTo: null,
+    subject: "Com anexo",
+    sourceHtml: null,
+    sourceText: "Segue o documento.",
+    html: null,
+    text: "Segue o documento.",
+    headers: {},
+    attachments,
+    mime: Buffer.from("exact final MIME fixture"),
+  };
+}
+const attachmentContext = {
+  name: "fixture",
+  plan: "free",
+  ageDays: 1,
+  verifiedDomains: ["sender.example"],
+};
+
+it("deixa passar anexo valido e mostra nome e tipo ao judge", async () => {
+  const calls = vi.fn(async (_block: string, _opts: { signal: AbortSignal }) => ({
+    ...syntheticCleanVerdict,
+  }));
+  const decision = await qualifyDispatchContent(
+    attachmentSnapshot([{ filename: "contrato.pdf", contentType: "application/pdf", size: 2048 }]),
+    attachmentContext,
+    { ...syntheticCleanContentJudge, judge: calls },
+  );
+  expect(decision.allowed).toBe(true);
+  expect(calls).toHaveBeenCalledTimes(1);
+  const block = calls.mock.calls[0]![0] as unknown as string;
+  expect(block).toContain("contrato.pdf");
+  expect(block).toContain("application/pdf");
+});
+
+it.each([
+  [
+    "nome com travessia de caminho",
+    { filename: "../etc/passwd.pdf", contentType: "application/pdf", size: 10 },
+    "attachment_name_blocked",
+  ],
+  [
+    "executavel com extensao dupla",
+    { filename: "contrato.pdf.exe", contentType: "application/pdf", size: 10 },
+    "attachment_name_blocked",
+  ],
+  [
+    "tipo fora da allowlist",
+    { filename: "contrato.pdf", contentType: "application/x-msdownload", size: 10 },
+    "attachment_type_blocked",
+  ],
+  [
+    "arquivo grande demais",
+    { filename: "contrato.pdf", contentType: "application/pdf", size: 11 * 1024 * 1024 },
+    "attachment_too_large",
+  ],
+] as const)("recusa %s antes de chamar o judge", async (_label, attachment, detail) => {
+  const calls = vi.fn(async (_block: string, _opts: { signal: AbortSignal }) => ({
+    ...syntheticCleanVerdict,
+  }));
+  const decision = await qualifyDispatchContent(
+    attachmentSnapshot([attachment]),
+    attachmentContext,
+    { ...syntheticCleanContentJudge, judge: calls },
+  );
+  expect(decision).toMatchObject({ allowed: false, detail });
+  expect(calls).not.toHaveBeenCalled();
 });

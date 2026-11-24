@@ -235,11 +235,25 @@
       "asksYou": "asks for your approval to send",
       "revoke": "Revoke",
       "revokeConfirm": "{count, plural, one {The agent loses access to this mailbox at once.} other {The agent loses access to the # mailboxes at once.}}",
-      "revoked": "{agent} no longer has access."
+      "revoked": "{agent} no longer has access.",
+      "search": "Filter agents or addresses…",
+      "moreMailboxes": "+{count} mailboxes",
+      "lessMailboxes": "Show fewer mailboxes",
+      "keysHeading": "Per-mailbox keys & MCP setup",
+      "autonomousCount": "Autonomous (direct send)",
+      "supervisedCount": "Copilot (with approval)",
+      "dedicatedBoxes": "Agent mailboxes",
+      "modeAutonomous": "Autonomous · sends directly",
+      "modeCopilot": "Copilot · asks approval",
+      "modeReadOnly": "Read-only",
+      "newAgentBox": "New agent mailbox"
     },
     "activity": {
       "title": "What the agents did",
-      "empty": "No agent activity yet."
+      "empty": "No agent activity yet.",
+      "showAll": "Show all ({count})",
+      "showRecent": "Show latest 8 only",
+      "searchMailboxes": "Filter mailboxes by label or address…"
     }
   }
 }

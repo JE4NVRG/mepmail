@@ -2,7 +2,7 @@
 /* Sized so the four piles fit the list's 380 px column without scrolling. */
 .tabs {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   min-inline-size: 0;
   margin: 0;
   padding: 8px 10px;

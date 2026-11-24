@@ -20,6 +20,7 @@
     "copy": "Copiar",
     "copied": "Copiado",
     "retry": "Tentar de novo",
+    "clearFilters": "Limpar filtros",
     "loadError": "Não foi possível carregar esta tela.",
     "none": "—",
     "yes": "sim",
@@ -126,7 +127,7 @@
     },
     "tiles": {
       "teams": "Equipes",
-      "teamsSub": "{free} free · {paid} pagas · {system} sistema · {new} novas na semana",
+      "teamsSub": "{free} free · {paid} {paid, plural, one {paga} other {pagas}} · {system} sistema · {new} novas na semana",
       "contacts": "Contatos armazenados",
       "contactsSub": "em {teams} equipes · {unsubscribed} descadastrados",
       "contactsSubPlain": "em {teams} equipes",
@@ -341,7 +342,7 @@
       "domains": "Domínios",
       "sent24h": "Enviados 24h",
       "bounce7d": "Bounce 7d",
-      "complaints7d": "Reclamações 24h",
+      "complaints7d": "Reclamações 7d",
       "breaker": "Breaker"
     },
     "planCell": {
@@ -452,7 +453,7 @@
   },
   "teams": {
     "title": "Equipes",
-    "proof": "{total} equipes · {free} free · {paid} pagas · {system} sistema · {suspended} suspensas",
+    "proof": "{total} equipes · {free} free · {paid} {paid, plural, one {paga} other {pagas}} · {system} sistema · {suspended} suspensas",
     "search": "Buscar equipes, proprietários, domínios, ids",
     "filters": {
       "type": "Tipo: {value}",
@@ -689,7 +690,7 @@
       }
     },
     "acquisition": {
-      "ownerSignup": "Origem do cadastro do proprietário atual",
+      "ownerSignup": "Cadastro do proprietário",
       "notMeasured": "Não medido",
       "sendStripe": "Stripe · Envio",
       "mail": "Correio",
@@ -1169,7 +1170,7 @@
     "policy": "Política armazenada: v{version}",
     "privateContext": "Informação privada para esta revisão. Não é enviada em recibos, logs ou resumos por e-mail.",
     "queue": {
-      "count": "{count} equipes na fila",
+      "count": "{count, plural, one {# equipe na fila} other {# equipes na fila}}",
       "effective": "Restrição efetiva",
       "empty": "Nenhuma revisão pendente.",
       "level": "Nível armazenado",

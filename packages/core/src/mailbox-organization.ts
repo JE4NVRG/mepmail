@@ -1,5 +1,5 @@
 import { type Db, schema } from "@millionsend/db";
-import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   type MailboxContentActor,
@@ -116,22 +116,24 @@ async function uniqueName(
   if (duplicate && duplicate.id !== exceptId) throw new MailboxContentError("conflict");
 }
 
-/** Names are private mailbox metadata: live read grants apply, team admin is insufficient. */
-export async function listMailboxFolders(
+/** Folders across one or more authorized mailboxes, keyed by mailboxId and bounded per box. */
+export async function listMailboxFoldersMany(
   db: Db,
   actor: MailboxContentActor,
-  input: { mailboxId: string },
-) {
+  mailboxIds: readonly string[],
+): Promise<Map<string, ReturnType<typeof folderDto>[]>> {
   actor = { ...actor };
-  const parsed = parse(mailbox, input);
-  return withMailboxContentAccess(db, actor, [parsed.mailboxId], async (tx) => {
+  const ids = [...new Set(mailboxIds)].map((id) => parse(mailbox, { mailboxId: id }).mailboxId);
+  const grouped = new Map<string, ReturnType<typeof folderDto>[]>(ids.map((id) => [id, []]));
+  if (!ids.length) return grouped;
+  return withMailboxContentAccess(db, actor, ids, async (tx) => {
     const folders = await tx
       .select()
       .from(schema.mailboxFolders)
       .where(
         and(
           eq(schema.mailboxFolders.teamId, actor.teamId),
-          eq(schema.mailboxFolders.mailboxId, parsed.mailboxId),
+          inArray(schema.mailboxFolders.mailboxId, ids),
           isNull(schema.mailboxFolders.archivedAt),
         ),
       )
@@ -140,10 +142,24 @@ export async function listMailboxFolders(
         asc(schema.mailboxFolders.position),
         asc(schema.mailboxFolders.name),
         asc(schema.mailboxFolders.id),
-      )
-      .limit(MAX_FOLDERS);
-    return folders.map(folderDto);
+      );
+    for (const folder of folders) {
+      const list = grouped.get(folder.mailboxId);
+      if (list && list.length < MAX_FOLDERS) list.push(folderDto(folder));
+    }
+    return grouped;
   });
+}
+
+/** Names are private mailbox metadata: live read grants apply, team admin is insufficient. */
+export async function listMailboxFolders(
+  db: Db,
+  actor: MailboxContentActor,
+  input: { mailboxId: string },
+) {
+  const parsed = parse(mailbox, input);
+  const grouped = await listMailboxFoldersMany(db, actor, [parsed.mailboxId]);
+  return grouped.get(parsed.mailboxId) ?? [];
 }
 
 export async function createMailboxFolder(

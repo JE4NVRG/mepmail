@@ -123,7 +123,8 @@
   "message": "Mensagem",
   "attach": "Adicionar anexos",
   "attachments": "Anexos",
-  "attachmentLimit": "Até 10 anexos de 256 KB cada; mensagem completa até 1 MB.",
+  "attachmentLimit": "Até 10 anexos de 10 MB cada (16 MB no total).",
+  "attachmentTypeBlocked": "Esse tipo ou nome de arquivo não é permitido como anexo.",
   "attachmentError": "Não foi possível ler o arquivo. Tente novamente.",
   "removeAttachment": "Remover {name}",
   "draftConflict": "Este rascunho foi alterado em outra sessão. Seu texto permanece aqui; copie-o e reabra a versão atual antes de salvar.",
@@ -171,6 +172,9 @@
   "bodyFormat": "Formato da mensagem",
   "formattedBody": "Formatado",
   "plainBody": "Texto simples",
+  "previewScheme": "Tema da leitura",
+  "previewLight": "Claro",
+  "previewDark": "Escuro",
   "externalImagesHelp": "{count, plural, one {# imagem externa bloqueada} other {# imagens externas bloqueadas}}. Ao mostrar, o remetente pode identificar o acesso.",
   "showExternalImages": "Mostrar imagens externas",
   "imagesShown": "Imagens de {domain} visíveis nesta mensagem.",
@@ -535,7 +539,8 @@
       "help": "Mostrar estes atalhos",
       "newFolder": "Nova pasta",
       "moveTo": "Mover para uma pasta",
-      "snooze": "Adiar"
+      "snooze": "Adiar",
+      "commands": "Paleta de comandos"
     }
   },
   "usage": {
@@ -1057,7 +1062,30 @@
     "more": "Mais",
     "collapse": "Recolher a barra lateral",
     "expand": "Expandir a barra lateral",
-    "waiting": "{count} aguardando"
+    "waiting": "{count} aguardando",
+    "agentBadge": "IA",
+    "teamAgents": "Equipe IA",
+    "teamAgentsAutonomous": "{count, plural, one {# autônomo} other {# autônomos}}",
+    "teamAgentsMailboxes": "{count, plural, one {# caixa} other {# caixas}}",
+    "waitingCompact": "{count} pendente(s)"
+  },
+  "commands": {
+    "open": "Comandos",
+    "title": "Paleta de comandos",
+    "placeholder": "Ir para caixa, pasta ou ação…",
+    "empty": "Nenhum comando encontrado.",
+    "groups": {
+      "actions": "Ações",
+      "folders": "Pastas",
+      "mailboxes": "Caixas"
+    },
+    "items": {
+      "compose": "Escrever novo e-mail",
+      "agents": "Equipe de agentes e permissões",
+      "settings": "Preferências do Correio",
+      "theme": "Alternar tema do Correio",
+      "shortcuts": "Atalhos de teclado"
+    }
   },
   "account": {
     "menu": "Conta e preferências",
@@ -1235,7 +1263,7 @@
   "recipientBlocked": "Não foi enviado: um dos destinatários está bloqueado porque um envio anterior voltou (endereço inexistente ou recusado) ou foi marcado como spam por quem recebeu. Tire esse destinatário e envie de novo; o rascunho continua guardado.",
   "recipientBlockedNamed": "Não foi enviado: {count, plural, one {{recipients} está bloqueado} other {{recipients} estão bloqueados}} porque um envio anterior voltou (endereço inexistente ou recusado) ou foi marcado como spam por quem recebeu. O rascunho continua guardado.",
   "unblockRecipients": "Ver e desbloquear",
-  "attachmentsLeftBehind": "{count, plural, one {Este anexo ficou de fora porque passa de 256 KB, o limite de envio: {names}.} other {Estes anexos ficaram de fora porque passam de 256 KB, o limite de envio: {names}.}}",
+  "attachmentsLeftBehind": "{count, plural, one {Este anexo ficou de fora por passar do limite de envio ou não ser permitido: {names}.} other {Estes anexos ficaram de fora por passar do limite de envio ou não serem permitidos: {names}.}}",
   "planQuota": "O plano chegou ao limite deste período (destinatários ou dados enviados, ou armazenamento). Nada foi enviado e o rascunho continua guardado.",
   "viewPlans": "Ver planos",
   "draftQuota": "O armazenamento do plano está cheio: não dá para guardar rascunhos novos. Faça upgrade em Configurações → Licença e uso. Seu texto permanece aqui.",
@@ -1329,7 +1357,12 @@
       "content_review": "Esta mensagem aguarda uma análise de conteúdo.",
       "semantic_content_review": "Aguardando análise de segurança",
       "cold_outreach": "Prospecção fria não pode ser enviada por esta conta",
-      "preflight_unavailable": "As verificações anteriores ao envio estão temporariamente indisponíveis."
+      "preflight_unavailable": "As verificações anteriores ao envio estão temporariamente indisponíveis.",
+      "attachment_not_supported": "Não entregue: anexo não suportado no Correio.",
+      "attachment_too_large": "Não entregue: anexo acima do limite de tamanho.",
+      "attachment_type_blocked": "Não entregue: tipo de arquivo não permitido como anexo.",
+      "attachment_name_blocked": "Não entregue: nome de arquivo recusado por segurança.",
+      "attachment_structure_invalid": "Não entregue: a mensagem com anexo está malformada."
     },
     "actions": {
       "none": "Você não precisa fazer nada neste momento.",

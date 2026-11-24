@@ -1,6 +1,8 @@
 {
   "title": "Reputação de envio",
   "unknown": "Desconhecido",
+  "systemPlan": "Sistema",
+  "unlimited": "Ilimitado",
   "loading": "Carregando reputação da equipe…",
   "unavailable": "Reputação indisponível. Nenhuma capacidade de envio foi confirmada.",
   "error": "Não foi possível carregar a reputação. Recarregue para tentar novamente; seus dados foram preservados.",

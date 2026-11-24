@@ -29,7 +29,12 @@
     "deleteConfirm": "Delete",
     "stopRest": "Stop the rest",
     "finishTip": "Finishes about {time}",
-    "progressTip": "{sent} sent · {waiting} waiting"
+    "progressTip": "{sent} sent · {waiting} waiting",
+    "searchPlaceholder": "Search by name, subject, or segment…",
+    "allStatuses": "All statuses",
+    "noMatch": "No broadcasts match your filters.",
+    "clearFilters": "Clear filters",
+    "pageOf": "{total, plural, one {# broadcast} other {# broadcasts}}"
   },
   "composer": {
     "newTitle": "New broadcast",

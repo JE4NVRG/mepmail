@@ -8,6 +8,7 @@ import {
   mailboxOutbox,
   mailboxRecipientBlocks,
 } from "../../db/src/schema/mailbox-transport.js";
+import { ATTACHMENT_MAX_BYTES, COMPOSER_MIME_MAX_BYTES } from "./attachment-policy.js";
 import {
   BOUND_ENVELOPE_VERSION_OFFSET,
   decryptPayload,
@@ -191,9 +192,9 @@ const OUTCOMES = new Set<MailboxOutboundOutcome>([
   "rendering_failed",
 ]);
 /** What the composer sends: the draft limit, attachments included. */
-const MAX_MIME_BYTES = 1024 * 1024;
+const MAX_MIME_BYTES = COMPOSER_MIME_MAX_BYTES;
 const MAX_RECIPIENTS = 20;
-const MAX_ATTACHMENT_BYTES = 256 * 1024;
+const MAX_ATTACHMENT_BYTES = ATTACHMENT_MAX_BYTES;
 /**
  * What other people send us is not ours to limit to the composer's size: received
  * mail up to 25 MiB (Gmail's ceiling, under SES's 40 MB), attachments included.
@@ -444,22 +445,10 @@ async function recordOutboundEvidence(
  * Delivery supersedes a delayed/soft-bounce fact independent of arrival order;
  * complaints/hard bounces remain sticky and never turn into "all delivered".
  */
-export async function getMailboxOutboundSummary(
-  db: Db,
-  input: { teamId: string; mailboxId: string; outboxId: string },
-): Promise<MailboxOutboundSummary | null> {
-  const scope = { ...input };
-  const [row] = await db
-    .select()
-    .from(mailboxOutbox)
-    .where(
-      and(
-        eq(mailboxOutbox.id, scope.outboxId),
-        eq(mailboxOutbox.teamId, scope.teamId),
-        eq(mailboxOutbox.mailboxId, scope.mailboxId),
-      ),
-    );
-  if (!row) return null;
+function summarizeOutboxRow(
+  row: { recipientCount: number; recipientHashes: string[] | null },
+  facts: readonly { recipientHash: string; outcome: MailboxOutboundOutcome; receivedAt: Date }[],
+): MailboxOutboundSummary {
   const summary: MailboxOutboundSummary = {
     totalRecipients: row.recipientCount,
     delivered: 0,
@@ -472,25 +461,8 @@ export async function getMailboxOutboundSummary(
     unconfirmed: row.recipientCount,
     lastObservedAt: null,
   };
-  if (!row.recipientHashes || !row.attemptId) return summary;
+  if (!row.recipientHashes || !facts.length) return summary;
   const approved = checkedHashes(row.recipientHashes);
-  const facts = await db
-    .select({
-      recipientHash: mailboxOutboundOutcomes.recipientHash,
-      outcome: mailboxOutboundEvents.outcome,
-      receivedAt: mailboxOutboundEvents.receivedAt,
-    })
-    .from(mailboxOutboundEvents)
-    .innerJoin(
-      mailboxOutboundOutcomes,
-      eq(mailboxOutboundOutcomes.eventId, mailboxOutboundEvents.id),
-    )
-    .where(
-      and(
-        eq(mailboxOutboundEvents.outboxId, row.id),
-        eq(mailboxOutboundEvents.attemptId, row.attemptId),
-      ),
-    );
   const states = new Map<string, Set<MailboxOutboundOutcome>>();
   for (const fact of facts) {
     if (!approved.includes(fact.recipientHash)) throw new MailboxContentError("conflict");
@@ -522,6 +494,79 @@ export async function getMailboxOutboundSummary(
     }
   }
   return summary;
+}
+
+export async function getMailboxOutboundSummariesMany(
+  db: Db,
+  input: { teamId: string; mailboxId: string; outboxIds: readonly string[] },
+): Promise<Map<string, MailboxOutboundSummary>> {
+  const scope = { ...input };
+  const ids = [...new Set(scope.outboxIds)];
+  const result = new Map<string, MailboxOutboundSummary>();
+  if (!ids.length) return result;
+  const rows = await db
+    .select()
+    .from(mailboxOutbox)
+    .where(
+      and(
+        inArray(mailboxOutbox.id, ids),
+        eq(mailboxOutbox.teamId, scope.teamId),
+        eq(mailboxOutbox.mailboxId, scope.mailboxId),
+      ),
+    );
+  const withAttempts = rows.filter((r) => Boolean(r.recipientHashes && r.attemptId));
+  const factsByOutbox = new Map<
+    string,
+    { recipientHash: string; outcome: MailboxOutboundOutcome; receivedAt: Date }[]
+  >();
+  if (withAttempts.length) {
+    const attemptByOutbox = new Map(withAttempts.map((r) => [r.id, r.attemptId!]));
+    const facts = await db
+      .select({
+        outboxId: mailboxOutboundEvents.outboxId,
+        attemptId: mailboxOutboundEvents.attemptId,
+        recipientHash: mailboxOutboundOutcomes.recipientHash,
+        outcome: mailboxOutboundEvents.outcome,
+        receivedAt: mailboxOutboundEvents.receivedAt,
+      })
+      .from(mailboxOutboundEvents)
+      .innerJoin(
+        mailboxOutboundOutcomes,
+        eq(mailboxOutboundOutcomes.eventId, mailboxOutboundEvents.id),
+      )
+      .where(
+        inArray(
+          mailboxOutboundEvents.outboxId,
+          withAttempts.map((r) => r.id),
+        ),
+      );
+    for (const fact of facts) {
+      if (fact.attemptId !== attemptByOutbox.get(fact.outboxId)) continue;
+      const list = factsByOutbox.get(fact.outboxId) ?? [];
+      list.push({
+        recipientHash: fact.recipientHash,
+        outcome: fact.outcome,
+        receivedAt: fact.receivedAt,
+      });
+      factsByOutbox.set(fact.outboxId, list);
+    }
+  }
+  for (const row of rows) {
+    result.set(row.id, summarizeOutboxRow(row, factsByOutbox.get(row.id) ?? []));
+  }
+  return result;
+}
+
+export async function getMailboxOutboundSummary(
+  db: Db,
+  input: { teamId: string; mailboxId: string; outboxId: string },
+): Promise<MailboxOutboundSummary | null> {
+  const found = await getMailboxOutboundSummariesMany(db, {
+    teamId: input.teamId,
+    mailboxId: input.mailboxId,
+    outboxIds: [input.outboxId],
+  });
+  return found.get(input.outboxId) ?? null;
 }
 function binding(row: { teamId: string; mailboxId: string; id: string }) {
   return {

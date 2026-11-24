@@ -24,6 +24,11 @@ const REASONS: Record<MailboxSendHoldReason, string> = {
   content_review: "sendHold.reasons.content_review",
   semantic_content_review: "sendHold.reasons.semantic_content_review",
   cold_outreach: "sendHold.reasons.cold_outreach",
+  attachment_not_supported: "sendHold.reasons.attachment_not_supported",
+  attachment_too_large: "sendHold.reasons.attachment_too_large",
+  attachment_type_blocked: "sendHold.reasons.attachment_type_blocked",
+  attachment_name_blocked: "sendHold.reasons.attachment_name_blocked",
+  attachment_structure_invalid: "sendHold.reasons.attachment_structure_invalid",
   preflight_unavailable: "sendHold.reasons.preflight_unavailable",
 };
 const ACTIONS: Record<MailboxSendHold["actionRequired"], string> = {

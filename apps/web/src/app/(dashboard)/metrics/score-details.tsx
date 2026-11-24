@@ -208,7 +208,7 @@ export function ScoreDetailsDrawer({ open, onClose }: { open: boolean; onClose: 
               <span>{score("content")}</span>
               <span
                 className="ms-mono"
-                style={{ color: "var(--ms-faint)", fontSize: 12, textAlign: "right" }}
+                style={{ color: "var(--ms-muted)", fontSize: 12, textAlign: "right" }}
               >
                 {points(data.contentScoreTenths)}
               </span>
@@ -224,7 +224,7 @@ export function ScoreDetailsDrawer({ open, onClose }: { open: boolean; onClose: 
               <span>{score("outcome")}</span>
               <span
                 className="ms-mono"
-                style={{ color: "var(--ms-faint)", fontSize: 12, textAlign: "right" }}
+                style={{ color: "var(--ms-muted)", fontSize: 12, textAlign: "right" }}
               >
                 {points(data.outcomeScoreTenths)}
               </span>
@@ -264,7 +264,7 @@ export function ScoreDetailsDrawer({ open, onClose }: { open: boolean; onClose: 
               flexWrap: "wrap",
               marginTop: 10,
               fontSize: 12.5,
-              color: "var(--ms-faint)",
+              color: "var(--ms-muted)",
             }}
           >
             {data.governorCapTenths !== null && data.blendTenths !== null ? (

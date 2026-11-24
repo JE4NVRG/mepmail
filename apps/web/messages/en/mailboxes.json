@@ -123,7 +123,8 @@
   "message": "Message",
   "attach": "Add attachments",
   "attachments": "Attachments",
-  "attachmentLimit": "Up to 10 attachments of 256 KB each; complete message up to 1 MB.",
+  "attachmentLimit": "Up to 10 attachments of 10 MB each (16 MB total).",
+  "attachmentTypeBlocked": "This file type or name isn't allowed as an attachment.",
   "attachmentError": "The file could not be read. Try again.",
   "removeAttachment": "Remove {name}",
   "draftConflict": "This draft changed in another session. Your text stays here; copy it and reopen the current version before saving.",
@@ -171,6 +172,9 @@
   "bodyFormat": "Message format",
   "formattedBody": "Formatted",
   "plainBody": "Plain text",
+  "previewScheme": "Reading theme",
+  "previewLight": "Light",
+  "previewDark": "Dark",
   "externalImagesHelp": "{count, plural, one {# external image blocked} other {# external images blocked}}. Showing them may reveal your access to the sender.",
   "showExternalImages": "Show external images",
   "imagesShown": "Images from {domain} shown for this message.",
@@ -535,7 +539,8 @@
       "help": "Show these shortcuts",
       "newFolder": "New folder",
       "moveTo": "Move to a folder",
-      "snooze": "Snooze"
+      "snooze": "Snooze",
+      "commands": "Command palette"
     }
   },
   "usage": {
@@ -1057,7 +1062,30 @@
     "more": "More",
     "collapse": "Collapse the sidebar",
     "expand": "Expand the sidebar",
-    "waiting": "{count} waiting"
+    "waiting": "{count} waiting",
+    "agentBadge": "AI",
+    "teamAgents": "AI team",
+    "teamAgentsAutonomous": "{count, plural, one {# autonomous} other {# autonomous}}",
+    "teamAgentsMailboxes": "{count, plural, one {# mailbox} other {# mailboxes}}",
+    "waitingCompact": "{count} pending"
+  },
+  "commands": {
+    "open": "Commands",
+    "title": "Command palette",
+    "placeholder": "Jump to mailbox, folder, or action…",
+    "empty": "No matching command.",
+    "groups": {
+      "actions": "Actions",
+      "folders": "Folders",
+      "mailboxes": "Mailboxes"
+    },
+    "items": {
+      "compose": "Write new email",
+      "agents": "Agent team & permissions",
+      "settings": "Correio preferences",
+      "theme": "Switch Correio theme",
+      "shortcuts": "Keyboard shortcuts"
+    }
   },
   "account": {
     "menu": "Account and preferences",
@@ -1235,7 +1263,7 @@
   "recipientBlocked": "Not sent: one of the recipients is blocked because an earlier message bounced (address doesn't exist or refused it) or was marked as spam by the person. Remove that recipient and send again; the draft is kept.",
   "recipientBlockedNamed": "Not sent: {count, plural, one {{recipients} is blocked} other {{recipients} are blocked}} because an earlier message bounced (address doesn't exist or refused it) or was marked as spam by the person. The draft is kept.",
   "unblockRecipients": "Review and unblock",
-  "attachmentsLeftBehind": "{count, plural, one {This attachment stays behind because it is over 256 KB, the sending limit: {names}.} other {These attachments stay behind because they are over 256 KB, the sending limit: {names}.}}",
+  "attachmentsLeftBehind": "{count, plural, one {This attachment stays behind because it exceeds the sending limit or isn't allowed: {names}.} other {These attachments stay behind because they exceed the sending limit or aren't allowed: {names}.}}",
   "planQuota": "The plan reached this period's limit (recipients or data sent, or storage). Nothing was sent and the draft is still saved.",
   "viewPlans": "See plans",
   "draftQuota": "The plan's storage is full: new drafts can't be saved. Upgrade in Settings → License and usage. Your text stays here.",
@@ -1329,7 +1357,12 @@
       "content_review": "This message is awaiting a content review.",
       "semantic_content_review": "Awaiting security review",
       "cold_outreach": "Cold outreach cannot be sent through this account",
-      "preflight_unavailable": "Pre-send checks are temporarily unavailable."
+      "preflight_unavailable": "Pre-send checks are temporarily unavailable.",
+      "attachment_not_supported": "Not delivered: attachments are not supported in Correio.",
+      "attachment_too_large": "Not delivered: the attachment is over the size limit.",
+      "attachment_type_blocked": "Not delivered: this file type is not allowed as an attachment.",
+      "attachment_name_blocked": "Not delivered: the file name was refused for security.",
+      "attachment_structure_invalid": "Not delivered: the message with attachments is malformed."
     },
     "actions": {
       "none": "No action is needed from you right now.",

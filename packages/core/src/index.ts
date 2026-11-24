@@ -181,10 +181,6 @@ export {
   validateSubjectMergeFields,
 } from "./broadcast-content.js";
 export {
-  SUPPRESSED_SIGNUP_TLDS,
-  suppressedSignupDomain,
-} from "./signup-risk-signals.js";
-export {
   bulkSentBySlot,
   cancelBroadcastRows,
   planRegionSend,
@@ -552,6 +548,7 @@ export {
   archiveMailboxFolder,
   createMailboxFolder,
   listMailboxFolders,
+  listMailboxFoldersMany,
   MAILBOX_FOLDER_COLORS,
   type MailboxFolderColor,
   reorderMailboxFolders,
@@ -654,6 +651,7 @@ export {
   claimDueMailboxSends,
   completeMailboxSend,
   countMailboxSchedules,
+  countMailboxSchedulesMany,
   failMailboxSend,
   MAILBOX_SCHEDULE_MAX_MS,
   MAILBOX_SCHEDULE_MIN_MS,
@@ -729,6 +727,7 @@ export {
   assertMailboxOutboxSendFresh,
   checkMailboxRecipientBlocks,
   failQueuedMailboxOutbox,
+  getMailboxOutboundSummariesMany,
   getMailboxOutboundSummary,
   type MailboxOutboundEvidence,
   type MailboxOutboundOutcome,
@@ -796,6 +795,13 @@ export {
 } from "./operator-alerts.js";
 export { isRootDomainSend, registrableDomain } from "./org-domain.js";
 export { splitPersonName } from "./person-name.js";
+export {
+  domainBrandKey,
+  findPhishingRecidivismDomainMatch,
+  findPhishingRecidivismTeamMatch,
+  type PhishingRecidivismMatch,
+  phishingBrandKey,
+} from "./phishing-recidivism.js";
 export {
   effectivePlan,
   formatVolume,
@@ -990,6 +996,10 @@ export {
   type SignupRiskReviewCandidate,
   signupReviewDomain,
 } from "./signup-risk-review-digest.js";
+export {
+  SUPPRESSED_SIGNUP_TLDS,
+  suppressedSignupDomain,
+} from "./signup-risk-signals.js";
 export {
   isBlockedIp,
   type PostFailureCode,

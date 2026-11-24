@@ -28,60 +28,61 @@ export async function getMailboxUsage(
   const entitlement = await mailboxServiceEntitlement(db, actor.teamId);
   const plan = entitlement.plan;
   const ids = readable.map((box) => box.id);
-  const stored = await db
-    .select({
-      mailboxId: schema.mailboxItems.mailboxId,
-      bytes: sql<string>`coalesce(sum(${schema.mailboxItems.rawBytes}),0)::text`,
-    })
-    .from(schema.mailboxItems)
-    .where(
-      and(
-        eq(schema.mailboxItems.teamId, actor.teamId),
-        inArray(schema.mailboxItems.mailboxId, ids),
-      ),
-    )
-    .groupBy(schema.mailboxItems.mailboxId);
-  const queued = await db
-    .select({
-      mailboxId: schema.mailboxOutbox.mailboxId,
-      bytes: sql<string>`coalesce(sum(${schema.mailboxOutbox.rawBytes}),0)::text`,
-    })
-    .from(schema.mailboxOutbox)
-    .where(
-      and(
-        eq(schema.mailboxOutbox.teamId, actor.teamId),
-        inArray(schema.mailboxOutbox.mailboxId, ids),
-        isNotNull(schema.mailboxOutbox.ciphertext),
-      ),
-    )
-    .groupBy(schema.mailboxOutbox.mailboxId);
-  const outbound = await db
-    .select({
-      mailboxId: schema.mailboxOutbox.mailboxId,
-      recipients: sql<string>`coalesce(sum(${schema.mailboxOutbox.recipientCount}),0)::text`,
-    })
-    .from(schema.mailboxOutbox)
-    .where(
-      and(
-        eq(schema.mailboxOutbox.teamId, actor.teamId),
-        inArray(schema.mailboxOutbox.mailboxId, ids),
-        ne(schema.mailboxOutbox.status, "failed"),
-        entitlement.unlimitedOutbound
-          ? undefined
-          : entitlement.usagePeriod
-            ? eq(schema.mailboxOutbox.periodStart, entitlement.usagePeriod.start)
-            : sql`false`,
-      ),
-    )
-    .groupBy(schema.mailboxOutbox.mailboxId);
+  const [stored, queued, outbound, team] = await Promise.all([
+    db
+      .select({
+        mailboxId: schema.mailboxItems.mailboxId,
+        bytes: sql<string>`coalesce(sum(${schema.mailboxItems.rawBytes}),0)::text`,
+      })
+      .from(schema.mailboxItems)
+      .where(
+        and(
+          eq(schema.mailboxItems.teamId, actor.teamId),
+          inArray(schema.mailboxItems.mailboxId, ids),
+        ),
+      )
+      .groupBy(schema.mailboxItems.mailboxId),
+    db
+      .select({
+        mailboxId: schema.mailboxOutbox.mailboxId,
+        bytes: sql<string>`coalesce(sum(${schema.mailboxOutbox.rawBytes}),0)::text`,
+      })
+      .from(schema.mailboxOutbox)
+      .where(
+        and(
+          eq(schema.mailboxOutbox.teamId, actor.teamId),
+          inArray(schema.mailboxOutbox.mailboxId, ids),
+          isNotNull(schema.mailboxOutbox.ciphertext),
+        ),
+      )
+      .groupBy(schema.mailboxOutbox.mailboxId),
+    db
+      .select({
+        mailboxId: schema.mailboxOutbox.mailboxId,
+        recipients: sql<string>`coalesce(sum(${schema.mailboxOutbox.recipientCount}),0)::text`,
+      })
+      .from(schema.mailboxOutbox)
+      .where(
+        and(
+          eq(schema.mailboxOutbox.teamId, actor.teamId),
+          inArray(schema.mailboxOutbox.mailboxId, ids),
+          ne(schema.mailboxOutbox.status, "failed"),
+          entitlement.unlimitedOutbound
+            ? undefined
+            : entitlement.usagePeriod
+              ? eq(schema.mailboxOutbox.periodStart, entitlement.usagePeriod.start)
+              : sql`false`,
+        ),
+      )
+      .groupBy(schema.mailboxOutbox.mailboxId),
+    // A "team" quota is one allowance for every mailbox of the team, readable or not.
+    plan?.quotaScope === "team"
+      ? teamUsage(db, actor.teamId, entitlement.usagePeriod?.start ?? null)
+      : Promise.resolve(null),
+  ]);
   const storage = new Map(stored.map((row) => [row.mailboxId, Number(row.bytes)]));
   const queue = new Map(queued.map((row) => [row.mailboxId, Number(row.bytes)]));
   const recipients = new Map(outbound.map((row) => [row.mailboxId, Number(row.recipients)]));
-  // A "team" quota is one allowance for every mailbox of the team, readable or not.
-  const team =
-    plan?.quotaScope === "team"
-      ? await teamUsage(db, actor.teamId, entitlement.usagePeriod?.start ?? null)
-      : null;
   return {
     quotaScope: plan?.quotaScope ?? ("mailbox" as const),
     plan:

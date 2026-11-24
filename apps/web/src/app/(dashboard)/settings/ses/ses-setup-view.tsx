@@ -103,10 +103,28 @@ function MonoBlock({
   const [open, setOpen] = useState(false);
   const header = (
     <>
-      <span className="ms-mono" style={{ fontSize: 11.5, color: "var(--ms-muted)" }}>
+      <span
+        className="ms-mono"
+        style={{
+          fontSize: 11.5,
+          color: "var(--ms-muted)",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          minWidth: 0,
+        }}
+      >
         {title}
       </span>
-      <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 12 }}>
+      <span
+        style={{
+          marginLeft: "auto",
+          flex: "none",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
         {/* preventDefault keeps a copy click from toggling the disclosure; keyboard
             activation hits the copy button directly, so no key handler is needed */}
         {/* biome-ignore lint/a11y/noStaticElementInteractions: passthrough guard, not a control */}
@@ -142,6 +160,8 @@ function MonoBlock({
   const headerStyle: React.CSSProperties = {
     display: "flex",
     alignItems: "center",
+    gap: 8,
+    minWidth: 0,
     padding: "7px 12px",
   };
   return (
@@ -252,6 +272,7 @@ function StepDoneCard({
         ...stepCardStyle,
         display: "flex",
         alignItems: "center",
+        flexWrap: "wrap",
         gap: 10,
         backgroundColor: "var(--ms-ground)",
         backgroundImage: statusGlow("success", 15),
@@ -263,11 +284,13 @@ function StepDoneCard({
       <span
         className="ms-mono"
         aria-hidden="true"
-        style={{ fontSize: 11, color: "var(--ms-success)" }}
+        style={{ fontSize: 11, color: "var(--ms-success)", flex: "none" }}
       >
         ✓
       </span>
-      <span style={{ fontSize: small ? 13 : 13.5, color: "var(--ms-bone)" }}>{message}</span>
+      <span style={{ fontSize: small ? 13 : 13.5, color: "var(--ms-bone)", minWidth: 0 }}>
+        {message}
+      </span>
       <button
         type="button"
         className="ms-btn ms-btn-ghost"
@@ -285,30 +308,35 @@ function StepDoneCard({
 function ConsoleCard() {
   const t = useTranslations("console.settingsCard");
   return (
-    <section
-      className="ms-card"
-      style={{
-        padding: 24,
-        // Sits in the stepper's content column (rail 30px + gap 18px), not under the rail.
-        marginLeft: 48,
-        marginBottom: 24,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 16,
-        flexWrap: "wrap",
-      }}
-    >
-      <div style={{ flex: "1 1 320px" }}>
-        <h2 className="ms-display" style={{ fontSize: "var(--ms-fs-section)", margin: "0 0 6px" }}>
-          {t("title")}
-        </h2>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)" }}>{t("body")}</p>
-      </div>
-      <Link href="/console" className="ms-btn ms-btn-secondary">
-        {t("open")} →
-      </Link>
-    </section>
+    <div className="ms-step" style={{ display: "flex", gap: 18, marginBottom: 24 }}>
+      <div aria-hidden="true" className="ms-stepper-rail" style={{ width: 30, flex: "none" }} />
+      <section
+        className="ms-card"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          padding: 24,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+          <h2
+            className="ms-display"
+            style={{ fontSize: "var(--ms-fs-section)", margin: "0 0 6px" }}
+          >
+            {t("title")}
+          </h2>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)" }}>{t("body")}</p>
+        </div>
+        <Link href="/console" className="ms-btn ms-btn-secondary">
+          {t("open")} →
+        </Link>
+      </section>
+    </div>
   );
 }
 
@@ -395,7 +423,15 @@ export function SesSetupView() {
                 </div>
               ))}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 10,
+                marginTop: 18,
+              }}
+            >
               <Skeleton width={130} height={30} radius="var(--ms-r-input)" />
             </div>
           </section>
@@ -451,7 +487,7 @@ export function SesSetupView() {
         {!credentialsOk || setupDetailsOpen ? (
           <div style={{ marginTop: credentialsOk ? 14 : 0 }}>
             <section className="ms-card" style={{ ...stepCardStyle, padding: 22 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                 <span style={{ fontSize: 16, fontWeight: 600, color: "var(--ms-bone)" }}>
                   {t("setup.cliTitle")}
                 </span>
@@ -592,7 +628,15 @@ export function SesSetupView() {
             />
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 10,
+              marginTop: 18,
+            }}
+          >
             <button
               type="button"
               className="ms-btn ms-btn-primary"
@@ -644,7 +688,10 @@ export function SesSetupView() {
                         {result.productionAccess ? t("test.production") : t("test.sandbox")}
                       </span>
                     </div>
-                    <div className="ms-kpi-row" style={{ display: "flex", gap: 48, marginTop: 18 }}>
+                    <div
+                      className="ms-kpi-row"
+                      style={{ display: "flex", flexWrap: "wrap", gap: "20px 48px", marginTop: 18 }}
+                    >
                       <QuotaFigure
                         label={t("test.quotaMax")}
                         value={fmt.format(result.quota.max24h)}
@@ -742,7 +789,11 @@ export function SesSetupView() {
         {!eventsOk || eventsDetailsOpen ? (
           <section
             className="ms-card"
-            style={{ ...stepCardStyle, padding: 24, marginTop: eventsOk ? 14 : 0 }}
+            style={{
+              ...stepCardStyle,
+              padding: 24,
+              marginTop: eventsOk || eventsHealth.status === "unhealthy" ? 14 : 0,
+            }}
           >
             <CheckRow
               ok={eventsHealth.status !== "unhealthy" && eventsHealth.lastSesEventAt !== null}

@@ -539,6 +539,33 @@ describe("POST /domains in cloud (shared AWS account)", () => {
     // Each successful create runs a real RSA keygen; 11 of them overrun the
     // default 5s on loaded CI runners.
   }, 30_000);
+
+  it("blocks and holds a team adding a domain matching a suspended phishing team", async () => {
+    const prior = await createTeam(db, "Banco Seguro");
+    await db
+      .update(schema.teams)
+      .set({ suspendedAt: new Date(), suspensionReason: "phishing" })
+      .where(eq(schema.teams.id, prior));
+    const t = await cloudTeam("cloud-recidivist");
+    await db
+      .update(schema.teams)
+      .set({ sendReviewClearedAt: new Date() })
+      .where(eq(schema.teams.id, t.id));
+    const { client, calls } = fakeSes();
+    const app = makeApp({ client, isCloud: true });
+    const res = await call(app, t.key, "POST", "/domains", { name: "banco-seguro.com.pt" });
+    expect(res.status).toBe(403);
+    expect(calls).toHaveLength(0);
+    const [held] = await db
+      .select({
+        sendReviewAt: schema.teams.sendReviewAt,
+        sendReviewReason: schema.teams.sendReviewReason,
+      })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, t.id));
+    expect(held?.sendReviewAt).not.toBeNull();
+    expect(held?.sendReviewReason).toBe("impersonation");
+  });
 });
 
 describe("GET /domains", () => {

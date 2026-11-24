@@ -12,6 +12,13 @@ export const MAILBOX_SEND_HOLD_REASONS = [
   "configuration_unavailable",
   "content_review",
   "semantic_content_review",
+  /** O Correio ainda nao entrega anexos: recusado na captura, nao e revisao de texto. */
+  "attachment_not_supported",
+  /** Anexo recusado pela policy: grande demais, tipo bloqueado, nome armadilha. */
+  "attachment_too_large",
+  "attachment_type_blocked",
+  "attachment_name_blocked",
+  "attachment_structure_invalid",
   "cold_outreach",
   "preflight_unavailable",
 ] as const;
@@ -51,6 +58,11 @@ export function mailboxSendHold(row: {
               "semantic_content_review",
               "cold_outreach",
               "campaign_consent_required",
+              "attachment_not_supported",
+              "attachment_too_large",
+              "attachment_type_blocked",
+              "attachment_name_blocked",
+              "attachment_structure_invalid",
             ].includes(reason)
           ? "review"
           : ["configuration_unavailable", "campaign_sending_disabled"].includes(reason)

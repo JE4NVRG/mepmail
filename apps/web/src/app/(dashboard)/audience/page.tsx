@@ -32,9 +32,9 @@ export default async function AudiencePage() {
     }
   }
   return (
-    <>
-      {cloud && <CampaignConsentClient canSubmit={canSubmit} />}
-      <AudienceContactsView migrateToUrl={cloud ? null : apiBaseUrl()} />
-    </>
+    <AudienceContactsView
+      migrateToUrl={cloud ? null : apiBaseUrl()}
+      consentBanner={cloud ? <CampaignConsentClient canSubmit={canSubmit} /> : null}
+    />
   );
 }

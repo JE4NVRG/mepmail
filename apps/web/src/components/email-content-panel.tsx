@@ -169,7 +169,7 @@ function InsightsSection({
           <div key={group.key} style={{ marginTop: 20 }}>
             <div className="ms-microlabel">{t(`insights.groups.${group.key}`)}</div>
             {group.key === "notChecked" ? (
-              <div style={{ fontSize: 12.5, color: "var(--ms-faint)", marginTop: 3 }}>
+              <div style={{ fontSize: 12.5, color: "var(--ms-muted)", marginTop: 3 }}>
                 {t("insights.notCheckedWhy")}
               </div>
             ) : null}
@@ -301,7 +301,7 @@ export function EmailContentPanel({
   };
 }) {
   const t = useTranslations("emails");
-  const [tab, setTab] = useState<Tab>("preview");
+  const [tab, setTab] = useState<Tab>(() => (email.html || !email.text ? "preview" : "text"));
   const [scheme, setScheme] = usePreviewScheme();
   const [htmlFormatted, setHtmlFormatted] = useState(true);
   const tabContent: Record<Tab, string | null> = {
@@ -414,7 +414,7 @@ export function EmailContentPanel({
             <p style={{ margin: 0, color: "var(--ms-muted)", fontSize: "var(--ms-fs-ui)" }}>
               {t("insights.empty")}
             </p>
-            <p style={{ margin: "6px 0 0", color: "var(--ms-faint)", fontSize: 13 }}>
+            <p style={{ margin: "6px 0 0", color: "var(--ms-muted)", fontSize: 13 }}>
               {t("insights.emptyHint")}
             </p>
           </div>
@@ -450,16 +450,30 @@ export function EmailContentPanel({
                 }}
               />
             ) : (
-              <p
+              <div
                 style={{
                   margin: 0,
                   padding: "16px 18px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
                   color: "var(--ms-muted)",
                   fontSize: "var(--ms-fs-ui)",
                 }}
               >
-                {t("detail.noHtml")}
-              </p>
+                <span>{t("detail.noHtml")}</span>
+                {email.text ? (
+                  <button
+                    type="button"
+                    className="ms-btn ms-btn-secondary"
+                    onClick={() => setTab("text")}
+                  >
+                    {t("detail.plainText")}
+                  </button>
+                ) : null}
+              </div>
             ))}
           {tab === "text" &&
             (email.text ? (
@@ -491,16 +505,30 @@ export function EmailContentPanel({
             (email.html ? (
               <HtmlSource html={email.html} formatted={htmlFormatted} />
             ) : (
-              <p
+              <div
                 style={{
                   margin: 0,
                   padding: "16px 18px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
                   color: "var(--ms-muted)",
                   fontSize: "var(--ms-fs-ui)",
                 }}
               >
-                {t("detail.noHtml")}
-              </p>
+                <span>{t("detail.noHtml")}</span>
+                {email.text ? (
+                  <button
+                    type="button"
+                    className="ms-btn ms-btn-secondary"
+                    onClick={() => setTab("text")}
+                  >
+                    {t("detail.plainText")}
+                  </button>
+                ) : null}
+              </div>
             ))}
         </>
       )}

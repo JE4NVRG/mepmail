@@ -126,6 +126,56 @@ export function mailboxOutboundPresentation(summary: OutboundSummary | null | un
 const INVISIBLE =
   /\u034f|[\u00ad\u061c\u115f\u1160\u17b4\u17b5\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\u3164\ufeff\uffa0]/g;
 
+const NAMED_PREVIEW_ENTITIES: Record<string, string> = {
+  nbsp: " ",
+  ensp: " ",
+  emsp: " ",
+  thinsp: " ",
+  zwnj: "",
+  zwj: "",
+  shy: "",
+  lrm: "",
+  rlm: "",
+  quot: '"',
+  apos: "'",
+  lt: "<",
+  gt: ">",
+  amp: "&",
+};
+
+function decodePreviewEntities(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, raw: string) => {
+    const key = raw.toLowerCase();
+    const named = NAMED_PREVIEW_ENTITIES[key];
+    if (named !== undefined) return named;
+    if (key.startsWith("#x")) {
+      const code = Number.parseInt(key.slice(2), 16);
+      if (
+        Number.isInteger(code) &&
+        code >= 0 &&
+        code <= 0x10ffff &&
+        (code < 0xd800 || code > 0xdfff)
+      ) {
+        return String.fromCodePoint(code);
+      }
+      return match;
+    }
+    if (key.startsWith("#")) {
+      const code = Number.parseInt(key.slice(1), 10);
+      if (
+        Number.isInteger(code) &&
+        code >= 0 &&
+        code <= 0x10ffff &&
+        (code < 0xd800 || code > 0xdfff)
+      ) {
+        return String.fromCodePoint(code);
+      }
+      return match;
+    }
+    return match;
+  });
+}
+
 /**
  * The list preview of a message body. HTML-only mail reaches us converted to
  * text, with every link and image target written out as "[https://…]"; those
@@ -133,7 +183,7 @@ const INVISIBLE =
  * whitespace collapse, so the preview shows the words a reader would see.
  */
 export function mailboxPreview(text: string, max = 160): string {
-  const clean = text
+  const clean = decodePreviewEntities(text)
     .replace(INVISIBLE, "")
     .replace(/\[\s*(?:https?:\/\/|mailto:|cid:)[^\]]*\]/gi, " ")
     .replace(/<\s*(?:https?:\/\/|mailto:)[^>]*>/gi, " ")

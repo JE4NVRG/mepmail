@@ -121,4 +121,32 @@ describe("accessible recovery action", () => {
       expect(retry).toHaveBeenCalledOnce();
     },
   );
+
+  it("delays visual reveal of retry during initial loading when retryDelayMs is set, never on error/paused", () => {
+    const retry = vi.fn(async () => {});
+    const loadingHtml = renderToStaticMarkup(
+      createElement(QueryRecoveryNotice, {
+        phase: "loading",
+        message: "Loading",
+        retryLabel: "Try again",
+        retry,
+        retryDelayMs: 5000,
+      }),
+    );
+    expect(loadingHtml).toContain("ms-delayed-reveal");
+    expect(loadingHtml).toContain("5000ms");
+
+    for (const phase of ["error", "paused"] as const) {
+      const immediateHtml = renderToStaticMarkup(
+        createElement(QueryRecoveryNotice, {
+          phase,
+          message: "Blocked",
+          retryLabel: "Try again",
+          retry,
+          retryDelayMs: 5000,
+        }),
+      );
+      expect(immediateHtml).not.toContain("ms-delayed-reveal");
+    }
+  });
 });

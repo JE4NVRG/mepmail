@@ -63,11 +63,7 @@ export function StatusBadge({ status }: { status: BadgeStatus }) {
     <span
       className={`ms-badge ms-badge-${VARIANTS[status]}`}
       title={status === "delivered" ? t("deliveryDisclosure") : undefined}
-      style={
-        status === "delivered"
-          ? { minWidth: 140, maxWidth: 180, whiteSpace: "normal", overflowWrap: "anywhere" }
-          : undefined
-      }
+      style={status === "delivered" ? { minWidth: 140, whiteSpace: "nowrap" } : undefined}
     >
       {t(`status.${status}`)}
     </span>

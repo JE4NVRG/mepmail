@@ -318,6 +318,25 @@ async function stripRecipients(
  * the row to "failed" and records why. Returns false when the row already
  * left "queued" (sent, canceled, suppressed) — nothing to fail then.
  */
+/** Bytes decodificados de um base64, sem alocar o buffer inteiro. */
+function base64Bytes(content: string): number {
+  const clean = content.replace(/[^A-Za-z0-9+/=]/g, "");
+  const padding = (clean.match(/=+$/) ?? [""])[0].length;
+  return Math.max(0, Math.floor((clean.length * 3) / 4) - padding);
+}
+
+/** So metadados: o conteudo nunca entra no snapshot do gate. */
+function attachmentMetas(
+  list: EmailAttachment[] | null | undefined,
+): { filename: string; contentType: string; size: number }[] {
+  return (list ?? []).map((a) => ({
+    filename: a.filename,
+    contentType: (a.contentType ?? "application/octet-stream").toLowerCase(),
+    // Base64 tem 4/3 de expansao: desconta o padding para nao errar o limite.
+    size: base64Bytes(a.content),
+  }));
+}
+
 function dispatchRowVersion(email: typeof schema.emails.$inferSelect): string {
   return JSON.stringify({
     teamId: email.teamId,
@@ -1336,7 +1355,7 @@ export async function sendEmail(
       html,
       text,
       headers: { ...headers },
-      attachments: !!attachments?.length,
+      attachments: attachmentMetas(attachments),
       mime: Buffer.from(mime),
     };
     if (preTrackingHtml && dispatchTrackingOptions)

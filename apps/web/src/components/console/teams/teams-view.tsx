@@ -3,7 +3,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { DOMAIN_REGIONS, regionFlag } from "@/app/(dashboard)/domains/regions";
 import { teamMenuItems, useTeamActions } from "@/components/console/team-actions";
 import { ListFooter } from "@/components/list-footer";
@@ -93,7 +93,7 @@ function SkeletonRows() {
             <Skeleton width={90} />
           </td>
           <td>
-            <Skeleton width={44} />
+            <Skeleton width={72} />
           </td>
           <td className="right">
             <Skeleton width={28} height={28} radius={8} />
@@ -124,6 +124,23 @@ export function TeamsView() {
   const [dirParam, setDir] = useUrlState("dir", "desc");
   const [limit, setLimit] = useState(25);
   const deferredSearch = useDeferredValue(search.trim());
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement;
+      if (event.key === "/" && !typing) {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // URL params are untrusted: anything outside the router's enums reads as the default.
   const guardrail = oneOf(GUARDRAILS, guardrailParam, "all");
@@ -132,6 +149,14 @@ export function TeamsView() {
   const region = oneOf(DOMAIN_REGIONS, regionParam, "all");
   const type = oneOf(TEAM_TYPES, typeParam, "all");
   const status = oneOf(TEAM_STATUSES, statusParam, "active");
+  const hasFilters =
+    search.trim() !== "" || type !== "all" || region !== "all" || guardrail !== "all";
+  const clearFilters = () => {
+    setSearch("");
+    setType("all");
+    setRegion("all");
+    setGuardrail("all");
+  };
 
   const input = {
     ...(deferredSearch ? { search: deferredSearch } : {}),
@@ -230,11 +255,18 @@ export function TeamsView() {
 
       <div
         className="ms-filter-row"
-        style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18 }}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 10,
+          alignItems: "center",
+          marginBottom: 18,
+        }}
       >
-        <div style={{ flex: 1, minWidth: 160 }}>
+        <div style={{ flex: "1 1 220px", minWidth: 180 }}>
           <input
-            type="text"
+            ref={searchRef}
+            type="search"
             className="ms-input"
             style={{ width: "100%" }}
             placeholder={t("search")}
@@ -246,6 +278,7 @@ export function TeamsView() {
         <Select
           value={plans.includes(type) ? type : "all"}
           onChange={setType}
+          width={145}
           ariaLabel={t("columns.type")}
           options={[
             { value: "all", label: t("filters.type", { value: t("filters.all") }) },
@@ -258,6 +291,7 @@ export function TeamsView() {
         <Select
           value={region}
           onChange={setRegion}
+          width={195}
           ariaLabel={t("columns.region")}
           options={[
             { value: "all", label: t("filters.region", { value: t("filters.all") }) },
@@ -272,6 +306,7 @@ export function TeamsView() {
         <Select
           value={guardrail}
           onChange={setGuardrail}
+          width={190}
           ariaLabel={t("columns.guardrail")}
           options={[
             {
@@ -286,19 +321,33 @@ export function TeamsView() {
             })),
           ]}
         />
+        {hasFilters ? (
+          <button
+            type="button"
+            className="ms-btn ms-btn-secondary"
+            onClick={clearFilters}
+            style={{ flexShrink: 0 }}
+          >
+            {common("clearFilters")}
+          </button>
+        ) : null}
       </div>
 
       {list.isError ? (
-        <div
-          className="ms-card"
-          style={{ padding: 20, display: "flex", gap: 14, alignItems: "center" }}
-        >
-          <p style={{ margin: 0, color: "var(--ms-bone)", fontSize: "var(--ms-fs-ui)" }}>
-            {common("loadError")}
-          </p>
-          <button type="button" className="ms-btn ms-btn-secondary" onClick={() => list.refetch()}>
-            {common("retry")}
-          </button>
+        <div className="ms-card ms-state">
+          <span className="ms-state-glyph" aria-hidden="true">
+            !
+          </span>
+          <p className="ms-state-headline">{common("loadError")}</p>
+          <div className="ms-state-actions">
+            <button
+              type="button"
+              className="ms-btn ms-btn-secondary"
+              onClick={() => list.refetch()}
+            >
+              {common("retry")}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="ms-card" style={{ padding: 0, overflow: "hidden" }}>
@@ -319,7 +368,7 @@ export function TeamsView() {
                 {sortable("guardrail")}
                 <th>{t("columns.region")}</th>
                 {sortable("created")}
-                <th />
+                <th aria-label={common("actions")} />
               </tr>
             </thead>
             {list.isPending ? (
@@ -332,7 +381,17 @@ export function TeamsView() {
                       colSpan={COLUMNS}
                       style={{ color: "var(--ms-muted)", padding: "18px 12px" }}
                     >
-                      {t("empty")}
+                      <span>{t("empty")}</span>
+                      {hasFilters ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-secondary ms-btn-sm"
+                          style={{ marginLeft: 12 }}
+                          onClick={clearFilters}
+                        >
+                          {common("clearFilters")}
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 ) : (
@@ -341,7 +400,16 @@ export function TeamsView() {
                       <td>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                           <TeamLogo name={row.name} logoUrl={row.logoUrl} size={22} />
-                          {row.name}
+                          <span
+                            title={row.name}
+                            style={{
+                              maxWidth: 220,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {row.name}
+                          </span>
                         </span>
                       </td>
                       <td>
@@ -431,7 +499,7 @@ export function TeamsView() {
             )}
           </Table>
           {list.isSuccess ? (
-            <div style={{ padding: "0 16px 14px", borderTop: "1px solid var(--ms-line)" }}>
+            <div style={{ padding: "0 16px 14px" }}>
               <ListFooter
                 left={common("ofTeams", { shown: nf.format(rows.length), total: nf.format(total) })}
                 size={limit}

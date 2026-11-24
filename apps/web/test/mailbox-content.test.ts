@@ -1357,14 +1357,22 @@ describe("session-authenticated mailbox content", () => {
     await expect(as().saveDraft(draft({ retainedAttachments: [0] }))).rejects.toMatchObject({
       code: "BAD_REQUEST",
     });
-    // Received attachments past the composer's 256 KiB open and download, but
-    // cannot ride along in a forward (the send would refuse them).
+    // Received attachments past the composer's 10 MiB limit open and download,
+    // but cannot ride along in a forward (the send would refuse them). Raise
+    // this fixture team's box storage above the 5 MiB test default so importing
+    // a >10 MiB inbound MIME stays isolated from storage-quota tests.
+    await db
+      .update(schema.mailboxSubscriptions)
+      .set({ storageBytesPerMailbox: 25 * 1024 * 1024 })
+      .where(eq(schema.mailboxSubscriptions.teamId, teamId));
     const a = await imported(
       "oversize",
       mailboxId,
-      mime(Buffer.alloc(256 * 1024 + 1), "large.bin"),
+      mime(Buffer.alloc(10 * 1024 * 1024 + 1), "large.pdf", "application/pdf"),
     );
-    expect((await as().item({ mailboxId, id: a.id })).attachments[0]?.bytes).toBe(256 * 1024 + 1);
+    expect((await as().item({ mailboxId, id: a.id })).attachments[0]?.bytes).toBe(
+      10 * 1024 * 1024 + 1,
+    );
     expect((await download(a.id)).status).toBe(200);
     await db
       .update(schema.domains)
@@ -1373,6 +1381,24 @@ describe("session-authenticated mailbox content", () => {
     await expect(
       as().saveDraft(
         draft({ sourceItemId: a.id, mode: "forward", retainedAttachments: [0], to: [] }),
+      ),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    // Uploads past the legacy 256 KiB cap (up to 10 MiB) work when the filename is safe.
+    await expect(
+      as().saveDraft(
+        draft({
+          uploads: [
+            { filename: "report.pdf", base64: Buffer.alloc(300 * 1024).toString("base64") },
+          ],
+        }),
+      ),
+    ).resolves.toMatchObject({ kind: "draft" });
+    // Unsafe attachment types are rejected immediately at draft creation.
+    await expect(
+      as().saveDraft(
+        draft({
+          uploads: [{ filename: "payload.exe", base64: Buffer.from("MZ").toString("base64") }],
+        }),
       ),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     // The same forward without that attachment is fine.

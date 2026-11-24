@@ -16,6 +16,7 @@
 }
 .identity {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
@@ -53,8 +54,15 @@
   border-top: 1px solid var(--ms-line);
   font-size: 12px;
   line-height: 1.6;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.returnNotice > span {
+  min-width: 0;
+  flex: 1 1 200px;
 }
 .dialog {
+  margin: auto;
   width: min(
     560px,
     calc(100vw - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))
@@ -194,6 +202,33 @@
   margin-top: 8px;
   color: var(--ms-muted);
 }
+.notice > a,
+.notice > button {
+  margin-top: 10px;
+}
+.loadState {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  margin: 16px 0;
+  font-size: 13px;
+  color: var(--ms-muted);
+}
+.loadState p {
+  margin: 0;
+}
+.dialog p[role="alert"]:not(.notice) {
+  margin: 4px 0 0;
+  color: var(--ms-danger);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.dialog p[role="status"]:not(.notice):not(.trial) {
+  margin: 4px 0 0;
+  color: var(--ms-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
 .purchase {
   border: 0;
   padding: 0;
@@ -221,9 +256,16 @@
 .purchase > select,
 .management input {
   box-sizing: border-box;
+  height: auto;
   padding: 10px 12px;
   font-size: var(--ms-fs-body);
   line-height: 1.5;
+}
+.purchase > select {
+  padding-right: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .purchase > button {
   width: 100%;
@@ -318,9 +360,14 @@
   .management input {
     max-width: none;
   }
+  .purchaseActions > button,
+  .planActions > button,
   .dialogFooter > button,
   .dialogFooter > a {
     flex: 1 1 auto;
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
     justify-content: center;
     margin-right: 0;
   }
@@ -330,12 +377,13 @@
 }
 /* The 7-day trial: its end and the sending limits while it lasts. */
 .trial {
-  margin: 8px 0 0;
+  margin: 0 14px 12px;
   padding: 8px 12px;
   border: 1px solid var(--ms-violet-border);
   border-radius: var(--ms-r-input);
   background: var(--ms-panel-raised);
   font-size: var(--ms-fs-label);
+  line-height: 1.55;
 }
 .trialOffer {
   margin: 4px 0 0;

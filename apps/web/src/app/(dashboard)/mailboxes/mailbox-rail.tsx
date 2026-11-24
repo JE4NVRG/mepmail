@@ -315,7 +315,14 @@ export function MailboxRail({
             >
               <MailboxFolderIcon name="stack" />
               <span className={`${styles.label} ${styles.pickerIdentity}`}>
-                <strong>{selected?.label ?? t(`scope.boxes.${scope}`)}</strong>
+                <strong className={styles.boxNameRow}>
+                  <span className={styles.boxNameText}>
+                    {selected?.label ?? t(`scope.boxes.${scope}`)}
+                  </span>
+                  {selected?.kind === "agent" ? (
+                    <span className={styles.agentPill}>{t("rail.agentBadge")}</span>
+                  ) : null}
+                </strong>
                 {selected ? <small>{selected.address}</small> : null}
               </span>
               {pill(selectedUnread)}
@@ -384,7 +391,9 @@ export function MailboxRail({
                       closePicker(true);
                     }}
                   >
-                    <span className={styles.label}>{t(`scope.${group.kind}`)}</span>
+                    <span className={styles.label}>
+                      {t(`scope.${group.kind}`)} ({group.total})
+                    </span>
                   </button>
                   {group.boxes.map((box) => (
                     <button
@@ -409,7 +418,14 @@ export function MailboxRail({
                         {mailboxInitials(box.label, box.address)}
                       </span>
                       <span className={`${styles.label} ${styles.boxIdentity}`}>
-                        <span className={styles.boxName}>{box.label}</span>
+                        <span className={styles.boxName}>
+                          <span className={styles.boxNameRow}>
+                            <span className={styles.boxNameText}>{box.label}</span>
+                            {box.kind === "agent" ? (
+                              <span className={styles.agentPill}>{t("rail.agentBadge")}</span>
+                            ) : null}
+                          </span>
+                        </span>
                         <span className={styles.boxAddress}>{box.address}</span>
                       </span>
                       {pill(unread[box.id] ?? 0)}

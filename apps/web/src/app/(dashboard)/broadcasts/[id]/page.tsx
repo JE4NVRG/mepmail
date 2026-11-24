@@ -15,6 +15,7 @@ import { Crumb, CrumbEnd, PageHeader } from "@/components/page-header";
 import { Skeleton, SkeletonBadge, SkeletonChip } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { StatBlock } from "@/components/stat-block";
+import { Truncated } from "@/components/truncated";
 import { formatDayTime, formatUtcTimestamp } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
 import { ListFooter } from "../../emails/list-parts";
@@ -138,13 +139,13 @@ export default function BroadcastDetailPage() {
       )}
 
       <div
-        className="ms-meta-grid"
+        className="ms-card ms-meta-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: "22px 28px",
-          padding: "22px 0",
-          borderTop: "1px solid var(--ms-line)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+          gap: "18px 24px",
+          padding: "16px 20px",
+          marginBottom: 20,
         }}
       >
         <div>
@@ -164,9 +165,9 @@ export default function BroadcastDetailPage() {
         </div>
         <div>
           <Microlabel>{t("detail.targeting")}</Microlabel>
-          <div style={{ fontSize: 14, marginTop: 6 }}>
+          <div style={{ fontSize: 14, marginTop: 6, minWidth: 0 }}>
             {broadcast ? (
-              (broadcast.segmentName ?? t("composer.segmentNone"))
+              <Truncated text={broadcast.segmentName ?? t("composer.segmentNone")} />
             ) : (
               <span style={{ display: "flex" }}>
                 <Skeleton width={110} height="1lh" />
@@ -220,10 +221,9 @@ export default function BroadcastDetailPage() {
         className="ms-meta-grid"
         style={{
           display: "grid",
-          // Seven stats wrap by content rather than crush at laptop widths; the
-          // narrow-screen rules still force two and one columns.
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: 22,
+          // Seven stats fit across desktop cleanly instead of wrapping an orphan 7th metric.
+          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gap: 18,
           padding: "20px 0",
           borderTop: "1px solid var(--ms-line)",
           borderBottom: "1px solid var(--ms-line)",

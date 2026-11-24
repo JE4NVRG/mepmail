@@ -4,7 +4,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { ResourceApiButton } from "@/components/api-sheet";
 import { EmptyState } from "@/components/empty-state";
 import { PlusGlyph } from "@/components/icons/nav-icons";
@@ -13,15 +13,17 @@ import { ConfirmKeycap, ModalFooter } from "@/components/modal-footer";
 import { PageHeader } from "@/components/page-header";
 import { PopoverMenu } from "@/components/popover-menu";
 import { RelativeTime } from "@/components/relative-time";
+import { Select } from "@/components/select";
 import { Skeleton, SkeletonBadge } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
+import { StatusDot } from "@/components/status-badge";
 import { NavTile, TONE_COLOR } from "@/components/status-tile";
 import { Table } from "@/components/table";
 import { Tooltip } from "@/components/tooltip";
 import { Truncated } from "@/components/truncated";
 import { formatFinishAbout, roundUpToQuarterHour } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
-import { ListFooter, StateCard } from "../emails/list-parts";
+import { ListFooter, SearchBox, StateCard } from "../emails/list-parts";
 import { type BroadcastStatus, PILL_VARIANT, StatusPill } from "./parts";
 
 // Fixed layout keeps the percentage column shares; the min width makes the
@@ -33,10 +35,10 @@ function BroadcastsHead() {
   return (
     <thead>
       <tr>
-        <th style={{ width: "30%" }}>{t("list.name")}</th>
+        <th style={{ width: "36%" }}>{t("list.name")}</th>
         <th style={{ width: "13%" }}>{t("list.status")}</th>
         <th style={{ width: "20%" }}>{t("list.targeting")}</th>
-        <th className="right" style={{ width: "13%" }}>
+        <th className="right" style={{ width: "12%" }}>
           {t("list.recipients")}
         </th>
         <th className="right">{t("list.created")}</th>
@@ -109,6 +111,9 @@ export default function BroadcastsPage() {
     name: string;
     stop: { sent: number; waiting: number } | null;
   } | null>(null);
+  const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search.trim().toLowerCase());
+  const [statusFilter, setStatusFilter] = useState<"all" | BroadcastStatus>("all");
 
   const query = useInfiniteQuery(
     trpc.broadcasts.list.infiniteQueryOptions(
@@ -117,6 +122,16 @@ export default function BroadcastsPage() {
     ),
   );
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const filteredItems = items.filter((row) => {
+    if (statusFilter !== "all" && row.status !== statusFilter) return false;
+    if (!deferredSearch) return true;
+    return (
+      (row.name ?? "").toLowerCase().includes(deferredSearch) ||
+      row.subject.toLowerCase().includes(deferredSearch) ||
+      (row.segmentName ?? "").toLowerCase().includes(deferredSearch)
+    );
+  });
+  const hasFilters = deferredSearch !== "" || statusFilter !== "all";
 
   const invalidate = () => queryClient.invalidateQueries(trpc.broadcasts.pathFilter());
   const deleteMutation = useMutation(
@@ -181,156 +196,215 @@ export default function BroadcastsPage() {
         />
       ) : (
         <>
-          {/* Fixed layout: the name column keeps its share and the name truncates in it. */}
-          <Table style={TABLE_STYLE}>
-            <BroadcastsHead />
-            <tbody>
-              {items.map((row) => {
-                const status = row.status as BroadcastStatus;
-                const label = row.name ?? row.subject;
-                const href =
-                  status === "draft" ? `/broadcasts/${row.id}/edit` : `/broadcasts/${row.id}`;
-                return (
-                  <tr key={row.id} className="hoverable" onClick={() => router.push(href)}>
-                    <td>
-                      <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                        <NavTile name="broadcasts" color={TONE_COLOR[PILL_VARIANT[status]]} />
-                        <Link
-                          href={href}
-                          style={{ color: "var(--ms-bone)", minWidth: 0 }}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <Truncated text={label} />
-                        </Link>
-                        {row.htmlAuthored ? (
-                          <Tooltip inline text={tTemplates("list.htmlChipHint")}>
-                            <span
-                              className="ms-chip"
-                              style={{ fontSize: 10.5, padding: "1px 7px" }}
-                            >
-                              HTML
-                            </span>
-                          </Tooltip>
-                        ) : null}
-                      </span>
-                    </td>
-                    <td>
-                      {status === "sending" && row.sentCount !== null ? (
-                        <Tooltip
-                          inline
-                          text={
-                            <>
-                              {row.finishesAt
-                                ? t("list.finishTip", {
-                                    time: formatFinishAbout(
-                                      roundUpToQuarterHour(row.finishesAt),
-                                      locale,
-                                    ),
-                                  })
-                                : null}
-                              {row.finishesAt ? <br /> : null}
-                              {t("list.progressTip", {
-                                sent: nf.format(row.sentCount),
-                                waiting: nf.format(Math.max(0, row.recipients - row.sentCount)),
-                              })}
-                            </>
-                          }
-                        >
-                          <StatusPill status={status} />
-                        </Tooltip>
-                      ) : (
-                        <StatusPill status={status} />
-                      )}
-                    </td>
-                    <td>{row.segmentName ?? t("composer.segmentNone")}</td>
-                    <td className="right ms-digits">
-                      {status === "sending" && row.sentCount !== null ? (
-                        <>
-                          {nf.format(row.sentCount)}
-                          <span style={{ color: "var(--ms-faint)" }}>
-                            {" / "}
-                            {nf.format(row.recipients)}
-                          </span>
-                        </>
-                      ) : row.recipients > 0 ? (
-                        nf.format(row.recipients)
-                      ) : (
-                        <span style={{ color: "var(--ms-faint)" }}>—</span>
-                      )}
-                    </td>
-                    <td className="right" style={{ color: "var(--ms-muted)" }}>
-                      <RelativeTime date={row.createdAt} />
-                    </td>
-                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: mouse-only guard so a menu click does not also trigger the row navigation; keyboard users reach the menu button directly */}
-                    <td
-                      className="right"
-                      style={{ width: 40 }}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {/* The row itself opens the broadcast; a menu with only "View" would repeat it. */}
-                      {status === "draft" || status === "scheduled" || status === "sending" ? (
-                        <PopoverMenu
-                          ariaLabel={t("list.menu")}
-                          items={
-                            status === "draft"
-                              ? [
-                                  {
-                                    label: t("list.edit"),
-                                    onSelect: () => router.push(`/broadcasts/${row.id}/edit`),
-                                  },
-                                  null,
-                                  {
-                                    label: t("list.delete"),
-                                    danger: true,
-                                    onSelect: () => setDeleteTarget({ id: row.id, name: label }),
-                                  },
-                                ]
-                              : [
-                                  {
-                                    label: t("list.view"),
-                                    onSelect: () => router.push(`/broadcasts/${row.id}`),
-                                  },
-                                  null,
-                                  {
-                                    label: t(
-                                      status === "sending" ? "list.stopRest" : "list.cancel",
-                                    ),
-                                    danger: true,
-                                    onSelect: () =>
-                                      setCancelTarget({
-                                        id: row.id,
-                                        name: label,
-                                        stop:
-                                          status === "sending" && row.sentCount !== null
-                                            ? {
-                                                sent: row.sentCount,
-                                                waiting: Math.max(
-                                                  0,
-                                                  row.recipients - row.sentCount,
-                                                ),
-                                              }
-                                            : null,
-                                      }),
-                                  },
-                                ]
-                          }
-                        />
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-          {query.hasNextPage ? (
-            <ListFooter
-              loadMore={{
-                label: t("list.loadMore"),
-                onClick: () => query.fetchNextPage(),
-                loading: query.isFetchingNextPage,
+          <div
+            className="ms-filter-row"
+            style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18 }}
+          >
+            <SearchBox
+              value={search}
+              onChange={setSearch}
+              placeholder={t("list.searchPlaceholder")}
+            />
+            <Select
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v as "all" | BroadcastStatus)}
+              width={180}
+              ariaLabel={t("list.status")}
+              options={[
+                { value: "all", label: t("list.allStatuses"), adornment: <StatusDot /> },
+                ...(["draft", "scheduled", "sending", "sent", "canceled"] as const).map((s) => ({
+                  value: s,
+                  label: t(`status.${s}`),
+                  adornment: <StatusDot color={`var(--ms-${PILL_VARIANT[s]})`} />,
+                })),
+              ]}
+            />
+            {hasFilters ? (
+              <button
+                type="button"
+                className="ms-btn ms-btn-secondary"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("all");
+                }}
+              >
+                {t("list.clearFilters")}
+              </button>
+            ) : null}
+          </div>
+
+          {filteredItems.length === 0 ? (
+            <StateCard
+              headline={t("list.noMatch")}
+              actionLabel={t("list.clearFilters")}
+              onAction={() => {
+                setSearch("");
+                setStatusFilter("all");
               }}
             />
-          ) : null}
+          ) : (
+            <>
+              {/* Fixed layout: the name column keeps its share and the name truncates in it. */}
+              <Table style={TABLE_STYLE}>
+                <BroadcastsHead />
+                <tbody>
+                  {filteredItems.map((row) => {
+                    const status = row.status as BroadcastStatus;
+                    const label = row.name ?? row.subject;
+                    const href =
+                      status === "draft" ? `/broadcasts/${row.id}/edit` : `/broadcasts/${row.id}`;
+                    return (
+                      <tr key={row.id} className="hoverable" onClick={() => router.push(href)}>
+                        <td>
+                          <span
+                            style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}
+                          >
+                            <NavTile name="broadcasts" color={TONE_COLOR[PILL_VARIANT[status]]} />
+                            <Link
+                              href={href}
+                              style={{ color: "var(--ms-bone)", minWidth: 0 }}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <Truncated text={label} />
+                            </Link>
+                            {row.htmlAuthored ? (
+                              <Tooltip inline text={tTemplates("list.htmlChipHint")}>
+                                <span
+                                  className="ms-chip"
+                                  style={{ fontSize: 10.5, padding: "1px 7px" }}
+                                >
+                                  HTML
+                                </span>
+                              </Tooltip>
+                            ) : null}
+                          </span>
+                        </td>
+                        <td>
+                          {status === "sending" && row.sentCount !== null ? (
+                            <Tooltip
+                              inline
+                              text={
+                                <>
+                                  {row.finishesAt
+                                    ? t("list.finishTip", {
+                                        time: formatFinishAbout(
+                                          roundUpToQuarterHour(row.finishesAt),
+                                          locale,
+                                        ),
+                                      })
+                                    : null}
+                                  {row.finishesAt ? <br /> : null}
+                                  {t("list.progressTip", {
+                                    sent: nf.format(row.sentCount),
+                                    waiting: nf.format(Math.max(0, row.recipients - row.sentCount)),
+                                  })}
+                                </>
+                              }
+                            >
+                              <StatusPill status={status} />
+                            </Tooltip>
+                          ) : (
+                            <StatusPill status={status} />
+                          )}
+                        </td>
+                        <td style={{ color: "var(--ms-muted)" }}>
+                          <Truncated text={row.segmentName ?? t("composer.segmentNone")} />
+                        </td>
+                        <td className="right ms-digits">
+                          {status === "sending" && row.sentCount !== null ? (
+                            <>
+                              {nf.format(row.sentCount)}
+                              <span style={{ color: "var(--ms-faint)" }}>
+                                {" / "}
+                                {nf.format(row.recipients)}
+                              </span>
+                            </>
+                          ) : row.recipients > 0 ? (
+                            nf.format(row.recipients)
+                          ) : (
+                            <span style={{ color: "var(--ms-faint)" }}>—</span>
+                          )}
+                        </td>
+                        <td className="right" style={{ color: "var(--ms-muted)" }}>
+                          <RelativeTime date={row.createdAt} />
+                        </td>
+                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: mouse-only guard so a menu click does not also trigger the row navigation; keyboard users reach the menu button directly */}
+                        <td
+                          className="right"
+                          style={{ width: 40 }}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {/* The row itself opens the broadcast; a menu with only "View" would repeat it. */}
+                          {status === "draft" || status === "scheduled" || status === "sending" ? (
+                            <PopoverMenu
+                              ariaLabel={t("list.menu")}
+                              items={
+                                status === "draft"
+                                  ? [
+                                      {
+                                        label: t("list.edit"),
+                                        onSelect: () => router.push(`/broadcasts/${row.id}/edit`),
+                                      },
+                                      null,
+                                      {
+                                        label: t("list.delete"),
+                                        danger: true,
+                                        onSelect: () =>
+                                          setDeleteTarget({ id: row.id, name: label }),
+                                      },
+                                    ]
+                                  : [
+                                      {
+                                        label: t("list.view"),
+                                        onSelect: () => router.push(`/broadcasts/${row.id}`),
+                                      },
+                                      null,
+                                      {
+                                        label: t(
+                                          status === "sending" ? "list.stopRest" : "list.cancel",
+                                        ),
+                                        danger: true,
+                                        onSelect: () =>
+                                          setCancelTarget({
+                                            id: row.id,
+                                            name: label,
+                                            stop:
+                                              status === "sending" && row.sentCount !== null
+                                                ? {
+                                                    sent: row.sentCount,
+                                                    waiting: Math.max(
+                                                      0,
+                                                      row.recipients - row.sentCount,
+                                                    ),
+                                                  }
+                                                : null,
+                                          }),
+                                      },
+                                    ]
+                              }
+                            />
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+              <ListFooter
+                left={t("list.pageOf", { total: filteredItems.length })}
+                singlePage={!query.hasNextPage}
+                loadMore={
+                  query.hasNextPage
+                    ? {
+                        label: t("list.loadMore"),
+                        onClick: () => query.fetchNextPage(),
+                        loading: query.isFetchingNextPage,
+                      }
+                    : undefined
+                }
+              />
+            </>
+          )}
         </>
       )}
 

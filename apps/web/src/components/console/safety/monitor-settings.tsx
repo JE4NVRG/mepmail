@@ -153,7 +153,18 @@ export function MonitorSettingsView() {
           </a>
         </p>
         {judge.on ? null : (
-          <pre className="ms-mono" style={{ margin: "10px 0 0", fontSize: 12 }}>
+          <pre
+            className="ms-mono"
+            style={{
+              margin: "10px 0 0",
+              fontSize: 12,
+              padding: "10px 12px",
+              background: "var(--ms-inset)",
+              border: "1px solid var(--ms-line)",
+              borderRadius: "var(--ms-r-input)",
+              overflowX: "auto",
+            }}
+          >
             {"ABUSE_JUDGE=typesafe\nABUSE_JUDGE_API_KEY=...\nABUSE_JUDGE_MODEL=jev-latest"}
           </pre>
         )}

@@ -203,13 +203,13 @@ export default function SuppressionDetailPage() {
           borderBottom: "1px solid var(--ms-line)",
         }}
       >
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div className="ms-microlabel" style={{ fontSize: 10.5 }}>
             {t("suppressions.detail.origin")}
           </div>
-          <div style={{ fontSize: 14, marginTop: 4 }}>{origin}</div>
+          <div style={{ fontSize: 14, marginTop: 4, overflowWrap: "anywhere" }}>{origin}</div>
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div className="ms-microlabel" style={{ fontSize: 10.5 }}>
             {t("suppressions.detail.recipient")}
           </div>
@@ -217,7 +217,7 @@ export default function SuppressionDetailPage() {
             {row.email ?? "—"}
           </div>
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div className="ms-microlabel" style={{ fontSize: 10.5 }}>
             {t("suppressions.detail.added")}
           </div>
@@ -238,7 +238,7 @@ export default function SuppressionDetailPage() {
               background: "var(--ms-inset)",
               border: "1px solid var(--ms-line)",
               borderRadius: 10,
-              padding: "14px 16px",
+              padding: "14px 42px 14px 16px",
             }}
           >
             <pre

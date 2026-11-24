@@ -75,7 +75,13 @@ export function HealthPill({ summary }: { summary: Summary }) {
       <button
         type="button"
         className={`ms-badge ms-badge-${tone}`}
-        style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+        style={{
+          cursor: "pointer",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          fontFamily: "inherit",
+        }}
         onClick={() =>
           document.getElementById("health")?.scrollIntoView({ behavior: "smooth", block: "start" })
         }
@@ -274,15 +280,20 @@ export function HealthCard({ summary }: { summary: Summary }) {
             className="ms-health-row"
             onClick={() => setOpen(row)}
           >
-            <span className={row.tone === "off" ? "ms-dot ring" : "ms-dot"} style={DOT[row.tone]} />
+            <span
+              className={row.tone === "off" ? "ms-dot ring" : "ms-dot"}
+              style={{ ...DOT[row.tone], flexShrink: 0 }}
+            />
             <span>{t(`health.rows.${row.probe}`)}</span>
             <span
               className="ms-mono"
               style={{
                 marginLeft: "auto",
+                minWidth: 0,
                 fontSize: 12,
-                color: row.muted ? "var(--ms-faint)" : "var(--ms-muted)",
+                color: "var(--ms-muted)",
                 textAlign: "right",
+                overflowWrap: "anywhere",
               }}
             >
               {row.how}

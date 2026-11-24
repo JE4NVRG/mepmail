@@ -150,10 +150,19 @@ const purchase = teamProcedure.use(noPurchaseInAndroidApp).use(async ({ ctx, nex
   if (ctx.supportView) throw new TRPCError({ code: "FORBIDDEN" });
   return next();
 });
-async function call<T>(run: () => Promise<T>): Promise<T> {
+async function call<T>(run: () => Promise<T>, op?: string): Promise<T> {
+  const startedAt = Date.now();
   try {
     return await run();
   } catch (error) {
+    if (op) {
+      // A failed read used to leave no trace: only a counter went up, and the
+      // cause (timeout, decrypt, authority) was unknowable afterwards. Log the
+      // reason only, never the message.
+      const reason =
+        error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 200) : typeof error;
+      console.error(`mailbox.read_failed op=${op} ms=${Date.now() - startedAt} reason=${reason}`);
+    }
     if (error instanceof PurchaseEligibilityError)
       throw new TRPCError({
         code:
@@ -981,7 +990,9 @@ export const mailboxesRouter = router({
         .strict(),
     )
     .mutation(({ ctx, input }) => call(() => setMailboxItemsSeenMany(ctx.db, actor(ctx), input))),
-  unreadCounts: enabled.query(({ ctx }) => call(() => getMailboxUnreadCounts(ctx.db, actor(ctx)))),
+  unreadCounts: enabled.query(({ ctx }) =>
+    call(() => getMailboxUnreadCounts(ctx.db, actor(ctx)), "unreadCounts"),
+  ),
   setItemFolder: enabled
     .input(
       z
@@ -1044,7 +1055,9 @@ export const mailboxesRouter = router({
         groupByThread: z.boolean().optional(),
       }),
     )
-    .query(({ ctx, input }) => call(() => getMailboxContentList(ctx.db, actor(ctx), input))),
+    .query(({ ctx, input }) =>
+      call(() => getMailboxContentList(ctx.db, actor(ctx), input), "items"),
+    ),
   // Correio search: the rows items returns, plus each one's folder (mailbox-search.ts).
   search: enabled
     .input(
@@ -1201,7 +1214,8 @@ export const mailboxesRouter = router({
           .array(
             z.object({
               filename: z.string().min(1).max(160),
-              base64: z.string().min(1).max(349528),
+              // 10 MiB decoded (ATTACHMENT_MAX_BYTES) as padded base64.
+              base64: z.string().min(1).max(13981016),
             }),
           )
           .max(10),

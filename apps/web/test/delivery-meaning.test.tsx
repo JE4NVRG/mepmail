@@ -98,7 +98,7 @@ it("exposes server receipt limits as visible API detail copy, including a delive
   expect(detail).toMatch(
     /<p[^>]*>[\s\S]*?common\("status.delivered"\)[\s\S]*?common\("deliveryDisclosure"\)[\s\S]*?<\/p>/,
   );
-  expect(detail).toContain('whiteSpace: type === "delivered" ? "normal" : "nowrap"');
+  expect(detail).toContain('whiteSpace: "nowrap"');
   expect(detail).toContain('delivered: "var(--ms-neutral)"');
 });
 

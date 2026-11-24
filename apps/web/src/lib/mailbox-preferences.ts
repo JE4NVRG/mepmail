@@ -168,12 +168,15 @@ export function useCorreioPrefs(): {
     }),
   );
   const save = useMutation(trpc.mailboxes.preferences.set.mutationOptions({ retry: 1 }));
-  const [local, setLocal] = useState<CorreioPrefs>(() =>
-    typeof window === "undefined" ? { ...CORREIO_PREF_DEFAULTS } : readLocalCorreioPrefs(),
-  );
+  const [local, setLocal] = useState<CorreioPrefs>(() => ({ ...CORREIO_PREF_DEFAULTS }));
   const [overrides, setOverrides] = useState<Partial<CorreioPrefs>>({});
   const pending = useRef<Partial<CorreioPrefs>>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync localStorage mirror after hydration so SSR and initial client markup match.
+  useEffect(() => {
+    setLocal(readLocalCorreioPrefs());
+  }, []);
 
   // The server copy wins over the mirror once it arrives.
   useEffect(() => {

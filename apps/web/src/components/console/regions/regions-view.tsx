@@ -156,7 +156,7 @@ export function RegionsView() {
   // One scale for every region's sparkline, so a quiet region reads as quiet.
   const sharedPeak = Math.max(1, ...served.flatMap((r) => r.daily.map((p) => p.sent)));
 
-  const [addParam] = useUrlState("add", "");
+  const [addParam, setAddParam] = useUrlState("add", "");
   const known = list.data?.known ?? [];
   const addRegion = oneOf(DOMAIN_REGIONS, addParam, "") || (known[0]?.region ?? "eu-west-1");
 
@@ -208,7 +208,7 @@ export function RegionsView() {
             onSort={(c, dir) => setSort({ column: c as Column, dir })}
           />
         ))}
-        <th />
+        <th aria-label={common("actions")} />
       </tr>
     </thead>
   );
@@ -287,7 +287,7 @@ export function RegionsView() {
               prefill={prefillFor(quotaFor)}
             />
           ) : null}
-          <div className="ms-card" style={{ padding: 0, marginBottom: 16 }}>
+          <div className="ms-card" style={{ padding: 0, marginBottom: 16, overflow: "hidden" }}>
             <Table className="nowrap">
               {header}
               {list.data ? (
@@ -335,7 +335,17 @@ export function RegionsView() {
                               </span>
                             </div>
                           ) : (
-                            <span style={{ color: "var(--ms-danger)", fontSize: 12 }}>
+                            <span
+                              title={r.error ?? undefined}
+                              style={{
+                                display: "block",
+                                maxWidth: 260,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                color: "var(--ms-danger)",
+                                fontSize: 12,
+                              }}
+                            >
                               {tr("error", { message: r.error ?? "" })}
                             </span>
                           )}
@@ -504,6 +514,7 @@ export function RegionsView() {
                 region={addRegion}
                 served={list.data.served.find((r) => r.region === addRegion)}
                 envRegions={list.data.envRegions ?? [list.data.defaultRegion]}
+                onSelectRegion={setAddParam}
               />
             ) : (
               <Skeleton width="100%" height={520} radius="var(--ms-r-card)" />

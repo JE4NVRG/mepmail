@@ -90,10 +90,13 @@ export function ReputationPanel(props: ReputationPanelProps) {
     s.nextEligibleAt && Number.isFinite(Date.parse(s.nextEligibleAt))
       ? new Date(s.nextEligibleAt).toLocaleString(props.locale, { timeZone: "UTC" }) + " UTC"
       : t.unknown;
+  const systemPlan = s.plan === "system";
+  const systemAware = (value: number | null | undefined) =>
+    systemPlan && value === null ? t.unlimited : number(value ?? null);
   const rows = [
-    [t.plan, s.plan ?? t.unknown],
-    [t.monthly, number(s.nominalMonthly ?? null)],
-    [t.left, number(s.dailyLeft ?? null)],
+    [t.plan, systemPlan ? t.systemPlan : (s.plan ?? t.unknown)],
+    [t.monthly, systemAware(s.nominalMonthly)],
+    [t.left, systemAware(s.dailyLeft)],
     [
       t.capacity,
       s.capacityAvailable === undefined
@@ -104,9 +107,9 @@ export function ReputationPanel(props: ReputationPanelProps) {
     ],
     [t.nextStep, t.steps[s.nextStep as keyof typeof t.steps] ?? t.unknown],
     [t.state, t.states[s.state]],
-    [t.nominal, number(s.nominalPlanDaily)],
-    [t.effective, s.capacityKnown ? number(s.effectiveDaily) : t.unknown],
-    [t.minute, s.capacityKnown ? number(s.effectiveMinute) : t.unknown],
+    [t.nominal, systemAware(s.nominalPlanDaily)],
+    [t.effective, s.capacityKnown ? systemAware(s.effectiveDaily) : t.unknown],
+    [t.minute, s.capacityKnown ? systemAware(s.effectiveMinute) : t.unknown],
     [t.used, number(s.usedToday)],
     [t.volume, number(s.volume24h)],
     [
@@ -140,7 +143,7 @@ export function ReputationPanel(props: ReputationPanelProps) {
       <p>{t.readonly}</p>
       {!s.capacityKnown ? <p role="status">{t.capacityUnknown}</p> : null}
       {s.refusal ? <p role="status">{t.refusals[s.refusal]}</p> : null}
-      <dl style={{ display: "grid", gap: "0.75rem" }}>
+      <dl style={{ display: "grid", gap: "0.75rem", maxWidth: 720 }}>
         {rows.map(([label, value]) => (
           <div
             key={label}
@@ -152,7 +155,7 @@ export function ReputationPanel(props: ReputationPanelProps) {
               overflowWrap: "anywhere",
             }}
           >
-            <dt>{label}</dt>
+            <dt style={{ color: "var(--ms-muted)" }}>{label}</dt>
             <dd style={{ margin: 0 }}>{value}</dd>
           </div>
         ))}

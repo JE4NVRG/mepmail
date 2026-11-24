@@ -52,14 +52,22 @@ function fieldLabelStyle(): React.CSSProperties {
 function UnsubscribeSkeleton() {
   const t = useTranslations("settings.unsubscribe");
   return (
-    <section className="ms-card" style={{ padding: 24, maxWidth: 640 }}>
-      {[t("brandName"), t("message"), t("redirectUrl")].map((label) => (
-        <div key={label} className="ms-field" style={{ marginBottom: 18 }}>
-          <span style={fieldLabelStyle()}>{label}</span>
-          <Skeleton width="100%" height={30} radius="var(--ms-r-input)" />
-        </div>
-      ))}
-    </section>
+    <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <section
+        className="ms-card"
+        style={{ padding: 24, flex: "1 1 360px", maxWidth: 480, minWidth: 0, width: "100%" }}
+      >
+        {[t("brandName"), t("message"), t("redirectUrl")].map((label) => (
+          <div key={label} className="ms-field" style={{ marginBottom: 18 }}>
+            <span style={fieldLabelStyle()}>{label}</span>
+            <Skeleton width="100%" height={30} radius="var(--ms-r-input)" />
+          </div>
+        ))}
+      </section>
+      <div style={{ flex: "1 1 380px", minWidth: 0 }}>
+        <Skeleton width="100%" height={360} radius="var(--ms-r-card)" />
+      </div>
+    </div>
   );
 }
 
@@ -164,7 +172,7 @@ export function UnsubscribeView() {
   return (
     <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
       <form
-        style={{ flex: "1 1 360px", maxWidth: 480 }}
+        style={{ flex: "1 1 360px", maxWidth: 480, minWidth: 0, width: "100%" }}
         onSubmit={(e) => {
           e.preventDefault();
           if (redirectInvalid || colorInvalid) return;
@@ -348,6 +356,7 @@ export function UnsubscribeView() {
             <div
               style={{
                 display: "flex",
+                flexWrap: "wrap",
                 gap: 10,
                 alignItems: "center",
                 justifyContent: "flex-end",
@@ -383,6 +392,8 @@ export function UnsubscribeView() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 8,
             marginBottom: 10,
           }}
         >

@@ -52,6 +52,9 @@ import {
 } from "./mailbox-outbound-region.js";
 import type { SesFailover } from "./ses-failover.js";
 
+/** ACS Email's message ceiling (10 MB, attachments and encoding included). */
+const AZURE_SMTP_MAX_MESSAGE_BYTES = 10_000_000;
+
 export const mailboxWorkerMime: MailboxTransportMimeAdapter = {
   async parse(raw) {
     const parsed = await simpleParser(raw, { skipImageLinks: true, skipTextToHtml: true });
@@ -299,7 +302,10 @@ export function createMailboxContentPolicySender(
             box?.origin !== "external" &&
             box?.domainStatus === "verified" &&
             !!box.relayEnabledAt &&
-            box.address === input.from;
+            box.address === input.from &&
+            // Azure Communication Services refuses messages over 10 MB; larger
+            // Correio mail (attachments) stays on the account's own provider.
+            input.raw.length <= AZURE_SMTP_MAX_MESSAGE_BYTES;
           const provider = box?.origin === "external" ? "customer_smtp" : "ses";
           const messageClass =
             insight.marketing ||

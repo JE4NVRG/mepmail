@@ -7,6 +7,11 @@ import {
 import { JUDGE_VERDICT_NOUL } from "./abuse-judge/questions.js";
 import { type AbuseJudge, type JudgeVerdict, judgeErrorClass } from "./abuse-judge/types.js";
 import {
+  type AttachmentRejection,
+  type DispatchAttachmentMeta,
+  validateDispatchAttachments,
+} from "./attachment-policy.js";
+import {
   hasUnsafeDispatchCharacters,
   normalizeDispatchText,
   projectDispatchHtml,
@@ -29,7 +34,8 @@ export interface DispatchContentSnapshot {
   html: string | null;
   text: string | null;
   headers: Record<string, string>;
-  attachments: boolean;
+  /** Metadados validados; o conteudo nunca entra no snapshot. */
+  attachments: readonly DispatchAttachmentMeta[];
   /** Exact final MIME bytes; no approval survives a transformation. */
   mime: Buffer;
 }
@@ -80,7 +86,7 @@ export function bindDispatchTracking(
 }
 
 export type ProjectionHold =
-  | "attachments"
+  | AttachmentRejection
   | "empty_content"
   | "text_too_long"
   | "unsafe_characters"
@@ -92,7 +98,8 @@ type ProjectionResult = { ok: true; blocks: string[] } | { ok: false; detail: Pr
 // Detail never carries content: only the branch that held the message, so a
 // hold can be explained to the sender without exposing the email itself.
 function projectionBlocks(s: DispatchContentSnapshot): ProjectionResult {
-  if (s.attachments) return { ok: false, detail: "attachments" };
+  const attachments = validateDispatchAttachments(s.attachments);
+  if (!attachments.ok) return { ok: false, detail: attachments.detail };
   if (!s.html && !s.text) return { ok: false, detail: "empty_content" };
   const scalars = [s.text ?? "", s.sourceText ?? "", s.subject, s.from, ...(s.replyTo ?? [])].map(
     normalizeDispatchText,
@@ -155,7 +162,10 @@ export async function qualifyDispatchContent(
     from: snapshot.from,
     replyTo: snapshot.replyTo,
     subject: snapshot.subject,
-    attachments: [],
+    attachments: snapshot.attachments.map((a) => ({
+      filename: a.filename,
+      contentType: a.contentType,
+    })),
   };
   // Same judge/prompt/rubric. The bounded text projection retains every text
   // node, every alternative, and complete original AND final href bytes.

@@ -78,7 +78,9 @@ export function ProfileSettings({ uploads }: { uploads: boolean }) {
         <div style={{ display: "grid", gap: 8, flex: 1, minWidth: 200 }}>
           <strong>{session?.user.name}</strong>
           <span style={{ color: "var(--ms-muted)", fontSize: 13 }}>{session?.user.email}</span>
-          <p style={{ margin: 0, color: "var(--ms-muted)", fontSize: 13 }}>{t("hint")}</p>
+          {uploads ? (
+            <p style={{ margin: 0, color: "var(--ms-muted)", fontSize: 13 }}>{t("hint")}</p>
+          ) : null}
           <input
             ref={picker}
             type="file"
@@ -92,49 +94,53 @@ export function ProfileSettings({ uploads }: { uploads: boolean }) {
               if (file) void choose(file);
             }}
           />
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className="ms-btn ms-btn-secondary"
-              disabled={!uploads || busy || !session}
-              onClick={() => picker.current?.click()}
-            >
-              {t("choose")}
-            </button>
-            {photo ? (
-              <>
+          {uploads || session?.user.image ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {uploads ? (
                 <button
                   type="button"
-                  className="ms-btn ms-btn-primary"
-                  disabled={busy}
-                  onClick={() => void change()}
+                  className="ms-btn ms-btn-secondary"
+                  disabled={busy || !session}
+                  onClick={() => picker.current?.click()}
                 >
-                  <BtnSpinner on={busy} />
-                  {t("save")}
+                  {t("choose")}
                 </button>
+              ) : null}
+              {photo ? (
+                <>
+                  <button
+                    type="button"
+                    className="ms-btn ms-btn-primary"
+                    disabled={busy}
+                    onClick={() => void change()}
+                  >
+                    <BtnSpinner on={busy} />
+                    {t("save")}
+                  </button>
+                  <button
+                    type="button"
+                    className="ms-btn ms-btn-secondary"
+                    disabled={busy}
+                    onClick={() => setPhoto(null)}
+                  >
+                    {t("cancel")}
+                  </button>
+                </>
+              ) : session?.user.image ? (
                 <button
                   type="button"
                   className="ms-btn ms-btn-secondary"
                   disabled={busy}
-                  onClick={() => setPhoto(null)}
+                  onClick={() => void change(true)}
                 >
-                  {t("cancel")}
+                  {t("remove")}
                 </button>
-              </>
-            ) : session?.user.image ? (
-              <button
-                type="button"
-                className="ms-btn ms-btn-secondary"
-                disabled={busy}
-                onClick={() => void change(true)}
-              >
-                {t("remove")}
-              </button>
-            ) : null}
-          </div>
-          {!uploads && (
+              ) : null}
+            </div>
+          ) : null}
+          {!uploads ? (
             <p style={{ margin: 0, color: "var(--ms-muted)", fontSize: 12 }}>{t("unavailable")}</p>
-          )}
+          ) : null}
           {message && (
             <p
               role="status"

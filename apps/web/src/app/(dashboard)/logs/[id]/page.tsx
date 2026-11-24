@@ -4,13 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { CopyChip } from "@/components/copy-chip";
+import { CopyChip, CopyGlyph } from "@/components/copy-chip";
 import { JsonView } from "@/components/json-view";
 import { Crumb, CrumbEnd, PageHeader } from "@/components/page-header";
 import { RelativeTime } from "@/components/relative-time";
 import { Skeleton, SkeletonChip } from "@/components/skeleton";
 import { formatBytes, formatDayTime, formatUtcTimestampMs } from "@/lib/format";
-import { statusCodeColor } from "@/lib/status-code-color";
+import { httpMethodTone } from "@/lib/http-method-tone";
+import { statusCodeTone } from "@/lib/status-code-color";
 import { useTRPC } from "@/lib/trpc";
 import { useTeamRole } from "@/lib/use-team-role";
 
@@ -48,30 +49,44 @@ function JsonSection({
       : bytes === null
         ? null
         : t("detail.bodyTruncated", { size: formatBytes(bytes) });
+  const rawJson = message === null ? JSON.stringify(value, null, 2) : null;
   return (
-    <section style={{ marginTop: 26 }}>
-      <div className="ms-microlabel">{label}</div>
+    <section style={{ marginTop: 22 }}>
       <div
         style={{
-          marginTop: 10,
-          background: "var(--ms-panel)",
-          border: "1px solid var(--ms-line)",
-          borderRadius: 14,
-          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
         }}
       >
-        {message !== null ? (
-          <p
-            style={{
-              margin: 0,
-              padding: "14px 16px",
-              color: "var(--ms-muted)",
-              fontSize: "var(--ms-fs-ui)",
-            }}
-          >
-            {message}
-          </p>
-        ) : (
+        <div className="ms-microlabel">{label}</div>
+        {rawJson ? <CopyGlyph value={rawJson} /> : null}
+      </div>
+      {message !== null ? (
+        <p
+          style={{
+            margin: "8px 0 0",
+            padding: "10px 14px",
+            background: "var(--ms-panel)",
+            border: "1px solid var(--ms-line)",
+            borderRadius: 10,
+            color: "var(--ms-muted)",
+            fontSize: "var(--ms-fs-ui)",
+          }}
+        >
+          {message}
+        </p>
+      ) : (
+        <div
+          style={{
+            marginTop: 8,
+            background: "var(--ms-panel)",
+            border: "1px solid var(--ms-line)",
+            borderRadius: 12,
+            overflow: "hidden",
+          }}
+        >
           <pre
             className="ms-mono ms-hl"
             style={{
@@ -86,8 +101,8 @@ function JsonSection({
           >
             <JsonView value={value} requestPath={requestPath} />
           </pre>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -225,50 +240,50 @@ export default function LogDetailPage() {
             <CrumbEnd label={t("detail.eyebrow")} />
           </>
         }
-        title={`${log.method} ${log.path}`}
+        leading={
+          <span
+            className={`ms-badge ms-badge-${httpMethodTone(log.method)} ms-mono`}
+            style={{ fontSize: 12, padding: "4px 10px" }}
+          >
+            {log.method}
+          </span>
+        }
+        title={log.path}
       />
 
       <div
-        className="ms-meta-grid"
+        className="ms-card ms-meta-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "22px 28px",
-          padding: "22px 0",
-          borderTop: "1px solid var(--ms-line)",
-          borderBottom: "1px solid var(--ms-line)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+          gap: "18px 24px",
+          padding: "16px 20px",
         }}
       >
         <div>
           <Microlabel>{t("detail.status")}</Microlabel>
-          <div
-            className="ms-mono"
-            style={{ fontSize: 13, marginTop: 5, color: statusCodeColor(log.statusCode) }}
-          >
-            {log.statusCode}
+          <div style={{ marginTop: 6 }}>
+            <span className={`ms-badge ms-badge-${statusCodeTone(log.statusCode)} ms-mono`}>
+              {log.statusCode}
+            </span>
           </div>
         </div>
         <div>
           <Microlabel>{t("detail.when")}</Microlabel>
-          <div style={{ fontSize: 13, marginTop: 5 }}>
+          <div style={{ fontSize: 13, marginTop: 6 }}>
             <span title={formatUtcTimestampMs(log.createdAt)}>
               {formatDayTime(log.createdAt, locale)}
             </span>
-            <span style={{ color: "var(--ms-muted)", marginLeft: 10 }}>
+            <span style={{ color: "var(--ms-muted)" }}>
+              {" · "}
               <RelativeTime date={log.createdAt} />
             </span>
           </div>
         </div>
         <div>
-          <Microlabel>{t("detail.id")}</Microlabel>
-          <div style={{ marginTop: 4 }}>
-            <CopyChip value={log.id} />
-          </div>
-        </div>
-        <div>
           <Microlabel>{t("detail.source")}</Microlabel>
           <div
-            style={{ fontSize: 13, marginTop: 5, display: "flex", alignItems: "center", gap: 8 }}
+            style={{ fontSize: 13, marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}
           >
             <Link href={log.apiKeyId ? "/api-keys" : "/settings/connected-apps"}>
               {log.apiKeyId
@@ -282,6 +297,12 @@ export default function LogDetailPage() {
             {log.apiKeyRevoked ? (
               <span className="ms-badge ms-badge-neutral">{t("list.revoked")}</span>
             ) : null}
+          </div>
+        </div>
+        <div>
+          <Microlabel>{t("detail.id")}</Microlabel>
+          <div style={{ marginTop: 5 }}>
+            <CopyChip value={log.id} />
           </div>
         </div>
       </div>

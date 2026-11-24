@@ -16,7 +16,15 @@
     "deleteTitle": "Delete template",
     "deleteBody": "\"{name}\" will be deleted. Broadcasts that started from it keep their copy.",
     "deleteConfirm": "Delete",
-    "htmlChipHint": "Created as HTML; opens in code mode"
+    "htmlChipHint": "Created as HTML; opens in code mode",
+    "searchPlaceholder": "Search template by name…",
+    "allTypes": "All types",
+    "typeBlocks": "Blocks",
+    "typeHtml": "HTML",
+    "noMatch": "No templates match your filters.",
+    "clearFilters": "Clear filters",
+    "useInBroadcast": "Use in broadcast",
+    "pageOf": "{total, plural, one {# template} other {# templates}}"
   },
   "starter": {
     "title": "New template",

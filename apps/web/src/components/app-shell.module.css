@@ -1,16 +1,60 @@
+.searchTrigger {
+  margin-top: 8px;
+  width: 100%;
+  height: 34px;
+  padding: 0 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9px;
+  border: 1px solid var(--ms-line);
+  background: var(--ms-inset);
+  color: var(--ms-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    border-color var(--ms-dur-fast) var(--ms-ease),
+    background var(--ms-dur-fast) var(--ms-ease),
+    color var(--ms-dur-fast) var(--ms-ease);
+}
+.searchTrigger:hover {
+  border-color: var(--ms-line-strong);
+  background: color-mix(in srgb, var(--ms-panel-raised) 85%, var(--ms-inset));
+  color: var(--ms-bone);
+}
+.searchTrigger:focus-visible {
+  outline: 2px solid var(--ms-steel);
+  outline-offset: 2px;
+}
+.searchKeycap {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--ms-line-strong);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--ms-line-strong) 85%, transparent);
+  background: var(--ms-panel);
+  color: var(--ms-muted);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
 .navSection {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 .navSection + .navSection {
-  margin-top: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--ms-line) 65%, transparent);
 }
 .navHeading {
-  padding: 4px 12px 6px;
+  padding: 1px 10px 5px;
   color: var(--ms-muted);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   line-height: 1.4;
 }
 .navNew {
@@ -18,15 +62,28 @@
   padding: 1px 7px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--ms-violet) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ms-violet) 30%, transparent);
   color: var(--ms-violet);
   font-size: 10.5px;
   font-weight: 600;
   line-height: 1.5;
 }
+.navExternal {
+  margin-left: auto;
+  display: inline-flex;
+  color: var(--ms-muted);
+  opacity: 0.7;
+  transition:
+    opacity var(--ms-dur-fast) var(--ms-ease),
+    color var(--ms-dur-fast) var(--ms-ease);
+}
+.sidebarNav :global(a:hover) .navExternal {
+  opacity: 1;
+  color: var(--ms-bone);
+}
 .sidebarNav :global(a) {
-  min-height: 38px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  min-height: 33px;
+  padding: 5px 10px;
 }
 .sidebarNav :global(a:focus-visible) {
   outline: 2px solid var(--ms-steel);
@@ -36,9 +93,36 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border-top: 1px solid var(--ms-line);
-  margin-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--ms-line) 70%, transparent);
+  margin-top: 10px;
   padding-top: 8px;
+}
+.accountTrigger {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition:
+    background var(--ms-dur-fast) var(--ms-ease),
+    border-color var(--ms-dur-fast) var(--ms-ease);
+}
+.accountTrigger:hover,
+.accountTrigger[aria-expanded="true"] {
+  background: var(--ms-panel-raised);
+  border-color: var(--ms-line-strong);
+}
+.accountTrigger:focus-visible {
+  outline: 2px solid var(--ms-steel);
+  outline-offset: 2px;
 }
 .mail > :global(.ms-main) {
   padding: 24px !important;
@@ -54,6 +138,8 @@
 @media (max-width: 900px) {
   .sidebarNav :global(a) {
     min-height: 44px;
+    gap: 8px;
+    padding: 6px 8px;
   }
   .mail > :global(.ms-main) {
     padding: 16px !important;

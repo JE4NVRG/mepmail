@@ -408,6 +408,34 @@ describe("domains.create", () => {
     }
   });
 
+  it("in cloud, blocks phishing-recidivism domains even when sendReviewClearedAt was set", async () => {
+    vi.stubEnv("IS_CLOUD", "true");
+    const prior = await createTeam(db, "Phish Brand");
+    await db
+      .update(schema.teams)
+      .set({ suspendedAt: new Date(), suspensionReason: "phishing" })
+      .where(eq(schema.teams.id, prior));
+    const teamId = await createTeam(db, "cleared-team");
+    await db
+      .update(schema.teams)
+      .set({ sendReviewClearedAt: new Date() })
+      .where(eq(schema.teams.id, teamId));
+    const { deps, calls } = fakeSes();
+    await expect(
+      callerFor(teamId, deps).domains.create({ name: "phish-brand.com.pt", region: "us-east-1" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(calls).toHaveLength(0);
+    const [held] = await db
+      .select({
+        sendReviewAt: schema.teams.sendReviewAt,
+        sendReviewReason: schema.teams.sendReviewReason,
+      })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, teamId));
+    expect(held?.sendReviewAt).not.toBeNull();
+    expect(held?.sendReviewReason).toBe("impersonation");
+  });
+
   it("in cloud, caps domains per plan", async () => {
     vi.stubEnv("IS_CLOUD", "true");
     const teamId = await createTeam(db);

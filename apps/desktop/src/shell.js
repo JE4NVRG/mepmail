@@ -6,6 +6,7 @@ const CORREIO_URL = "https://mepmail.dev/mail";
 // means the host answered; a network error means it did not.
 const PROBE_URL = "https://mepmail.dev/manifest.webmanifest";
 const PROBE_TIMEOUT_MS = 8000;
+const AUTO_RETRY_MS = 15000;
 
 const STRINGS = {
   "pt-BR": {
@@ -50,8 +51,27 @@ async function hostAnswers() {
 }
 
 let connecting = false;
+let retryTimer = null;
+
+function clearRetry() {
+  if (retryTimer !== null) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+}
+
+function scheduleRetry() {
+  clearRetry();
+  if (document.visibilityState === "hidden") return;
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    connect();
+  }, AUTO_RETRY_MS);
+}
+
 async function connect() {
   if (connecting) return;
+  clearRetry();
   connecting = true;
   setState("connecting");
   if (await hostAnswers()) {
@@ -61,8 +81,12 @@ async function connect() {
   connecting = false;
   setState("offline");
   retry.focus();
+  scheduleRetry();
 }
 
 retry.addEventListener("click", connect);
 window.addEventListener("online", connect);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && shell.dataset.state === "offline") connect();
+});
 connect();

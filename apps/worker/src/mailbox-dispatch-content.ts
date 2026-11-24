@@ -8,13 +8,19 @@ import {
   graduatedSendingEnabled,
   type MailboxOutboxSender,
   MailboxSendDeferredError,
+  type MailboxSendHoldReason,
   parseSingleSender,
   stripMailboxPrivateHeaders,
 } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { and, eq } from "drizzle-orm";
-import { simpleParser } from "mailparser";
+import { type ParsedMail, simpleParser } from "mailparser";
 import type { AbuseJudge } from "../../../packages/core/src/abuse-judge/types.js";
+import {
+  attachmentFilenameBlocked,
+  type DispatchAttachmentMeta,
+  validateDispatchAttachments,
+} from "../../../packages/core/src/attachment-policy.js";
 import { guardColdOutreach } from "../../../packages/core/src/outreach-guard.js";
 import {
   type DispatchContentSnapshot,
@@ -59,8 +65,16 @@ function valid(input: Input, proof: Approval): boolean {
     (hash === proof.original || hash === proof.wire)
   );
 }
-function held(): never {
-  throw new MailboxSendDeferredError("semantic_content_review");
+const ATTACHMENT_HOLDS = new Set<string>([
+  "attachment_too_large",
+  "attachment_type_blocked",
+  "attachment_name_blocked",
+  "attachment_structure_invalid",
+  "attachment_not_supported",
+]);
+
+function held(reason: MailboxSendHoldReason = "semantic_content_review"): never {
+  throw new MailboxSendDeferredError(reason);
 }
 /** A policy stop, not a judgment on the copy: never released by approving content. */
 function heldColdOutreach(): never {
@@ -115,7 +129,7 @@ function mimeParts(raw: Buffer): Buffer[] {
     )
   )
     held();
-  if (headers("content-disposition").length) held();
+  if (headers("content-disposition").length) held("attachment_not_supported");
   const type = headers("content-type")[0] ?? "text/plain";
   if (
     /^text\/(?:plain|html)(?:\s*;\s*charset\s*=\s*(?:"(?:utf-8|us-ascii)"|utf-8|us-ascii))?\s*$/i.test(
@@ -189,7 +203,155 @@ function validateEncodedIdentity(line: string): void {
   });
   if (rest.includes("=?")) held();
 }
-async function inspect(raw: Buffer) {
+interface Inspection {
+  parsed: ParsedMail;
+  text: string | null;
+  html: string | null;
+  attachments: DispatchAttachmentMeta[];
+}
+
+const BOUNDARY_RE =
+  /^multipart\/[a-z]+\s*;\s*boundary\s*=\s*(?:"([A-Za-z0-9'()+_,./:=? -]{1,70})"|([A-Za-z0-9'()+_,./:=?-]{1,70}))\s*$/i;
+
+/** Cabecalhos de UMA parte, com a mesma rigidez do caminho sem anexo. */
+function parsePartHead(raw: Buffer): { headers: (key: string) => string[]; body: string } {
+  const value = raw.toString("latin1");
+  const end = value.indexOf("\r\n\r\n");
+  if (end < 0 || /(^|[^\r])\n/.test(value.slice(0, end))) held("attachment_structure_invalid");
+  const lines = value
+    .slice(0, end)
+    .replace(/\r\n[ \t]+/g, " ")
+    .split("\r\n");
+  if (lines.some((line) => !/^[!-9;-~]+:[^\r\n]*$/.test(line)))
+    held("attachment_structure_invalid");
+  const headers = (key: string) =>
+    lines
+      .filter((line) => line.slice(0, line.indexOf(":")).toLowerCase() === key)
+      .map((line) => line.slice(line.indexOf(":") + 1).trim());
+  if (
+    ["content-type", "content-transfer-encoding", "content-disposition"].some(
+      (key) => headers(key).length > 1,
+    )
+  )
+    held("attachment_structure_invalid");
+  return { headers, body: value.slice(end + 4) };
+}
+
+/** Um boundary quebrado nao vira "dois anexos": a mensagem e recusada inteira. */
+function splitBoundary(body: string, boundary: string): string[] {
+  const chunks = body.split(`--${boundary}`);
+  if (chunks.length < 3 || chunks[0]!.trim() || !/^--(?:\r\n)?$/.test(chunks[chunks.length - 1]!))
+    held("attachment_structure_invalid");
+  return chunks.slice(1, -1).map((chunk) => {
+    if (!chunk.startsWith("\r\n") || !chunk.endsWith("\r\n")) held("attachment_structure_invalid");
+    return chunk.slice(2, -2);
+  });
+}
+
+/**
+ * Uma parte de corpo dentro de multipart/mixed nao tem From/Subject proprios:
+ * ela passa pelas mesmas regras de MIME, mas nao pelas de identidade, que sao
+ * do topo da mensagem.
+ */
+async function inspectBodyPart(
+  part: Buffer,
+): Promise<{ text: string | null; html: string | null }> {
+  mimeParts(part);
+  const parsed = await simpleParser(part, {
+    skipImageLinks: true,
+    skipTextToHtml: true,
+    skipHtmlToText: true,
+  });
+  if (parsed.attachments.length) held("attachment_structure_invalid");
+  if (
+    (parsed.text ?? "").includes("\ufffd") ||
+    (typeof parsed.html === "string" && parsed.html.includes("\ufffd"))
+  )
+    held("attachment_structure_invalid");
+  return {
+    text: typeof parsed.text === "string" ? parsed.text : null,
+    html: typeof parsed.html === "string" ? parsed.html : null,
+  };
+}
+
+/**
+ * multipart/mixed: um corpo (multipart/alternative ou texto) + N anexos. Um
+ * anexo dentro de anexo, ou um multipart dentro de uma parte, e recusado: o
+ * leitor nao deve adivinhar o que o remetente quis.
+ */
+async function inspectMixed(raw: Buffer): Promise<Inspection> {
+  const { headers, body } = parsePartHead(raw);
+  const type = headers("content-type")[0] ?? "";
+  const match = BOUNDARY_RE.exec(type);
+  if (!match) held("attachment_structure_invalid");
+  const boundary = match[1] ?? match[2]!;
+  if (headers("content-transfer-encoding").length) held("attachment_structure_invalid");
+  const chunks = splitBoundary(body, boundary);
+
+  const bodyParts: Buffer[] = [];
+  const attachments: DispatchAttachmentMeta[] = [];
+  for (const chunk of chunks) {
+    const part = Buffer.from(chunk, "latin1");
+    const head = parsePartHead(part);
+    const ctype = (head.headers("content-type")[0] ?? "text/plain").toLowerCase();
+    const disposition = head.headers("content-disposition")[0] ?? "";
+    if (/^\s*(?:attachment|inline)\b/i.test(disposition)) {
+      // Aninhamento: um anexo que e, ele mesmo, um multipart.
+      if (/^multipart\//i.test(ctype)) held("attachment_structure_invalid");
+      const parsed = await simpleParser(part, {
+        skipImageLinks: true,
+        skipTextToHtml: true,
+        skipHtmlToText: true,
+      });
+      if (parsed.attachments.length !== 1) held("attachment_structure_invalid");
+      const file = parsed.attachments[0]!;
+      // O parser adivinha o tipo pela extensao: um .txt declarado como binario
+      // volta como text/plain e a mentira passaria. Validar o declarado E o
+      // detectado, e recusar quando divergem.
+      const declared = (head.headers("content-type")[0] ?? "").toLowerCase().split(";")[0]!.trim();
+      const detected = (file.contentType ?? "").toLowerCase().split(";")[0]!.trim();
+      if (declared && detected && declared !== detected) held("attachment_type_blocked");
+      const declaredName = /filename\s*=\s*"?([^";]{1,255})"?/i.exec(disposition)?.[1] ?? "";
+      attachments.push({
+        filename: file.filename ?? declaredName,
+        contentType: declared || detected,
+        size: file.size,
+      });
+      if (declaredName && attachmentFilenameBlocked(declaredName)) held("attachment_name_blocked");
+      continue;
+    }
+    if (/^multipart\/(?!alternative\b)/i.test(ctype)) held("attachment_structure_invalid");
+    bodyParts.push(part);
+  }
+
+  const policy = validateDispatchAttachments(attachments);
+  if (!policy.ok) held(policy.detail);
+  if (bodyParts.length === 0 || bodyParts.length > 2) held("attachment_structure_invalid");
+
+  const inspected = await Promise.all(bodyParts.map((part) => inspectBodyPart(part)));
+  const parsed = await simpleParser(raw, {
+    skipImageLinks: true,
+    skipTextToHtml: true,
+    skipHtmlToText: true,
+  });
+  let text: string | null = null;
+  let html: string | null = null;
+  for (const one of inspected) {
+    if (one.html !== null) {
+      if (html !== null) held("attachment_structure_invalid");
+      html = one.html;
+    }
+    if (one.text !== null) {
+      if (text !== null) held("attachment_structure_invalid");
+      text = one.text;
+    }
+  }
+  return { parsed, text, html, attachments };
+}
+
+async function inspect(raw: Buffer): Promise<Inspection> {
+  const topType = (parsePartHead(raw).headers("content-type")[0] ?? "").toLowerCase();
+  if (/^multipart\/mixed\b/i.test(topType)) return inspectMixed(raw);
   const parts = mimeParts(raw);
   const parsed = await simpleParser(raw, {
     skipImageLinks: true,
@@ -199,11 +361,8 @@ async function inspect(raw: Buffer) {
   for (const h of parsed.headerLines) {
     if (["from", "reply-to", "subject"].includes(h.key)) validateEncodedIdentity(h.line);
   }
-  if (
-    parsed.attachments.length ||
-    parsed.headerLines.some((h) => h.key === "sender" || h.key.startsWith("resent-"))
-  )
-    held();
+  if (parsed.attachments.length) held("attachment_structure_invalid");
+  if (parsed.headerLines.some((h) => h.key === "sender" || h.key.startsWith("resent-"))) held();
   for (const name of ["from", "to", "cc", "bcc", "reply-to", "subject"])
     if (parsed.headerLines.filter((h) => h.key === name).length > 1) held();
   if (parsed.from?.value.length !== 1 || !parsed.from.value[0]?.address) held();
@@ -228,7 +387,7 @@ async function inspect(raw: Buffer) {
       skipTextToHtml: true,
       skipHtmlToText: true,
     });
-    if (p.attachments.length) held();
+    if (p.attachments.length) held("attachment_structure_invalid");
     if (
       (p.text ?? "").includes("\ufffd") ||
       (typeof p.html === "string" && p.html.includes("\ufffd"))
@@ -242,7 +401,7 @@ async function inspect(raw: Buffer) {
       text = p.text;
     }
   }
-  return { parsed, text, html };
+  return { parsed, text, html, attachments: [] as DispatchAttachmentMeta[] };
 }
 
 export async function withMailboxDispatchContent<T>(
@@ -295,7 +454,7 @@ export async function withMailboxDispatchContent<T>(
       html: final.html,
       text: final.text,
       headers: Object.fromEntries(final.parsed.headerLines.map((h) => [h.key, h.line])),
-      attachments: false,
+      attachments: source.attachments,
       mime: wire,
     };
     if (graduatedSendingEnabled()) {
@@ -374,8 +533,20 @@ export async function withMailboxDispatchContent<T>(
         ? judgeForEmail(judge, db, input.teamId, input.outboxId, "mailbox")
         : judge,
     );
-    if (!decision.allowed || fingerprint(input) !== original) held();
-  } catch {
+    if (!decision.allowed) {
+      // O gate nomeia a branch que reteve: anexo recusado nao e revisao de texto,
+      // e dizer que e deixa o remetente esperando um veredito que nao vem.
+      held(
+        decision.detail !== undefined && ATTACHMENT_HOLDS.has(decision.detail)
+          ? (decision.detail as MailboxSendHoldReason)
+          : "semantic_content_review",
+      );
+    }
+    if (fingerprint(input) !== original) held();
+  } catch (error) {
+    // A policy stop already carries the reason the sender needs; do not flatten
+    // "anexo recusado" into a generic review deferral.
+    if (error instanceof MailboxSendDeferredError) throw error;
     held();
   }
   // Cold outreach never leaves through SES, whatever the judge said about the

@@ -130,14 +130,17 @@ export function TeamSwitcher({
           alignItems: "center",
           gap: 9,
           width: "100%",
-          padding: "7px 10px",
+          padding: "7px 9px",
           borderRadius: 10,
-          background: open ? "var(--ms-panel-raised)" : "none",
-          border: 0,
+          background: "var(--ms-panel-raised)",
+          border: `1px solid ${open ? "var(--ms-line-strong)" : "color-mix(in srgb, var(--ms-line-strong) 65%, var(--ms-line))"}`,
+          boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--ms-bone) 5%, transparent)",
           cursor: switchable ? "pointer" : "default",
           textAlign: "left",
           font: "inherit",
           color: "inherit",
+          transition:
+            "border-color var(--ms-dur-fast) var(--ms-ease), background var(--ms-dur-fast) var(--ms-ease)",
         }}
       >
         <TeamLogo
@@ -147,7 +150,7 @@ export function TeamSwitcher({
         />
         <span
           style={{
-            fontSize: 14,
+            fontSize: 13.5,
             fontWeight: 600,
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -156,7 +159,17 @@ export function TeamSwitcher({
         >
           {active?.teamName ?? teamName}
         </span>
-        <span style={{ marginLeft: "auto", display: "inline-flex", flex: "none" }}>
+        <span
+          style={{
+            marginLeft: "auto",
+            display: "inline-flex",
+            flex: "none",
+            padding: "3px 4px",
+            borderRadius: 6,
+            background: "var(--ms-inset)",
+            border: "1px solid var(--ms-line)",
+          }}
+        >
           <ChevronStack />
         </span>
       </button>

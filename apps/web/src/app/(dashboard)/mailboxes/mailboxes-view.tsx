@@ -304,7 +304,7 @@ export function RegistryDialog({
           </p>
         ) : null}
         <footer className={styles.dialogFooter}>
-          <button type="button" className="ms-btn" disabled={busy} onClick={close}>
+          <button type="button" className="ms-btn ms-btn-secondary" disabled={busy} onClick={close}>
             {t("cancel")}
           </button>
           <button
@@ -318,7 +318,12 @@ export function RegistryDialog({
       </form>
       {options.canManage && mailbox && !deleting ? (
         <div className={styles.dialogFooter}>
-          <button type="button" className="ms-btn" disabled={busy} onClick={openReceiving}>
+          <button
+            type="button"
+            className="ms-btn ms-btn-secondary"
+            disabled={busy}
+            onClick={openReceiving}
+          >
             {t("setup.checkReceiving")}
           </button>
         </div>
@@ -330,7 +335,11 @@ export function RegistryDialog({
           {grants.isError ? (
             <div role="alert">
               <p>{t("loadError")}</p>
-              <button type="button" className="ms-btn" onClick={() => void grants.refetch()}>
+              <button
+                type="button"
+                className="ms-btn ms-btn-secondary"
+                onClick={() => void grants.refetch()}
+              >
                 {t("retry")}
               </button>
             </div>
@@ -581,6 +590,7 @@ export function MailboxesView({
   const [licenseOfferId, setLicenseOfferId] = useState<string | null>(null);
   const [agentDialogId, setAgentDialogId] = useState<string | null>(null);
   const [teamAgentDialog, setTeamAgentDialog] = useState(false);
+  const [agentBoxSearch, setAgentBoxSearch] = useState("");
   const [signatureDialogId, setSignatureDialogId] = useState<string | null>(null);
   // "Usar em outro app de e-mail": app passwords for IMAP/SMTP (owner, person mailbox).
   const [clientsDialogId, setClientsDialogId] = useState<string | null>(null);
@@ -695,7 +705,7 @@ export function MailboxesView({
   const unreadCounts = useQuery(
     trpc.mailboxes.unreadCounts.queryOptions(undefined, {
       enabled: mayUseMail && !!registry.data,
-      refetchInterval: livePollMs(live, 15000),
+      refetchInterval: (query) => (query.state.error ? false : livePollMs(live, 15000)),
       // The title, the desktop tray badge and the new-mail notice read these
       // counts, so they keep coming while the window is hidden or in the tray.
       refetchIntervalInBackground: true,
@@ -1233,6 +1243,7 @@ export function MailboxesView({
     !capabilityReady || capability.isError || capability.fetchStatus === "paused"
       ? (queryRecoveryPhase(capability) ?? "loading")
       : (queryRecoveryPhase(registry) ?? "loading");
+  const retryNoticeDelayMs = 5000;
   const registryNotice = (
     <QueryRecoveryNotice
       phase={registryRecovery}
@@ -1240,6 +1251,7 @@ export function MailboxesView({
       retryLabel={t("retry")}
       retry={retryRegistry}
       className={styles.notice}
+      retryDelayMs={retryNoticeDelayMs}
     />
   );
   if (!capabilityReady) return frame(registryNotice);
@@ -1260,10 +1272,14 @@ export function MailboxesView({
     registry.isError ||
     capability.fetchStatus === "paused" ||
     registry.fetchStatus === "paused";
-  const operatorRecovery =
+  const operatorPhase =
     typeof operator.data?.isOperationsMember === "boolean"
       ? null
-      : (queryRecoveryPhase(operator) ?? "loading");
+      : (queryRecoveryPhase(operator) ?? null);
+  const operatorRecovery =
+    operatorPhase && operatorPhase !== "loading" && operatorPhase !== "refreshing"
+      ? operatorPhase
+      : null;
   const ownsBox = (box: Box) => box.ownerActive && box.ownerUserId === session?.user.id;
   // The rail reads a folder's first page ahead, under the same key the list uses.
   const prefetchFolder = (next: MailboxFolder) => {
@@ -1428,7 +1444,7 @@ export function MailboxesView({
       usage={
         showTeamTools ? (
           <>
-            <MailboxAgentsPending />
+            <MailboxAgentsPending agentBoxCount={boxes.filter((b) => b.kind === "agent").length} />
             <MailboxUsagePanel mailboxId={selected?.id ?? null} />
           </>
         ) : null
@@ -1456,6 +1472,13 @@ export function MailboxesView({
             folderList.data?.find((entry) => entry.id === customFolderId)?.name ?? null
           }
           changeFolder={chooseFolder}
+          onSelectBox={(id) => {
+            setMailboxKind("all");
+            selectMailbox(id);
+          }}
+          onScopeAll={() => changeScope("all")}
+          onOpenAgents={showTeamTools ? () => router.push("/mail/settings?tab=agents") : undefined}
+          onOpenSettings={() => router.push("/mail/settings")}
           selection={itemSelection}
           select={selectItem}
           dropHandler={dropAction}
@@ -1713,6 +1736,11 @@ export function MailboxesView({
     </>
   );
   const ownedBoxes = boxes.filter((box) => box.ownerActive && box.ownerUserId === session?.user.id);
+  const dashboardHref = showTeamTools
+    ? "/emails"
+    : operator.data?.canReadUsers
+      ? "/operations/users"
+      : "/settings";
   return (
     <section className={`${styles.view} ${styles.appView}`}>
       <header className={styles.appBar}>
@@ -1729,14 +1757,14 @@ export function MailboxesView({
           </Link>
         </nav>
         <div className={styles.appActions}>
+          <Link className="ms-btn ms-btn-ghost" href={dashboardHref} aria-label={t("app.back")}>
+            <span className={styles.backLong}>{t("app.back")}</span>
+            <span className={styles.backShort} aria-hidden="true">
+              {t("app.backShort")}
+            </span>
+          </Link>
           <MailboxAccountMenu
-            dashboardHref={
-              showTeamTools
-                ? "/emails"
-                : operator.data?.canReadUsers
-                  ? "/operations/users"
-                  : "/settings"
-            }
+            dashboardHref={dashboardHref}
             theme={prefs.theme}
             setTheme={(theme) => setPref({ theme })}
             onShortcuts={() => setShortcutsOpen(true)}
@@ -1763,6 +1791,7 @@ export function MailboxesView({
             )
           }
           className={styles.notice}
+          retryDelayMs={5000}
         />
       ) : null}
       {layout === "app" ? (
@@ -1870,7 +1899,7 @@ export function MailboxesView({
                         <div className={styles.settingsRowActions}>
                           <button
                             type="button"
-                            className="ms-btn ms-btn-ghost"
+                            className="ms-btn ms-btn-secondary ms-btn-sm"
                             onClick={() => setSignatureDialogId(box.id)}
                           >
                             {t("signature.action")}
@@ -1879,7 +1908,7 @@ export function MailboxesView({
                             <>
                               <button
                                 type="button"
-                                className="ms-btn ms-btn-ghost"
+                                className="ms-btn ms-btn-secondary ms-btn-sm"
                                 disabled={!options.data}
                                 onClick={() => {
                                   selectMailbox(box.id);
@@ -1890,7 +1919,7 @@ export function MailboxesView({
                               </button>
                               <button
                                 type="button"
-                                className="ms-btn"
+                                className="ms-btn ms-btn-secondary ms-btn-sm"
                                 disabled={!options.data}
                                 onClick={() => {
                                   selectMailbox(box.id);
@@ -1917,55 +1946,107 @@ export function MailboxesView({
             </section>
           ) : visibleSettingsTab === "agents" ? (
             <section className={styles.settingsSection} aria-label={t("app.tabs.agents")}>
-              <MailboxAgentsPanel />
-              <p className={styles.hint}>{t("app.agentsHint")}</p>
-              {correioMcpUrl && teamAgentBoxes.length ? (
-                <OAuthConnectCallout url={correioMcpUrl.replace(/\/correio$/, "")} />
-              ) : null}
-              {teamAgentBoxes.length ? (
-                <div className={styles.settingsRowActions}>
-                  <button
-                    type="button"
-                    className="ms-btn ms-btn-primary"
-                    onClick={() => setTeamAgentDialog(true)}
-                  >
-                    {tAgent("team.open")}
-                  </button>
+              {(() => {
+                const firstOwned = ownedBoxes[0];
+                const connectHandler = teamAgentBoxes.length
+                  ? () => setTeamAgentDialog(true)
+                  : firstOwned
+                    ? () => setAgentDialogId(firstOwned.id)
+                    : undefined;
+                return (
+                  <MailboxAgentsPanel
+                    agentMailboxCount={boxes.filter((b) => b.kind === "agent").length}
+                    onNewAgentMailbox={
+                      canCreate && options.data ? () => setDialog("new") : undefined
+                    }
+                    {...(connectHandler ? { onConnect: connectHandler } : {})}
+                  />
+                );
+              })()}
+              <div
+                style={{
+                  borderTop: "1px solid var(--ms-line)",
+                  paddingTop: 22,
+                  marginTop: 6,
+                  display: "grid",
+                  gap: 14,
+                }}
+              >
+                <div style={{ display: "grid", gap: 4 }}>
+                  <h3 style={{ margin: 0, fontSize: 15, color: "var(--ms-bone)" }}>
+                    {tAgent("panel.agents.keysHeading")}
+                  </h3>
+                  <p className={styles.hint} style={{ margin: 0 }}>
+                    {t("app.agentsHint")}
+                  </p>
                 </div>
-              ) : null}
-              {ownedBoxes.length ? (
-                <ul className={styles.settingsList}>
-                  {ownedBoxes.map((box) => (
-                    <li key={box.id}>
-                      <div>
-                        <strong>{box.label}</strong>
-                        <span>{box.address}</span>
-                        <small>{t(`scope.${box.kind}`)}</small>
-                      </div>
-                      <div className={styles.settingsRowActions}>
-                        {box.canRead && box.status === "planned" ? (
-                          <button
-                            type="button"
-                            className="ms-btn ms-btn-ghost"
-                            onClick={() => setActivityDialogId(box.id)}
-                          >
-                            {tActivity("open")}
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="ms-btn"
-                          onClick={() => setAgentDialogId(box.id)}
-                        >
-                          {t("connectAgent")}
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>{t("app.agentsEmpty")}</p>
-              )}
+                {correioMcpUrl && teamAgentBoxes.length ? (
+                  <OAuthConnectCallout url={correioMcpUrl.replace(/\/correio$/, "")} />
+                ) : null}
+                {teamAgentBoxes.length ? (
+                  <div className={styles.settingsRowActions}>
+                    <button
+                      type="button"
+                      className="ms-btn ms-btn-primary"
+                      onClick={() => setTeamAgentDialog(true)}
+                    >
+                      {tAgent("team.open")}
+                    </button>
+                  </div>
+                ) : null}
+                {ownedBoxes.length > 5 ? (
+                  <input
+                    type="search"
+                    className="ms-input"
+                    style={{ width: "min(100%, 380px)" }}
+                    placeholder={tAgent("panel.activity.searchMailboxes")}
+                    value={agentBoxSearch}
+                    onChange={(e) => setAgentBoxSearch(e.target.value)}
+                  />
+                ) : null}
+                {ownedBoxes.length ? (
+                  <ul className={styles.settingsList}>
+                    {ownedBoxes
+                      .filter((box) => {
+                        const q = agentBoxSearch.trim().toLowerCase();
+                        return (
+                          !q ||
+                          box.label.toLowerCase().includes(q) ||
+                          box.address.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((box) => (
+                        <li key={box.id}>
+                          <div>
+                            <strong>{box.label}</strong>
+                            <span>{box.address}</span>
+                            <small>{t(`scope.${box.kind}`)}</small>
+                          </div>
+                          <div className={styles.settingsRowActions}>
+                            {box.canRead && box.status === "planned" ? (
+                              <button
+                                type="button"
+                                className="ms-btn ms-btn-ghost ms-btn-sm"
+                                onClick={() => setActivityDialogId(box.id)}
+                              >
+                                {tActivity("open")}
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="ms-btn ms-btn-secondary ms-btn-sm"
+                              onClick={() => setAgentDialogId(box.id)}
+                            >
+                              {t("connectAgent")}
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                ) : (
+                  <p>{t("app.agentsEmpty")}</p>
+                )}
+              </div>
             </section>
           ) : visibleSettingsTab === "license" ? (
             <section className={styles.settingsSection} aria-label={t("app.tabs.license")}>

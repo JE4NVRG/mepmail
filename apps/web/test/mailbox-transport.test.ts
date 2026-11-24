@@ -903,7 +903,7 @@ describe("durable private Correio transport contracts with captured provider", (
           parse: async () => ({
             from: "person@transport.invalid",
             to: ["recipient@example.invalid"],
-            attachmentBytes: [256 * 1024 + 1],
+            attachmentBytes: [10 * 1024 * 1024 + 1],
           }),
         },
       ),

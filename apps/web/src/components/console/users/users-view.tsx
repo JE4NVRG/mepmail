@@ -3,11 +3,11 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ListFooter } from "@/components/list-footer";
 import { PageHeader } from "@/components/page-header";
 import { Select } from "@/components/select";
-import { Skeleton } from "@/components/skeleton";
+import { Skeleton, SkeletonBadge } from "@/components/skeleton";
 import { SortableTh, type SortDir } from "@/components/sortable-th";
 import { Table } from "@/components/table";
 import { formatDay, formatDayTime } from "@/lib/format";
@@ -19,7 +19,7 @@ const SORT_KEYS = ["name", "email", "teams", "sent30d", "joined", "seen"] as con
 const VERIFIED = ["yes", "no"] as const;
 const COLUMNS = 7;
 
-/** Mirrors a loaded row: avatar + name, e-mail, three figures, two days. */
+/** Mirrors a loaded row: avatar + name, e-mail, two figures, two days, verified badge. */
 function SkeletonRows() {
   return (
     <tbody>
@@ -34,7 +34,7 @@ function SkeletonRows() {
           <td>
             <Skeleton width={160} />
           </td>
-          {[28, 48, 56].map((w, i) => (
+          {[28, 48].map((w, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: placeholder cells, position is identity
             <td key={i} className="right">
               <Skeleton width={w} />
@@ -45,6 +45,9 @@ function SkeletonRows() {
           </td>
           <td>
             <Skeleton width={112} />
+          </td>
+          <td>
+            <SkeletonBadge width={64} />
           </td>
         </tr>
       ))}
@@ -90,11 +93,33 @@ export function UsersView({ readOnly = false }: { readOnly?: boolean } = {}) {
   const [dirParam, setDir] = useUrlState("dir", "desc");
   const [limit, setLimit] = useState(25);
   const deferredSearch = useDeferredValue(search.trim());
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement;
+      if (event.key === "/" && !typing) {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // URL params are untrusted: anything outside the router's enums reads as the default.
   const verified = oneOf(VERIFIED, verifiedParam, "all");
   const sort = oneOf(SORT_KEYS, sortParam, "joined");
   const dir: SortDir = oneOf(["asc", "desc"] as const, dirParam, "desc");
+  const hasFilters = search.trim() !== "" || verified !== "all";
+  const clearFilters = () => {
+    setSearch("");
+    setVerified("all");
+  };
 
   const input = {
     ...(deferredSearch ? { search: deferredSearch } : {}),
@@ -161,10 +186,17 @@ export function UsersView({ readOnly = false }: { readOnly?: boolean } = {}) {
 
       <div
         className="ms-filter-row"
-        style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18 }}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 10,
+          alignItems: "center",
+          marginBottom: 18,
+        }}
       >
-        <div style={{ flex: 1, minWidth: 160 }}>
+        <div style={{ flex: "1 1 220px", minWidth: 180 }}>
           <input
+            ref={searchRef}
             type="text"
             className="ms-input"
             style={{ width: "100%" }}
@@ -177,6 +209,7 @@ export function UsersView({ readOnly = false }: { readOnly?: boolean } = {}) {
         <Select
           value={verified}
           onChange={setVerified}
+          width={215}
           ariaLabel={t("columns.verified")}
           options={[
             { value: "all", label: t("filters.verified", { value: t("filters.all") }) },
@@ -186,19 +219,33 @@ export function UsersView({ readOnly = false }: { readOnly?: boolean } = {}) {
             })),
           ]}
         />
+        {hasFilters ? (
+          <button
+            type="button"
+            className="ms-btn ms-btn-secondary"
+            onClick={clearFilters}
+            style={{ flexShrink: 0 }}
+          >
+            {common("clearFilters")}
+          </button>
+        ) : null}
       </div>
 
       {list.isError ? (
-        <div
-          className="ms-card"
-          style={{ padding: 20, display: "flex", gap: 14, alignItems: "center" }}
-        >
-          <p style={{ margin: 0, color: "var(--ms-bone)", fontSize: "var(--ms-fs-ui)" }}>
-            {common("loadError")}
-          </p>
-          <button type="button" className="ms-btn ms-btn-secondary" onClick={() => list.refetch()}>
-            {common("retry")}
-          </button>
+        <div className="ms-card ms-state">
+          <span className="ms-state-glyph" aria-hidden="true">
+            !
+          </span>
+          <p className="ms-state-headline">{common("loadError")}</p>
+          <div className="ms-state-actions">
+            <button
+              type="button"
+              className="ms-btn ms-btn-secondary"
+              onClick={() => list.refetch()}
+            >
+              {common("retry")}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="ms-card" style={{ padding: 0, overflow: "hidden" }}>
@@ -224,7 +271,17 @@ export function UsersView({ readOnly = false }: { readOnly?: boolean } = {}) {
                       colSpan={COLUMNS}
                       style={{ color: "var(--ms-muted)", padding: "18px 12px" }}
                     >
-                      {t("empty")}
+                      <span>{t("empty")}</span>
+                      {hasFilters ? (
+                        <button
+                          type="button"
+                          className="ms-btn ms-btn-secondary ms-btn-sm"
+                          style={{ marginLeft: 12 }}
+                          onClick={clearFilters}
+                        >
+                          {common("clearFilters")}
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 ) : (
@@ -233,7 +290,16 @@ export function UsersView({ readOnly = false }: { readOnly?: boolean } = {}) {
                       <td>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                           <UserAvatar name={row.name} email={row.email} />
-                          {row.name}
+                          <span
+                            title={row.name}
+                            style={{
+                              maxWidth: 200,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {row.name}
+                          </span>
                           {row.isOperator ? (
                             <span className="ms-badge ms-badge-info">{t("operatorBadge")}</span>
                           ) : null}
@@ -276,7 +342,7 @@ export function UsersView({ readOnly = false }: { readOnly?: boolean } = {}) {
             )}
           </Table>
           {list.isSuccess ? (
-            <div style={{ padding: "0 16px 14px", borderTop: "1px solid var(--ms-line)" }}>
+            <div style={{ padding: "0 16px 14px" }}>
               <ListFooter
                 left={t("ofUsers", { shown: nf.format(rows.length), total: nf.format(total) })}
                 size={limit}

@@ -105,6 +105,27 @@ describe("stripHiddenElements", () => {
     });
     expect(stripHiddenElements('<p style="font-size:0.9em">fine</p>').html).toContain("fine");
   });
+
+  it("does not swallow the remaining document when a hidden element is unclosed", () => {
+    const html =
+      '<div style="display:none"><p>Confirm your Banco account</p><a href="https://evil.test/login">Login</a>';
+    const stripped = stripHiddenElements(html);
+    expect(stripped.html).toContain("Confirm your Banco account");
+    expect(stripped.html).toContain("https://evil.test/login");
+    expect(stripped.hiddenChars).toBe(0);
+
+    const block = buildJudgeBlock({
+      team: { name: "Acme", verifiedDomains: ["acme.dev"], ageDays: 1, plan: "free" },
+      from: "Acme <no-reply@acme.dev>",
+      replyTo: null,
+      subject: "Notice",
+      html,
+      text: null,
+      attachments: [],
+    });
+    expect(block).toContain("Confirm your Banco account");
+    expect(block).toContain("Login -> evil.test");
+  });
 });
 
 describe("buildJudgeBlock", () => {

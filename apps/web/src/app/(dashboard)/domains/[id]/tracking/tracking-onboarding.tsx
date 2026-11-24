@@ -85,7 +85,9 @@ export function TrackingOnboarding({ id }: { id: string }) {
                 onSaved={() => setSaved(true)}
               />
             ) : (
-              <Skeleton width={520} height={260} />
+              <div style={{ maxWidth: 520 }}>
+                <Skeleton width="100%" height={260} />
+              </div>
             )}
           </div>
         </div>

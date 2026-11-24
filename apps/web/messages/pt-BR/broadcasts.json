@@ -29,7 +29,12 @@
     "deleteConfirm": "Excluir",
     "stopRest": "Parar o restante",
     "finishTip": "Termina por volta de {time}",
-    "progressTip": "{sent} enviados · {waiting} aguardando"
+    "progressTip": "{sent} enviados · {waiting} aguardando",
+    "searchPlaceholder": "Buscar por nome, assunto ou segmento…",
+    "allStatuses": "Todos os status",
+    "noMatch": "Nenhuma transmissão corresponde aos seus filtros.",
+    "clearFilters": "Limpar filtros",
+    "pageOf": "{total, plural, one {# transmissão} other {# transmissões}}"
   },
   "composer": {
     "newTitle": "Nova transmissão",

@@ -22,9 +22,9 @@ import { Tooltip } from "@/components/tooltip";
 import { maskApiKey } from "@/lib/format";
 import { useTRPC } from "@/lib/trpc";
 import { useTeamRole } from "@/lib/use-team-role";
-import { ListFooter } from "../emails/list-parts";
+import { ListFooter, SearchBox, StateCard } from "../emails/list-parts";
 
-/** Mirrors the loaded table: name, masked mono token, two relative times, menu column. */
+/** Mirrors the loaded table: name, scope, masked mono token, two relative times, menu column. */
 function KeysSkeleton() {
   const t = useTranslations("api-keys");
   return (
@@ -32,6 +32,7 @@ function KeysSkeleton() {
       <thead>
         <tr>
           <th>{t("table.name")}</th>
+          <th>{t("table.scope")}</th>
           <th>{t("table.token")}</th>
           <th>{t("table.lastUsed")}</th>
           <th>{t("table.created")}</th>
@@ -43,6 +44,9 @@ function KeysSkeleton() {
           <tr key={width}>
             <td>
               <Skeleton width={width} height={13} />
+            </td>
+            <td>
+              <Skeleton width={120} height={13} />
             </td>
             <td>
               <Skeleton width={176} height={13} />
@@ -95,6 +99,10 @@ export function ApiKeysView() {
   const [revokeTarget, setRevokeTarget] = useState<{ id: string; name: string } | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [renameName, setRenameName] = useState("");
+  const [search, setSearch] = useState("");
+  const [permissionFilter, setPermissionFilter] = useState<
+    "all" | "full_access" | "sending_access"
+  >("all");
 
   const invalidateList = () =>
     queryClient.invalidateQueries({ queryKey: trpc.apiKeys.list.queryKey() });
@@ -176,6 +184,17 @@ export function ApiKeysView() {
     renameMutation.mutate({ id: renameTarget.id, name });
   };
   const createError = createMutation.error;
+  const searchTerm = search.trim().toLowerCase();
+  const filteredKeys = (keys ?? []).filter((key) => {
+    if (permissionFilter !== "all" && key.permission !== permissionFilter) return false;
+    if (!searchTerm) return true;
+    return (
+      key.name.toLowerCase().includes(searchTerm) ||
+      (key.domainName ?? "").toLowerCase().includes(searchTerm) ||
+      key.last4.toLowerCase().includes(searchTerm)
+    );
+  });
+  const hasFilters = searchTerm !== "" || permissionFilter !== "all";
 
   return (
     <>
@@ -227,71 +246,131 @@ export function ApiKeysView() {
 
       {keys && keys.length > 0 ? (
         <>
-          <Table>
-            <thead>
-              <tr>
-                <th>{t("table.name")}</th>
-                <th>{t("table.token")}</th>
-                <th>{t("table.lastUsed")}</th>
-                <th>{t("table.created")}</th>
-                <th className="right" aria-label={t("table.menu")} />
-              </tr>
-            </thead>
-            <tbody>
-              {keys.map((key) => (
-                <tr key={key.id}>
-                  <td>
-                    <span
-                      style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
-                    >
-                      <NavTile name="api-keys" color={TONE_COLOR.neutral} />
-                      {key.name}
-                      <span
-                        className={`ms-badge ms-badge-${
-                          key.permission === "sending_access" ? "info" : "neutral"
-                        }`}
-                      >
-                        {t(key.permission === "sending_access" ? "scope.sending" : "scope.full")}
-                      </span>
-                      {key.domainName ? (
-                        <span className="ms-badge ms-badge-neutral">{key.domainName}</span>
-                      ) : null}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="ms-mono">{maskApiKey(key.tokenPrefix, key.last4)}</span>
-                  </td>
-                  <td>
-                    {key.lastUsedAt ? <RelativeTime date={key.lastUsedAt} /> : t("neverUsed")}
-                  </td>
-                  <td>
-                    <RelativeTime date={key.createdAt} />
-                  </td>
-                  <td className="right">
-                    <PopoverMenu
-                      ariaLabel={t("table.menu")}
-                      items={[
-                        {
-                          label: t("rename"),
-                          onSelect: () => {
-                            setRenameName(key.name);
-                            setRenameTarget({ id: key.id, name: key.name });
-                          },
-                        },
-                        null,
-                        {
-                          label: t("revoke"),
-                          danger: true,
-                          onSelect: () => setRevokeTarget({ id: key.id, name: key.name }),
-                        },
-                      ]}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-          <ListFooter left={t("pageOf", { total: keys.length })} singlePage />
+          <div
+            className="ms-filter-row"
+            style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18 }}
+          >
+            <SearchBox value={search} onChange={setSearch} placeholder={t("searchPlaceholder")} />
+            <Select
+              value={permissionFilter}
+              onChange={(v) => setPermissionFilter(v as "all" | "full_access" | "sending_access")}
+              width={210}
+              ariaLabel={t("create.permission")}
+              options={[
+                { value: "all", label: t("allPermissions") },
+                { value: "full_access", label: t("scope.full") },
+                { value: "sending_access", label: t("scope.sending") },
+              ]}
+            />
+            {hasFilters ? (
+              <button
+                type="button"
+                className="ms-btn ms-btn-secondary"
+                onClick={() => {
+                  setSearch("");
+                  setPermissionFilter("all");
+                }}
+              >
+                {t("clearFilters")}
+              </button>
+            ) : null}
+          </div>
+
+          {filteredKeys.length === 0 ? (
+            <StateCard
+              headline={t("noMatch")}
+              actionLabel={t("clearFilters")}
+              onAction={() => {
+                setSearch("");
+                setPermissionFilter("all");
+              }}
+            />
+          ) : (
+            <>
+              <Table>
+                <thead>
+                  <tr>
+                    <th>{t("table.name")}</th>
+                    <th>{t("table.scope")}</th>
+                    <th>{t("table.token")}</th>
+                    <th>{t("table.lastUsed")}</th>
+                    <th>{t("table.created")}</th>
+                    <th className="right" aria-label={t("table.menu")} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredKeys.map((key) => (
+                    <tr key={key.id}>
+                      <td>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                          <NavTile name="api-keys" color={TONE_COLOR.neutral} />
+                          <span style={{ fontWeight: 500, color: "var(--ms-bone)" }}>
+                            {key.name}
+                          </span>
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span
+                            className={`ms-badge ms-badge-${
+                              key.permission === "sending_access" ? "info" : "neutral"
+                            }`}
+                          >
+                            {t(
+                              key.permission === "sending_access" ? "scope.sending" : "scope.full",
+                            )}
+                          </span>
+                          <span
+                            className="ms-badge ms-badge-neutral ms-mono"
+                            style={{ color: key.domainName ? "var(--ms-bone)" : "var(--ms-muted)" }}
+                          >
+                            {key.domainName ?? t("allDomains")}
+                          </span>
+                        </span>
+                      </td>
+                      <td>
+                        <span className="ms-mono">{maskApiKey(key.tokenPrefix, key.last4)}</span>
+                      </td>
+                      <td>
+                        {key.lastUsedAt ? <RelativeTime date={key.lastUsedAt} /> : t("neverUsed")}
+                      </td>
+                      <td>
+                        <RelativeTime date={key.createdAt} />
+                      </td>
+                      <td className="right">
+                        <PopoverMenu
+                          ariaLabel={t("table.menu")}
+                          items={[
+                            {
+                              label: t("rename"),
+                              onSelect: () => {
+                                setRenameName(key.name);
+                                setRenameTarget({ id: key.id, name: key.name });
+                              },
+                            },
+                            null,
+                            {
+                              label: t("revoke"),
+                              danger: true,
+                              onSelect: () => setRevokeTarget({ id: key.id, name: key.name }),
+                            },
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+              <ListFooter left={t("pageOf", { total: filteredKeys.length })} singlePage />
+            </>
+          )}
         </>
       ) : null}
 

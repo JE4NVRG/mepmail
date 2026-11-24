@@ -22,8 +22,15 @@ export function SignupRiskQueue() {
   const counts = query.data?.counts;
   return (
     <section id="signup-reviews" className="ms-card" style={{ padding: 20, marginBottom: 20 }}>
-      <h2 style={{ marginTop: 0 }}>{t("queue.title")}</h2>
-      <p style={{ color: "var(--ms-muted)", fontSize: 13 }}>{t("queue.subtitle")}</p>
+      <h2
+        className="ms-display"
+        style={{ fontSize: "var(--ms-fs-h2)", color: "var(--ms-bone)", margin: "0 0 4px" }}
+      >
+        {t("queue.title")}
+      </h2>
+      <p style={{ color: "var(--ms-muted)", fontSize: "var(--ms-fs-label)", margin: "0 0 14px" }}>
+        {t("queue.subtitle")}
+      </p>
       <div
         className="ms-tabs"
         role="tablist"
@@ -63,7 +70,7 @@ export function SignupRiskQueue() {
         <p role="status">{t("queue.loading")}</p>
       ) : (
         <>
-          <Table>
+          <Table className="nowrap">
             <thead>
               <tr>
                 <th>{t("queue.team")}</th>
@@ -78,23 +85,27 @@ export function SignupRiskQueue() {
               {(query.data?.items ?? []).map((row) => (
                 <tr key={row.teamId}>
                   <td>
-                    <Link href={`/console/safety/${row.teamId}`}>{row.name}</Link>
-                    {row.reviewRequestedAt ? (
-                      <div className="ms-badge ms-badge-warn">{t("queue.requested")}</div>
-                    ) : null}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <Link href={`/console/safety/${row.teamId}`}>{row.name}</Link>
+                      {row.reviewRequestedAt ? (
+                        <span className="ms-badge ms-badge-warn">{t("queue.requested")}</span>
+                      ) : null}
+                    </span>
                   </td>
                   <td>{row.level ? t(`levels.${row.level}`) : t("legacy")}</td>
                   <td>{t(`effectiveLevels.${row.restriction}`)}</td>
-                  <td style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>
+                  <td style={{ whiteSpace: "normal", overflowWrap: "anywhere", minWidth: 180 }}>
                     {row.reasons.length ? row.reasons.join(", ") : t("queue.noReasons")}
                   </td>
                   <td>{t(row.paid ? "queue.paid" : "queue.unconfirmed")}</td>
-                  <td>{row.since ? <RelativeTime date={row.since} /> : "—"}</td>
+                  <td style={{ color: "var(--ms-muted)" }}>
+                    {row.since ? <RelativeTime date={row.since} /> : "—"}
+                  </td>
                 </tr>
               ))}
               {!query.data?.items?.length ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={6} style={{ color: "var(--ms-muted)" }}>
                     {scope === "pending" ? t("queue.scope.emptyPending") : t("queue.empty")}
                   </td>
                 </tr>
@@ -110,9 +121,11 @@ export function SignupRiskQueue() {
               flexWrap: "wrap",
             }}
           >
-            <span>{t("queue.count", { count: query.data?.total ?? 0 })}</span>
+            <span style={{ fontSize: "var(--ms-fs-label)", color: "var(--ms-muted)" }}>
+              {t("queue.count", { count: query.data?.total ?? 0 })}
+            </span>
             {offset > 0 || query.data?.nextOffset != null ? (
-              <>
+              <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
                 <button
                   className="ms-btn ms-btn-secondary"
                   type="button"
@@ -129,7 +142,7 @@ export function SignupRiskQueue() {
                 >
                   {t("queue.next")}
                 </button>
-              </>
+              </div>
             ) : null}
           </div>
         </>

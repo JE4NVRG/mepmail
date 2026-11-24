@@ -24,8 +24,10 @@ export function NotificationsView({ cloud }: { cloud: boolean }) {
   );
   const off = new Set<string>(data?.optOuts ?? []);
   return (
-    <div style={{ maxWidth: 640, display: "grid", gap: 16 }}>
-      <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)" }}>{t("intro")}</p>
+    <div style={{ maxWidth: 860, display: "grid", gap: 20 }}>
+      <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)", lineHeight: 1.55 }}>
+        {t("intro")}
+      </p>
       {MAIL_PREFERENCE_GROUPS.filter((group) => cloud || !group.cloudOnly).map((group) => (
         <section key={group.group} className="ms-card" style={{ padding: 24 }}>
           <h2
@@ -34,47 +36,50 @@ export function NotificationsView({ cloud }: { cloud: boolean }) {
           >
             {t(`groups.${group.group}`)}
           </h2>
-          {group.keys.map((key) => (
-            <div
-              key={key}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                gap: 16,
-                marginBottom: 14,
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: "var(--ms-fs-label)",
-                    color: "var(--ms-bone)",
-                    marginBottom: 2,
-                  }}
-                >
-                  {t(`items.${itemId(key)}.label`)}
-                </span>
-                <span style={{ display: "block", fontSize: 12, color: "var(--ms-muted)" }}>
-                  {t(`items.${itemId(key)}.note`)}
-                </span>
+          <div style={{ display: "grid", gap: 14 }}>
+            {group.keys.map((key) => (
+              <div
+                key={key}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 16,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "var(--ms-fs-label)",
+                      color: "var(--ms-bone)",
+                      marginBottom: 2,
+                    }}
+                  >
+                    {t(`items.${itemId(key)}.label`)}
+                  </span>
+                  <span style={{ display: "block", fontSize: 12, color: "var(--ms-muted)" }}>
+                    {t(`items.${itemId(key)}.note`)}
+                  </span>
+                </div>
+                {data ? (
+                  <Switch
+                    checked={!off.has(key)}
+                    disabled={set.isPending}
+                    onChange={(enabled) => set.mutate({ key, enabled })}
+                    ariaLabel={t(`items.${itemId(key)}.label`)}
+                  />
+                ) : (
+                  <Skeleton width={40} height={22} radius={999} />
+                )}
               </div>
-              {data ? (
-                <Switch
-                  checked={!off.has(key)}
-                  disabled={set.isPending}
-                  onChange={(enabled) => set.mutate({ key, enabled })}
-                  ariaLabel={t(`items.${itemId(key)}.label`)}
-                />
-              ) : (
-                <Skeleton width={40} height={22} radius={999} />
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </section>
       ))}
-      <p style={{ margin: 0, fontSize: 12, color: "var(--ms-muted)" }}>{t("always")}</p>
+      <p style={{ margin: 0, fontSize: 12, color: "var(--ms-muted)", lineHeight: 1.55 }}>
+        {t("always")}
+      </p>
     </div>
   );
 }

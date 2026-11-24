@@ -138,7 +138,15 @@ export function AttentionCard() {
 
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {clear ? (
-          <li style={{ display: "flex", gap: 12, alignItems: "center", padding: "14px 20px" }}>
+          <li
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "4px 12px",
+              alignItems: "center",
+              padding: "14px 20px",
+            }}
+          >
             <Dot tone="ok" />
             <span style={{ color: "var(--ms-bone)" }}>{t("clear")}</span>
             <span style={{ color: "var(--ms-muted)", fontSize: 13 }}>{t("clearSub")}</span>
@@ -162,8 +170,17 @@ export function AttentionCard() {
               <strong className="ms-digits" style={{ minWidth: 28 }}>
                 {nf.format(row.count)}
               </strong>
-              <span style={{ flex: 1 }}>{t(`rows.${row.key}`)}</span>
-              <span style={{ color: "var(--ms-muted)", fontSize: 13 }}>{t("open")} →</span>
+              <span style={{ flex: 1, minWidth: 0 }}>{t(`rows.${row.key}`)}</span>
+              <span
+                style={{
+                  color: "var(--ms-muted)",
+                  fontSize: 13,
+                  flexShrink: 0,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {t("open")} →
+              </span>
             </Link>
           </li>
         ))}

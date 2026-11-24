@@ -249,6 +249,7 @@ export default function PropertiesPage() {
         <Select
           value={typeFilter}
           onChange={setTypeFilter}
+          width={164}
           ariaLabel={t("type")}
           options={[
             { value: "", label: t("allTypes") },
@@ -261,24 +262,12 @@ export default function PropertiesPage() {
       {defined.isPending ? (
         <PropertiesSkeleton />
       ) : defined.isError ? (
-        <div
-          style={{
-            border: "1px solid var(--ms-line)",
-            borderRadius: 16,
-            padding: 22,
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontSize: 14.5, fontWeight: 600 }}>{t("loadError")}</div>
-          <button
-            type="button"
-            className="ms-btn ms-btn-secondary"
-            style={{ marginTop: 12 }}
-            onClick={() => defined.refetch()}
-          >
-            {t("retry")}
-          </button>
-        </div>
+        <StateCard
+          tone="error"
+          headline={t("loadError")}
+          actionLabel={t("retry")}
+          onAction={() => defined.refetch()}
+        />
       ) : isEmpty ? (
         <EmptyState
           area="audience"
@@ -347,9 +336,16 @@ export default function PropertiesPage() {
               {filteredDerived.map((row) => (
                 <tr key={`derived-${row.key}`}>
                   <td>
-                    <MonoKey text={row.key} />{" "}
-                    <span className="ms-badge ms-badge-neutral" style={{ marginLeft: 6 }}>
-                      {t("inUse")}
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <MonoKey text={row.key} />
+                      <span className="ms-badge ms-badge-neutral">{t("inUse")}</span>
                     </span>
                   </td>
                   <td>

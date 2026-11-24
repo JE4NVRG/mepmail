@@ -196,7 +196,7 @@ function loadSocialBranch(depsIn: Record<string, unknown>) {
 function loadUserCreateHook(depsIn: Record<string, unknown>) {
   return factory(
     `export function make(deps) {
-  const { canarySignupAdmissionFor, assertSignupAllowed, signupOpen, signupBotProtectionEnabled, getOAuthState, verifiedSignupContexts, SIGNUP_BOT_OAUTH_CONTEXT, APIError, db } = deps;
+  const { canarySignupAdmissionFor, suppressedSignupDomain, assertSignupAllowed, signupOpen, signupBotProtectionEnabled, getOAuthState, verifiedSignupContexts, SIGNUP_BOT_OAUTH_CONTEXT, APIError, db } = deps;
   return async (user, ctx) => {${block(AUTH, CREATE_HOOK)}};
 }`,
     "user-create-hook.ts",
@@ -510,6 +510,7 @@ describe("user.create re-derives the proof from the request that creates the row
     if (options.verified) verifiedSignupContexts.add(ctxContext);
     const run = loadUserCreateHook({
       canarySignupAdmissionFor: adapter.canarySignupAdmissionFor,
+      suppressedSignupDomain: (email: string) => email.toLowerCase().endsWith(".shop"),
       assertSignupAllowed: async (_db: unknown, _allow: boolean, canary?: unknown) => {
         events.push(
           `authority:${canary ? (canary as { canaryEmail: string }).canaryEmail : "closed"}`,

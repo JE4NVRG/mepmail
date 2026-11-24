@@ -159,12 +159,14 @@ export default function TopicsPage() {
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 520px", minWidth: 0 }}>
-          <div
-            className="ms-filter-row"
-            style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18 }}
-          >
-            <SearchBox value={search} onChange={setSearch} placeholder={t("searchPlaceholder")} />
-          </div>
+          {query.isPending || query.isError || (query.data && query.data.length > 0) || search ? (
+            <div
+              className="ms-filter-row"
+              style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18 }}
+            >
+              <SearchBox value={search} onChange={setSearch} placeholder={t("searchPlaceholder")} />
+            </div>
+          ) : null}
 
           {query.isPending ? (
             <TopicsSkeleton />

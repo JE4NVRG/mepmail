@@ -14,6 +14,8 @@ import {
   effectiveDomainLimit,
   failQueuedEmailsForDomain,
   fetchEffectivePlan,
+  findPhishingRecidivismDomainMatch,
+  holdTeamForReview,
   isIdentitySharedByOtherDomains,
   isOperatorTeam,
   isReservedSenderDomain,
@@ -379,6 +381,21 @@ export function createDomainsRouter(deps: DomainsSesDeps = defaultSesDeps) {
           }
           if (createLimited(ctx.teamId)) {
             throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many domains created" });
+          }
+          const match = await findPhishingRecidivismDomainMatch(ctx.db, {
+            teamId: ctx.teamId,
+            domain: input.name,
+          });
+          if (match) {
+            await holdTeamForReview(ctx.db, {
+              teamId: ctx.teamId,
+              reason: "impersonation",
+              note: `Domain matches suspended phishing ${match.source} (${match.matchedTeamId}): ${input.name}`,
+            });
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "This domain requires manual review before provisioning.",
+            });
           }
         }
 

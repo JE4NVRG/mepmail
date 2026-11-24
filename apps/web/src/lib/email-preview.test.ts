@@ -30,5 +30,11 @@ describe("emulateEmailScheme", () => {
         "dark",
       ),
     ).not.toContain(DARK_CLIENT_SIM);
+    expect(
+      emulateEmailScheme(
+        '<meta name="color-scheme" content="light dark"/><body style="background-color:#ffffff"><p>x</p></body>',
+        "dark",
+      ),
+    ).toContain(DARK_CLIENT_SIM);
   });
 });

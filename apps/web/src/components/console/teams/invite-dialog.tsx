@@ -102,6 +102,7 @@ export function OperationsScopeSelector({
               <label key={domain.id} style={optionStyle}>
                 <input
                   type="checkbox"
+                  className="ms-checkbox"
                   checked={domainIds.includes(domain.id)}
                   onChange={(event) => onDomainChange(domain.id, event.target.checked)}
                 />
@@ -117,6 +118,7 @@ export function OperationsScopeSelector({
               <label key={mailbox.id} style={optionStyle}>
                 <input
                   type="checkbox"
+                  className="ms-checkbox"
                   checked={mailboxIds.includes(mailbox.id)}
                   onChange={(event) => onMailboxChange(mailbox.id, event.target.checked)}
                 />
@@ -604,7 +606,9 @@ export function PendingList({
           <tbody>
             {invitations.map((invite) => (
               <tr key={invite.id}>
-                <td className="ms-mono">{invite.email}</td>
+                <td className="ms-mono" style={{ overflowWrap: "anywhere", maxWidth: 220 }}>
+                  {invite.email}
+                </td>
                 <td>{invite.role === "admin" ? roles("admin") : roles("member")}</td>
                 <td>
                   {new Date(invite.expiresAt).getTime() <= Date.now() ? (

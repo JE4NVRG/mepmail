@@ -8,6 +8,8 @@ import {
   DOMAIN_CREATE_LIMIT_PER_HOUR,
   effectiveDomainLimit,
   failQueuedEmailsForDomain,
+  findPhishingRecidivismDomainMatch,
+  holdTeamForReview,
   isIdentitySharedByOtherDomains,
   isLoopbackUrl,
   isOperatorTeam,
@@ -416,6 +418,21 @@ export function registerDomainRoutes(
         }
         if (createLimited(auth.teamId)) {
           return c.json(errorBody(429, "rate_limit_exceeded", "Too many domains created"), 429);
+        }
+        const match = await findPhishingRecidivismDomainMatch(db, {
+          teamId: auth.teamId,
+          domain: body.name,
+        });
+        if (match) {
+          await holdTeamForReview(db, {
+            teamId: auth.teamId,
+            reason: "impersonation",
+            note: `Domain matches suspended phishing ${match.source} (${match.matchedTeamId}): ${body.name}`,
+          });
+          return c.json(
+            errorBody(403, "forbidden", "This domain requires manual review before provisioning."),
+            403,
+          );
         }
       }
 

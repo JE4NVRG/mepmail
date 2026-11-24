@@ -6,11 +6,17 @@
   },
   "table": {
     "name": "Nome",
+    "scope": "Escopo",
     "token": "Token",
     "lastUsed": "Último uso",
     "created": "Criada",
     "menu": "Ações da chave"
   },
+  "searchPlaceholder": "Buscar por nome, domínio ou final…",
+  "allPermissions": "Todas as permissões",
+  "allDomains": "Qualquer domínio",
+  "noMatch": "Nenhuma chave corresponde aos seus filtros.",
+  "clearFilters": "Limpar filtros",
   "neverUsed": "Nunca",
   "pageOf": "{total, plural, one {# chave de API} other {# chaves de API}}",
   "rename": "Renomear",

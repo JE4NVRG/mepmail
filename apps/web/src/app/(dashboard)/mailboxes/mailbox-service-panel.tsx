@@ -619,7 +619,10 @@ export function MailboxServicePanel({
             </p>
           ) : null}
           {!loaded ? (
-            <div role={service.isError || billing.isError ? "alert" : "status"}>
+            <div
+              className={styles.loadState}
+              role={service.isError || billing.isError ? "alert" : "status"}
+            >
               <p>{t(service.isError || billing.isError ? "loadError" : "loading")}</p>
               <button
                 type="button"

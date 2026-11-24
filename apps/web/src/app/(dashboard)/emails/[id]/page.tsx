@@ -139,10 +139,12 @@ function Microlabel({
 function Meta({
   label,
   mono,
+  copyValue,
   children,
 }: {
   label: string;
   mono?: boolean;
+  copyValue?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -150,9 +152,17 @@ function Meta({
       <Microlabel>{label}</Microlabel>
       <div
         className={mono ? "ms-mono" : undefined}
-        style={{ fontSize: mono ? 13 : 14, marginTop: 5, overflowWrap: "anywhere" }}
+        style={{
+          fontSize: mono ? 13 : 14,
+          marginTop: 5,
+          overflowWrap: "anywhere",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 4,
+        }}
       >
-        {children}
+        <span style={{ minWidth: 0 }}>{children}</span>
+        {copyValue ? <CopyGlyph value={copyValue} /> : null}
       </div>
     </div>
   );
@@ -705,10 +715,12 @@ export default function EmailDetailPage() {
           borderBottom: "1px solid var(--ms-line)",
         }}
       >
-        <Meta label={t("detail.from")} mono>
+        <Meta label={t("detail.from")} mono copyValue={email.from}>
           {email.from}
         </Meta>
-        <Meta label={t("detail.subject")}>{email.subject}</Meta>
+        <Meta label={t("detail.subject")} copyValue={email.subject}>
+          {email.subject}
+        </Meta>
         {email.replyTo?.length ? (
           <Meta label={t("detail.replyTo")} mono>
             {email.replyTo.join(", ")}
@@ -842,9 +854,7 @@ export default function EmailDetailPage() {
                       fontSize: 12,
                       fontWeight: 600,
                       color: EVENT_COLOR[type],
-                      maxWidth: type === "delivered" ? 180 : undefined,
-                      whiteSpace: type === "delivered" ? "normal" : "nowrap",
-                      overflowWrap: type === "delivered" ? "anywhere" : undefined,
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {eventLabel(type)}

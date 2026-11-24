@@ -28,7 +28,12 @@ export function MonitoringCard() {
   const nf = new Intl.NumberFormat(locale);
   const data = query.data;
 
-  if (query.isError) return <LoadErrorCard onRetry={() => query.refetch()} />;
+  if (query.isError)
+    return (
+      <div style={{ marginTop: 16 }}>
+        <LoadErrorCard onRetry={() => query.refetch()} />
+      </div>
+    );
   if (!data) {
     return (
       <div className="ms-card" style={{ padding: 20, marginTop: 16 }}>

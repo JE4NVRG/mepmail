@@ -79,9 +79,10 @@ function RelayDomains({
                 <dd
                   style={{
                     display: "flex",
+                    flexWrap: "wrap",
                     justifyContent: "flex-end",
                     alignItems: "center",
-                    gap: 10,
+                    gap: "6px 10px",
                   }}
                 >
                   <span>

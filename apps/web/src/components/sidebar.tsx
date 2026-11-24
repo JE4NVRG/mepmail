@@ -4,7 +4,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
-import { EllipsisGlyph, NavGlyph } from "@/components/icons/nav-icons";
+import {
+  DocsGlyph,
+  EllipsisGlyph,
+  ExternalArrowGlyph,
+  NavGlyph,
+  SearchGlyph,
+  SourceGlyph,
+  SupportGlyph,
+} from "@/components/icons/nav-icons";
 import { useDismiss } from "@/components/popover-menu";
 import { QueryRecoveryNotice } from "@/components/query-recovery";
 import { TeamSwitcher } from "@/components/team-switcher";
@@ -54,7 +62,9 @@ function NavItem({
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
     >
-      <NavGlyph name={item.icon} hovered={hovered} />
+      <span className="ms-nav-icon" aria-hidden="true">
+        <NavGlyph name={item.icon} hovered={hovered} active={active} size={15} />
+      </span>
       {label}
       {badge ? (
         <span className={styles.navNew} aria-hidden="true">
@@ -210,10 +220,10 @@ export function Sidebar({
         boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
-        padding: "16px 12px 12px",
+        padding: "12px 12px 10px",
       }}
     >
-      <div style={{ padding: "4px 10px 14px" }}>
+      <div style={{ padding: "2px 10px 10px" }}>
         {/* biome-ignore lint/performance/noImgElement: static SVG logo, nothing for next/image to optimize */}
         <img
           src="/logo/mepmail-wordmark.svg"
@@ -223,6 +233,18 @@ export function Sidebar({
         />
       </div>
       <TeamSwitcher teamName={teamName} teamLogoUrl={teamLogoUrl} />
+      <button
+        type="button"
+        className={styles.searchTrigger}
+        onClick={() => window.dispatchEvent(new Event("mepmail:open-palette"))}
+        aria-label={tCommon("commandPalette.placeholder")}
+      >
+        <SearchGlyph size={14} />
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {tCommon("select.searchPlaceholder")}
+        </span>
+        <kbd className={`ms-keycap ${styles.searchKeycap}`}>⌘K</kbd>
+      </button>
       {/* The list scrolls, and a scroll container clips its children's
           focus ring at its own edges. Side padding pulled back by the same
           margin keeps the ring inside the scrollable box without moving the
@@ -260,6 +282,7 @@ export function Sidebar({
               message={t(`recovery.${navigation.recoveryPhase}`)}
               retryLabel={t("recovery.retry")}
               retry={navigation.retry}
+              retryDelayMs={5000}
             />
           </section>
         ) : null}
@@ -303,54 +326,24 @@ export function Sidebar({
               openSupportChat();
             }}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              style={{ flex: "none", display: "block" }}
-            >
-              <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" />
-            </svg>
+            <span className="ms-nav-icon" aria-hidden="true">
+              <SupportGlyph size={15} />
+            </span>
             {t("support")}
           </a>
           <a href={DOCS_URL} target="_blank" rel="noreferrer">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              style={{ flex: "none", display: "block" }}
-            >
-              <path d="M12 7v14M3 3h6a3 3 0 0 1 3 3 3 3 0 0 1 3-3h6v16h-6a3 3 0 0 0-3 2 3 3 0 0 0-3-2H3Z" />
-            </svg>
+            <span className="ms-nav-icon" aria-hidden="true">
+              <DocsGlyph size={15} />
+            </span>
             {t("docs")}
+            <span className={styles.navExternal} aria-hidden="true">
+              <ExternalArrowGlyph size={12} />
+            </span>
           </a>
           <a href="/source" title={t("sourceDownload")}>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              style={{ flex: "none", display: "block" }}
-            >
-              <path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16" />
-            </svg>
+            <span className="ms-nav-icon" aria-hidden="true">
+              <SourceGlyph size={15} />
+            </span>
             {t("sourceCode")}
           </a>
         </section>
@@ -417,28 +410,16 @@ export function Sidebar({
         ) : null}
         <button
           type="button"
+          className={styles.accountTrigger}
           onClick={() => setMenuOpen((open) => !open)}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-            width: "100%",
-            padding: "8px 10px 2px",
-            background: "none",
-            border: 0,
-            cursor: "pointer",
-            textAlign: "left",
-            font: "inherit",
-            color: "inherit",
-          }}
         >
-          <UserAvatar email={userEmail} size={24} />
+          <UserAvatar email={userEmail} size={26} />
           <span
             style={{
               fontSize: 12.5,
-              color: "var(--ms-muted)",
+              color: "var(--ms-bone)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -446,8 +427,8 @@ export function Sidebar({
           >
             {userEmail}
           </span>
-          <span style={{ marginLeft: "auto", color: "var(--ms-faint)" }}>
-            <EllipsisGlyph size={13} />
+          <span style={{ marginLeft: "auto", color: "var(--ms-muted)" }}>
+            <EllipsisGlyph size={14} />
           </span>
         </button>
       </div>

@@ -10,6 +10,7 @@
     "emptyHint": "Calls to the API with your key show up here — <code>POST /emails</code> is a good first one.",
     "noMatch": "No requests match your filters.",
     "clearFilter": "Clear filters",
+    "refresh": "Refresh",
     "loadError": "Couldn't load logs.",
     "retry": "Retry",
     "searchPlaceholder": "Search path…",
@@ -53,6 +54,9 @@
   "diagnosis": {
     "title": "Where you stand",
     "counts": "{requests} calls · {failures} failed",
+    "successRate": "{rate}% success",
+    "filterByError": "Filter logs by this error",
+    "readyBadge": "Integration active",
     "step": {
       "reach": "Your key reached us",
       "domain": "A verified domain",

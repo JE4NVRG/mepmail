@@ -165,7 +165,16 @@ export function ConsentReviewPanel({
       {!onSubmit && !onReview && <p>{t.readOnly}</p>}
       {onSubmit && (
         <details>
-          <summary style={{ cursor: "pointer", padding: "12px 0" }}>{t.open}</summary>
+          <summary
+            className="ms-btn ms-btn-secondary"
+            style={{
+              display: "inline-flex",
+              listStyle: "none",
+              width: "fit-content",
+            }}
+          >
+            {t.open}
+          </summary>
           <form
             onSubmit={(event) => {
               event.preventDefault();

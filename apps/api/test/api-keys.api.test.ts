@@ -180,6 +180,7 @@ describe("POST /api-keys", () => {
 
   it("422s past the active-key cap, counting revoked keys as free slots", async () => {
     const capTeam = await createTeam(db, "keys-cap-team");
+    await insertDomain(capTeam, "cap.dev", "verified");
     const minter = await insertKey(capTeam);
     for (let i = 1; i < MAX_ACTIVE_API_KEYS; i++) await insertKey(capTeam);
     const over = await call(minter, "POST", "/api-keys", { name: "one-too-many" });

@@ -35,24 +35,45 @@ export function TeamReputation() {
           ? "unavailable"
           : "ready";
   return (
-    <div>
-      <label htmlFor={id}>{t.domainSelector}</label>
-      <select
-        id={id}
-        value={domainId ?? ""}
-        disabled={!domains.isSuccess}
-        aria-describedby={`${id}-scope`}
-        style={{ display: "block", maxWidth: "100%", minHeight: 44 }}
-        onChange={(event) => setDomainId(event.target.value || null)}
+    <div style={{ marginBottom: 16 }}>
+      <div className="ms-field" style={{ marginBottom: 6 }}>
+        <label htmlFor={id}>{t.domainSelector}</label>
+        <select
+          id={id}
+          className="ms-input"
+          value={domainId ?? ""}
+          disabled={!domains.isSuccess}
+          aria-describedby={`${id}-scope`}
+          style={{
+            display: "block",
+            width: "min(100%, 580px)",
+            height: 36,
+            paddingRight: 32,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            cursor: "pointer",
+          }}
+          onChange={(event) => setDomainId(event.target.value || null)}
+        >
+          <option value="">{t.principalScope}</option>
+          {domains.data?.map((domain) => (
+            <option key={domain.id} value={domain.id}>
+              {domain.name} · {domain.status === "verified" ? t.domainVerified : t.domainPending}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p
+        id={`${id}-scope`}
+        role="status"
+        style={{
+          margin: "0 0 12px",
+          fontSize: 12,
+          color: "var(--ms-muted)",
+          overflowWrap: "anywhere",
+        }}
       >
-        <option value="">{t.principalScope}</option>
-        {domains.data?.map((domain) => (
-          <option key={domain.id} value={domain.id}>
-            {domain.name} · {domain.status === "verified" ? t.domainVerified : t.domainPending}
-          </option>
-        ))}
-      </select>
-      <p id={`${id}-scope`} role="status" style={{ overflowWrap: "anywhere" }}>
         {domainId === null
           ? t.principalExplanation
           : selected

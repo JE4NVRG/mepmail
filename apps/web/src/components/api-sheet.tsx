@@ -529,6 +529,7 @@ export function ResourceApiButton({ resource }: { resource: Resource }) {
         type="button"
         className="ms-btn ms-btn-icon"
         aria-label={title}
+        title={title}
         onClick={() => setOpen(true)}
       >
         <CodeGlyph size={14} />

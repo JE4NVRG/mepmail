@@ -1,5 +1,5 @@
 import { type Db, schema } from "@millionsend/db";
-import { and, asc, eq, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import {
@@ -257,15 +257,17 @@ export interface MailboxScheduleCounts {
   scheduled: number;
   followUps: number;
 }
-/** How many messages wait in Snoozed, Scheduled and Follow-ups, for the rail. */
-export async function countMailboxSchedules(
+/** How many messages wait in Snoozed, Scheduled and Follow-ups across one or more mailboxes. */
+export async function countMailboxSchedulesMany(
   db: Db,
   actor: MailboxContentActor,
-  mailboxId: string,
+  mailboxIds: readonly string[],
 ): Promise<MailboxScheduleCounts> {
   actor = { ...actor };
   if (actor.agentAccess) throw new MailboxContentError("forbidden");
-  return withMailboxContentAccess(db, actor, [mailboxId], async (tx) => {
+  const ids = [...new Set(mailboxIds)];
+  if (!ids.length) return { snoozed: 0, scheduled: 0, followUps: 0 };
+  return withMailboxContentAccess(db, actor, ids, async (tx) => {
     const [row] = await tx
       .select({
         snoozed: sql<number>`(count(*) filter (where ${items.snoozedUntil} > now()))::int`,
@@ -275,7 +277,7 @@ export async function countMailboxSchedules(
       .from(items)
       .where(
         and(
-          eq(items.mailboxId, mailboxId),
+          inArray(items.mailboxId, ids),
           eq(items.teamId, actor.teamId),
           isNull(items.trashedAt),
           or(isNotNull(items.snoozedUntil), isNotNull(items.sendAt), isNotNull(items.remindedAt)),
@@ -287,6 +289,15 @@ export async function countMailboxSchedules(
       followUps: Number(row?.followUps ?? 0),
     };
   });
+}
+
+/** How many messages wait in Snoozed, Scheduled and Follow-ups, for the rail. */
+export function countMailboxSchedules(
+  db: Db,
+  actor: MailboxContentActor,
+  mailboxId: string,
+): Promise<MailboxScheduleCounts> {
+  return countMailboxSchedulesMany(db, actor, [mailboxId]);
 }
 
 /* ---------------------------------------------------------------- worker side */

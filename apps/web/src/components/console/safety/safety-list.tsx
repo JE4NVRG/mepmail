@@ -139,9 +139,15 @@ export function SafetyList() {
       <SignupRiskQueue />
       <div
         className="ms-filter-row"
-        style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18 }}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 10,
+          alignItems: "center",
+          marginBottom: 18,
+        }}
       >
-        <div style={{ flex: 1, minWidth: 160 }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
           <input
             type="text"
             className="ms-input"
@@ -155,7 +161,6 @@ export function SafetyList() {
         <Select
           value={status}
           onChange={setStatus}
-          width={160}
           ariaLabel={t("filters.status", { value: t(`status.${status}`) })}
           options={STATUSES.map((s) => ({
             value: s,
@@ -165,7 +170,6 @@ export function SafetyList() {
         <Select
           value={reason}
           onChange={setReason}
-          width={160}
           ariaLabel={t("filters.reason", {
             value: reason === "all" ? t("filters.all") : t(`reasons.${reason}`),
           })}
@@ -180,7 +184,6 @@ export function SafetyList() {
         <Select
           value={region}
           onChange={setRegion}
-          width={180}
           ariaLabel={t("filters.region", {
             value: region === "all" ? t("filters.all") : domains(`regions.${region}`),
           })}
@@ -200,7 +203,7 @@ export function SafetyList() {
         <LoadErrorCard onRetry={refetch} />
       ) : (
         <>
-          <div className="ms-card" style={{ padding: 0 }}>
+          <div className="ms-card" style={{ padding: 0, overflow: "hidden" }}>
             <Table className="nowrap">
               <thead>
                 <tr>
@@ -253,14 +256,14 @@ export function SafetyList() {
                         className="hoverable"
                         style={{ cursor: "pointer" }}
                         onClick={(event) => {
-                          if ((event.target as HTMLElement).closest("button")) return;
+                          if ((event.target as HTMLElement).closest("button, a")) return;
                           router.push(href);
                         }}
                       >
                         <td>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                             <TeamLogo name={row.name} logoUrl={row.logoUrl} size={22} />
-                            {row.name}
+                            <Link href={href}>{row.name}</Link>
                           </span>
                         </td>
                         <td>
@@ -296,14 +299,14 @@ export function SafetyList() {
                             ? percent(row.hardBounceRate7d)
                             : common("none")}
                         </td>
-                        <td style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <td>
                           <GuardrailCell
                             guardrail={row.guardrail}
                             suspendedAt={row.suspendedAt}
                             pausedAt={row.broadcastsPausedByOperatorAt}
                           />
                         </td>
-                        <td style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <td>
                           <ReasonLabel reason={row.reason} detail={row.detail} />
                         </td>
                         <td>

@@ -134,13 +134,24 @@ describe("checkDnsRecords", () => {
     ).toBe("mismatch");
     expect(await check("v=spf1 include:amazonses.com +all")).toBe("mismatch");
     expect(await check("v=spf1 include:amazonses.com all")).toBe("mismatch");
-    // A DKIM-shaped expectation keeps its exact match.
+    // A DKIM-shaped expectation keeps its exact match and flags duplicate/quoted copies.
     expect(
       (
         await checkDnsRecords([{ type: "TXT", name: "a", value: '"v=DKIM1; k=rsa; p=ABC"' }], {
           ...empty,
           resolveTxt: async () => [["v=DKIM1; k=rsa; p=ABC; t=s"]],
         })
+      )[0],
+    ).toBe("mismatch");
+    expect(
+      (
+        await checkDnsRecords(
+          [{ type: "TXT", name: "mepmail._domainkey.d.com", value: '"v=DKIM1; k=rsa; p=ABC"' }],
+          {
+            ...empty,
+            resolveTxt: async () => [["v=DKIM1; k=rsa; p=ABC"], ['"v=DKIM1; k=rsa; p=ABC"']],
+          },
+        )
       )[0],
     ).toBe("mismatch");
   });

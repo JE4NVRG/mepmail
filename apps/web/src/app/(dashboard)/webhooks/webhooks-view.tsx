@@ -18,6 +18,7 @@ import { Skeleton, SkeletonBadge } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { NavTile, TONE_COLOR } from "@/components/status-tile";
 import { Table } from "@/components/table";
+import { toast } from "@/components/toast";
 import { Tooltip } from "@/components/tooltip";
 import { codeRichTags } from "@/lib/code-rich-tags";
 import { displayUrl } from "@/lib/format";
@@ -116,6 +117,22 @@ export function WebhooksView() {
       onSuccess: () => {
         setDeleteTarget(null);
         void invalidateList();
+      },
+    }),
+  );
+  const testMutation = useMutation(
+    trpc.webhooks.testDelivery.mutationOptions({
+      onSuccess: () => {
+        toast(t("detail.testQueued"), "success");
+        void invalidateList();
+      },
+      onError: (err) => {
+        toast(
+          err.data?.code === "TOO_MANY_REQUESTS"
+            ? t("detail.testRateLimited")
+            : t("detail.testFailed"),
+          "danger",
+        );
       },
     }),
   );
@@ -246,7 +263,7 @@ export function WebhooksView() {
                   </td>
                   <td>
                     {webhook.eventTypes === null || webhook.eventTypes.length === 0 ? (
-                      <span className="ms-chip">{t("allEvents")}</span>
+                      <span className="ms-badge ms-badge-neutral">{t("allEvents")}</span>
                     ) : (
                       <Tooltip
                         inline
@@ -270,8 +287,35 @@ export function WebhooksView() {
                           </span>
                         }
                       >
-                        <span className="ms-chip">
-                          {t("eventsCount", { count: webhook.eventTypes.length })}
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          {webhook.eventTypes.slice(0, 2).map((type) => (
+                            <span
+                              key={type}
+                              className="ms-chip"
+                              style={{ fontSize: 12, padding: "2px 8px" }}
+                            >
+                              <span
+                                className="ms-dot"
+                                style={{
+                                  background: WEBHOOK_EVENT_META[type as WebhookEventType]?.dot,
+                                }}
+                                aria-hidden="true"
+                              />
+                              {t(`eventLabel.${type}`)}
+                            </span>
+                          ))}
+                          {webhook.eventTypes.length > 2 ? (
+                            <span className="ms-badge ms-badge-neutral ms-mono">
+                              +{webhook.eventTypes.length - 2}
+                            </span>
+                          ) : null}
                         </span>
                       </Tooltip>
                     )}
@@ -280,9 +324,23 @@ export function WebhooksView() {
                     <WebhookStatusBadge status={webhook.status} />
                   </td>
                   <td>
-                    <span className="ms-mono">
-                      {webhook.successRate === null ? "—" : `${webhook.successRate}%`}
-                    </span>
+                    {webhook.successRate === null ? (
+                      <span className="ms-mono" style={{ color: "var(--ms-muted)" }}>
+                        —
+                      </span>
+                    ) : (
+                      <span
+                        className={`ms-badge ms-badge-${
+                          webhook.successRate >= 95
+                            ? "success"
+                            : webhook.successRate >= 80
+                              ? "warn"
+                              : "danger"
+                        } ms-mono`}
+                      >
+                        {webhook.successRate}%
+                      </span>
+                    )}
                   </td>
                   <td>
                     <RelativeTime date={webhook.createdAt} />
@@ -291,6 +349,10 @@ export function WebhooksView() {
                     <PopoverMenu
                       ariaLabel={t("table.menu")}
                       items={[
+                        {
+                          label: t("detail.sendTest"),
+                          onSelect: () => testMutation.mutate({ id: webhook.id }),
+                        },
                         {
                           label: t("edit"),
                           onSelect: () =>

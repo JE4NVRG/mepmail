@@ -34,8 +34,17 @@ export function CommandPalette() {
         setOpen(false);
       }
     }
+    function onOpen() {
+      setOpen(true);
+      setQuery("");
+      setIndex(0);
+    }
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("mepmail:open-palette", onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mepmail:open-palette", onOpen);
+    };
   }, []);
 
   const groups = productPaletteGroups(navigation, tNav, t, query);

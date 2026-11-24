@@ -102,7 +102,7 @@ export const mailboxOutbox = pgTable(
     check("mailbox_outbox_period_check", sql`${t.periodEnd} > ${t.periodStart}`),
     check(
       "mailbox_outbox_raw_check",
-      sql`${t.rawBytes} between 1 and 1048576 and ${t.rawSha256} ~ '^[a-f0-9]{64}$'`,
+      sql`${t.rawBytes} between 1 and 26214400 and ${t.rawSha256} ~ '^[a-f0-9]{64}$'`,
     ),
     check(
       "mailbox_outbox_attempt_check",
@@ -110,7 +110,7 @@ export const mailboxOutbox = pgTable(
     ),
     check(
       "mailbox_outbox_payload_check",
-      sql`(${t.status} = 'accepted' and ${t.ciphertext} is null and ${t.iv} is null and ${t.wrappedDek} is null and ${t.keyVersion} is null and ${t.providerMessageId} is not null and ${t.acceptedAt} is not null) or (${t.status} <> 'accepted' and ${t.ciphertext} is not null and ${t.iv} is not null and ${t.wrappedDek} is not null and ${t.keyVersion} >= 2000000 and octet_length(${t.iv}) = 12 and octet_length(${t.ciphertext}) between 17 and 1048592)`,
+      sql`(${t.status} = 'accepted' and ${t.ciphertext} is null and ${t.iv} is null and ${t.wrappedDek} is null and ${t.keyVersion} is null and ${t.providerMessageId} is not null and ${t.acceptedAt} is not null) or (${t.status} <> 'accepted' and ${t.ciphertext} is not null and ${t.iv} is not null and ${t.wrappedDek} is not null and ${t.keyVersion} >= 2000000 and octet_length(${t.iv}) = 12 and octet_length(${t.ciphertext}) between 17 and 26214416)`,
     ),
   ],
 );

@@ -145,9 +145,11 @@ function StampRow({ children, at }: { children: React.ReactNode; at?: Date | str
         color: "var(--ms-muted)",
       }}
     >
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{children}</span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        {children}
+      </span>
       {at ? (
-        <span style={{ fontSize: 11, color: "var(--ms-faint)" }} title={formatUtcTimestamp(at)}>
+        <span style={{ fontSize: 11.5, color: "var(--ms-muted)" }} title={formatUtcTimestamp(at)}>
           {formatDayTime(at, locale)}
         </span>
       ) : null}
@@ -222,7 +224,12 @@ function ApiQuickstartContent({
   const [keySend, setKeySend] = useState<{
     state: "idle" | "sending" | "ok" | "error";
     message?: string;
+    sentId?: string;
   }>({ state: "idle" });
+  const [playFrom, setPlayFrom] = useState<string | null>(null);
+  const [playTo, setPlayTo] = useState<string | null>(null);
+  const [playSubject, setPlaySubject] = useState<string | null>(null);
+  const [playHtml, setPlayHtml] = useState<string | null>(null);
 
   // Self-host: sending needs SES connected, so the stepper leads with that
   // when credentials are absent. Polls until connected (the SES settings
@@ -327,13 +334,19 @@ function ApiQuickstartContent({
       ? maskApiKey(bankedKey.tokenPrefix, bankedKey.last4)
       : "ms_…";
 
+  const effectiveFrom =
+    playFrom ?? (verifiedDomain ? `onboarding@${verifiedDomain}` : t("step2.fromPlaceholder"));
+  const effectiveTo = playTo ?? userEmail;
+  const effectiveSubject = playSubject ?? t("step2.subject");
+  const effectiveHtml = playHtml ?? t.raw("step2.html");
+
   const snippetBase = {
     apiUrl,
     // API requests use the team's own verified domain, not the platform demonstration sender.
-    from: verifiedDomain ? `onboarding@${verifiedDomain}` : t("step2.fromPlaceholder"),
-    to: userEmail,
-    subject: t("step2.subject"),
-    html: t.raw("step2.html"),
+    from: effectiveFrom,
+    to: effectiveTo,
+    subject: effectiveSubject,
+    html: effectiveHtml,
   };
   // Honest key handling: only while the real token is in memory may the
   // snippet promise (and deliver) the real key on copy. Otherwise both the
@@ -365,10 +378,10 @@ function ApiQuickstartContent({
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          from: `onboarding@${verifiedDomain}`,
-          to: userEmail,
-          subject: t("step2.subject"),
-          html: t.raw("step2.html"),
+          from: effectiveFrom,
+          to: effectiveTo,
+          subject: effectiveSubject,
+          html: effectiveHtml,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
@@ -377,6 +390,7 @@ function ApiQuickstartContent({
           ? {
               state: "ok",
               message: body.id ? t("step2.tryOk", { id: body.id }) : t("step2.tryOkNoId"),
+              ...(body.id ? { sentId: body.id } : {}),
             }
           : {
               state: "error",
@@ -450,15 +464,128 @@ function ApiQuickstartContent({
       </section>
     ) : null;
 
+  // The same block serves the first-send flow and the state after a delivery:
+  // a team that already sends still needs to prove a freshly minted key.
+  const keyTestBlock = (
+    <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
+      {token ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 10,
+          }}
+        >
+          <div className="ms-field">
+            <label htmlFor="playground-from">{t("step2.playgroundFrom")}</label>
+            <input
+              id="playground-from"
+              className="ms-input mono"
+              style={{ width: "100%" }}
+              value={effectiveFrom}
+              onChange={(e) => setPlayFrom(e.target.value)}
+            />
+          </div>
+          <div className="ms-field">
+            <label htmlFor="playground-to">{t("step2.playgroundTo")}</label>
+            <input
+              id="playground-to"
+              className="ms-input mono"
+              style={{ width: "100%" }}
+              value={effectiveTo}
+              onChange={(e) => setPlayTo(e.target.value)}
+            />
+          </div>
+          <div className="ms-field">
+            <label htmlFor="playground-subject">{t("step2.playgroundSubject")}</label>
+            <input
+              id="playground-subject"
+              className="ms-input"
+              style={{ width: "100%" }}
+              value={effectiveSubject}
+              onChange={(e) => setPlaySubject(e.target.value)}
+            />
+          </div>
+          <div className="ms-field" style={{ gridColumn: "1 / -1" }}>
+            <label htmlFor="playground-html">{t("step2.playgroundHtml")}</label>
+            <input
+              id="playground-html"
+              className="ms-input mono"
+              style={{ width: "100%" }}
+              value={effectiveHtml}
+              onChange={(e) => setPlayHtml(e.target.value)}
+            />
+          </div>
+        </div>
+      ) : null}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className={token ? "ms-btn ms-btn-primary" : "ms-btn ms-btn-secondary"}
+          data-testid="onboarding-try-with-key"
+          disabled={!token || keySend.state === "sending"}
+          onClick={() => void sendWithOwnKey()}
+        >
+          <BtnSpinner on={keySend.state === "sending"} />
+          {keySend.state === "sending" ? t("step2.trySending") : t("step2.tryWithKey")}
+        </button>
+        {!token && hasKey ? (
+          <button
+            type="button"
+            className="ms-btn ms-btn-secondary"
+            disabled={createKey.isPending}
+            onClick={() => createKey.mutate({ name: "Playground" })}
+          >
+            <BtnSpinner on={createKey.isPending} />
+            {t("step2.playgroundMintKey")}
+          </button>
+        ) : null}
+        {!token ? (
+          <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-muted)" }}>
+            {t("step2.tryNeedsToken")}
+          </span>
+        ) : null}
+        {keySend.state === "ok" ? (
+          <span
+            className="ms-mono"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              fontSize: 12,
+              color: "var(--ms-success)",
+            }}
+          >
+            <span>{keySend.message}</span>
+            {keySend.sentId ? (
+              <Link
+                href={`/emails/${keySend.sentId}`}
+                className="ms-btn ms-btn-secondary ms-btn-sm"
+              >
+                {t("step2.playgroundViewEmail")}
+              </Link>
+            ) : null}
+          </span>
+        ) : null}
+        {keySend.state === "error" ? (
+          <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-warn, #b45309)" }}>
+            {keySend.message}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+
   const explore = (
-    <div style={{ marginTop: 56 }}>
+    <div style={{ marginTop: 48 }}>
       <div className="ms-microlabel" style={{ marginBottom: 10 }}>
         {t("explore.label")}
       </div>
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(195px, 1fr))",
           gap: 14,
         }}
       >
@@ -473,7 +600,7 @@ function ApiQuickstartContent({
                 <span style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ms-bone)" }}>
                   {t(`explore.${card.key}.title`)}
                 </span>
-                {"recommended" in card ? (
+                {"recommended" in card && card.recommended && !verifiedDomain ? (
                   <span className="ms-badge ms-badge-success">{t("explore.recommended")}</span>
                 ) : null}
               </div>
@@ -782,28 +909,44 @@ function ApiQuickstartContent({
             </StampRow>
           </div>
 
-          <div style={{ textAlign: "center", marginTop: 56 }}>
-            <DeliveredOdometer value={deliveredCount} locale={locale} />
-            <div style={{ fontSize: 15, color: "var(--ms-bone)", marginTop: 18 }}>
-              {t("success.counting", { count: deliveredCount })}
+          <div
+            className="ms-card"
+            style={{
+              marginTop: 24,
+              padding: "22px 26px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "16px 24px",
+              backgroundImage: statusGlow("success", 8),
+            }}
+          >
+            <div>
+              <DeliveredOdometer value={deliveredCount} locale={locale} />
             </div>
-            {deliveredSeconds ? (
-              <div
-                className="ms-mono"
-                style={{ fontSize: 12, color: "var(--ms-muted)", marginTop: 8 }}
-              >
-                {t("success.deliveredIn", { seconds: deliveredSeconds })}
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ms-bone)" }}>
+                {t("success.counting", { count: deliveredCount })}
               </div>
-            ) : null}
-            {/* The first send's route only reads as a story while it is the only one. */}
-            {detail && emailCount <= 1 ? (
-              <div
-                className="ms-mono"
-                style={{ fontSize: 12, color: "var(--ms-muted)", marginTop: 3 }}
-              >
-                {detail.from} → {toDisplay}
-              </div>
-            ) : null}
+              {deliveredSeconds ? (
+                <div
+                  className="ms-mono"
+                  style={{ fontSize: 12, color: "var(--ms-muted)", marginTop: 6 }}
+                >
+                  {t("success.deliveredIn", { seconds: deliveredSeconds })}
+                </div>
+              ) : null}
+              {/* The first send's route only reads as a story while it is the only one. */}
+              {detail && emailCount <= 1 ? (
+                <div
+                  className="ms-mono"
+                  style={{ fontSize: 12, color: "var(--ms-muted)", marginTop: 3 }}
+                >
+                  {detail.from} → {toDisplay}
+                </div>
+              ) : null}
+            </div>
           </div>
         </>
       ) : (
@@ -873,43 +1016,7 @@ function ApiQuickstartContent({
               locked={!hasKey}
             >
               {codePanel}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  marginTop: 12,
-                  flexWrap: "wrap",
-                }}
-              >
-                <button
-                  type="button"
-                  className="ms-btn"
-                  data-testid="onboarding-try-with-key"
-                  disabled={!token || keySend.state === "sending"}
-                  onClick={() => void sendWithOwnKey()}
-                >
-                  {keySend.state === "sending" ? t("step2.trySending") : t("step2.tryWithKey")}
-                </button>
-                {!token ? (
-                  <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-muted)" }}>
-                    {t("step2.tryNeedsToken")}
-                  </span>
-                ) : null}
-                {keySend.state === "ok" ? (
-                  <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-bone)" }}>
-                    {keySend.message}
-                  </span>
-                ) : null}
-                {keySend.state === "error" ? (
-                  <span
-                    className="ms-mono"
-                    style={{ fontSize: 12, color: "var(--ms-warn, #b45309)" }}
-                  >
-                    {keySend.message}
-                  </span>
-                ) : null}
-              </div>
+              {keyTestBlock}
               {showInstanceHint && lang !== "curl" ? (
                 <p
                   className="ms-mono"
@@ -968,6 +1075,23 @@ function ApiQuickstartContent({
           <Link href="/emails" className="ms-btn ms-btn-secondary" style={{ marginTop: 12 }}>
             {t("attempt.history")}
           </Link>
+        </section>
+      ) : null}
+
+      {success ? (
+        <section
+          className="ms-card"
+          aria-label={t("step2.tryTitle")}
+          style={{ marginTop: 32, padding: 22 }}
+        >
+          <p className="ms-microlabel" style={{ margin: 0 }}>
+            {t("step2.tryTitle")}
+          </p>
+          <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+            {t("step2.tryBody")}
+          </p>
+          {codePanel}
+          {keyTestBlock}
         </section>
       ) : null}
 

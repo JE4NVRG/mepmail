@@ -125,7 +125,7 @@ export function AuditView({
   }
 
   return (
-    <div className="ms-card" style={{ padding: 0 }}>
+    <div className="ms-card" style={{ padding: 0, overflow: "hidden" }}>
       {query.isPending ? (
         <AuditSkeleton />
       ) : items.length === 0 ? (

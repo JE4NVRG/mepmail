@@ -720,7 +720,18 @@ export function DomainDetail({ id }: { id: string }) {
                 <BtnSpinner on={verify.isPending || minSpin} />
                 {t("detail.checkDns")}
               </button>
-            ) : null}
+            ) : (
+              <button
+                type="button"
+                className="ms-btn ms-btn-secondary"
+                title={t("detail.checkDnsTooltip")}
+                disabled={verify.isPending || minSpin}
+                onClick={runCheck}
+              >
+                <BtnSpinner on={verify.isPending || minSpin} />
+                {t("detail.recheckDns")}
+              </button>
+            )}
             <div style={{ position: "relative" }}>
               <PopoverMenu
                 boxed
@@ -799,14 +810,12 @@ export function DomainDetail({ id }: { id: string }) {
       />
 
       <div
-        className="ms-meta-grid"
+        className="ms-card ms-meta-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 28,
-          padding: "20px 0",
-          borderTop: "1px solid var(--ms-line)",
-          borderBottom: "1px solid var(--ms-line)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+          gap: "18px 24px",
+          padding: "16px 20px",
           maxWidth: 1000,
         }}
       >
@@ -940,8 +949,21 @@ export function DomainDetail({ id }: { id: string }) {
           ) : null}
 
           {records.isError ? (
-            <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 20 }}>
-              <p style={{ margin: 0, fontSize: "var(--ms-fs-ui)" }}>{t("detail.recordsError")}</p>
+            <div
+              className="ms-card"
+              style={{
+                display: "flex",
+                gap: 14,
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                padding: "16px 20px",
+                marginTop: 20,
+              }}
+            >
+              <p style={{ margin: 0, fontSize: "var(--ms-fs-ui)", color: "var(--ms-muted)" }}>
+                {t("detail.recordsError")}
+              </p>
               <button
                 type="button"
                 className="ms-btn ms-btn-secondary"

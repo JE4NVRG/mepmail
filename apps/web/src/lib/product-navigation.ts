@@ -19,7 +19,7 @@ export const NAV_ITEMS: readonly ProductNavItem[] = [
   { key: "webhooks", href: "/webhooks", icon: "webhooks" },
   { key: "settings", href: "/settings", icon: "settings" },
 ];
-export const MAIL_NAV_ITEM: ProductNavItem = { key: "mailboxes", href: "/mail", icon: "emails" };
+export const MAIL_NAV_ITEM: ProductNavItem = { key: "mailboxes", href: "/mail", icon: "inbox" };
 export const CONSOLE_NAV_ITEM: ProductNavItem = {
   key: "console",
   href: "/console",

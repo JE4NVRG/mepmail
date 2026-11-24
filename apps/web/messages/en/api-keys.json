@@ -6,11 +6,17 @@
   },
   "table": {
     "name": "Name",
+    "scope": "Scope",
     "token": "Token",
     "lastUsed": "Last used",
     "created": "Created",
     "menu": "Key actions"
   },
+  "searchPlaceholder": "Search by name, domain, or last 4…",
+  "allPermissions": "All permissions",
+  "allDomains": "Any domain",
+  "noMatch": "No API keys match your filters.",
+  "clearFilters": "Clear filters",
   "neverUsed": "Never",
   "pageOf": "{total, plural, one {# API key} other {# API keys}}",
   "rename": "Rename",

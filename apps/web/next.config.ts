@@ -26,6 +26,10 @@ const config: NextConfig = {
     // react-query (its own freshness rules) — the cached payload holds no
     // user data that could go stale.
     staleTimes: { dynamic: 30, static: 180 },
+    // proxy.ts runs on every request, so Next buffers each body and silently cuts it at
+    // 10 MB by default. Correio uploads 16 MiB of attachments as base64 JSON (~21.4 MiB);
+    // nginx caps mepmail.dev bodies at 25m, so match that here.
+    proxyClientMaxBodySize: "25mb",
   },
   async redirects() {
     return [

@@ -23,18 +23,22 @@ export function AwsCredentialsBanner() {
         border: "1px solid var(--ms-warn-border)",
         background: "var(--ms-warn-bg)",
         borderRadius: "var(--ms-r-input)",
-        padding: "9px 14px",
+        padding: "10px 14px",
         marginBottom: 18,
         fontSize: 13,
         lineHeight: 1.5,
         color: "var(--ms-warn)",
         maxWidth: 1000,
         display: "flex",
+        flexWrap: "wrap",
         alignItems: "center",
-        gap: 14,
+        justifyContent: "space-between",
+        gap: "10px 14px",
       }}
     >
-      <span style={{ flex: 1 }}>{t.rich("awsCredentialsWarning", codeRichTags)}</span>
+      <span style={{ flex: "1 1 240px", minWidth: 0 }}>
+        {t.rich("awsCredentialsWarning", codeRichTags)}
+      </span>
       <Link href="/settings/ses" className="ms-btn ms-btn-secondary" style={{ flex: "none" }}>
         {t("awsCredentialsCta")}
       </Link>

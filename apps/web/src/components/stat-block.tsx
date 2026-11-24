@@ -27,12 +27,18 @@ export function StatBlock({
         className="ms-digits"
         style={{
           fontSize: "var(--ms-fs-kpi)",
-          color: "var(--ms-bone)",
+          color: value === "—" ? "var(--ms-faint)" : "var(--ms-bone)",
           marginTop: 6,
           display: "flex",
         }}
       >
-        {value != null ? <Odometer formatted={value} /> : <Skeleton width={64} height="1lh" />}
+        {value == null ? (
+          <Skeleton width={64} height="1lh" />
+        ) : value === "—" ? (
+          <span>—</span>
+        ) : (
+          <Odometer formatted={value} lit={false} />
+        )}
       </div>
       {hint ? (
         <div style={{ fontSize: 12.5, color: "var(--ms-muted)", marginTop: 4 }}>{hint}</div>

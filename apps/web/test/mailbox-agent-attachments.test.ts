@@ -41,6 +41,7 @@ const sha = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("he
 const fileA = randomBytes(3000);
 const fileB = randomBytes(5000);
 const bigFile = randomBytes(300 * 1024);
+const overLimitForward = Buffer.alloc(10 * 1024 * 1024 + 1024);
 
 const headers = (mailbox: string, bearer = token) => ({
   authorization: `Bearer ${bearer}`,
@@ -167,6 +168,7 @@ beforeEach(async () => {
   teamId = teams[0]!.id;
   foreignTeamId = teams[1]!.id;
   await seedMailboxTestService(db, [teamId, foreignTeamId]);
+  await db.update(schema.mailboxSubscriptions).set({ storageBytesPerMailbox: 25 * 1024 * 1024 });
   for (const id of ["owner", "foreign"])
     await db
       .insert(schema.user)
@@ -280,15 +282,15 @@ describe("agent attachments", () => {
     const created = await draft({
       expectedRevision: 0,
       uploads: [
-        { filename: "a.bin", base64: fileA.toString("base64") },
-        { filename: "b.bin", base64: fileB.toString("base64") },
+        { filename: "a.pdf", base64: fileA.toString("base64") },
+        { filename: "b.txt", base64: fileB.toString("base64") },
       ],
     });
     expect(created.status).toBe(200);
     const first = await read(created.body.id);
     expect(first.body.attachments.map((a) => [a.filename, a.bytes])).toEqual([
-      ["a.bin", 3000],
-      ["b.bin", 5000],
+      ["a.pdf", 3000],
+      ["b.txt", 5000],
     ]);
     // Edit keeping only b, as its own source.
     const edited = await draft({
@@ -300,7 +302,7 @@ describe("agent attachments", () => {
     });
     expect(edited.status).toBe(200);
     const after = await read(created.body.id);
-    expect(after.body.attachments.map((a) => a.filename)).toEqual(["b.bin"]);
+    expect(after.body.attachments.map((a) => a.filename)).toEqual(["b.txt"]);
     const kept = await download({ id: created.body.id, revision: after.body.revision, index: 0 });
     expect(kept.sha).toBe(sha(fileB));
     // A stale edit is refused and leaves the draft's files as they were.
@@ -315,7 +317,7 @@ describe("agent attachments", () => {
       ).status,
     ).toBe(409);
     expect((await read(created.body.id)).body.attachments.map((a) => a.filename)).toEqual([
-      "b.bin",
+      "b.txt",
     ]);
     // Forward a received message keeping its second file and adding one.
     const inbound = await receive([
@@ -348,7 +350,7 @@ describe("agent attachments", () => {
   it("refuses files over the limits and sources from another mailbox", async () => {
     const tooBig = await draft({
       expectedRevision: 0,
-      uploads: [{ filename: "big.bin", base64: bigFile.toString("base64") }],
+      uploads: [{ filename: "big.pdf", base64: bigFile.toString("base64") }],
     });
     expect([400, 413]).toContain(tooBig.status);
     const many = await draft({
@@ -359,7 +361,7 @@ describe("agent attachments", () => {
       })),
     });
     expect(many.status).toBe(400);
-    const inbound = await receive([{ name: "grande.zip", bytes: bigFile }]);
+    const inbound = await receive([{ name: "grande.pdf", bytes: overLimitForward }]);
     expect(
       (
         await draft({

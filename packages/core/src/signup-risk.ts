@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
 import { and, asc, count, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { findPhishingRecidivismTeamMatch } from "./phishing-recidivism.js";
 import { holdTeamForReview } from "./send-review.js";
 import { assessSignupRisk, type SignupRiskSignals } from "./signup-risk-policy.js";
 import { collectSignupRiskSignals, signupGenericTeamName } from "./signup-risk-signals.js";
@@ -325,9 +326,13 @@ export async function enrollTeamSignupRisk(
       ),
     )
     .limit(1);
+  const priorPhishing = heldOwner
+    ? null
+    : await findPhishingRecidivismTeamMatch(tx, { teamId: input.teamId, teamName: team.name });
+  const forcedHold = Boolean(heldOwner || priorPhishing);
   const signals = { ...profile.signals, genericTeamName: signupGenericTeamName(team.name) };
   const assessment = assessSignupRisk(signals);
-  const level = heldOwner
+  const level = forcedHold
     ? "hold"
     : rank[assessment.level] > rank[profile.level]
       ? assessment.level
@@ -337,6 +342,7 @@ export async function enrollTeamSignupRisk(
       ...profile.reasons,
       ...assessment.reasons,
       ...(heldOwner ? ["existing_owner_hold"] : []),
+      ...(priorPhishing ? ["phishing_recidivism_team"] : []),
     ]),
   ];
   const inserted = await tx
@@ -353,7 +359,7 @@ export async function enrollTeamSignupRisk(
     .onConflictDoNothing()
     .returning({ id: schema.teamSignupRisk.teamId });
   if (!inserted.length) return;
-  if (heldOwner && profile.level !== "hold")
+  if (forcedHold && profile.level !== "hold")
     await tx
       .update(schema.userSignupRisk)
       .set({ level: "hold", reasons })
@@ -361,8 +367,10 @@ export async function enrollTeamSignupRisk(
   if (level === "hold")
     await holdTeamForReview(tx, {
       teamId: input.teamId,
-      reason: "new_sender",
-      note: "Signup risk requires operator review.",
+      reason: priorPhishing ? "impersonation" : "new_sender",
+      note: priorPhishing
+        ? `Team name matches suspended phishing ${priorPhishing.source} (${priorPhishing.matchedTeamId}).`
+        : "Signup risk requires operator review.",
       now,
     });
   await audit(tx, {
@@ -375,6 +383,7 @@ export async function enrollTeamSignupRisk(
       reasons,
       policyVersion: assessment.policyVersion,
       inheritedOwnerHold: Boolean(heldOwner),
+      ...(priorPhishing ? { phishingRecidivism: priorPhishing } : {}),
     },
   });
 }

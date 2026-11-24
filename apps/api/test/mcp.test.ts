@@ -1192,6 +1192,13 @@ describe("cloud key issuance through OAuth MCP", () => {
       await db
         .insert(schema.teamMembers)
         .values({ teamId: restrictedTeam, userId: principal, role: "owner" });
+      await db.insert(schema.domains).values({
+        teamId: restrictedTeam,
+        name: `mcp-risk-${principal}.test`,
+        region: "us-east-1",
+        status: "verified",
+        verifiedAt: new Date(),
+      });
       await db.insert(schema.teamSignupRisk).values({
         teamId: restrictedTeam,
         principalUserId: principal,

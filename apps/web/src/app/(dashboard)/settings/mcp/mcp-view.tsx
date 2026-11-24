@@ -118,7 +118,7 @@ export function McpView({ serverUrl }: { serverUrl: string }) {
   const snippet = clientSnippet(client, serverUrl);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20, maxWidth: 920 }}>
       <section className="ms-card" style={{ padding: 24 }}>
         <p style={{ margin: "0 0 4px", fontSize: 14, color: "var(--ms-bone)" }}>{t("intro")}</p>
         <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--ms-muted)" }}>
@@ -191,11 +191,22 @@ export function McpView({ serverUrl }: { serverUrl: string }) {
                   ) : null}
                 </td>
                 <td>
-                  <span className="ms-mono" style={{ fontSize: 12 }}>
-                    {tool.scope}
-                  </span>
-                  <span style={{ marginLeft: 8, fontSize: 12, color: "var(--ms-muted)" }}>
-                    {scopeT(tool.scope.replace(":", "_"))}
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span
+                      className={`ms-badge ms-badge-${tool.readOnly ? "neutral" : "info"} ms-mono`}
+                    >
+                      {tool.scope}
+                    </span>
+                    <span style={{ fontSize: 12.5, color: "var(--ms-muted)" }}>
+                      {scopeT(tool.scope.replace(":", "_"))}
+                    </span>
                   </span>
                 </td>
               </tr>

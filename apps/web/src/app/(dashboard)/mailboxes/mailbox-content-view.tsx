@@ -11,6 +11,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -19,6 +20,7 @@ import {
 import { confirmDialog } from "@/components/confirm-dialog";
 import { NavGlyph } from "@/components/icons/nav-icons";
 import { QueryRecoveryNotice } from "@/components/query-recovery";
+import { Select } from "@/components/select";
 import { toast } from "@/components/toast";
 import { inAndroidApp } from "@/lib/android-app";
 import { htmlDropsWork } from "@/lib/desktop-bridge";
@@ -27,6 +29,12 @@ import {
   mailboxSignature,
   replaceMailboxSignature,
 } from "@/lib/mailbox-compose-signature";
+import {
+  base64Bytes,
+  carryForwardSelection,
+  composerFileProblem,
+  pastedFileName,
+} from "@/lib/mailbox-composer-attachments";
 import { mailboxDeliveryLabel } from "@/lib/mailbox-delivery-status";
 import {
   createMailboxListDateFormatter,
@@ -108,6 +116,7 @@ import {
 import { queryHasUsableData, queryRecoveryPhase, recoverQuery } from "@/lib/query-recovery";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import type { AppRouter } from "@/server/routers";
+import { CorreioCommandDialog } from "./correio-command-dialog";
 import { MailboxColumnDivider } from "./mailbox-column-divider";
 import { MailboxFolderIcon } from "./mailbox-folder-icon";
 import { MailboxInviteCard } from "./mailbox-invite-card";
@@ -163,8 +172,6 @@ function sendStateMessage(state: SendState) {
               ? "sendProcessing"
               : "sendQueued";
 }
-/** Largest attachment the composer sends (server: mailbox-content MAX_ATTACHMENT). */
-const SEND_ATTACHMENT_BYTES = 256 * 1024;
 /** The server render never has a send waiting. */
 const noHeldSend = () => null;
 /** No subscription: the client clock only has to differ from the server render once. */
@@ -378,6 +385,7 @@ function DraftDialog({
   const dialog = useRef<HTMLDialogElement>(null);
   const composerBody = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const fromId = useId();
   const recipientInput = useRef<HTMLInputElement>(null);
   const messageInput = useRef<RichEditorHandle>(null);
   // The formatted body: HTML goes with the text only when there is formatting.
@@ -511,15 +519,12 @@ function DraftDialog({
     );
   });
   // A forward (or an edited draft) carries the attachments; a reply, like mail apps, does not.
-  // Received attachments over what we send (256 KiB each) stay behind, with a note.
+  // Received attachments that exceed the composer cap or fail the allowlist stay behind, with a note.
   const carried =
     source && (source.kind === "draft" || mode === "forward") ? source.attachments : [];
-  const [retained, setRetained] = useState(
-    carried.filter((a) => a.bytes <= SEND_ATTACHMENT_BYTES).map((a) => a.index),
-  );
-  const [leftBehind] = useState(() =>
-    carried.filter((a) => a.bytes > SEND_ATTACHMENT_BYTES).map((a) => a.filename),
-  );
+  const [initialCarried] = useState(() => carryForwardSelection(carried));
+  const [retained, setRetained] = useState(initialCarried.keep);
+  const leftBehind = initialCarried.skip;
   const [uploads, setUploads] = useState<{ id: number; filename: string; base64: string }[]>([]);
   const uploadSequence = useRef(0);
   const [loadingFiles, loadFiles] = useState(false);
@@ -529,10 +534,16 @@ function DraftDialog({
   const [error, setError] = useState("");
   // A wide window keeps the inbox usable while writing: the composer docks at
   // the bottom right, not modal, and minimizes to its title bar. A narrow one
-  // gets the full-screen modal it always had.
-  const [docked] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(min-width: 900px)").matches,
-  );
+  // gets the full-screen modal it always had. Starts null so SSR matches hydration
+  // and only calls show()/showModal() once the docked mode is known.
+  const [docked, setDocked] = useState<boolean | null>(null);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 900px)");
+    const sync = () => setDocked(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
   const [minimized, setMinimized] = useState(false);
   // Closing after a change asks first: typing anywhere in the form, other
   // recipients or attachments than it opened with.
@@ -575,9 +586,14 @@ function DraftDialog({
     return () => window.removeEventListener(MAILBOX_NEW_MAIL_EVENT, onNewMail);
   }, []);
   useEffect(() => {
+    if (docked === null) return;
     active.current = true;
-    if (docked) dialog.current?.show();
-    else dialog.current?.showModal();
+    const element = dialog.current;
+    if (element) {
+      if (element.open) element.close();
+      if (docked) element.show();
+      else element.showModal();
+    }
     // A reply puts the cursor in the editor (it focuses itself once it
     // mounts); a new message or a forward starts at the recipients.
     if (!(source && mode !== "forward")) recipientInput.current?.focus();
@@ -590,7 +606,7 @@ function DraftDialog({
   useEffect(() => {
     const viewport = window.visualViewport;
     const element = dialog.current;
-    if (docked || !viewport || !element) return;
+    if (docked === null || docked || !viewport || !element) return;
     let frame = 0;
     let revealFrame = 0;
     const revealFocus = () => {
@@ -679,29 +695,39 @@ function DraftDialog({
   useEffect(() => {
     if (!allowed) lost();
   }, [allowed, lost]);
-  async function addFiles(files: FileList | null) {
+  async function addFiles(files: FileList | readonly File[] | null) {
     if (!files?.length || submitting.current || plainText || plainSaveUncertain || !current())
       return;
     setError("");
-    if (
-      retained.length + uploads.length + files.length > 10 ||
-      Array.from(files).some((f) => !f.size || f.size > 256 * 1024)
-    ) {
-      setError(t("attachmentLimit"));
+    const now = new Date();
+    const list = Array.from(files).map((file, index) => ({
+      file,
+      name: pastedFileName(file, now, index).slice(0, 160),
+    }));
+    const retainedBytes = carried
+      .filter((a) => retained.includes(a.index))
+      .reduce((sum, a) => sum + a.bytes, 0);
+    const uploadBytes = uploads.reduce((sum, u) => sum + base64Bytes(u.base64), 0);
+    const problem = composerFileProblem(
+      { count: retained.length + uploads.length, bytes: retainedBytes + uploadBytes },
+      list.map(({ file, name }) => ({ name, size: file.size })),
+    );
+    if (problem) {
+      setError(t(problem === "type" ? "attachmentTypeBlocked" : "attachmentLimit"));
       return;
     }
     loadFiles(true);
     try {
       const incoming = await Promise.all(
-        Array.from(files).map(
-          (file) =>
+        list.map(
+          ({ file, name }) =>
             new Promise<{ id: number; filename: string; base64: string }>((resolve, reject) => {
               const reader = new FileReader();
               reader.onload = () =>
                 typeof reader.result === "string"
                   ? resolve({
                       id: ++uploadSequence.current,
-                      filename: file.name.slice(0, 160),
+                      filename: name,
                       base64: reader.result.split(",")[1] ?? "",
                     })
                   : reject(new Error("file"));
@@ -757,7 +783,11 @@ function DraftDialog({
       aria-labelledby="draft-title"
       onCancel={(e) => {
         // Cancelling the file picker bubbles from its input, not this dialog.
-        if (e.target !== e.currentTarget) return;
+        if (e.target !== e.currentTarget || e.defaultPrevented) return;
+        if (e.currentTarget.querySelector?.('[role="listbox"], [role="menu"]')) {
+          e.preventDefault();
+          return;
+        }
         // Esc never throws the message away on its own: a docked composer
         // minimizes; the full-screen one asks when there is something to lose.
         e.preventDefault();
@@ -973,7 +1003,18 @@ function DraftDialog({
           }
         }}
       >
-        <div ref={composerBody} className={styles.composerBody}>
+        <div
+          ref={composerBody}
+          className={styles.composerBody}
+          onDragOver={(event) => {
+            if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+          }}
+          onDrop={(event) => {
+            if (!event.dataTransfer?.files?.length) return;
+            event.preventDefault();
+            void addFiles(event.dataTransfer.files);
+          }}
+        >
           <fieldset
             className={`${styles.fields} ${styles.composerFields}`}
             disabled={busy || !allowed}
@@ -1012,22 +1053,22 @@ function DraftDialog({
               </label>
             ) : null}
             <div className={styles.composerAddressFields}>
-              <label>
+              <label htmlFor={fromId}>
                 {t("from")}
-                <select
-                  className="ms-input"
+                <Select
+                  id={fromId}
+                  ariaLabel={t("from")}
+                  width="100%"
                   value={boxId}
-                  onChange={(e) => selectBox(e.target.value)}
+                  onChange={selectBox}
                   disabled={!!source}
-                >
-                  {boxes
+                  options={boxes
                     .filter((b) => b.canDraft && b.status === "planned")
-                    .map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.label} · {b.address}
-                      </option>
-                    ))}
-                </select>
+                    .map((b) => ({
+                      value: b.id,
+                      label: `${b.label} · ${b.address}`,
+                    }))}
+                />
               </label>
               <MailboxRecipientField
                 label={t("to")}
@@ -1136,6 +1177,7 @@ function DraftDialog({
                     setRichHtml(value.html);
                     setFormatted(value.formatted);
                   }}
+                  onPasteFiles={(files) => void addFiles(files)}
                   disabled={busy || !allowed}
                   placeholder={t("composeBodyPlaceholder")}
                   ariaLabel={t("message")}
@@ -1351,6 +1393,8 @@ export function ShortcutsDialog({ close }: { close: () => void }) {
   return (
     <dialog
       ref={dialog}
+      role="dialog"
+      aria-modal="true"
       className={`${styles.dialog} ${styles.shortcutsDialog}`}
       aria-labelledby="mailbox-shortcuts-title"
       onClose={close}
@@ -1394,6 +1438,10 @@ export function MailboxContentView({
   customFolderName,
   manage,
   changeFolder,
+  onSelectBox,
+  onScopeAll,
+  onOpenAgents,
+  onOpenSettings,
   selection,
   select,
   draftSaved,
@@ -1415,6 +1463,10 @@ export function MailboxContentView({
   customFolderName: string | null;
   manage?: (() => void) | undefined;
   changeFolder: (folder: Folder) => void;
+  onSelectBox?: ((id: string) => void) | undefined;
+  onScopeAll?: (() => void) | undefined;
+  onOpenAgents?: (() => void) | undefined;
+  onOpenSettings?: (() => void) | undefined;
   selection: { mailboxId: string; id: string } | null;
   select: (item: { mailboxId: string; id: string } | null) => void;
   draftSaved: (item: Outputs["saveDraft"]) => void;
@@ -1543,6 +1595,7 @@ export function MailboxContentView({
   const held = useSyncExternalStore(subscribeHeldSend, heldSend, noHeldSend);
   const [, setSendClock] = useState(0);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [commandsOpen, setCommandsOpen] = useState(false);
   const { prefs, setPref } = useCorreioPrefs();
   // Marking as read waits the preferred delay; leaving the message first cancels it.
   const seenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1559,7 +1612,7 @@ export function MailboxContentView({
   const sentForPeople = useQuery(
     trpc.mailboxes.items.queryOptions(
       { mailboxId: null, folder: "sent" },
-      { enabled: folder === "inbox", ...MAILBOX_READ_QUERY_OPTIONS, staleTime: 300_000 },
+      { enabled: smartOn, ...MAILBOX_READ_QUERY_OPTIONS, staleTime: 300_000 },
     ),
   );
   const knownPeople = useMemo(
@@ -1993,16 +2046,24 @@ export function MailboxContentView({
     openComposer(from, null, "reply", undefined, prefill);
     return true;
   }
-  // /mail?mailto=<link> (a browser or the desktop app handing over an email
-  // link): the composer opens with it once the writable mailboxes are known,
-  // and the link leaves the address bar so a reload does not open it again.
+  // /mail?mailto=<link> or /mail?compose=1 (a browser or desktop tray action):
+  // opens the composer once the writable mailboxes are known, and clears the
+  // query param so a reload does not open it again.
   const pendingMailto = useRef<string | null>(null);
+  const pendingCompose = useRef(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const link = params.get(MAILTO_PARAM);
-    if (!link) return;
-    pendingMailto.current = link;
-    params.delete(MAILTO_PARAM);
+    const composeNew = params.get("compose") === "1";
+    if (!link && !composeNew) return;
+    if (link) {
+      pendingMailto.current = link;
+      params.delete(MAILTO_PARAM);
+    }
+    if (composeNew) {
+      pendingCompose.current = true;
+      params.delete("compose");
+    }
     const query = params.toString();
     window.history.replaceState(
       window.history.state,
@@ -2013,10 +2074,19 @@ export function MailboxContentView({
   // Runs on every render until the link is used: cheap, and it waits for the
   // mailboxes without tracking each value the composer needs.
   useEffect(() => {
+    if (!writable.length) return;
     const link = pendingMailto.current;
-    if (!link || !writable.length) return;
-    pendingMailto.current = null;
-    composeMailto(link);
+    if (link) {
+      pendingMailto.current = null;
+      pendingCompose.current = false;
+      composeMailto(link);
+      return;
+    }
+    if (pendingCompose.current) {
+      pendingCompose.current = false;
+      const box = writable.find((w) => w.id === selected?.id) ?? writable[0];
+      if (box) openComposer(box.id, null);
+    }
   });
   const closeComposer = useCallback((session: number) => {
     if (composerSession.current !== session) return;
@@ -3364,13 +3434,27 @@ export function MailboxContentView({
   const folderTitle =
     folder === "custom" ? (customFolderName ?? t("organization.folders")) : t(folder);
   shortcut.current = (event) => {
+    // Alt+K: Correio command palette (switch boxes, folders, compose, agents).
+    if (
+      event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      event.key.toLowerCase() === "k" &&
+      !(event.target as Element | null)?.closest?.("dialog") &&
+      !shortcutsOpen
+    ) {
+      event.preventDefault();
+      setCommandsOpen((open) => !open);
+      return;
+    }
     // Ctrl+K (⌘K): search every mailbox from anywhere but the composer.
     if (
       (event.ctrlKey || event.metaKey) &&
       !event.altKey &&
       event.key.toLowerCase() === "k" &&
       !(event.target as Element | null)?.closest?.("dialog") &&
-      !shortcutsOpen
+      !shortcutsOpen &&
+      !commandsOpen
     ) {
       event.preventDefault();
       if (selected) setSearchEverywhere(true);
@@ -3381,7 +3465,7 @@ export function MailboxContentView({
     const action = mailboxShortcut(event, event.target);
     // The docked composer leaves the inbox's keys working outside it (keys typed
     // inside it, or in the full-screen one, never reach here as shortcuts).
-    if (!action || shortcutsOpen) return;
+    if (!action || shortcutsOpen || commandsOpen) return;
     const run = (act: () => void) => {
       event.preventDefault();
       act();
@@ -3563,6 +3647,15 @@ export function MailboxContentView({
             </button>
             <button
               type="button"
+              className="ms-btn ms-btn-ghost"
+              aria-label={t("commands.open")}
+              title={`${t("commands.open")} (Alt+K)`}
+              onClick={() => setCommandsOpen(true)}
+            >
+              <kbd className={styles.shortcutsHint}>⌘</kbd>
+            </button>
+            <button
+              type="button"
               className={`ms-btn ms-btn-ghost ${styles.narrowHidden}`}
               aria-label={t("shortcuts.title")}
               title={t("shortcuts.title")}
@@ -3572,6 +3665,22 @@ export function MailboxContentView({
             </button>
           </div>
         </section>
+        {commandsOpen ? (
+          <CorreioCommandDialog
+            close={() => setCommandsOpen(false)}
+            boxes={boxes}
+            theme={prefs.theme}
+            onToggleTheme={(theme) => setPref({ theme })}
+            canCompose={canCompose}
+            onCompose={newDraft}
+            onSelectFolder={changeFolder}
+            onSelectBox={onSelectBox}
+            onScopeAll={onScopeAll}
+            onOpenAgents={onOpenAgents}
+            onOpenSettings={onOpenSettings}
+            onOpenShortcuts={() => setShortcutsOpen(true)}
+          />
+        ) : null}
         {shortcutsOpen ? <ShortcutsDialog close={() => setShortcutsOpen(false)} /> : null}
         <div
           className={styles.contentPanels}
@@ -3679,6 +3788,7 @@ export function MailboxContentView({
                   phase={searchRecovery}
                   message={t(`recovery.${searchRecovery}`)}
                   retryLabel={t("retry")}
+                  retryDelayMs={5000}
                   retry={() =>
                     recoverSearch(found.isFetchingNextPage || found.isFetchNextPageError)
                   }
@@ -3908,6 +4018,7 @@ export function MailboxContentView({
                   phase={listingRecovery}
                   message={t(`recovery.${listingRecovery}`)}
                   retryLabel={t("retry")}
+                  retryDelayMs={5000}
                   retry={() =>
                     recoverListing(listing.isFetchingNextPage || listing.isFetchNextPageError)
                   }
@@ -3919,6 +4030,7 @@ export function MailboxContentView({
                   phase={listingRecovery}
                   message={t(`recovery.${listingRecovery}`)}
                   retryLabel={t("retry")}
+                  retryDelayMs={5000}
                   retry={() => recoverListing()}
                   className={styles.emptyFolder}
                 />
@@ -4339,7 +4451,7 @@ export function MailboxContentView({
                   <div className={`${styles.contentActions} ${styles.replyActions}`}>
                     <button
                       type="button"
-                      className="ms-btn"
+                      className="ms-btn ms-btn-secondary"
                       disabled={
                         pendingSentReply ||
                         !!(item.kind === "draft" && sendState && sendState !== "failed")
@@ -4603,6 +4715,7 @@ export function MailboxContentView({
                   phase={detailRecovery}
                   message={t(`recovery.${detailRecovery}`)}
                   retryLabel={t("retry")}
+                  retryDelayMs={5000}
                   retry={recoverDetail}
                   className={styles.emptyFolder}
                 />
@@ -4622,6 +4735,7 @@ export function MailboxContentView({
                       phase={detailRecovery}
                       message={t(`recovery.${detailRecovery}`)}
                       retryLabel={t("retry")}
+                      retryDelayMs={5000}
                       retry={recoverDetail}
                       className={styles.readerLoading}
                     />
@@ -4638,6 +4752,7 @@ export function MailboxContentView({
                       phase={detailRecovery}
                       message={t(`recovery.${detailRecovery}`)}
                       retryLabel={t("retry")}
+                      retryDelayMs={5000}
                       retry={recoverDetail}
                       className={styles.notice}
                     />

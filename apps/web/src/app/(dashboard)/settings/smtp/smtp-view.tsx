@@ -25,7 +25,8 @@ function FieldRow({
       style={{
         display: "flex",
         alignItems: "baseline",
-        gap: 16,
+        flexWrap: "wrap",
+        gap: "6px 16px",
         padding: "12px 0",
         borderBottom: "1px solid var(--ms-line)",
       }}
@@ -33,7 +34,9 @@ function FieldRow({
       <div className="ms-microlabel" style={{ width: 96, flex: "none" }}>
         {label}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+      <div
+        style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 220px", minWidth: 0 }}
+      >
         {children}
         {note ? <span style={{ fontSize: 12, color: "var(--ms-muted)" }}>{note}</span> : null}
       </div>
@@ -47,7 +50,7 @@ export function SmtpView() {
   const { data } = useQuery(trpc.settings.smtp.get.queryOptions());
 
   return (
-    <div style={{ maxWidth: 720, display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
+    <div style={{ maxWidth: 860, display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       {data && !data.tlsConfigured ? (
         data.allowInsecureAuth ? (
           <p

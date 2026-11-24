@@ -235,11 +235,25 @@
       "asksYou": "pede sua aprovação para enviar",
       "revoke": "Revogar",
       "revokeConfirm": "{count, plural, one {O agente perde o acesso a esta caixa na hora.} other {O agente perde o acesso às # caixas na hora.}}",
-      "revoked": "{agent} não tem mais acesso."
+      "revoked": "{agent} não tem mais acesso.",
+      "search": "Filtrar agentes ou endereços…",
+      "moreMailboxes": "+{count} caixas",
+      "lessMailboxes": "Mostrar menos caixas",
+      "keysHeading": "Chaves por caixa e conexão MCP",
+      "autonomousCount": "Autônomos (envio livre)",
+      "supervisedCount": "Copiloto (com aprovação)",
+      "dedicatedBoxes": "Caixas de agentes",
+      "modeAutonomous": "Autônomo · envia direto",
+      "modeCopilot": "Copiloto · pede aprovação",
+      "modeReadOnly": "Somente leitura",
+      "newAgentBox": "Nova caixa de agente"
     },
     "activity": {
       "title": "O que os agentes fizeram",
-      "empty": "Nenhuma atividade de agente ainda."
+      "empty": "Nenhuma atividade de agente ainda.",
+      "showAll": "Mostrar todas ({count})",
+      "showRecent": "Mostrar só as 8 mais recentes",
+      "searchMailboxes": "Filtrar caixas por nome ou endereço…"
     }
   }
 }

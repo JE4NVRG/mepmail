@@ -74,6 +74,9 @@ export function MailboxClientsDialog({
       className={styles.dialog}
       aria-labelledby="mailbox-clients-title"
       onClose={close}
+      onCancel={(event) => {
+        if (busy) event.preventDefault();
+      }}
     >
       <header className={styles.dialogHeader}>
         <h2 id="mailbox-clients-title">{t("title")}</h2>
@@ -87,7 +90,13 @@ export function MailboxClientsDialog({
         </button>
       </header>
       {!s ? (
-        <p className={styles.hint}>{t("loading")}</p>
+        settings.isError ? (
+          <p role="alert" className={styles.error}>
+            {t("errors.generic")}
+          </p>
+        ) : (
+          <p className={styles.hint}>{t("loading")}</p>
+        )
       ) : !s.open ? (
         <p className={styles.hint}>{t("soon")}</p>
       ) : (
@@ -149,7 +158,7 @@ export function MailboxClientsDialog({
           ) : null}
 
           <form
-            className={own.create}
+            className={`${own.create} ${styles.clientsCreate}`}
             onSubmit={async (e) => {
               e.preventDefault();
               setError("");
@@ -192,10 +201,14 @@ export function MailboxClientsDialog({
             </p>
           ) : null}
 
-          <section className={own.list} aria-label={t("list.title")}>
+          <section className={`${own.list} ${styles.clientsList}`} aria-label={t("list.title")}>
             <h3>{t("list.title")}</h3>
             {passwords.isPending ? (
               <p className={styles.hint}>{t("loading")}</p>
+            ) : passwords.isError ? (
+              <p role="alert" className={styles.error}>
+                {t("errors.generic")}
+              </p>
             ) : !list.length ? (
               <p className={styles.hint}>{t("list.empty")}</p>
             ) : (

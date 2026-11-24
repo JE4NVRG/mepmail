@@ -17,7 +17,8 @@ export type MailboxShortcut =
   | "undo"
   | "newFolder"
   | "moveTo"
-  | "snooze";
+  | "snooze"
+  | "commands";
 
 const KEYS: Record<string, MailboxShortcut> = {
   j: "next",
@@ -58,6 +59,7 @@ export const MAILBOX_SHORTCUTS: { key: string; action: MailboxShortcut }[] = [
   { key: "Shift+N", action: "newFolder" },
   { key: "/", action: "search" },
   { key: "Ctrl+K", action: "searchEverywhere" },
+  { key: "Alt+K", action: "commands" },
   { key: "?", action: "help" },
 ];
 

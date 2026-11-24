@@ -16,7 +16,15 @@
     "deleteTitle": "Excluir modelo",
     "deleteBody": "\"{name}\" será excluído. Transmissões que partiram dele mantêm sua cópia.",
     "deleteConfirm": "Excluir",
-    "htmlChipHint": "Criado como HTML; abre no modo código"
+    "htmlChipHint": "Criado como HTML; abre no modo código",
+    "searchPlaceholder": "Buscar modelo por nome…",
+    "allTypes": "Todos os tipos",
+    "typeBlocks": "Blocos",
+    "typeHtml": "HTML",
+    "noMatch": "Nenhum modelo corresponde aos seus filtros.",
+    "clearFilters": "Limpar filtros",
+    "useInBroadcast": "Usar em transmissão",
+    "pageOf": "{total, plural, one {# modelo} other {# modelos}}"
   },
   "starter": {
     "title": "Novo modelo",

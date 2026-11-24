@@ -170,7 +170,7 @@ function PlanUsage({ plan, detailed }: { plan: MailboxPlanUsage; detailed: boole
       <MailboxReceivingNotice plan={plan} compact />
       {names.map((name, index) => {
         const metric = plan.metrics[name];
-        const level = levels[index]!;
+        const level = levels[index] ?? "ok";
         return (
           <div key={name} className={styles.planMetric} data-level={level}>
             <div className={styles.usageMetric}>
@@ -313,7 +313,7 @@ export function MailboxUsagePanel({
           ) : (
             <p>{t("noPolicy")}</p>
           )}
-          <p>{t(unlimited ? "internalHelp" : "outboundHelp")}</p>
+          {detailed ? <p>{t(unlimited ? "internalHelp" : "outboundHelp")}</p> : null}
           {rows[0]?.periodEnd ? (
             <small>
               {t("renews", {

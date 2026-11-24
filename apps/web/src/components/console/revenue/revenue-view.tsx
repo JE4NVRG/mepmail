@@ -42,8 +42,11 @@ export function RevenueView() {
   if (query.isError) {
     return (
       <>
-        <PageHeader title={t("title")} />
+        <PageHeader title={t("title")} subtitle={t("proof")} />
         <div className="ms-card ms-state">
+          <span className="ms-state-glyph" aria-hidden="true">
+            !
+          </span>
           <p className="ms-state-headline">{common("loadError")}</p>
           <div className="ms-state-actions">
             <button
@@ -98,11 +101,47 @@ export function RevenueView() {
         )}
       </div>
 
-      <div className="ms-card" style={{ padding: 0 }}>
+      <div className="ms-card" style={{ padding: 0, overflow: "hidden" }}>
         {!d ? (
-          <div style={{ padding: 20 }}>
-            <Skeleton width="100%" height={160} />
-          </div>
+          <Table className="nowrap">
+            <thead>
+              <tr>
+                <th>{t("columns.team")}</th>
+                <th>{t("columns.product")}</th>
+                <th>{t("columns.status")}</th>
+                <th className="right">{t("columns.monthly")}</th>
+                <th>{t("columns.renews")}</th>
+                <th>{t("columns.links")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[130, 160, 110, 145].map((width) => (
+                <tr key={width}>
+                  <td>
+                    <Skeleton width={width} height={13} />
+                  </td>
+                  <td>
+                    <Skeleton width={110} height={13} />
+                  </td>
+                  <td>
+                    <Skeleton width={64} height={20} radius="var(--ms-r-chip)" />
+                  </td>
+                  <td className="right">
+                    <Skeleton width={56} height={13} />
+                  </td>
+                  <td>
+                    <Skeleton width={90} height={13} />
+                  </td>
+                  <td>
+                    <span style={{ display: "inline-flex", gap: 6 }}>
+                      <Skeleton width={48} height={22} radius="var(--ms-r-chip)" />
+                      <Skeleton width={54} height={22} radius="var(--ms-r-chip)" />
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
         ) : d.rows.length === 0 ? (
           <p style={{ margin: 0, padding: 20, color: "var(--ms-muted)" }}>{t("empty")}</p>
         ) : (
@@ -177,21 +216,23 @@ export function RevenueView() {
                           ? day.format(new Date(r.periodEnd))
                           : common("none")}
                     </td>
-                    <td style={{ display: "flex", gap: 6 }}>
-                      <Link
-                        className="ms-chip"
-                        style={{ textDecoration: "none", fontSize: 12 }}
-                        href={`/console/audit?team=${r.teamId}`}
-                      >
-                        {t("audit")}
-                      </Link>
-                      <Link
-                        className="ms-chip"
-                        style={{ textDecoration: "none", fontSize: 12 }}
-                        href={`/console/safety/${r.teamId}`}
-                      >
-                        {t("review")}
-                      </Link>
+                    <td>
+                      <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                        <Link
+                          className="ms-chip"
+                          style={{ textDecoration: "none", fontSize: 12 }}
+                          href={`/console/audit?team=${r.teamId}`}
+                        >
+                          {t("audit")}
+                        </Link>
+                        <Link
+                          className="ms-chip"
+                          style={{ textDecoration: "none", fontSize: 12 }}
+                          href={`/console/safety/${r.teamId}`}
+                        >
+                          {t("review")}
+                        </Link>
+                      </span>
                     </td>
                   </tr>
                 );

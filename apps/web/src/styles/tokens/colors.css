@@ -4,6 +4,7 @@
    attribute, so a preview frame can show the other scheme inside the app. */
 :root,
 [data-theme="dark"] {
+  color-scheme: dark;
   /* Ground & surfaces — separation comes from darkness + 1px lines, plus a
      subtle edge-lit lift on floating/card surfaces (--ms-shadow-card below) */
   --ms-void: #000000; /* app/page ground */
@@ -78,6 +79,7 @@
    system preference is not followed). */
 :root[data-theme="light"],
 [data-theme="light"] {
+  color-scheme: light;
   --ms-void: #faf8f4;
   --ms-ground: #f4f1ea;
   --ms-panel: #fffefb;

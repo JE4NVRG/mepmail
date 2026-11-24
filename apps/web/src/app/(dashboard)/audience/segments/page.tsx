@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { Table } from "@/components/table";
 import { Tooltip } from "@/components/tooltip";
+import { Truncated } from "@/components/truncated";
 import { formatRelative } from "@/lib/format";
 import { type BuilderRow, buildSegmentFilter, type MatchMode } from "@/lib/segment-builder";
 import { useTRPC } from "@/lib/trpc";
@@ -235,28 +236,28 @@ export default function SegmentsPage() {
               {shownRows.map((row) => (
                 <tr key={row.id}>
                   <td>
-                    <div style={{ fontSize: 14 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        minWidth: 0,
+                        fontSize: 14,
+                      }}
+                    >
                       <Link
                         href={`/audience/segments/${row.id}`}
-                        style={{ color: "var(--ms-bone)" }}
+                        style={{ color: "var(--ms-bone)", minWidth: 0, overflow: "hidden" }}
                       >
-                        {row.name}
+                        <Truncated text={row.name} />
                       </Link>
                       {/* Null filter = manual segment (membership added via the
                           API); the builder only edits filter segments. */}
                       {row.filter === null ? (
-                        <span
-                          style={{
-                            marginLeft: 8,
-                            color: "var(--ms-faint)",
-                            fontSize: "var(--ms-fs-label)",
-                          }}
-                        >
-                          {t("manual")}
-                        </span>
+                        <span className="ms-badge ms-badge-neutral">{t("manual")}</span>
                       ) : null}
                       {copiedId === row.id ? (
-                        <span style={{ marginLeft: 8, color: "var(--ms-muted)", fontSize: 12.5 }}>
+                        <span style={{ color: "var(--ms-muted)", fontSize: 12.5 }}>
                           ✓ {common("copied")}
                         </span>
                       ) : null}

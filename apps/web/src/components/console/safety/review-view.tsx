@@ -281,7 +281,9 @@ export function ReviewView({ teamId }: { teamId: string }) {
               subtitle={`${team.sendReview.reason ? t(`sendReview.${team.sendReview.reason}`) : ""} ${formatRelative(team.sendReview.at, locale)}`}
             />
             {team.sendReview.note ? (
-              <p style={{ margin: "8px 0 0", fontSize: 13 }}>{team.sendReview.note}</p>
+              <p style={{ margin: "8px 0 0", fontSize: 13, overflowWrap: "anywhere" }}>
+                {team.sendReview.note}
+              </p>
             ) : null}
             <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
               {t("sendReview.body")}
@@ -520,7 +522,16 @@ export function ReviewView({ teamId }: { teamId: string }) {
                             ? monitorT("pending")
                             : monitorT("unjudged", { error: sample.errorClass ?? "" })}
                       </td>
-                      <td className="ms-mono" style={{ fontSize: 12, color: "var(--ms-muted)" }}>
+                      <td
+                        className="ms-mono"
+                        style={{
+                          fontSize: 12,
+                          color: "var(--ms-muted)",
+                          whiteSpace: "normal",
+                          overflowWrap: "anywhere",
+                          minWidth: 160,
+                        }}
+                      >
                         {(sample.reasons ?? []).join(", ") || common("none")}
                       </td>
                     </tr>
@@ -569,12 +580,20 @@ export function ReviewView({ teamId }: { teamId: string }) {
               >
                 <span
                   className="ms-dot"
-                  style={{ background: SEVERITY_DOT[check.severity] ?? "var(--ms-muted)" }}
+                  style={{
+                    flexShrink: 0,
+                    background: SEVERITY_DOT[check.severity] ?? "var(--ms-muted)",
+                  }}
                 />
                 <span>{emails(`insights.check.${check.id}.title`)}</span>
                 <span
                   className="ms-mono"
-                  style={{ marginLeft: "auto", fontSize: 12, color: "var(--ms-muted)" }}
+                  style={{
+                    marginLeft: "auto",
+                    flexShrink: 0,
+                    fontSize: 12,
+                    color: "var(--ms-muted)",
+                  }}
                 >
                   {t("checks.count", { emails: check.emails })}
                 </span>
@@ -584,7 +603,7 @@ export function ReviewView({ teamId }: { teamId: string }) {
         </div>
       </div>
 
-      <div className="ms-card" style={{ padding: 0, marginBottom: 16 }}>
+      <div className="ms-card" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
         <CardHead
           inset
           title={t("emails.title", { count: flaggedEmails.length })}
@@ -614,7 +633,12 @@ export function ReviewView({ teamId }: { teamId: string }) {
                   <td style={{ color: "var(--ms-muted)" }}>
                     {email.sentAt ? <RelativeTime date={email.sentAt} /> : common("none")}
                   </td>
-                  <td className="ms-mono">{email.from}</td>
+                  <td
+                    className="ms-mono"
+                    style={{ maxWidth: 260, whiteSpace: "normal", overflowWrap: "anywhere" }}
+                  >
+                    {email.from}
+                  </td>
                   <td className="right ms-digits">{nf.format(email.recipients)}</td>
                   <td>
                     {email.check ? (
@@ -639,7 +663,14 @@ export function ReviewView({ teamId }: { teamId: string }) {
                       common("none")
                     )}
                   </td>
-                  <td style={{ fontSize: 12, color: "var(--ms-muted)", whiteSpace: "normal" }}>
+                  <td
+                    style={{
+                      fontSize: 12,
+                      color: "var(--ms-muted)",
+                      whiteSpace: "normal",
+                      minWidth: 160,
+                    }}
+                  >
                     {!email.model
                       ? common("none")
                       : email.model.status === "judged" && email.model.score !== null
@@ -671,7 +702,7 @@ export function ReviewView({ teamId }: { teamId: string }) {
         </Table>
       </div>
 
-      <div className="ms-card" style={{ padding: 0 }}>
+      <div className="ms-card" style={{ padding: 0, overflow: "hidden" }}>
         <CardHead inset title={t("audit.title")} subtitle={t("audit.subtitle")} />
         <Table>
           <thead>

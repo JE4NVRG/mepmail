@@ -8,6 +8,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./attachment-policy": {
+      "types": "./src/attachment-policy.ts",
+      "default": "./src/attachment-policy.ts"
+    },
     "./audit-actions": {
       "types": "./src/audit-actions.ts",
       "default": "./src/audit-actions.ts"

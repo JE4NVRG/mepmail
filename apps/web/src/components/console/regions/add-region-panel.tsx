@@ -3,8 +3,9 @@
 import { awsAddRegionCommand } from "@millionsend/ses/setup-constants";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { regionFlag } from "@/app/(dashboard)/domains/regions";
-import type { ServedRegion } from "../region-actions";
+import { DOMAIN_REGIONS, regionFlag } from "@/app/(dashboard)/domains/regions";
+import { Select } from "@/components/select";
+import { RegionBadge, type ServedRegion } from "../region-actions";
 import { codeBlock, TemplateDialog } from "./region-dialogs";
 
 const faint: React.CSSProperties = { color: "var(--ms-faint)" };
@@ -29,14 +30,15 @@ function Check({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 10,
+        flexWrap: "wrap",
+        gap: "4px 10px",
         fontSize: "var(--ms-fs-label)",
         padding: "7px 0",
         borderBottom: last ? 0 : "1px solid var(--ms-line)",
       }}
     >
-      <span className="ms-dot" style={{ background: `var(--ms-${tone})` }} />
-      {children}
+      <span className="ms-dot" style={{ background: `var(--ms-${tone})`, flexShrink: 0 }} />
+      <span style={{ minWidth: 0 }}>{children}</span>
       {trailing ? (
         <span className="ms-mono" style={{ marginLeft: "auto", fontSize: 12, ...muted }}>
           {trailing}
@@ -83,13 +85,16 @@ export function AddRegionPanel({
   region,
   served,
   envRegions,
+  onSelectRegion,
 }: {
   region: string;
   /** The live row when the region is already served; the checks reflect it. */
   served: ServedRegion | undefined;
   envRegions: string[];
+  onSelectRegion?: (region: string) => void;
 }) {
   const t = useTranslations("console.regions.add");
+  const tRegions = useTranslations("console.regions");
   const domains = useTranslations("domains");
   const [template, setTemplate] = useState(false);
   const flag = regionFlag(region);
@@ -109,25 +114,46 @@ export function AddRegionPanel({
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           alignItems: "flex-start",
           justifyContent: "space-between",
           gap: 12,
           marginBottom: 16,
         }}
       >
-        <div>
+        <div style={{ minWidth: 0, flex: "1 1 220px" }}>
           <h3 style={{ margin: "0 0 4px", fontSize: "var(--ms-fs-section)", fontWeight: 600 }}>
             {t("title", { region: `${flag} ${region}` })}
           </h3>
           <p style={{ ...p, margin: 0 }}>{t("subtitle")}</p>
         </div>
-        <span className="ms-badge ms-badge-neutral">{t("notStarted")}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {onSelectRegion ? (
+            <Select
+              value={region}
+              onChange={onSelectRegion}
+              ariaLabel={tRegions("columns.region")}
+              width={200}
+              options={DOMAIN_REGIONS.map((code) => ({
+                value: code,
+                label: `${regionFlag(code)} ${domains(`regions.${code}`)}`,
+              }))}
+            />
+          ) : null}
+          {served ? (
+            <RegionBadge status={served.status} />
+          ) : (
+            <span className="ms-badge ms-badge-neutral" style={{ flexShrink: 0 }}>
+              {t("notStarted")}
+            </span>
+          )}
+        </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column" }}>
         <Step n="01">
           <h4 style={h4}>{t("step1")}</h4>
           <p style={p}>{t("step1Body")}</p>
-          <pre className="ms-mono" style={codeBlock}>
+          <pre className="ms-mono" style={{ ...codeBlock, whiteSpace: "pre" }}>
             {`$ ${awsAddRegionCommand(region)}  `}
             <span style={faint}>{domains(`regions.${region}`)}</span>
             {"\n"}

@@ -12,7 +12,7 @@ use tauri_plugin_autostart::ManagerExt;
 
 #[cfg(not(feature = "store"))]
 use crate::update;
-use crate::{is_portuguese, settings, show_main, MAIN_WINDOW};
+use crate::{deeplink, is_portuguese, navigate_main, settings, show_main, MAIN_WINDOW};
 
 pub struct TrayHandle<R: Runtime>(pub TrayIcon<R>);
 
@@ -57,6 +57,7 @@ fn toggle_autostart<R: Runtime>(handle: &AppHandle<R>) -> bool {
 
 struct Strings {
     open: &'static str,
+    compose: &'static str,
     reload: &'static str,
     autostart: &'static str,
     keep_in_tray: &'static str,
@@ -67,6 +68,7 @@ fn strings() -> Strings {
     if is_portuguese() {
         Strings {
             open: "Abrir MepMail",
+            compose: "Novo e-mail",
             reload: "Recarregar",
             autostart: if cfg!(windows) {
                 "Iniciar com o Windows"
@@ -79,6 +81,7 @@ fn strings() -> Strings {
     } else {
         Strings {
             open: "Open MepMail",
+            compose: "New message",
             reload: "Reload",
             autostart: if cfg!(windows) {
                 "Start with Windows"
@@ -98,6 +101,7 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     let keep_in_tray = settings::current(handle).keep_in_tray;
 
     let open = MenuItem::with_id(app, "open", strings.open, true, None::<&str>)?;
+    let compose = MenuItem::with_id(app, "compose", strings.compose, true, None::<&str>)?;
     let reload = MenuItem::with_id(app, "reload", strings.reload, true, None::<&str>)?;
     let autostart = CheckMenuItem::with_id(
         app,
@@ -121,8 +125,9 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     #[cfg(not(feature = "store"))]
     let updates = MenuItem::with_id(app, "updates", update::tray_label(None), true, None::<&str>)?;
     #[cfg(not(feature = "store"))]
-    let items: [&dyn tauri::menu::IsMenuItem<R>; 8] = [
+    let items: [&dyn tauri::menu::IsMenuItem<R>; 9] = [
         &open,
+        &compose,
         &reload,
         &separator_top,
         &autostart,
@@ -132,8 +137,9 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
         &quit,
     ];
     #[cfg(feature = "store")]
-    let items: [&dyn tauri::menu::IsMenuItem<R>; 7] = [
+    let items: [&dyn tauri::menu::IsMenuItem<R>; 8] = [
         &open,
+        &compose,
         &reload,
         &separator_top,
         &autostart,
@@ -151,6 +157,12 @@ pub fn build<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
         .tooltip("MepMail")
         .on_menu_event(move |handle, event| match event.id.as_ref() {
             "open" => show_main(handle),
+            "compose" => {
+                if let Some(target) = deeplink::compose_route() {
+                    navigate_main(handle, target);
+                }
+                show_main(handle);
+            }
             // A page that hangs or went blank after a network drop comes back
             // without quitting the app.
             "reload" => {

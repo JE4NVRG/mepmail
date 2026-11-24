@@ -201,7 +201,7 @@
 .gtm-nav-links {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   /* Nav v2 é flat (6 itens): a linha não pode quebrar em duas — o que aperta é
      o padding/fonte (ver faixa 880–1199px), nunca o wrap. */
   flex-wrap: nowrap;
@@ -308,10 +308,10 @@
 }
 .gtm-action.ms-btn {
   height: auto;
-  min-height: 44px;
+  min-height: 36px;
   justify-content: center;
-  padding: 10px 18px;
-  font-size: 15px;
+  padding: 7px 14px;
+  font-size: 14px;
   /* A CTA do header nunca quebra em duas linhas, em nenhuma faixa. */
   white-space: nowrap;
 }
@@ -575,7 +575,7 @@
 /* On a phone each footer link is a finger-sized row, not a 22px line. */
 @media (max-width: 640px) {
   .gtm-footer-col {
-    gap: 2px;
+    gap: 8px;
   }
   .gtm-footer-col a {
     padding-block: 7px;
@@ -765,7 +765,7 @@
     gap: 12px;
   }
   .gtm-nav-links {
-    gap: 4px;
+    gap: 8px;
   }
   .gtm-nav-links a {
     padding: 0 12px;
@@ -1515,7 +1515,8 @@
   align-items: center;
   gap: 10px;
   justify-content: flex-end;
-  width: 224px;
+  width: auto;
+  min-width: 224px;
   min-height: 44px;
 }
 .gtm-public-account.is-pending::after {
@@ -1547,9 +1548,14 @@
   border: 0;
   color: var(--ms-muted);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
-  padding: 5px;
+  padding: 0 8px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .gtm-account-signout:disabled {
   opacity: 0.5;

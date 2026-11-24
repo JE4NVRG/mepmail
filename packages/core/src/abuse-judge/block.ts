@@ -75,7 +75,7 @@ export function stripHiddenElements(html: string): { html: string; hiddenChars: 
     if (!VOID_TAGS.has(tag) && !attrs.trimEnd().endsWith("/")) {
       const walker = new RegExp(`<(/?)${tag}\\b[^<>]*>`, "gi");
       let depth = 1;
-      let close = html.length;
+      let close: number | null = null;
       for (const t of html.slice(end).matchAll(walker)) {
         depth += t[1] === "/" ? -1 : 1;
         if (depth === 0) {
@@ -83,8 +83,12 @@ export function stripHiddenElements(html: string): { html: string; hiddenChars: 
           break;
         }
       }
-      hiddenChars += visibleText(html.slice(end, close)).length;
-      end = close;
+      // Unclosed hidden containers must not swallow the rest of the document;
+      // drop only the opening tag so subsequent links and text stay inspectable.
+      if (close !== null) {
+        hiddenChars += visibleText(html.slice(end, close)).length;
+        end = close;
+      }
     }
     out += html.slice(cursor, open);
     cursor = end;

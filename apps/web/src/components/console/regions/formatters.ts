@@ -24,8 +24,8 @@ export function useRegionFormats() {
     const one = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
     return {
       locale,
-      n: (v: number) => nf.format(v),
-      oneDecimal: (v: number) => one.format(v),
+      n: (v: number) => (Number.isFinite(v) ? nf.format(v) : "—"),
+      oneDecimal: (v: number) => (Number.isFinite(v) ? one.format(v) : "—"),
       pct0: (v: number) => percent(0).format(v),
       pct2: (v: number) => percent(2).format(v),
       pct3: (v: number) => percent(3).format(v),

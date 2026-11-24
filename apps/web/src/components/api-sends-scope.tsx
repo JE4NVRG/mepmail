@@ -8,8 +8,18 @@ import { sendingClarityMessage } from "@/lib/sending-clarity";
 export function ApiSendsScope() {
   const t = useTranslations("common");
   return (
-    <div style={{ marginBottom: 20, overflowWrap: "anywhere" }}>
-      <p style={{ color: "var(--ms-muted)", margin: "0 0 8px" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: "8px 16px",
+        marginBottom: 16,
+        overflowWrap: "anywhere",
+      }}
+    >
+      <p style={{ color: "var(--ms-muted)", margin: 0, fontSize: "var(--ms-fs-ui)" }}>
         {sendingClarityMessage(t, "apiSends.description")}
       </p>
       <Link href="/mail" className="ms-btn ms-btn-secondary">

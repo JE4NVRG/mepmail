@@ -7,11 +7,12 @@ import { Modal } from "@/components/modal";
 import { ConfirmKeycap, ModalFooter } from "@/components/modal-footer";
 import { PopoverMenu } from "@/components/popover-menu";
 import { RelativeTime } from "@/components/relative-time";
-import { Skeleton } from "@/components/skeleton";
+import { Skeleton, SkeletonBadge } from "@/components/skeleton";
 import { BtnSpinner } from "@/components/spinner";
 import { Table } from "@/components/table";
 import { Tooltip } from "@/components/tooltip";
 import { useTRPC } from "@/lib/trpc";
+import { StateCard } from "../../emails/list-parts";
 
 export function ConnectedAppsView() {
   const t = useTranslations("settings.connectedApps");
@@ -41,11 +42,52 @@ export function ConnectedAppsView() {
   const grants = listQuery.data;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20, maxWidth: 920 }}>
       <p style={{ margin: 0, fontSize: 13, color: "var(--ms-muted)", lineHeight: 1.55 }}>
         {t("intro")}
       </p>
-      {listQuery.isPending ? <Skeleton width="100%" height={48} /> : null}
+      {listQuery.isPending ? (
+        <Table>
+          <thead>
+            <tr>
+              <th>{t("table.app")}</th>
+              <th>{t("table.user")}</th>
+              <th>{t("table.scopes")}</th>
+              <th>{t("table.granted")}</th>
+              <th className="right" aria-label={t("table.menu")} />
+            </tr>
+          </thead>
+          <tbody>
+            {["42%", "58%", "36%"].map((width) => (
+              <tr key={width}>
+                <td>
+                  <Skeleton width={width} height={13} />
+                </td>
+                <td>
+                  <Skeleton width="65%" height={13} />
+                </td>
+                <td>
+                  <SkeletonBadge width={92} />
+                </td>
+                <td>
+                  <Skeleton width={54} height={13} />
+                </td>
+                <td className="right" style={{ width: 40 }}>
+                  <Skeleton width={28} height={28} radius={8} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      ) : null}
+      {listQuery.isError ? (
+        <StateCard
+          tone="error"
+          headline={common("loadError.ours")}
+          actionLabel={common("loadError.retry")}
+          onAction={() => listQuery.refetch()}
+        />
+      ) : null}
       {grants && grants.length === 0 ? (
         <p className="ms-card" style={{ margin: 0, padding: 24, color: "var(--ms-muted)" }}>
           {t("empty")}
@@ -76,16 +118,30 @@ export function ConnectedAppsView() {
                       name
                     )}
                   </td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    {grant.userEmail ?? "—"}
-                    {grant.own ? (
-                      <span className="ms-badge ms-badge-neutral" style={{ marginLeft: 8 }}>
-                        {t("you")}
-                      </span>
-                    ) : null}
+                  <td>
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {grant.userEmail ?? "—"}
+                      {grant.own ? (
+                        <span className="ms-badge ms-badge-neutral">{t("you")}</span>
+                      ) : null}
+                    </span>
                   </td>
                   <td>
-                    <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span
+                      style={{
+                        display: "flex",
+                        gap: 6,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
                       {grant.allTeams ? (
                         <span className="ms-badge ms-badge-neutral">{t("allTeams")}</span>
                       ) : null}
@@ -105,7 +161,7 @@ export function ConnectedAppsView() {
                     </span>
                   </td>
                   <td>{grant.grantedAt ? <RelativeTime date={grant.grantedAt} /> : "—"}</td>
-                  <td className="right">
+                  <td className="right" style={{ width: 40 }}>
                     <PopoverMenu
                       ariaLabel={t("table.menu")}
                       items={[

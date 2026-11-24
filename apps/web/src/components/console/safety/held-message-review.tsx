@@ -179,7 +179,9 @@ export function HeldMessageReviewEntry({ teamId }: { teamId: string }) {
       >
         {copy.entryTitle}
       </h2>
-      <p style={{ color: "var(--ms-muted)", fontSize: 13 }}>{copy.entryLead}</p>
+      <p style={{ color: "var(--ms-muted)", fontSize: 13, margin: "6px 0 14px" }}>
+        {copy.entryLead}
+      </p>
       <Link href={href} className="ms-btn ms-btn-secondary">
         {copy.entryAction}
       </Link>
@@ -272,35 +274,54 @@ export function HeldMessageReview({ teamId, emailId }: { teamId: string; emailId
                 {copy.expiry} <span className="ms-digits">{formatMmSs(left)}</span>
               </p>
             ) : null}
-            {access?.state === "ready" && left > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                alignItems: "center",
+                marginTop: 16,
+              }}
+            >
+              {access?.state === "ready" && left > 0 ? (
+                <button
+                  ref={openButton}
+                  type="button"
+                  className="ms-btn ms-btn-primary"
+                  onClick={() => setContentOpen(true)}
+                >
+                  {copy.open}
+                </button>
+              ) : !access || left === 0 ? (
+                <button
+                  ref={requestButton}
+                  type="button"
+                  className="ms-btn ms-btn-primary"
+                  onClick={() => {
+                    setRequestError(false);
+                    setRequestOpen(true);
+                  }}
+                >
+                  {copy.request}
+                </button>
+              ) : null}
               <button
-                ref={openButton}
                 type="button"
-                className="ms-btn ms-btn-primary"
-                onClick={() => setContentOpen(true)}
+                className="ms-btn ms-btn-secondary"
+                disabled={query.isFetching || request.isPending}
+                onClick={() => void check()}
               >
-                {copy.open}
+                <BtnSpinner on={query.isFetching} />
+                {copy.check}
               </button>
-            ) : !access || left === 0 ? (
-              <button
-                ref={requestButton}
-                type="button"
-                className="ms-btn ms-btn-primary"
-                onClick={() => {
-                  setRequestError(false);
-                  setRequestOpen(true);
-                }}
-              >
-                {copy.request}
-              </button>
-            ) : null}
+            </div>
           </>
         )}
-        {!query.isPending ? (
+        {!query.isPending && (!query.data?.enabled || !matches || !message) ? (
           <button
             type="button"
             className="ms-btn ms-btn-secondary"
-            style={{ marginTop: 16 }}
+            style={{ marginTop: 12 }}
             disabled={query.isFetching || request.isPending}
             onClick={() => void check()}
           >
@@ -379,7 +400,9 @@ export function HeldReviewRequestDialog({
         }}
         aria-busy={pending}
       >
-        <p>{copy.lead}</p>
+        <p style={{ margin: "6px 0 16px", color: "var(--ms-muted)", fontSize: 13.5 }}>
+          {copy.lead}
+        </p>
         <div className="ms-field" style={{ marginBottom: 14 }}>
           <label htmlFor={`${id}-reason`}>{copy.reason}</label>
           <Select
@@ -406,16 +429,23 @@ export function HeldReviewRequestDialog({
             aria-invalid={showError}
             aria-describedby={`${id}-help${showError ? ` ${id}-error` : ""}`}
           />
-          <p id={`${id}-help`} style={{ fontSize: 13, color: "var(--ms-muted)" }}>
+          <p
+            id={`${id}-help`}
+            style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ms-muted)" }}
+          >
             {copy.whyHelp}
           </p>
           {showError ? (
-            <p id={`${id}-error`} role="alert" style={{ color: "var(--ms-danger)" }}>
+            <p
+              id={`${id}-error`}
+              role="alert"
+              style={{ margin: "4px 0 0", fontSize: 12, color: "var(--ms-danger)" }}
+            >
               {copy.whyError}
             </p>
           ) : null}
         </div>
-        <p>{copy.scope}</p>
+        <p style={{ margin: 0, fontSize: 12.5, color: "var(--ms-muted)" }}>{copy.scope}</p>
         {error ? (
           <p role="alert" style={{ color: "var(--ms-danger)" }}>
             {copy.requestFailed}
@@ -454,19 +484,27 @@ export function HeldReviewContent({ locale, content }: { locale: string; content
   const copy = copyFor(locale);
   return (
     <>
-      <p className="ms-chip">{copy.rendered}</p>
-      <h3 className="ms-microlabel">{copy.subject}</h3>
-      <div style={{ fontWeight: 600, overflowWrap: "anywhere" }}>
+      <p className="ms-chip" style={{ margin: "0 0 12px" }}>
+        {copy.rendered}
+      </p>
+      <h3 className="ms-microlabel" style={{ margin: "0 0 4px" }}>
+        {copy.subject}
+      </h3>
+      <div style={{ fontWeight: 600, marginBottom: 12, overflowWrap: "anywhere" }}>
         <TextSpans spans={content.subject} />
       </div>
-      <h3 className="ms-microlabel">{copy.body}</h3>
+      <h3 className="ms-microlabel" style={{ margin: "0 0 4px" }}>
+        {copy.body}
+      </h3>
       <div className="ms-revealed" style={{ overflowWrap: "anywhere" }}>
         {content.spans.length ? <TextSpans spans={content.spans} /> : copy.empty}
       </div>
       {content.linkHosts.length ? (
         <>
-          <h3 className="ms-microlabel">{copy.hosts}</h3>
-          <ul>
+          <h3 className="ms-microlabel" style={{ margin: "12px 0 4px" }}>
+            {copy.hosts}
+          </h3>
+          <ul style={{ margin: "0 0 8px", paddingLeft: 18 }}>
             {content.linkHosts.map((host) => (
               <li key={host} className="ms-mono" style={{ overflowWrap: "anywhere" }}>
                 {host}
@@ -475,7 +513,7 @@ export function HeldReviewContent({ locale, content }: { locale: string; content
           </ul>
         </>
       ) : null}
-      <p style={{ color: "var(--ms-muted)", fontSize: 13 }}>{copy.noMonitor}</p>
+      <p style={{ color: "var(--ms-muted)", fontSize: 13, margin: "12px 0 0" }}>{copy.noMonitor}</p>
     </>
   );
 }

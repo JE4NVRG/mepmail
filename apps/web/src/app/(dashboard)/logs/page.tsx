@@ -3,7 +3,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useDeferredValue, useMemo } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -18,11 +18,11 @@ import { maskApiKey } from "@/lib/format";
 import { httpMethodTone } from "@/lib/http-method-tone";
 import { type RangeKey, rangeSince } from "@/lib/list-range";
 import { encodeLogSource, parseLogSource } from "@/lib/log-source";
-import { statusCodeColor } from "@/lib/status-code-color";
+import { statusCodeTone } from "@/lib/status-code-color";
 import { useTRPC } from "@/lib/trpc";
 import { oneOf, useUrlState } from "@/lib/url-state";
 import { ListFooter, SearchBox, StateCard } from "../emails/list-parts";
-import { DiagnosisCard } from "./diagnosis-card";
+import { DiagnosisCard, type DiagnosisErrorFilter } from "./diagnosis-card";
 
 const STATUS_CLASSES = ["2xx", "4xx", "5xx"] as const;
 type StatusClass = (typeof STATUS_CLASSES)[number];
@@ -40,7 +40,7 @@ const STATUS_CLASS_TONE: Record<StatusClass, BadgeTone> = {
 };
 const toneColor = (tone: string) => `var(--ms-${tone})`;
 
-const COL = { method: "12%", source: "20%", status: "10%", when: "14%" } as const;
+const COL = { method: "10%", source: "24%", status: "10%", when: "18%" } as const;
 
 /**
  * Ghost stand-in mirroring the loaded table: mono chip, mono path bar,
@@ -89,6 +89,7 @@ function LogsSkeleton({ headers }: { headers: [string, string, string, string, s
 
 export default function LogsPage() {
   const t = useTranslations("logs");
+  const locale = useLocale();
   const trpc = useTRPC();
   const router = useRouter();
   const [search, setSearch] = useUrlState("q");
@@ -170,11 +171,50 @@ export default function LogsPage() {
     t("list.when"),
   ];
 
+  function handleSelectDiagnosisError({ path, statusClass: targetStatus }: DiagnosisErrorFilter) {
+    if (deferredSearch === path && statusClass === targetStatus) {
+      setSearch("");
+      setStatusClass("all");
+    } else {
+      setSearch(path);
+      setStatusClass(targetStatus);
+    }
+  }
+
   return (
     <>
-      <PageHeader title={t("list.title")} />
+      <PageHeader
+        title={t("list.title")}
+        actions={
+          <button
+            type="button"
+            className="ms-btn ms-btn-secondary"
+            onClick={() => void query.refetch()}
+            disabled={query.isFetching}
+          >
+            <svg
+              width={13}
+              height={13}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 3v6h-6" />
+            </svg>
+            {t("list.refresh")}
+          </button>
+        }
+      />
 
-      <DiagnosisCard />
+      <DiagnosisCard
+        onSelectError={handleSelectDiagnosisError}
+        activeFilter={{ path: deferredSearch, statusClass }}
+      />
 
       <div
         className="ms-filter-row"
@@ -191,7 +231,7 @@ export default function LogsPage() {
         <Select
           value={method}
           onChange={setMethod}
-          width={168}
+          width={196}
           ariaLabel={t("list.method")}
           options={[
             { value: "all", label: t("list.allMethods"), adornment: <StatusDot /> },
@@ -223,6 +263,16 @@ export default function LogsPage() {
             })),
           ]}
         />
+        {hasFilters ? (
+          <button
+            type="button"
+            className="ms-btn ms-btn-secondary"
+            onClick={clearFilters}
+            style={{ flexShrink: 0 }}
+          >
+            {t("list.clearFilter")}
+          </button>
+        ) : null}
       </div>
 
       {query.isPending ? (
@@ -289,14 +339,26 @@ export default function LogsPage() {
                   </td>
                   <td>
                     {(() => {
+                      const sourceKind = t(`list.sources.${row.apiKeyId ? "api_key" : "mcp"}`);
+                      const caller = callerNames.get(row.apiKeyId ?? row.oauthClientId ?? "");
+                      const label = caller ? `${sourceKind} · ${caller}` : sourceKind;
                       const pill = (
-                        <span className="ms-badge ms-badge-neutral">
-                          {t(`list.sources.${row.apiKeyId ? "api_key" : "mcp"}`)}
+                        <span
+                          className="ms-badge ms-badge-neutral"
+                          style={{
+                            maxWidth: 190,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            display: "inline-block",
+                            verticalAlign: "middle",
+                          }}
+                        >
+                          {label}
                         </span>
                       );
-                      const caller = callerNames.get(row.apiKeyId ?? row.oauthClientId ?? "");
                       return caller ? (
-                        <Tooltip text={caller} inline>
+                        <Tooltip text={label} inline>
                           {pill}
                         </Tooltip>
                       ) : (
@@ -305,10 +367,23 @@ export default function LogsPage() {
                     })()}
                   </td>
                   <td className="ms-mono">
-                    <span style={{ color: statusCodeColor(row.statusCode) }}>{row.statusCode}</span>
+                    <span className={`ms-badge ms-badge-${statusCodeTone(row.statusCode)} ms-mono`}>
+                      {row.statusCode}
+                    </span>
                   </td>
                   <td className="right">
                     <RelativeTime date={row.createdAt} />
+                    <time
+                      dateTime={new Date(row.createdAt).toISOString()}
+                      suppressHydrationWarning
+                      className="ms-mono"
+                      style={{ fontSize: 11, color: "var(--ms-faint)", marginLeft: 8 }}
+                    >
+                      {new Date(row.createdAt).toLocaleTimeString(locale, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </time>
                   </td>
                 </tr>
               ))}

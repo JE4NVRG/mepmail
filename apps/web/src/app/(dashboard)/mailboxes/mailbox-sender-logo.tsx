@@ -16,19 +16,31 @@ const missing = new Set<string>();
 export function MailboxSenderLogo({ token }: { token: string | null | undefined }) {
   const url = token ? senderPictureUrl(token) : null;
   const [failed, setFailed] = useState(() => !url || missing.has(url));
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     setFailed(!url || missing.has(url));
+    setLoaded(false);
   }, [url]);
   if (!url || failed) return null;
   return (
     // biome-ignore lint/performance/noImgElement: a same-origin proxy answering 404 for "no picture"; next/image would log every miss instead of falling back to the initials.
     <img
       className={styles.logo}
+      data-loaded={loaded || undefined}
       src={url}
       alt=""
       loading="lazy"
       decoding="async"
       draggable={false}
+      onLoad={(event) => {
+        const img = event.currentTarget;
+        if (img.naturalWidth <= 1 && img.naturalHeight <= 1) {
+          missing.add(url);
+          setFailed(true);
+          return;
+        }
+        setLoaded(true);
+      }}
       onError={() => {
         missing.add(url);
         setFailed(true);

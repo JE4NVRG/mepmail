@@ -57,6 +57,13 @@ pub fn mailto_route(link: &str) -> Option<Url> {
     Some(target)
 }
 
+/// Blank composer URL used by the tray's "New message" action.
+pub fn compose_route() -> Option<Url> {
+    let mut target = Url::parse(CORREIO_URL).ok()?;
+    target.query_pairs_mut().append_pair("compose", "1");
+    Some(target)
+}
+
 /// The first `mailto:` among the process arguments opens the composer.
 /// Returns whether one did.
 #[cfg(desktop)]
@@ -152,6 +159,7 @@ mod tests {
         assert!(mailto_route("https://mepmail.dev").is_none());
         assert!(mailto_route("mepmail://mail").is_none());
         assert!(mailto_route(&format!("mailto:a@b.co?body={}", "x".repeat(16_000))).is_none());
+        assert_eq!(compose_route().unwrap().as_str(), "https://mepmail.dev/mail?compose=1");
     }
 
     #[test]

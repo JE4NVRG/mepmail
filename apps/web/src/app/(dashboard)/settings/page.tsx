@@ -14,11 +14,13 @@ export default async function SettingsPage() {
     <>
       <PageHeader title={t("tabs.settings")} />
       <SettingsTabs />
-      <ProfileSettings uploads={uploadsEnabled()} />
-      <SocialConnections providers={enabledSocialProviders()} />
-      {/* Instance settings steer the whole deployment — an operator concern
-          that exists only on self-host; cloud tenants never see them. */}
-      <SettingsSections showInstance={!env.IS_CLOUD} />
+      <div style={{ maxWidth: 860, display: "grid", gap: 20 }}>
+        <ProfileSettings uploads={uploadsEnabled()} />
+        <SocialConnections providers={enabledSocialProviders()} />
+        {/* Instance settings steer the whole deployment — an operator concern
+            that exists only on self-host; cloud tenants never see them. */}
+        <SettingsSections showInstance={!env.IS_CLOUD} />
+      </div>
     </>
   );
 }

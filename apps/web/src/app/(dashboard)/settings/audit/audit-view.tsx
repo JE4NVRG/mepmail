@@ -69,88 +69,91 @@ export function AuditView() {
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
   const headers: [string, string, string, string] = [t("when"), t("who"), t("action"), t("target")];
 
-  if (query.isPending) return <AuditSkeleton headers={headers} />;
-  if (query.isError) {
-    if (query.error.data?.code === "FORBIDDEN") {
-      return (
-        <p style={{ margin: 0, color: "var(--ms-muted)", fontSize: "var(--ms-fs-label)" }}>
-          {t("forbidden")}
-        </p>
-      );
-    }
-    return (
-      <StateCard
-        tone="error"
-        headline={t("loadError")}
-        actionLabel={t("retry")}
-        onAction={() => query.refetch()}
-      />
-    );
-  }
-  if (items.length === 0) {
-    return (
-      <p style={{ margin: 0, color: "var(--ms-muted)", fontSize: "var(--ms-fs-label)" }}>
-        {t("empty")}
-      </p>
-    );
-  }
-
   return (
-    <>
-      <Table>
-        <thead>
-          <tr>
-            <th style={{ width: COL.when }}>{headers[0]}</th>
-            <th style={{ width: COL.who }}>{headers[1]}</th>
-            <th style={{ width: COL.action }}>{headers[2]}</th>
-            <th>{headers[3]}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((row) => (
-            <tr key={row.id}>
-              <td>
-                <RelativeTime date={row.createdAt} />
-              </td>
-              <td>
-                {row.actor.kind === "user" ? (
-                  <span title={row.actor.email}>{row.actor.name ?? t("actors.deletedUser")}</span>
-                ) : (
-                  <span className="ms-chip">{t(`actors.${row.actor.kind}`)}</span>
-                )}
-              </td>
-              {/* next-intl reads "." as nesting, so the catalogue keys carry "_" in its place. */}
-              <td>
-                {isKnownAction(row.action)
-                  ? t(`actions.${row.action.replace(".", "_")}`)
-                  : row.action}
-              </td>
-              <td
-                className="ms-mono"
-                title={row.target ?? undefined}
-                style={{
-                  fontSize: 13,
-                  maxWidth: 360,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {targetLabel(row.data, row.target)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-      {query.hasNextPage ? (
-        <ListFooter
-          loadMore={{
-            label: t("loadMore"),
-            onClick: () => query.fetchNextPage(),
-            loading: query.isFetchingNextPage,
-          }}
-        />
-      ) : null}
-    </>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20, maxWidth: 920 }}>
+      {query.isPending ? (
+        <AuditSkeleton headers={headers} />
+      ) : query.isError ? (
+        query.error.data?.code === "FORBIDDEN" ? (
+          <div className="ms-card" style={{ padding: 24 }}>
+            <p style={{ margin: 0, color: "var(--ms-muted)", fontSize: "var(--ms-fs-label)" }}>
+              {t("forbidden")}
+            </p>
+          </div>
+        ) : (
+          <StateCard
+            tone="error"
+            headline={t("loadError")}
+            actionLabel={t("retry")}
+            onAction={() => query.refetch()}
+          />
+        )
+      ) : items.length === 0 ? (
+        <div className="ms-card" style={{ padding: 24 }}>
+          <p style={{ margin: 0, color: "var(--ms-muted)", fontSize: "var(--ms-fs-label)" }}>
+            {t("empty")}
+          </p>
+        </div>
+      ) : (
+        <>
+          <Table>
+            <thead>
+              <tr>
+                <th style={{ width: COL.when }}>{headers[0]}</th>
+                <th style={{ width: COL.who }}>{headers[1]}</th>
+                <th style={{ width: COL.action }}>{headers[2]}</th>
+                <th>{headers[3]}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <RelativeTime date={row.createdAt} />
+                  </td>
+                  <td>
+                    {row.actor.kind === "user" ? (
+                      <span title={row.actor.email}>
+                        {row.actor.name ?? t("actors.deletedUser")}
+                      </span>
+                    ) : (
+                      <span className="ms-chip">{t(`actors.${row.actor.kind}`)}</span>
+                    )}
+                  </td>
+                  {/* next-intl reads "." as nesting, so the catalogue keys carry "_" in its place. */}
+                  <td>
+                    {isKnownAction(row.action)
+                      ? t(`actions.${row.action.replace(".", "_")}`)
+                      : row.action}
+                  </td>
+                  <td
+                    className="ms-mono"
+                    title={row.target ?? undefined}
+                    style={{
+                      fontSize: 13,
+                      maxWidth: 360,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {targetLabel(row.data, row.target)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          {query.hasNextPage ? (
+            <ListFooter
+              loadMore={{
+                label: t("loadMore"),
+                onClick: () => query.fetchNextPage(),
+                loading: query.isFetchingNextPage,
+              }}
+            />
+          ) : null}
+        </>
+      )}
+    </div>
   );
 }
