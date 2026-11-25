@@ -1,231 +1,142 @@
 <p align="center">
-  <a href="https://mepmail.dev"><img src="apps/web/public/logo/mepmail-banner.svg" alt="MepMail" width="560"></a>
+  <a href="https://mepmail.dev/"><img src="apps/web/public/logo/mepmail-banner.svg" alt="MepMail" width="560"></a>
 </p>
 
-<h3 align="center">The open-source email platform for products, teams and AI agents</h3>
+<h3 align="center">Sending API, SMTP and real mailboxes on your domain for apps and AI agents, with official MCP.</h3>
 
 <p align="center">
-  Transactional email API (Resend-compatible) · SMTP relay · Broadcasts and newsletters ·<br>
-  Business email on your own domain · MCP server for AI agents
-</p>
-
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-7343E0" alt="License: AGPL-3.0"></a>
-  <a href="https://www.npmjs.com/package/@mepmail/mcp"><img src="https://img.shields.io/npm/v/@mepmail/mcp?label=%40mepmail%2Fmcp&color=7343E0" alt="@mepmail/mcp on npm"></a>
-  <a href="https://www.npmjs.com/package/@mepmail/cli"><img src="https://img.shields.io/npm/v/@mepmail/cli?label=%40mepmail%2Fcli&color=7343E0" alt="@mepmail/cli on npm"></a>
-  <a href="https://docs.mepmail.dev"><img src="https://img.shields.io/badge/docs-docs.mepmail.dev-7343E0" alt="Documentation"></a>
-  <a href="https://apps.microsoft.com/detail/9nhpx6qrf0pb"><img src="https://img.shields.io/badge/Windows-Microsoft%20Store-7343E0" alt="MepMail on the Microsoft Store"></a>
-</p>
-
-<p align="center">
-  <a href="https://mepmail.dev/signup"><b>Start free on MepMail Cloud</b></a> ·
+  <a href="https://mepmail.dev/"><b>Website</b></a> ·
   <a href="https://mepmail.dev/pricing">Pricing</a> ·
-  <a href="https://docs.mepmail.dev">Docs</a> ·
-  <a href="#self-hosting">Self-host</a> ·
-  <a href="README.pt-BR.md">Português</a>
+  <a href="https://docs.mepmail.dev/mcp">MCP Docs</a> ·
+  <a href="https://www.npmjs.com/package/@mepmail/mcp">@mepmail/mcp 0.3.3</a> ·
+  <a href="mailto:suporte@mepmail.dev">Support</a>
 </p>
 
 <p align="center">
-  <img src=".github/screenshots/send-emails.png" alt="MepMail Send: the Emails page of the dashboard, with the delivery status of each email" width="900">
+  <a href="https://www.npmjs.com/package/@mepmail/mcp"><img src="https://img.shields.io/npm/v/@mepmail/mcp?label=%40mepmail%2Fmcp&color=7343E0" alt="@mepmail/mcp on npm"></a>
+  <a href="https://docs.mepmail.dev/mcp"><img src="https://img.shields.io/badge/docs-docs.mepmail.dev%2Fmcp-7343E0" alt="MepMail MCP Documentation"></a>
+  <a href="https://mepmail.dev/pricing"><img src="https://img.shields.io/badge/MCP-Streamable%20HTTP%20%2B%20OAuth%202.1-7343E0" alt="Hosted MCP OAuth 2.1"></a>
+  <a href="https://apps.microsoft.com/detail/9nhpx6qrf0pb"><img src="https://img.shields.io/badge/Windows-Microsoft%20Store-7343E0" alt="MepMail Correio on Windows"></a>
 </p>
 
-## What is MepMail?
+---
 
-MepMail puts the two kinds of email a company needs in one place:
+## Overview
 
-- **Send**: an email API and SMTP relay for transactional email (sign-ups, receipts,
-  password resets, notifications) and marketing broadcasts. It speaks the Resend
-  wire format, so the Resend SDK you already use works by changing the base URL.
-  Delivery runs on Amazon SES.
-- **Correio (Mail)**: business email on your own domain. Mailboxes for people and
-  AI agents, a fast webmail, and desktop apps for Windows and Linux.
+Sending API, SMTP and real mailboxes on your domain for apps and AI agents, with official MCP.
 
-It is an open-source alternative to Resend, SendGrid, Mailgun and Postmark for
-sending, and to the Google Workspace or Microsoft 365 inbox for your domain. The
-whole stack is in this repository under AGPL-3.0.
+MepMail brings transactional sending and real domain mailboxes together in one platform:
 
-## Cloud or self-hosted
+- **Send (Transactional Email API & SMTP):** REST API (`https://api.mepmail.dev`), idempotency keys (`Idempotency-Key`), SMTP submission (`smtp.mepmail.dev:2587`, STARTTLS), guided DNS verification (SPF, DKIM, DMARC), webhooks, templates, contacts, suppressions, delivery tracking, and metrics.
+- **Correio (Real Mailboxes on Your Domain):** Business and AI-agent inboxes on your custom domain with smart inbox tabs, rules, IMAP import, webmail, and desktop apps for [Windows](https://apps.microsoft.com/detail/9nhpx6qrf0pb) and [Linux](https://mepmail.dev/desktop/correio/linux).
+- **Official MCP Server:** Hosted OAuth 2.1 server at `https://api.mepmail.dev/mcp` (Streamable HTTP) and local stdio package `@mepmail/mcp` (`0.3.3`) on npm.
 
-Run it yourself, or let us run it for you. It is the same product, with the same
-dashboard, API and SDKs.
+---
 
-| | **[MepMail Cloud](https://mepmail.dev)** | **Self-hosted** |
-| --- | --- | --- |
-| Setup | Sign up and send your first email in minutes | Docker Compose, your own server and AWS account |
-| Amazon SES | Ours: production access, quotas and regions are handled | Yours: leave the SES sandbox and manage quotas |
-| Deliverability | DKIM, SPF, DMARC, bounces, complaints and reputation monitored for you | You wire the SNS events and watch the rates |
-| Business mailboxes (Correio) | Solo, Duo or Equipe plans | Not covered by the self-hosting guide yet |
-| Desktop apps, MCP, updates, backups | Managed | You run upgrades and backups |
-| Support | People who build the product, in English and Portuguese | GitHub issues |
-| Price | **Free plan: 100 emails a day, no credit card.** Paid plans by card, or Pix in Brazil | Free software; you pay AWS |
+## Official MCP Setup
 
-**Don't want to run email infrastructure?** [Create a free account](https://mepmail.dev/signup)
-and you are sending in a few minutes. Correio plans start at US$ 2.90 a month
-(R$ 14,90 in Brazil), with 7 days free on a card. See [pricing](https://mepmail.dev/pricing).
+### Option 1 — Hosted MCP (OAuth 2.1, recommended)
 
-## Features
+Connect directly to the hosted Streamable HTTP endpoint (no API key in config):
 
-### Send: email API, SMTP and broadcasts
+```json
+{
+  "mcpServers": {
+    "mepmail": {
+      "url": "https://api.mepmail.dev/mcp"
+    }
+  }
+}
+```
 
-| Feature | Notes |
-| --- | --- |
-| Emails API (Resend-compatible) | Send, batch, get and cancel with Resend's request and response shapes. |
-| Idempotency | An `Idempotency-Key` header de-duplicates retried sends. |
-| SMTP relay | `smtp.mepmail.dev:2587` (STARTTLS), authenticated with an API key. |
-| Domains and BYODKIM | Guided DNS verification with live checks; bring your own DKIM key or let SES manage it. |
-| Webhooks (Standard Webhooks) | Signed `webhook-*` and `svix-*` headers, per-endpoint events, a delivery log, bring-your-own `whsec_` secret. |
-| Contacts and audience | Segments, topics, CSV import and `POST /contacts/batch`. |
-| Broadcasts | Compose, schedule and send to every contact, a segment or a topic. |
-| Templates | Reusable templates with merge fields and a `/templates` API. |
-| One-click unsubscribe | RFC 8058 `List-Unsubscribe` headers plus a hosted unsubscribe page. |
-| Suppression list | Hard bounces and complaints suppressed automatically, managed per address or in bulk. |
-| Metrics and logs | Daily sends with bounce and complaint rates; every API request logged with secrets redacted. |
-| Migrate from Resend | `npx @mepmail/cli migrate --from resend` copies contacts, segments, topics, templates, webhooks, domains and suppressions. Read-only against Resend. |
+When connecting via OAuth 2.1, select one team and grant only the scopes your workflow requires (for example `emails:read`, `domains:read`, `emails:send`, `mail:read`, `mail:draft`, and optionally `mail:send`). See the full MCP setup guide at [docs.mepmail.dev/mcp](https://docs.mepmail.dev/mcp).
 
-### Correio: business email on your domain
+### Option 2 — Local stdio (`@mepmail/mcp` `0.3.3`)
 
-<p align="center">
-  <img src=".github/screenshots/correio-inbox.png" alt="The MepMail Correio inbox: mailboxes for people and agents, a smart inbox and a message open" width="900">
-</p>
+Requires Node.js `>=20`. Create a team API key (`ms_...`) in the dashboard and/or a Correio agent key (`mmb_...` or `mmt_...`) under **Correio → Settings → Agents**.
 
-- **Mailboxes for people and agents** on your domain, with aliases and team plans
-  (Solo with 1 mailbox, Duo with 3, Equipe with 10).
-- **A smart inbox**: People, Notifications and Newsletters in separate tabs, and
-  a new-sender check: approve keeps a sender in the inbox, block sends them to Spam.
-- **Snooze, pin, follow-up reminders, send later, undo send, quick replies,
-  folders and automatic rules.**
-- **Live updates**, 25 MiB attachments, sender logos (BIMI and Gravatar) and
-  message translation.
-- **Import** your existing mail from your old provider over IMAP.
-- **Desktop apps**: [Windows on the Microsoft Store](https://apps.microsoft.com/detail/9nhpx6qrf0pb)
-  and [Linux](https://mepmail.dev/desktop/correio/linux) (AppImage, .deb and .rpm).
+**Cursor / Claude Desktop (`mcp.json` / `claude_desktop_config.json`):**
 
-### Built for AI agents
+```json
+{
+  "mcpServers": {
+    "mepmail": {
+      "command": "npx",
+      "args": ["-y", "@mepmail/mcp"],
+      "env": {
+        "MEPMAIL_API_KEY": "ms_...",
+        "MEPMAIL_BASE_URL": "https://api.mepmail.dev"
+      }
+    }
+  }
+}
+```
 
-- **Official MCP server**: hosted at `https://api.mepmail.dev/mcp` (OAuth) or local
-  with `npx -y @mepmail/mcp`, for Claude, Cursor, Codex and any MCP client. Agents
-  use the same sending pipeline, limits and logs as your app.
-- **Agent mailboxes**: an agent gets its own address, reads and drafts replies,
-  and a person can approve each send before it goes out.
-- **n8n**: the [`n8n-nodes-mepmail`](https://www.npmjs.com/package/n8n-nodes-mepmail)
-  community node, with a new-mail trigger and mailbox operations.
-- **Agent discovery**: `/llms.txt`, `/.well-known/ai-catalog.json` and `/auth.md`
-  served by the web app.
+**Claude Code:**
 
-<a href="https://mcprush.com/to/mepmail-mcp?ref=badge"><img width="380" height="200" src="https://mcprush.com/badge/mepmail-mcp/card.svg" alt="MepMail MCP server: grade A on mcprush" loading="lazy" /></a>
+```bash
+claude mcp add mepmail \
+  -e MEPMAIL_API_KEY=ms_... \
+  -e MEPMAIL_BASE_URL=https://api.mepmail.dev \
+  -- npx -y @mepmail/mcp
+```
 
-## Send your first email
+Set `MEPMAIL_MAIL_TOKEN` (`mmb_...` or `mmt_...`) when using mailbox tools (`mailbox_list_accounts`, `mailbox_list_messages`, `mailbox_read_message`, `mailbox_get_attachment`, `mailbox_save_draft`, `mailbox_send_draft`). Every tool response separates untrusted email content into `{ notice, untrusted_data }` and supports owner approval before sending drafts.
 
-Create an API key in the dashboard (it starts with `ms_`), then:
+---
+
+## REST API & SMTP Quickstart
+
+**REST API (`https://api.mepmail.dev/emails`):**
 
 ```sh
 curl -X POST https://api.mepmail.dev/emails \
   -H "Authorization: Bearer ms_..." \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: order-1042" \
   -d '{
     "from": "Acme <onboarding@acme.dev>",
-    "to": ["delivered@example.com"],
-    "subject": "Hello from MepMail",
-    "html": "<strong>It works!</strong>"
+    "to": ["user@example.com"],
+    "subject": "Welcome to Acme",
+    "html": "<strong>Your account is ready.</strong>"
   }'
 ```
 
-Already on Resend? Keep the SDK and point it at MepMail:
+**SMTP Relay:**
 
-```ts
-import { Resend } from "resend";
+- Host: `smtp.mepmail.dev`
+- Port: `2587` (`STARTTLS`)
+- Auth: your verified MepMail API key (`ms_...`)
 
-const resend = new Resend("ms_...", { baseUrl: "https://api.mepmail.dev" });
+---
 
-await resend.emails.send({
-  from: "Acme <onboarding@acme.dev>",
-  to: "delivered@example.com",
-  subject: "Hello from MepMail",
-  html: "<strong>It works!</strong>",
-});
-```
+## Plans & Sending Limits
 
-On a self-hosted instance, use your own API origin instead of
-`https://api.mepmail.dev`. The [quickstart](https://docs.mepmail.dev/quickstart)
-and the [SDK guide](https://docs.mepmail.dev/sdks) cover every language.
+All plans follow published quotas, domain verification, warm-up stages, and regional capacity rules on [mepmail.dev/pricing](https://mepmail.dev/pricing):
 
-## Self-hosting
+- **Send:** Free (`100 emails/day`, no card), Starter (`1,500 emails/day`), Pro (`110,000 emails/month` and `220,000 emails/month`), Scale (`550,000 emails/month` and `1,100,000 emails/month`). Larger custom volumes are available on inquiry.
+- **Correio (Domain Mailboxes):** Solo (`1 mailbox`), Duo (`3 mailboxes`), and Equipe (`10 mailboxes`), with per-plan storage and monthly message allowances listed at [mepmail.dev/pricing](https://mepmail.dev/pricing).
 
-Requirements: Docker with Compose, and an AWS account with SES access. New SES
-accounts start in the sandbox and can only send to verified recipients until
-AWS grants production access.
+Sending requires email and sender domain verification; new domains start with warm-up limits and scale according to measured deliverability and reputation.
 
-```sh
-git clone https://github.com/JE4NVRG/mepmail.git mepmail
-cd mepmail
-cp .env.example .env
-```
+---
 
-Fill the two required secrets in `.env`, `MASTER_ENCRYPTION_KEY` and
-`BETTER_AUTH_SECRET` (`openssl rand -base64 32` for each), then:
+## Discovery & Machine Endpoints
 
-```sh
-docker compose up --build -d
-```
+- MCP Server Card: [https://mepmail.dev/.well-known/mcp/server-card.json](https://mepmail.dev/.well-known/mcp/server-card.json)
+- AI Catalog: [https://mepmail.dev/.well-known/ai-catalog.json](https://mepmail.dev/.well-known/ai-catalog.json)
+- Agent Auth Guide: [https://mepmail.dev/auth.md](https://mepmail.dev/auth.md)
+- OpenAPI Spec: [https://api.mepmail.dev/openapi.json](https://api.mepmail.dev/openapi.json)
+- LLMs Summary: [https://mepmail.dev/llms.txt](https://mepmail.dev/llms.txt)
 
-The dashboard is at http://localhost:3000 and the API at http://localhost:3001.
+---
 
-The supported installation is this local source build (`Dockerfile` and
-`docker-compose.yml` at the root). Images or installers published under other
-names are not release channels of this project. The AWS setup wizard
-(`pnpm setup:aws`), the SES event pipeline, the SMTP relay, TLS, backups and
-upgrades are in the [self-hosting guide](https://docs.mepmail.dev/self-hosting)
-and in [SELF_HOSTING.md](SELF_HOSTING.md).
+## Links & Support
 
-## Tech stack
+- **Homepage:** [mepmail.dev](https://mepmail.dev/)
+- **MCP Documentation:** [docs.mepmail.dev/mcp](https://docs.mepmail.dev/mcp)
+- **General Docs:** [docs.mepmail.dev](https://docs.mepmail.dev)
+- **Pricing & Limits:** [mepmail.dev/pricing](https://mepmail.dev/pricing)
+- **Support:** [suporte@mepmail.dev](mailto:suporte@mepmail.dev)
 
-TypeScript monorepo (pnpm and Turborepo): Next.js and tRPC for the dashboard,
-Hono for the public API, a worker for queues and SES events, an SMTP server,
-PostgreSQL with Drizzle ORM, Better Auth, and Tauri for the desktop app.
-
-| Path | What it is |
-| --- | --- |
-| `apps/web` | Dashboard, Correio webmail and public site |
-| `apps/api` | Public REST API (Resend-compatible) and hosted MCP |
-| `apps/worker` | Sending queue, SES events, webhooks and schedules |
-| `apps/smtp` | SMTP relay and mail protocols |
-| `apps/desktop` | Correio desktop app (Tauri) |
-| `apps/docs` | Documentation site ([docs.mepmail.dev](https://docs.mepmail.dev)) |
-| `packages/*` | Database, billing, core logic, CLI and MCP server |
-
-## FAQ
-
-**Is MepMail free?** The software is free and open source (AGPL-3.0). MepMail
-Cloud has a free plan with 100 emails a day and no credit card; paid plans add
-volume and Correio mailboxes.
-
-**Does it work with the Resend SDK?** Yes. Point the SDK's base URL at MepMail and
-use a MepMail API key; request and response shapes stay the same. See the
-[migration guide](https://docs.mepmail.dev/migrate-from-resend) for the
-differences.
-
-**Which provider delivers the email?** Amazon SES, in your own AWS account when
-you self-host, or in ours on MepMail Cloud.
-
-**Can AI agents send and receive email?** Yes: through the MCP server and agent
-mailboxes, with optional human approval before each send.
-
-## Links
-
-- Website: [mepmail.dev](https://mepmail.dev)
-- Pricing: [mepmail.dev/pricing](https://mepmail.dev/pricing)
-- Documentation: [docs.mepmail.dev](https://docs.mepmail.dev)
-- API: [api.mepmail.dev](https://api.mepmail.dev)
-- Coming from Resend: [mepmail.dev/alternatives/resend](https://mepmail.dev/alternatives/resend)
-- Integrations: [mepmail.dev/integrations](https://mepmail.dev/integrations)
-- Support: [mepmail.dev/support](https://mepmail.dev/support)
-- Changelog: [CHANGELOG.md](CHANGELOG.md)
-
-## License
-
-The code is licensed under [AGPL-3.0](LICENSE). The `@mepmail/mcp` server, the
-`@mepmail/cli` and the n8n node ship under MIT.
-
-MepMail is a fork of an AGPL-3.0 project. The fork notice, upstream attribution
-and third-party notices are in [NOTICE.md](NOTICE.md). Third-party names,
-wordmarks and logos belong to their owners and are not licensed under the AGPL.
+See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md) for licensing terms (`@mepmail/mcp` and `@mepmail/cli` are MIT-licensed).
