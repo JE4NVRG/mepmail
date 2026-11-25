@@ -17,6 +17,8 @@
   <a href="https://docs.mepmail.dev/mcp"><img src="https://img.shields.io/badge/docs-docs.mepmail.dev%2Fmcp-7343E0" alt="MepMail MCP Documentation"></a>
   <a href="https://mepmail.dev/pricing"><img src="https://img.shields.io/badge/MCP-Streamable%20HTTP%20%2B%20OAuth%202.1-7343E0" alt="Hosted MCP OAuth 2.1"></a>
   <a href="https://apps.microsoft.com/detail/9nhpx6qrf0pb"><img src="https://img.shields.io/badge/Windows-Microsoft%20Store-7343E0" alt="MepMail Correio on Windows"></a>
+  <a href="https://kiro.dev/launch/mcp/add?name=MepMail&config=%7B%22url%22%3A%22https%3A//api.mepmail.dev/mcp%22%7D"><img src="https://kiro.dev/images/add-to-kiro.svg" alt="Add to Kiro"></a>
+  <a href="https://glama.ai/mcp/servers/JE4NVRG/mepmail"><img src="https://glama.ai/mcp/servers/JE4NVRG/mepmail/badges/score.svg" alt="JE4NVRG/mepmail MCP server"></a>
 </p>
 
 ---
@@ -138,5 +140,6 @@ Sending requires email and sender domain verification; new domains start with wa
 - **General Docs:** [docs.mepmail.dev](https://docs.mepmail.dev)
 - **Pricing & Limits:** [mepmail.dev/pricing](https://mepmail.dev/pricing)
 - **Support:** [suporte@mepmail.dev](mailto:suporte@mepmail.dev)
+- **Privacy Policy:** [mepmail.dev/privacy](https://mepmail.dev/privacy)
 
 See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md) for licensing terms (`@mepmail/mcp` and `@mepmail/cli` are MIT-licensed).
