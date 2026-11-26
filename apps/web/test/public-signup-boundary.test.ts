@@ -450,16 +450,19 @@ describe("public signup server-boundary regression", () => {
         assert.equal(view.props.requireLoginCaptcha, true);
         if (mode === "purchase-paused") assert.equal(state.dbCalls, 0);
       });
-  it("narrow header reserves an account row instead of accepting overflow-free overlap", () => {
+  it("narrow header reserves a clean visitor row below 460px while keeping signed-in controls inline", () => {
     const css = source("apps/web/src/app/landing.css");
     assert.match(
       css,
-      /@media \(max-width: 600px\)\s*\{\s*\.gtm-header-inner\s*\{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\) 44px;/,
+      /@media \(max-width: 460px\)\s*\{\s*\.gtm-header:has\(\.gtm-nav-login\) \.gtm-header-inner\s*\{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\) 44px;/,
     );
-    assert.match(css, /\.gtm-header \.gtm-header-cta\s*\{[^}]*grid-column: 1 \/ -1/);
     assert.match(
       css,
-      /\.gtm-header \.gtm-public-account\s*\{[^}]*width: auto;[^}]*flex-wrap: wrap;/,
+      /\.gtm-header:has\(\.gtm-nav-login\) \.gtm-header-cta\s*\{[^}]*grid-column: 1 \/ -1/,
+    );
+    assert.match(
+      css,
+      /\.gtm-header:has\(\.gtm-nav-login\) \.gtm-public-account\s*\{[^}]*width: 100%;[^}]*flex-wrap: wrap;/,
     );
   });
   it("scopes the closed login CTA above generic auth links without altering its route", async () => {

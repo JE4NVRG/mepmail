@@ -1594,56 +1594,77 @@
   outline: 2px solid var(--ms-violet);
   outline-offset: 3px;
 }
-/* Long translated actions need their own row, not space borrowed from the brand. */
+/* Keep signed-in users on the single top row across all mobile widths; only
+   narrow visitor screens (<= 460px) wrap login + signup into a clean sub-bar. */
 @media (max-width: 600px) {
-  .gtm-header-inner {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 44px;
+  .gtm-header .gtm-header-inner {
+    gap: 8px;
   }
   .gtm-header .gtm-brand-group {
-    min-width: max-content;
+    min-width: 0;
   }
-  .gtm-header .gtm-nav-burger {
-    order: 2;
-  }
-  .gtm-header .gtm-header-cta {
-    order: 3;
-    grid-column: 1 / -1;
-    margin-inline: 0;
-    justify-content: center;
-  }
-  .gtm-header .gtm-header-cta:has(.is-pending) {
-    display: none;
+  .gtm-header .gtm-wordmark img {
+    width: 108px;
   }
   .gtm-header .gtm-public-account {
     width: auto;
     min-width: 0;
-    max-width: 100%;
-    flex-wrap: wrap;
-    justify-content: center;
+    gap: 8px;
   }
   .gtm-account-signout {
     display: none;
   }
-  .gtm-public-account {
-    gap: 7px;
-    width: 176px;
+  .gtm-header .gtm-header-cta:has(.is-pending) {
+    display: none;
+  }
+  .gtm-header .gtm-public-account .gtm-action {
+    min-height: 36px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+}
+@media (max-width: 460px) {
+  .gtm-header:has(.gtm-nav-login) .gtm-header-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+  .gtm-header:has(.gtm-nav-login) .gtm-brand-group {
+    min-width: max-content;
+  }
+  .gtm-header:has(.gtm-nav-login) .gtm-nav-burger {
+    order: 2;
+  }
+  .gtm-header:has(.gtm-nav-login) .gtm-header-cta {
+    order: 3;
+    grid-column: 1 / -1;
+    margin-inline: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--ms-line);
+    width: 100%;
+  }
+  .gtm-header:has(.gtm-nav-login) .gtm-public-account {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
   }
 }
 @media (max-width: 400px) {
-  .gtm-public-account {
-    width: 164px;
+  .gtm-header .gtm-wordmark img {
+    width: 96px;
   }
-  .gtm-public-account .gtm-nav-login {
-    padding-inline: 3px;
-    font-size: 12px;
+  .gtm-header .gtm-public-account {
+    gap: 6px;
+  }
+  .gtm-header .gtm-public-account .gtm-nav-login {
+    padding-inline: 4px;
+    font-size: 13px;
   }
   .gtm-header .gtm-public-account .gtm-action {
     padding-inline: 10px;
-    font-size: 13px;
-  }
-  .gtm-header .gtm-wordmark img {
-    width: 100px;
+    font-size: 12.5px;
   }
 }
 
