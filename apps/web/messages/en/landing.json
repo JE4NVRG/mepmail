@@ -1,9 +1,9 @@
 {
   "meta": {
-    "title": "MepMail | Email API and mailboxes for apps and agents",
-    "description": "Send transactional email through API, SMTP or MCP. Start with 100 emails/day free, no card. Mailboxes for people and agents are a separate product.",
-    "domainTitle": "MepMail | Email API and mailboxes for apps and agents",
-    "domainDescription": "Send transactional email through API, SMTP or MCP. Start with 100 emails/day free, no card. Mailboxes for people and agents are a separate product."
+    "title": "MepMail | Sending API, SMTP, Domain Mailboxes & Official MCP",
+    "description": "Sending API, SMTP relay, and real mailboxes on your domain for apps and AI agents, with official MCP. Start free with 100 emails/day, no card.",
+    "domainTitle": "MepMail | Sending API, SMTP, Domain Mailboxes & Official MCP",
+    "domainDescription": "Sending API, SMTP relay, and real mailboxes on your domain for apps and AI agents, with official MCP. Start free with 100 emails/day, no card."
   },
   "skip": "Skip to content",
   "brandAria": "MepMail home",
@@ -198,42 +198,42 @@
       },
       {
         "volume": "110,000/month",
-        "limits": "25 domains · 10 workspaces · unlimited contacts",
+        "limits": "25 domains · 10 workspaces · unlimited contacts · 1 Mail Solo mailbox included",
         "overage": "US$ 0.35/1k",
         "attachment": "5 MB",
         "cta": "Start with Pro 110K"
       },
       {
         "volume": "220,000/month",
-        "limits": "25 domains · 10 workspaces · unlimited contacts",
+        "limits": "25 domains · 10 workspaces · unlimited contacts · 1 Mail Solo mailbox included",
         "overage": "US$ 0.32/1k",
         "attachment": "5 MB",
         "cta": "Start with Pro 220K"
       },
       {
         "volume": "550,000/month",
-        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
+        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts · 1 Mail Solo mailbox included",
         "overage": "US$ 0.29/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 550K"
       },
       {
         "volume": "1,100,000/month",
-        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
+        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts · 1 Mail Solo mailbox included",
         "overage": "US$ 0.26/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 1.1M"
       },
       {
         "volume": "1,650,000/month",
-        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
+        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts · 1 Mail Solo mailbox included",
         "overage": "US$ 0.24/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 1.65M"
       },
       {
         "volume": "2,750,000/month",
-        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts",
+        "limits": "Unlimited domains · Unlimited workspaces · unlimited contacts · 1 Mail Solo mailbox included",
         "overage": "US$ 0.22/1k",
         "attachment": "10 MB",
         "cta": "Start with Scale 2.75M"

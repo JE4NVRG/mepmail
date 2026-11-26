@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Resend alternative: sending flows and pricing",
-    "description": "Compare compatible sending flows in MepMail, with API, SMTP and MCP. Resend pricing checked on 2026-10-16, with sources and feature differences."
+    "title": "Resend Alternative — Email API, SMTP, Mailboxes & Pricing",
+    "description": "Compare MepMail vs Resend pricing by volume. Keep the SDK baseUrl, add SMTP relay, domain mailboxes, and official MCP from 100 emails/day free."
   },
   "eyebrow": "Alternatives",
   "title": "Coming from Resend? <highlight>Keep the SDK.</highlight>",

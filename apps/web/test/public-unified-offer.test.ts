@@ -138,8 +138,8 @@ for (const locale of ["en", "pt-BR"] as const) {
       const html = await render(Pricing);
       expect(html).toContain('id="cenarios"');
       const body = text(html);
-      // Equipe + Envio Pro 110K: US$ 12.90 + US$ 29.00, or R$ 64,90 + R$ 149,00 in Brazil.
-      expect(body).toContain(pt ? "R$ 213,90" : "US$ 41.90");
+      // Equipe + Envio Pro 110K: US$ 12.90 + US$ 29.00, or R$ 74,90 + R$ 169,00 in Brazil.
+      expect(body).toContain(pt ? "R$ 243,90" : "US$ 41.90");
       expect(body).toMatch(pt ? /Como o uso é contado\?/ : /How is usage counted\?/);
       expect(body).toMatch(pt ? /Para, Cc e Cco/ : /To, Cc and Bcc/);
       expect(body).toMatch(

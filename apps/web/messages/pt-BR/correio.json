@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "E-mail corporativo no seu domínio, com agentes de IA | MepMail",
-    "description": "E-mail profissional no seu domínio, sem servidor para manter. Você e seu agente de IA na mesma caixa. A partir de R$ 14,90/mês, com 7 dias grátis no cartão no primeiro plano elegível da equipe."
+    "description": "E-mail profissional no seu domínio, sem servidor para manter. Você e seu agente de IA na mesma caixa. A partir de R$ 16,90/mês, com 7 dias grátis no cartão no primeiro plano elegível da equipe."
   },
   "hero": {
     "eyebrow": "Correio · e-mail no seu domínio, para você e seus agentes",
@@ -11,7 +11,7 @@
     "lead": "Comprou um domínio? Tenha e-mail nele sem contratar hospedagem. Use no navegador ou nos apps para Windows e Linux e conecte agentes às caixas que escolher: você e seu agente na mesma caixa.",
     "primary": "Ver como funciona",
     "secondary": "Conhecer planos de Envio",
-    "note": "Correio pago à parte. Escolha Solo, Duo ou Equipe pelo painel, com ou sem plano de Envio.",
+    "note": "Planos Pro 110K+ do Envio incluem 1 caixa Correio Solo. Ou contrate Solo, Duo ou Equipe à parte.",
     "audiences": ["Para você", "Para sua equipe", "Para seus agentes"]
   },
   "use": {
@@ -71,7 +71,7 @@
     "steps": [
       {
         "title": "Escolha seu plano de Correio",
-        "body": "Escolha Solo, Duo ou Equipe, com ou sem plano de Envio. Correio é cobrado à parte. O Envio Pro 110K custa US$ 29/mês; novos clientes elegíveis pagam US$ 20 somente na primeira mensalidade."
+        "body": "Planos a partir do Envio Pro 110K já incluem 1 caixa Correio Solo sem custo extra; nos planos menores ou sem Envio, escolha Solo, Duo ou Equipe à parte. O Envio Pro 110K custa US$ 29/mês; novos clientes elegíveis pagam US$ 20 somente na primeira mensalidade."
       },
       {
         "title": "Vincule um domínio seu",
@@ -125,11 +125,11 @@
   "plans": {
     "eyebrow": "Envio + Correio",
     "title": "Um plano para sua aplicação. Caixas para suas conversas.",
-    "body": "Envio cuida dos e-mails da aplicação e das campanhas. Correio oferece caixas com entrada e saída para pessoas e agentes, pago à parte, com ou sem plano de Envio.",
+    "body": "Envio cuida dos e-mails da aplicação e das campanhas. Planos a partir do Pro 110K já incluem 1 caixa Correio Solo; nos menores ou avulsos, contrate Solo, Duo ou Equipe com ou sem plano de Envio.",
     "sending": {
       "label": "Para sua aplicação",
       "title": "Só Envio",
-      "body": "110 mil e-mails por mês por R$ 149 recorrentes; novos clientes elegíveis pagam R$ 99 só na primeira mensalidade. Você pode usar o Envio sem contratar caixas, e as assinaturas atuais são preservadas.",
+      "body": "110 mil e-mails por mês por R$ 169 recorrentes; novos clientes elegíveis pagam R$ 117 só na primeira mensalidade. Você pode usar o Envio sem contratar caixas, e as assinaturas atuais são preservadas.",
       "link": "Comparar planos de Envio"
     },
     "mail": {
@@ -138,11 +138,11 @@
       "body": "Com um plano pago de Envio você escolhe os mesmos planos do Correio. Caixas já contratadas como adicional do Envio mantêm preço e condições.",
       "note": "As assinaturas do Correio estão abertas pelo painel. Escolha Solo, Duo ou Equipe; não é preciso ter plano de Envio."
     },
-    "terms": "Correio é pago à parte. O upgrade é cobrado na hora; um plano menor vale quando o seu uso couber nele, sem reembolso do mês em curso. As mensagens guardadas são preservadas. Você pode continuar usando só Envio.",
+    "terms": "Solo já vem incluso a partir do Envio Pro 110K; planos maiores ou avulsos são cobrados à parte. O upgrade é cobrado na hora; um plano menor vale quando o seu uso couber nele, sem reembolso do mês em curso. As mensagens guardadas são preservadas. Você pode continuar usando só Envio.",
     "solo": {
       "label": "Planos do Correio",
       "title": "Solo, Duo ou Equipe",
-      "body": "Solo: 1 caixa por R$ 14,90 por mês. Duo: 3 caixas por R$ 29,90. Equipe: 10 caixas por R$ 64,90. No cartão ou no Pix. Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios (10 no Equipe) e sem precisar de plano de Envio. No cartão, comece com 7 dias grátis; no Pix, você paga mês a mês.",
+      "body": "Solo: 1 caixa por R$ 16,90 por mês. Duo: 3 caixas por R$ 34,90. Equipe: 10 caixas por R$ 74,90. No cartão ou no Pix. Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios (10 no Equipe) e sem precisar de plano de Envio. No cartão, comece com 7 dias grátis; no Pix, você paga mês a mês.",
       "cta": "Assinar o Correio"
     },
     "windows": "Instalar o app para Windows pela Microsoft Store",
@@ -225,7 +225,7 @@
     "items": [
       {
         "q": "Preciso de um plano de Envio para usar o Correio?",
-        "a": "Não. Os planos do Correio funcionam sozinhos: Solo R$ 14,90 por mês com 1 caixa, Duo R$ 29,90 com 3 ou Equipe R$ 64,90 com 10 (fora do Brasil, US$ 2,90, US$ 5,90 e US$ 12,90). No cartão, 7 dias grátis (a cobrança começa no fim do teste, a menos que você cancele antes); no Pix, você paga mês a mês. Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios (10 no Equipe). Assinaturas existentes mantêm as condições, sem migração automática."
+        "a": "Não. Os planos do Correio funcionam sozinhos: Solo R$ 16,90 por mês com 1 caixa, Duo R$ 34,90 com 3 ou Equipe R$ 74,90 com 10 (fora do Brasil, US$ 2,90, US$ 5,90 e US$ 12,90). No cartão, 7 dias grátis (a cobrança começa no fim do teste, a menos que você cancele antes); no Pix, você paga mês a mês. Armazenamento, envios e mensagens recebidas de cada plano são divididos entre as caixas, com até 3 domínios (10 no Equipe). Assinaturas existentes mantêm as condições, sem migração automática."
       },
       {
         "q": "Comprei um domínio. Já posso criar qualquer endereço?",
@@ -260,16 +260,16 @@
   "close": {
     "eyebrow": "O próximo endereço pode ser do seu agente",
     "title": "Sua empresa conversa. Você acompanha.",
-    "body": "O Correio está aberto a todos. Adicione caixas para você, sua equipe ou seu agente pelo painel: planos a partir de R$ 14,90 por mês, no cartão com 7 dias grátis (a cobrança começa no fim do teste, a menos que você cancele antes) ou no Pix.",
+    "body": "O Correio está aberto a todos. Adicione caixas para você, sua equipe ou seu agente pelo painel: planos a partir de R$ 16,90 por mês, no cartão com 7 dias grátis (a cobrança começa no fim do teste, a menos que você cancele antes) ou no Pix.",
     "primary": "Ver planos e preços",
     "secondary": "Ler a documentação do Correio"
   },
   "release": {
-    "heroNote": "Planos do Correio a partir de R$ 14,90 por mês: Solo com 1 caixa, Duo com 3 ou Equipe com 10, no cartão com 7 dias grátis (a cobrança começa no fim do teste, a menos que você cancele antes) ou no Pix. Com ou sem Envio. Contrate pelo painel.",
+    "heroNote": "Planos do Correio a partir de R$ 16,90 por mês: Solo com 1 caixa, Duo com 3 ou Equipe com 10, no cartão com 7 dias grátis (a cobrança começa no fim do teste, a menos que você cancele antes) ou no Pix. Com ou sem Envio. Contrate pelo painel.",
     "heroStatus": "Aberto a todos, com ou sem plano de Envio",
     "heroSecondary": "Ver planos e preços",
     "setupFirstTitle": "Escolha como assinar",
-    "setupFirst": "Escolha Solo (1 caixa, R$ 14,90 por mês), Duo (3, R$ 29,90) ou Equipe (10, R$ 64,90), no cartão ou no Pix. As caixas dividem armazenamento, envios e mensagens recebidas do plano, com até 3 domínios (10 no Equipe). Não é preciso ter Envio, e os contratos existentes são preservados.",
+    "setupFirst": "Escolha Solo (1 caixa, R$ 16,90 por mês), Duo (3, R$ 34,90) ou Equipe (10, R$ 74,90), no cartão ou no Pix. As caixas dividem armazenamento, envios e mensagens recebidas do plano, com até 3 domínios (10 no Equipe). Não é preciso ter Envio, e os contratos existentes são preservados.",
     "restStatus": "Disponível para caixas ativadas",
     "plansBody": "Envio cuida dos e-mails da aplicação e das campanhas. Correio dá caixas com entrada e saída para pessoas e agentes em três planos, com ou sem plano de Envio.",
     "mailNote": "Verifique o domínio e conclua eventuais revisões antes de assinar pelo painel. O recebimento também depende de DNS/MX e ativação.",

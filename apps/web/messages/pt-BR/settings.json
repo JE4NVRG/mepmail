@@ -425,6 +425,7 @@
       "domainsUnlimited": "Domínios de envio ilimitados",
       "contacts": "Contatos, segmentos e tópicos ilimitados",
       "contactsLimit": "Até {n, number} contatos",
+      "mailIncluded": "1 caixa Correio Solo inclusa (1 GiB, 500 envios/mês); em downgrade abaixo de 110K as mensagens ficam em leitura",
       "broadcasts": "Broadcasts: newsletters e campanhas, personalizados por contato",
       "integrations": "Webhooks e chaves de API",
       "agents": "Servidor MCP, CLI e SDKs oficiais em nove linguagens"

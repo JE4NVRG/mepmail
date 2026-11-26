@@ -341,4 +341,51 @@ describe("cloud signup challenge through the real HTTP handler", () => {
     expect(await db.select().from(schema.user)).toHaveLength(1);
     expect(siteverify).toHaveBeenCalledTimes(1);
   });
+
+  it("blocks honeypot-filled and sub-second automated signups while allowing normal human timing", async () => {
+    const honeypot = await auth.handler(
+      new Request(`${BASE}/api/auth/sign-up/email`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: BASE,
+          "x-captcha-response": "synthetic-hp-token",
+          "x-mepmail-hp": "acme-bot-corp",
+          "x-mepmail-form-elapsed": "3200",
+        },
+        body: JSON.stringify({ name: "Bot", email: "hp@example.com", password: PASSWORD }),
+      }),
+    );
+    expect(honeypot.status).toBe(403);
+    expect(await honeypot.json()).toMatchObject({ code: "SIGNUP_BOT_VERIFICATION_REQUIRED" });
+
+    const tooFast = await auth.handler(
+      new Request(`${BASE}/api/auth/sign-up/email`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: BASE,
+          "x-captcha-response": "synthetic-fast-token",
+          "x-mepmail-form-elapsed": "120",
+        },
+        body: JSON.stringify({ name: "Bot", email: "fast@example.com", password: PASSWORD }),
+      }),
+    );
+    expect(tooFast.status).toBe(403);
+    expect(await tooFast.json()).toMatchObject({ code: "SIGNUP_BOT_VERIFICATION_REQUIRED" });
+
+    const human = await auth.handler(
+      new Request(`${BASE}/api/auth/sign-up/email`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: BASE,
+          "x-captcha-response": "synthetic-human-token",
+          "x-mepmail-form-elapsed": "2400",
+        },
+        body: JSON.stringify({ name: "Human", email: "human@example.com", password: PASSWORD }),
+      }),
+    );
+    expect(human.status).toBe(200);
+  });
 });

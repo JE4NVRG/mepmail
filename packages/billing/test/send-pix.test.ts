@@ -1,3 +1,4 @@
+import { PIX_MAX_BRL_CENTS, rungByKey } from "@millionsend/core/plans";
 import { type Db, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
@@ -12,9 +13,11 @@ import type { MetaConversionConfig, MetaFetch } from "../src/meta-conversions.js
 import {
   beginPixInvoicePayment,
   isPixSubscription,
+  PIX_MAX_AMOUNT,
   PIX_SESSION_METADATA_KEY,
   type PixPayment,
   type PixStripe,
+  pixAmountForPrice,
   readPixPayment,
 } from "../src/pix.js";
 import {
@@ -34,11 +37,12 @@ import { checkoutFixture } from "./send-checkout-fixture.js";
 
 /** Reais per price, as the live currency_options (stripe-send-brl.mjs). */
 const BRL: Record<string, number> = {
-  price_launch_month: 14_900,
-  price_launch_year: 149_000,
-  price_millionsend_pro_200k_monthly: 27_900,
+  price_launch_month: 16_900,
+  price_launch_year: 169_000,
+  price_millionsend_pro_200k_monthly: 32_500,
+  price_millionsend_scale_2_5m_monthly: 322_900,
 };
-const COUPON_BRL = 5_000;
+const COUPON_BRL = 5_200;
 const OTHER_TEAM = "00000000-0000-4000-8000-000000000000";
 
 let f: Awaited<ReturnType<typeof checkoutFixture>>;
@@ -408,7 +412,7 @@ describe("Send paid by Pix", () => {
     expect(pix.calls.sessions[0]).toMatchObject({
       mode: "payment",
       payment_method_types: ["pix"],
-      line_items: [{ quantity: 1, price_data: { currency: "brl", unit_amount: 9_900 } }],
+      line_items: [{ quantity: 1, price_data: { currency: "brl", unit_amount: 11_700 } }],
       metadata: {
         mepmail_pix: "send_start",
         team_id: f.input.team.id,
@@ -428,7 +432,7 @@ describe("Send paid by Pix", () => {
   it("charges the year in one Pix, without overage or intro discount", async () => {
     await begin("year");
     expect(pix.calls.sessions[0]).toMatchObject({
-      line_items: [{ price_data: { currency: "brl", unit_amount: 149_000 } }],
+      line_items: [{ price_data: { currency: "brl", unit_amount: 169_000 } }],
       metadata: { mepmail_pix_price: "price_launch_year", mepmail_pix_interval: "year" },
     });
     expect(pix.calls.sessions[0]?.metadata).not.toHaveProperty("mepmail_pix_overage");
@@ -438,6 +442,19 @@ describe("Send paid by Pix", () => {
   it("refuses a rung without a price in reais", async () => {
     await expect(begin("month", "scale_500k")).rejects.toMatchObject({ code: "invalid" });
     expect(pix.calls.sessions).toEqual([]);
+  });
+
+  it("refuses Scale 2.5M (R$ 3.229) for Pix above Stripe's R$ 3.000 limit", async () => {
+    expect(PIX_MAX_AMOUNT).toBe(PIX_MAX_BRL_CENTS);
+    expect(PIX_MAX_BRL_CENTS).toBe(300_000);
+    expect(rungByKey("scale_2_5m").brlPriceCents).toBe(322_900);
+    expect(rungByKey("scale_2_5m").brlPriceCents).toBeGreaterThan(PIX_MAX_BRL_CENTS);
+    expect(
+      await pixAmountForPrice(pix.client, "price_millionsend_scale_2_5m_monthly", 1),
+    ).toBeNull();
+    expect(
+      await pixAmountForPrice(pix.client, "price_millionsend_pro_200k_monthly", 1),
+    ).toMatchObject({ amount: 32_500 });
   });
 
   it("starts the plan as a send_invoice subscription in reais whose first invoice the Pix pays", async () => {
@@ -575,12 +592,12 @@ describe("Send paid by Pix", () => {
     await begin();
     const sessionId = Object.keys(pix.sessions).at(-1)!;
     // The authoritative Session/PI reports the different amount, not a forged caller DTO.
-    pix.sessions[sessionId]!.amount_total = 14_900;
+    pix.sessions[sessionId]!.amount_total = 16_900;
     pix.pay(sessionId);
     const payment = await readPixPayment(pix.client, sessionId, false);
     if (payment === "invalid" || payment === "pending")
       throw new Error("fixture requires provider-verified Pix payment");
-    expect(payment.amount).toBe(14_900);
+    expect(payment.amount).toBe(16_900);
     expect(await fulfill(payment)).toBe("refunded");
     expect(pix.calls.subscriptions).toEqual([]);
     expect(pix.calls.refunds).toEqual(["amount"]);
@@ -588,7 +605,7 @@ describe("Send paid by Pix", () => {
 
   it("undoes the start when the first invoice is not the Pix amount", async () => {
     const payment = await paid();
-    pix.billFirstInvoice(14_900);
+    pix.billFirstInvoice(16_900);
     expect(await fulfill(payment)).toBe("refunded");
     expect(pix.calls.cancels).toEqual(["sub_send_pix_1"]);
     expect(pix.calls.voids).toEqual(["in_send_pix_1"]);
@@ -762,11 +779,11 @@ describe("the first Send purchase paid by Pix, for advertising", () => {
       stripeSessionId: sessionId,
       stripeInvoiceId: "in_send_pix_1",
       stripeSubscriptionId: "sub_send_pix_1",
-      amountPaidMinor: 9_900,
+      amountPaidMinor: 11_700,
       currency: "brl",
     });
     expect(await googleRows()).toMatchObject([
-      { transactionId: "in_send_pix_1", valueMinor: 9_900, currency: "BRL", rung: "pro_100k" },
+      { transactionId: "in_send_pix_1", valueMinor: 11_700, currency: "BRL", rung: "pro_100k" },
     ]);
     expect(f.state.subscriptions.sub_send_pix_1?.metadata).toMatchObject({
       mepmail_send_checkout: attempt?.id,
@@ -779,7 +796,7 @@ describe("the first Send purchase paid by Pix, for advertising", () => {
     expect(await metaRows()).toHaveLength(1);
     expect(await googleRows()).toHaveLength(1);
 
-    // What leaves for Meta is the amount actually paid, in BRL: R$ 99, not the R$ 149 renewal.
+    // What leaves for Meta is the amount actually paid, in BRL: R$ 117, not the R$ 169 renewal.
     const fetch = vi.fn<MetaFetch>(async () => ({
       status: 200,
       json: async () => ({ events_received: 1 }),
@@ -792,15 +809,15 @@ describe("the first Send purchase paid by Pix, for advertising", () => {
     expect(body.data[0]).toMatchObject({
       event_name: "Purchase",
       event_id: purchase?.eventId,
-      custom_data: { value: 99, currency: "BRL" },
+      custom_data: { value: 117, currency: "BRL" },
     });
   });
 
-  it("records the year paid by Pix at its full R$ 1.490", async () => {
+  it("records the year paid by Pix at its full R$ 1.690", async () => {
     const saved = await consent();
     const payment = await payAndRead(await openPix(saved.proof, "year"));
     await fulfillWithAds(payment);
-    expect(await metaRows()).toMatchObject([{ amountPaidMinor: 149_000, currency: "brl" }]);
+    expect(await metaRows()).toMatchObject([{ amountPaidMinor: 169_000, currency: "brl" }]);
   });
 
   it("records nothing without advertising consent, and the plan still starts", async () => {
@@ -831,7 +848,7 @@ describe("the first Send purchase paid by Pix, for advertising", () => {
   });
 
   it.each([
-    ["a different amount", { amount: 14_900, amount_received: 14_900 }],
+    ["a different amount", { amount: 16_900, amount_received: 16_900 }],
     ["a payment still processing", { status: "processing" }],
     ["another currency", { currency: "usd" }],
     ["another customer", { customer: "cus_someone_else" }],
@@ -852,7 +869,7 @@ describe("the first Send purchase paid by Pix, for advertising", () => {
       id: "in_send_pix_renewal",
       status: "open",
       billing_reason: "subscription_cycle",
-      amount_remaining: 14_900,
+      amount_remaining: 16_900,
       amount_paid: 0,
       metadata: {},
     } as Stripe.Invoice;

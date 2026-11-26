@@ -519,5 +519,12 @@ for (const [locale, copy] of [
       expect(curl).toContain('"domain":"example.com"');
       expect(curl).toContain('"create_key":true');
     });
+
+    it("points domainless teams to domain verification before creating an API key", () => {
+      hooks.fixture.verifiedDomain = false;
+      const html = render(locale);
+      expect(html).toContain('id="agent-quickstart"');
+      expect(html).toContain(copy.domainFirst.api.body);
+    });
   });
 }

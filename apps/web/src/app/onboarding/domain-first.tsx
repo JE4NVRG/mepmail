@@ -106,7 +106,7 @@ export function DomainFirst({ userEmail }: { userEmail: string }) {
   }
 
   return (
-    <div className={styles.flow}>
+    <div id="domain-first" className={styles.flow} style={{ scrollMarginTop: 24 }}>
       <header className={styles.intro}>
         <h1 className="ms-display">{t("title")}</h1>
         <p>{t("subtitle")}</p>
@@ -116,6 +116,37 @@ export function DomainFirst({ userEmail }: { userEmail: string }) {
           {t("noDomain")} <Link href="/mail">{t("noDomainLink")}</Link>
         </p>
       </header>
+      {!verified ? (
+        <aside
+          data-testid="onboarding-quick-test"
+          className="ms-card"
+          style={{
+            padding: 18,
+            marginBottom: 20,
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 14,
+            borderColor: "color-mix(in srgb, var(--ms-violet) 45%, var(--ms-line))",
+          }}
+        >
+          <div style={{ flex: "1 1 260px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <strong style={{ fontSize: 14.5, color: "var(--ms-bone)" }}>
+                {t("quickTest.title")}
+              </strong>
+              <span className="ms-badge ms-badge-success">{t("quickTest.badge")}</span>
+            </div>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+              {t("quickTest.body")}
+            </p>
+          </div>
+          <a href="#send-test-inbox" className="ms-btn ms-btn-primary">
+            {t("quickTest.cta")}
+          </a>
+        </aside>
+      ) : null}
       <ol className={styles.steps}>
         <DomainStep
           domain={domain}

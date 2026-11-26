@@ -1,3 +1,4 @@
+import { PIX_MAX_BRL_CENTS } from "@millionsend/core/plans";
 import Stripe from "stripe";
 import {
   type MailboxPriceTerms,
@@ -31,7 +32,7 @@ const PIX_ATTEMPT_METADATA_KEY = "mepmail_pix_attempt";
 export const PIX_DAYS_UNTIL_DUE = 5;
 /** Stripe's Pix limits: R$ 0,50 to R$ 3.000 per payment. */
 export const PIX_MIN_AMOUNT = 50;
-export const PIX_MAX_AMOUNT = 300_000;
+export const PIX_MAX_AMOUNT = PIX_MAX_BRL_CENTS;
 /** The QR code and the Checkout page each stay valid for an hour. */
 const PIX_QR_SECONDS = 3600;
 const PIX_CHECKOUT_SECONDS = 3600;

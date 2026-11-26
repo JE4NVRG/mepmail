@@ -167,6 +167,18 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
             isNull(schema.mailboxes.deletionRequestedAt),
           ),
         );
+      const configured = awsCredentialsConfigured();
+      const regionHealth = new Map(
+        await Promise.all(
+          servedRegions().map(
+            async (region) =>
+              [region, (await regionalStatus(region, configured)).sendingHealthy] as const,
+          ),
+        ),
+      );
+      const sesPaused = isCloudDeployment()
+        ? Array.from(regionHealth.values()).some((healthy) => !healthy)
+        : false;
       const permitted = sesPresentationPermitted(ctx.teamId, env.SENDING_PROVIDER_POLICY_JSON);
       const healthySesRoute =
         permitted &&
@@ -182,13 +194,11 @@ export function createSystemRouter(deps: SystemSesDeps = defaultSesDeps) {
           bindingsRaw: process.env.MAILBOX_SES_OUTBOUND_REGIONS,
           topics: parseSnsTopicArns(process.env.SNS_TOPIC_ARNS) ?? [],
           healthy: async (region) =>
-            (
-              await regionalStatus(region, awsCredentialsConfigured())
-            ).sendingHealthy,
+            regionHealth.get(region) ?? (await regionalStatus(region, configured)).sendingHealthy,
         }));
       return sendingAvailability({
         teamId: ctx.teamId,
-        sesPaused: true,
+        sesPaused,
         healthySesRoute,
         policyRaw: env.SENDING_PROVIDER_POLICY_JSON,
         relayConfigured: !!customerSmtpRelay(),

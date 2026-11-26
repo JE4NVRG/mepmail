@@ -316,6 +316,9 @@
   /* A CTA do header nunca quebra em duas linhas, em nenhuma faixa. */
   white-space: nowrap;
 }
+.gtm-action.ms-btn-primary {
+  color: var(--ms-ground);
+}
 .gtm-action.ms-btn:focus-visible {
   outline: 2px solid var(--ms-violet);
   outline-offset: 3px;
@@ -562,7 +565,7 @@
   text-transform: uppercase;
   color: var(--ms-violet);
 }
-.gtm-footer-col a {
+.gtm-footer-col a:not(.ms-btn) {
   justify-self: start;
   font-size: 14px;
   color: var(--ms-bone);
@@ -570,7 +573,7 @@
   opacity: 0.85;
   transition: opacity 0.15s ease;
 }
-.gtm-footer-col a:hover {
+.gtm-footer-col a:not(.ms-btn):hover {
   opacity: 1;
 }
 /* On a phone each footer link is a finger-sized row, not a 22px line. */
@@ -578,7 +581,7 @@
   .gtm-footer-col {
     gap: 8px;
   }
-  .gtm-footer-col a {
+  .gtm-footer-col a:not(.ms-btn) {
     padding-block: 7px;
   }
 }

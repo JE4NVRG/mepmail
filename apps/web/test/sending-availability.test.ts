@@ -58,6 +58,22 @@ describe("team-scoped sending presentation never authorizes a message", () => {
         now,
       }),
     ).toEqual({ state: "normal" }));
+  it("stays quiet when cloud SES regions are healthy even with healthySesRoute defined and campaign disabled", () =>
+    expect(
+      sendingAvailability({
+        teamId: own,
+        sesPaused: false,
+        healthySesRoute: true,
+        relayConfigured: false,
+        policyRaw: JSON.stringify({
+          version: 1,
+          graduated: true,
+          paused: false,
+          defaults: { transactional: "ses", campaign: "disabled" },
+        }),
+        now,
+      }),
+    ).toEqual({ state: "normal" }));
   it("does not expose credentials, sender lists or operator policy", () =>
     expect(Object.keys(status())).toEqual(["state"]));
 });

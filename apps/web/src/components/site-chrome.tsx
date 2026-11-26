@@ -2,6 +2,7 @@ import { getLocale } from "next-intl/server";
 import type { ReactNode } from "react";
 import { DESKTOP_DOWNLOAD_URL } from "@/lib/desktop-download";
 import { publicSignupCopy } from "@/lib/public-signup-copy";
+import { showSourceLinkEnabled } from "@/lib/source-link";
 import { newSubscriptionsPaused } from "@/server/new-subscriptions";
 import { publicSignupAvailability } from "@/server/public-signup";
 import { AdvertisingSettingsButton } from "./advertising-consent";
@@ -358,9 +359,11 @@ export async function PublicFooter({
             <GithubLink href="https://github.com/JE4NVRG/mepmail">
               {labels.footer.sourceCode}
             </GithubLink>
-            <a href="/source" title={labels.footer.sourceDownload}>
-              {labels.footer.sourceArchive ?? labels.footer.sourceDownload}
-            </a>
+            {showSourceLinkEnabled() ? (
+              <a href="/source" title={labels.footer.sourceDownload}>
+                {labels.footer.sourceArchive ?? labels.footer.sourceDownload}
+              </a>
+            ) : null}
           </nav>
         </div>
         <div className="gtm-container gtm-footer-base">

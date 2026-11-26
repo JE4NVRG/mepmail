@@ -91,8 +91,8 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(body).toContain(
         locale === "en" ? "100 emails a day free" : "100 e-mails por dia grátis",
       );
-      expect(body).toContain(locale === "en" ? "US$ 9/month" : "R$ 49/mês");
-      expect(body).toContain(locale === "en" ? "US$ 29" : "R$ 149");
+      expect(body).toContain(locale === "en" ? "US$ 9/month" : "R$ 54/mês");
+      expect(body).toContain(locale === "en" ? "US$ 29" : "R$ 169");
       for (const rung of ["starter", "pro_100k"])
         expect(html).toContain(`href="/signup?next=%2Fsettings%2Fbilling%3Fplan%3D${rung}"`);
       expect(html).toContain('href="/pricing#planos"');
@@ -112,7 +112,7 @@ for (const locale of ["en", "pt-BR"] as const) {
       const row = comparisonRowsForLocale(true, locale).find((r) => r.volume === 550_000);
       expect(row).toBeDefined();
       expect(html).toContain(formatWholeComparisonPrice(row?.mepmail ?? 0, locale));
-      expect(html).toContain(locale === "en" ? "US$ 129" : "R$ 649");
+      expect(html).toContain(locale === "en" ? "US$ 129" : "R$ 759");
       expect(html).toContain(formatWholeComparisonPrice(row?.resend ?? 0, locale));
       // The footnote dates the competitor's price; Portuguese also names the exchange rate.
       expect(text(html)).toMatch(locale === "en" ? /2026-10-16/ : /16\/10\/2026.*PTAX/);

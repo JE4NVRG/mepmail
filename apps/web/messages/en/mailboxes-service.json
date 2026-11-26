@@ -26,6 +26,8 @@
   },
   "additionalService": "Additional service",
   "viewPlan": "View license",
+  "includedBadge": "Included with Send Pro 110K+",
+  "includedWithSendBody": "Your active Send plan (Pro 110K or above) already includes 1 Mail Solo mailbox (1 GiB storage, 500 outbound recipients and 2,000 inbound messages/month) at no extra charge. Need more mailboxes? Upgrade to Duo or Equipe below. Downgrading Send below Pro 110K preserves existing mail read-only until you upgrade again or subscribe to Mail.",
   "close": "Close",
   "loading": "Loading license…",
   "loadError": "The license could not be loaded. Refresh before continuing.",

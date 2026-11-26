@@ -91,14 +91,42 @@ def build_context(raw, revision):
     return context, receipt
 
 
+def write_archive_dir(raw, revision, target_dir):
+    """Write source.tar.gz and SOURCE-REVISION directly into a build directory."""
+    _, receipt = build_context(raw, revision)
+    source_entries = []
+    with tarfile.open(fileobj=io.BytesIO(raw)) as source:
+        for item in source:
+            if not item.isfile() or not source_included(item.name):
+                continue
+            stream = source.extractfile(item)
+            assert stream is not None
+            source_entries.append((item.name, stream.read(), item.mode))
+    revision_bytes = (revision + '\n').encode()
+    source_entries.sort()
+    source_entries.append(('SOURCE-REVISION', revision_bytes, 0o644))
+    archive_bytes = gzip.compress(archive(source_entries), mtime=0)
+    out = Path(target_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / 'SOURCE-REVISION').write_bytes(revision_bytes)
+    (out / 'source.tar.gz').write_bytes(archive_bytes)
+    return {k: v for k, v in receipt.items() if k not in ('paths', 'source_manifest')}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--revision', required=True)
-    parser.add_argument('--output', required=True)
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--output')
+    group.add_argument('--write-archive-dir')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     revision = subprocess.check_output(['git', 'rev-parse', args.revision], cwd=root, text=True).strip()
     raw = subprocess.check_output(['git', 'archive', revision], cwd=root)
+    if args.write_archive_dir:
+        summary = write_archive_dir(raw, revision, args.write_archive_dir)
+        print(json.dumps(summary))
+        return
     context, receipt = build_context(raw, revision)
     output = Path(args.output)
     if output.exists():

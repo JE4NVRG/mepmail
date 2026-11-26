@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { LAUNCH_OFFER } from "@/lib/launch-offer";
 import {
+  breadcrumbJsonLd,
   correioJsonLd,
   desktopAppJsonLd,
   faqJsonLd,
   jsonLdDocument,
   organizationJsonLd,
+  sendingApiJsonLd,
   websiteJsonLd,
 } from "@/lib/structured-data";
 
@@ -18,10 +20,36 @@ describe("schema.org graph of the public pages", () => {
       "@type": "Organization",
       "@id": `${base}/#organization`,
       logo: `${base}/logo/mepmail-logo-400.png`,
+      email: "suporte@mepmail.dev",
     });
+    expect(org.sameAs).toEqual(
+      expect.arrayContaining([
+        "https://github.com/JE4NVRG/mepmail",
+        "https://www.npmjs.com/package/@mepmail/mcp",
+        "https://glama.ai/mcp/servers/JE4NVRG/mepmail",
+      ]),
+    );
     expect(websiteJsonLd(base, "pt-BR")).toMatchObject({
       inLanguage: "pt-BR",
       publisher: { "@id": `${base}/#organization` },
+    });
+    expect(sendingApiJsonLd(base, `${base}/envio`, "Sending API")).toMatchObject({
+      "@type": "SoftwareApplication",
+      name: "MepMail Send",
+      applicationCategory: "DeveloperApplication",
+      publisher: { "@id": `${base}/#organization` },
+    });
+    expect(
+      breadcrumbJsonLd(base, [
+        { name: "MepMail", path: "/" },
+        { name: "Integrations", path: "/integrations" },
+      ]),
+    ).toMatchObject({
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "MepMail", item: `${base}/` },
+        { "@type": "ListItem", position: 2, name: "Integrations", item: `${base}/integrations` },
+      ],
     });
   });
 

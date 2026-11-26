@@ -425,6 +425,7 @@
       "domainsUnlimited": "Unlimited sending domains",
       "contacts": "Unlimited contacts, segments and topics",
       "contactsLimit": "Up to {n, number} contacts",
+      "mailIncluded": "1 Mail Solo mailbox included (1 GiB, 500 sends/month); downgrading below Pro 110K keeps existing mail read-only",
       "broadcasts": "Broadcasts: newsletters and campaigns, personalized per contact",
       "integrations": "Webhooks and API keys",
       "agents": "MCP server, CLI and official SDKs in nine languages"

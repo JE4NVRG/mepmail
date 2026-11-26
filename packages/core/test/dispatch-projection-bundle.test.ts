@@ -160,9 +160,7 @@ for (const slot of ["sourceHtml", "html", "sourceText", "text"] as const) {
 it("uninspectable alternatives never reach the judge", async () => {
   for (const changes of [
     {
-      attachments: [
-        { filename: "amostra.exe", contentType: "application/x-msdownload", size: 16 },
-      ],
+      attachments: [{ filename: "amostra.exe", contentType: "application/x-msdownload", size: 16 }],
     },
     { sourceText: "x".repeat(6001) },
     { html: '<img src="https://image.example.invalid/x">' },

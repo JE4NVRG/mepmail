@@ -1002,19 +1002,16 @@ function DraftDialog({
             if (active.current && current()) setSaving(null);
           }
         }}
+        onDragOver={(event) => {
+          if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+        }}
+        onDrop={(event) => {
+          if (!event.dataTransfer?.files?.length) return;
+          event.preventDefault();
+          void addFiles(event.dataTransfer.files);
+        }}
       >
-        <div
-          ref={composerBody}
-          className={styles.composerBody}
-          onDragOver={(event) => {
-            if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
-          }}
-          onDrop={(event) => {
-            if (!event.dataTransfer?.files?.length) return;
-            event.preventDefault();
-            void addFiles(event.dataTransfer.files);
-          }}
-        >
+        <div ref={composerBody} className={styles.composerBody}>
           <fieldset
             className={`${styles.fields} ${styles.composerFields}`}
             disabled={busy || !allowed}
@@ -1393,7 +1390,6 @@ export function ShortcutsDialog({ close }: { close: () => void }) {
   return (
     <dialog
       ref={dialog}
-      role="dialog"
       aria-modal="true"
       className={`${styles.dialog} ${styles.shortcutsDialog}`}
       aria-labelledby="mailbox-shortcuts-title"

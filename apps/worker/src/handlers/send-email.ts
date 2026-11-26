@@ -1408,11 +1408,18 @@ export async function sendEmail(
           score: decision.verdict.score,
           categories: decision.verdict.categories,
         });
+      // Only a genuine content verdict or uninspectable projection is a content hold;
+      // transient classifier failures (upstream/throttled/parse_error/inconclusive)
+      // still fail-closed here without tagging content_review so quota.drain retries.
+      const isContentHold =
+        !changed &&
+        !decision.allowed &&
+        (decision.reason === "content" || decision.reason === "uninspectable");
       await parkQueued(
         db,
         email,
         "pre-dispatch content review required",
-        decision.allowed ? undefined : (decision.detail ?? "unclassified"),
+        isContentHold ? (decision.detail ?? decision.reason) : undefined,
       );
       return "parked";
     }

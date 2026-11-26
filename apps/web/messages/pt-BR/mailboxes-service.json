@@ -26,6 +26,8 @@
   },
   "additionalService": "Serviço adicional",
   "viewPlan": "Ver licença",
+  "includedBadge": "Incluso no Envio Pro 110K+",
+  "includedWithSendBody": "Seu plano de Envio ativo (Pro 110K ou superior) já inclui 1 caixa Correio Solo (1 GiB, 500 envios e 2.000 recebimentos/mês) sem custo extra. Precisa de mais caixas? Faça upgrade para Duo ou Equipe abaixo. Em downgrade do Envio abaixo de 110K, as mensagens já armazenadas permanecem em leitura até novo upgrade ou assinatura do Correio.",
   "close": "Fechar",
   "loading": "Carregando a licença…",
   "loadError": "Não foi possível consultar a licença. Atualize antes de continuar.",

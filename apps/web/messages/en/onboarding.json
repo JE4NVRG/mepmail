@@ -14,6 +14,12 @@
     "skip": "Skip for now",
     "noDomain": "No domain yet?",
     "noDomainLink": "Start with the Gmail, iCloud or Yahoo you already use, free and with no DNS",
+    "quickTest": {
+      "badge": "No DNS needed",
+      "title": "Send test to my inbox in 1 click",
+      "body": "Want to confirm delivery before setting up DNS? Send a platform test straight to your registered email.",
+      "cta": "Send test to my inbox"
+    },
     "help": "Need help? Talk to us",
     "domain": {
       "title": "What is your domain?",
@@ -104,7 +110,7 @@
     },
     "api": {
       "title": "Rather start with the API?",
-      "body": "Send a test email and get an API key. You can do it now, even without a domain."
+      "body": "Send a platform demonstration email right away without a domain, and unlock API keys once your domain is verified."
     }
   },
   "title": "Send your first email",
@@ -247,6 +253,8 @@
     "domainFallback": "yourdomain.com",
     "apiHint": "Creates an agent mailbox on your domain and returns its scoped mmb_ token in the same response.",
     "mintKey": "Generate API key to copy",
+    "needsDomain": "Add and verify a sending domain in Step 01 above before creating API keys.",
+    "verifyDomainCta": "Add domain in Step 01",
     "manageAgents": "Manage agent permissions in Correio",
     "mcpSettings": "Browse all MCP tools"
   }

@@ -53,6 +53,7 @@ import {
   CLOUDFLARE_TOKEN,
   type CloudflareDesiredRecord,
 } from "../cloudflare-dns";
+import { emitFunnel } from "../funnel";
 import { mailboxReceivingDeps } from "../mailbox-receiving";
 import { withMailboxDomainDeletion } from "../mailboxes";
 import { type AuthSession, adminProcedure, router, teamProcedure } from "../trpc";
@@ -242,6 +243,12 @@ export function createDomainsRouter(deps: DomainsSesDeps = defaultSesDeps) {
         action: "domain.verified",
         target: { type: "domain", id: domain.id },
         metadata: { name: domain.name },
+      });
+      await emitFunnel(ctx.db, {
+        name: "domain_verified",
+        dedupeKey: `domain_verified:${ctx.teamId}`,
+        teamId: ctx.teamId,
+        props: { region: domain.region },
       });
     }
     return {
@@ -464,6 +471,12 @@ export function createDomainsRouter(deps: DomainsSesDeps = defaultSesDeps) {
           action: "domain.created",
           target: { type: "domain", id: created.id },
           metadata: { name: input.name, region: input.region },
+        });
+        await emitFunnel(ctx.db, {
+          name: "domain_added",
+          dedupeKey: `domain_added:${ctx.teamId}`,
+          teamId: ctx.teamId,
+          props: { region: input.region },
         });
         return { id: created.id };
       }),

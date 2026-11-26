@@ -132,7 +132,7 @@ const MAIL_TERMS = {
   includedMailboxes: 10,
   planCode: "equipe" as const,
   trialDays: 7,
-  localCurrency: { currency: "brl", unitAmount: 6490 },
+  localCurrency: { currency: "brl", unitAmount: 7490 },
   inboundDeliveriesPerPeriod: 10_000,
   inboundBytesPerPeriod: 3 * GIB,
   outboundBytesPerPeriod: 5 * GIB,
@@ -325,7 +325,7 @@ beforeEach(async () => {
         percent_off: null,
         duration: "once",
         applies_to: { products: ["prod_send_launch"] },
-        currency_options: { brl: { amount_off: 5000 } },
+        currency_options: { brl: { amount_off: 5200 } },
         metadata: { mepmail_send_offer: SEND_LAUNCH_OFFER },
       }) as unknown as Stripe.Coupon,
   };

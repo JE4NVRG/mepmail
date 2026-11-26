@@ -11,7 +11,6 @@ import type { SignupRiskSignals } from "../src/signup-risk-policy.js";
 
 import { verifiedDns } from "./antiabuse-contract-fixture.js";
 
-
 /** The key gate now requires a verified sending domain; every fixture gets one. */
 async function verifiedSendingDomain(teamId: string): Promise<void> {
   await db.insert(schema.domains).values({

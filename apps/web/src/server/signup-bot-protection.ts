@@ -5,11 +5,39 @@ const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const VERIFY_TIMEOUT_MS = 10_000;
 export const SIGNUP_BOT_ACTION = "auth";
 export const SIGNUP_BOT_OAUTH_CONTEXT = "mepmailSignupBotVerified";
+export const SIGNUP_HONEYPOT_HEADER = "x-mepmail-hp";
+export const SIGNUP_ELAPSED_HEADER = "x-mepmail-form-elapsed";
+const MIN_HUMAN_SIGNUP_ELAPSED_MS = 800;
 
 /** The flag is deliberately opt-in and does not change self-hosted setup. */
 export function signupBotProtectionEnabled(): boolean {
   const value: unknown = env.SIGNUP_BOT_PROTECTION;
   return isCloudDeployment() && (value === true || value === "true" || value === "1");
+}
+
+/**
+ * Lightweight, non-blocking antibot signal check (honeypot + impossibly fast form submit).
+ * Only rejects obvious automation without ever blocking real humans or headerless API tests.
+ */
+export function assertSignupBotSignals(headers: Headers | undefined): void {
+  if (!headers) return;
+  const honeypot = headers.get(SIGNUP_HONEYPOT_HEADER)?.trim();
+  if (honeypot) {
+    throw new APIError("FORBIDDEN", {
+      code: "SIGNUP_BOT_VERIFICATION_REQUIRED",
+      message: "Complete the account verification and try again.",
+    });
+  }
+  const elapsedRaw = headers.get(SIGNUP_ELAPSED_HEADER)?.trim();
+  if (elapsedRaw !== undefined && elapsedRaw !== "") {
+    const elapsed = Number(elapsedRaw);
+    if (Number.isFinite(elapsed) && elapsed >= 0 && elapsed < MIN_HUMAN_SIGNUP_ELAPSED_MS) {
+      throw new APIError("FORBIDDEN", {
+        code: "SIGNUP_BOT_VERIFICATION_REQUIRED",
+        message: "Complete the account verification and try again.",
+      });
+    }
+  }
 }
 
 function unavailable(): APIError {

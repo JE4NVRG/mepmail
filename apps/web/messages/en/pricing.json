@@ -1,8 +1,8 @@
 {
   "meta": {
-    "title": "Pricing: every MepMail plan on one page",
+    "title": "Pricing — Email API, SMTP, MCP & Domain Mailboxes",
     "description": "MepMail pricing in USD: free with 100 emails/day, Pro from US$ 20 for 110,000 emails/month and Scale up to 2.75M. Overage per 1,000 and no lock-in.",
-    "launchDescription": "Every plan on one page: Mail from US$ 2.90 a month, and Send free with 100 emails a day or Pro with 110K emails for US$ 29 a month."
+    "launchDescription": "Domain Mailboxes from US$ 2.90/mo (7-day trial), and Email API + SMTP + MCP free at 100 emails/day or Pro 110K for US$ 29/mo."
   },
   "choice": {
     "title": "What do you need?",
@@ -16,7 +16,7 @@
     "freeCta": "Start free · 100 emails/day",
     "mailTitle": "Email inboxes on your domain.",
     "mailEntry": "Mail starts at {price}/month. The 7-day trial needs a card; cancel before it ends to avoid a charge. Separate from Send Free.",
-    "mailPix": "In Brazil, Mail starts at R$ 14.90/month with Pix or card. R$ 14.90 is a Mail price, not a Send plan. The 7-day trial is card only.",
+    "mailPix": "In Brazil, Mail starts at R$ 16.90/month with Pix or card. R$ 16.90 is a Mail price, not a Send plan. The 7-day trial is card only.",
     "mailClosed": "Mail pricing and availability are shown on its product page. Creating a free Send account does not activate a Mail trial.",
     "dailyNote": "Free and Starter monthly figures are illustrative, not a monthly allowance: each UTC day has its own cap. With paid overage disabled, monthly sending stops at the quota."
   },
@@ -66,7 +66,7 @@
       },
       {
         "q": "Can I use Mail and Send together?",
-        "a": "Yes, in the same account and on the same verified domain. Mail handles mailboxes for people and agents; Send handles your app's email by API or SMTP. Each has its own credential and limit, and you pay the sum of the plans you pick, with no required bundle. With Mail active, Send Free accepts up to 3 domains (10 with Equipe)."
+        "a": "Yes, in the same account and on the same verified domain. Plans from Pro 110K upward include 1 Mail Solo mailbox (1 GiB, 500 outbound/month) at no extra cost; Free and Starter can add Solo, Duo or Equipe separately, and Equipe unlocks up to 10 domains."
       },
       {
         "q": "How is usage counted?",
@@ -112,7 +112,7 @@
     "yearQuota": "The 110,000 allowance renews monthly, without an accumulated annual balance. Sending stops at the monthly quota; annual billing does not include metered overage.",
     "preserved": "Existing contracts keep their prices and limits; there is no automatic migration.",
     "mailCta": "Explore Mail",
-    "mailAccess": "Mail is paid separately, with or without a Send plan: Solo US$ 2.90, Duo US$ 5.90 or Equipe US$ 12.90 a month.",
+    "mailAccess": "Plans from Pro 110K up include 1 Mail Solo mailbox (1 GiB, 500 outbound/month) at no extra cost. Standalone Mail plans: Solo US$ 2.90, Duo US$ 5.90 or Equipe US$ 12.90 a month.",
     "monthLocal": "In Brazil, charged in reais: {first} the first month, then {price} a month.",
     "yearLocal": "In Brazil, charged in reais: {price} a year."
   },
@@ -123,7 +123,7 @@
     },
     {
       "q": "Can I use Mail and Send together?",
-      "a": "Yes, in the same account and on the same verified domain. Mail handles mailboxes for people and agents; Send handles your app's email by API or SMTP. Each has its own credential and limit, and you pay the sum of the plans you pick, with no required bundle. With Mail active, Send Free accepts up to 3 domains (10 with Equipe)."
+      "a": "Yes, in the same account and on the same verified domain. Plans from Pro 110K upward include 1 Mail Solo mailbox (1 GiB, 500 outbound/month) at no extra cost; Free and Starter can add Solo, Duo or Equipe separately, and Equipe unlocks up to 10 domains."
     },
     {
       "q": "How is usage counted?",

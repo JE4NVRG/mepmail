@@ -25,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: seo.alternates,
     // Reached from the docs and from the wizard's fallback link: it stays out
     // of search, while still carrying a title a reader can find in a tab.
-    robots: { index: false, follow: false },
+    robots: { index: false, follow: true },
   };
 }
 

@@ -70,6 +70,17 @@ export async function POST(request: Request) {
     const after = await planOf(db, event.customerId);
     if (after) {
       if (
+        after.plan !== "free" &&
+        (before.plan === "free" || raisesQuota(teamQuota(before, true), teamQuota(after, true)))
+      ) {
+        await emitFunnel(db, {
+          name: "upgrade",
+          dedupeKey: `upgrade:${after.id}:${before.plan}:${before.planQuota ?? 0}:${after.plan}:${after.planQuota ?? 0}`,
+          teamId: after.id,
+          resolve: (tx) => teamFunnelProps(tx, after.id),
+        });
+      }
+      if (
         after.plan !== before.plan ||
         after.planQuota !== before.planQuota ||
         after.planStatus !== before.planStatus

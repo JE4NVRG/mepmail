@@ -1,9 +1,9 @@
 {
   "meta": {
-    "title": "MepMail | API de e-mail e caixas para apps e agentes",
-    "description": "Envie e-mails transacionais por API, SMTP ou MCP. Comece com 100 e-mails/dia grátis, sem cartão. Caixas para pessoas e agentes são um produto separado.",
-    "domainTitle": "MepMail | API de e-mail e caixas para apps e agentes",
-    "domainDescription": "Envie e-mails transacionais por API, SMTP ou MCP. Comece com 100 e-mails/dia grátis, sem cartão. Caixas para pessoas e agentes são um produto separado."
+    "title": "MepMail | API de E-mail, SMTP, E-mail no Domínio e MCP",
+    "description": "API de envio transacional, SMTP e caixas de e-mail reais no seu domínio para apps e agentes de IA, com MCP oficial. Grátis até 100/dia, sem cartão.",
+    "domainTitle": "MepMail | API de E-mail, SMTP, E-mail no Domínio e MCP",
+    "domainDescription": "API de envio transacional, SMTP e caixas de e-mail reais no seu domínio para apps e agentes de IA, com MCP oficial. Grátis até 100/dia, sem cartão."
   },
   "skip": "Pular para o conteúdo",
   "brandAria": "MepMail início",
@@ -58,7 +58,7 @@
       "responseLabel": "Resposta",
       "caption": "Uma base URL e o SDK que você já usa envia pelo MepMail."
     },
-    "launchOffer": "{volume} entregas/mês por {price} recorrentes. R$ 99 só na primeira mensalidade elegível."
+    "launchOffer": "{volume} entregas/mês por {price} recorrentes. R$ 117 só na primeira mensalidade elegível."
   },
   "domainHero": {
     "eyebrow": "E-mail no seu domínio · para você e seus agentes",
@@ -198,48 +198,48 @@
       },
       {
         "volume": "110.000/mês",
-        "limits": "25 domínios · 10 workspaces · contatos ilimitados",
-        "overage": "R$ 1,75/1k",
+        "limits": "25 domínios · 10 workspaces · contatos ilimitados · 1 caixa Correio Solo inclusa",
+        "overage": "R$ 2,05/1k",
         "attachment": "5 MB",
         "cta": "Começar no Pro 110K"
       },
       {
         "volume": "220.000/mês",
-        "limits": "25 domínios · 10 workspaces · contatos ilimitados",
-        "overage": "R$ 1,60/1k",
+        "limits": "25 domínios · 10 workspaces · contatos ilimitados · 1 caixa Correio Solo inclusa",
+        "overage": "R$ 1,90/1k",
         "attachment": "5 MB",
         "cta": "Começar no Pro 220K"
       },
       {
         "volume": "550.000/mês",
-        "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "R$ 1,45/1k",
+        "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados · 1 caixa Correio Solo inclusa",
+        "overage": "R$ 1,70/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 550K"
       },
       {
         "volume": "1.100.000/mês",
-        "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "R$ 1,30/1k",
+        "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados · 1 caixa Correio Solo inclusa",
+        "overage": "R$ 1,55/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 1.1M"
       },
       {
         "volume": "1.650.000/mês",
-        "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "R$ 1,20/1k",
+        "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados · 1 caixa Correio Solo inclusa",
+        "overage": "R$ 1,40/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 1.65M"
       },
       {
         "volume": "2.750.000/mês",
-        "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados",
-        "overage": "R$ 1,10/1k",
+        "limits": "Domínios ilimitados · Workspaces ilimitados · contatos ilimitados · 1 caixa Correio Solo inclusa",
+        "overage": "R$ 1,30/1k",
         "attachment": "10 MB",
         "cta": "Começar no Scale 2.75M"
       }
     ],
-    "note": "A capacidade cresce com verificação e atividade saudável. A tolerância de cobrança de 50%, o teto de fila de 3× a cota diária nominal e o teto mensal de 5× o volume incluído (até 4× cobrados como excedente) são limites de cobrança e fila, não vazão garantida do provedor. O envio efetivo depende da etapa de graduação, da margem de segurança e dos recursos regionais disponíveis; pagar nunca ignora esses controles. Com excedente desativado, o envio para na franquia mensal. O Pro 110K anual custa R$ 1.490 antecipados; a franquia de 110.000 renova mensalmente, sem saldo anual acumulado nem excedente medido. Os limites atuais aparecem no painel de reputação da equipe.",
+    "note": "A capacidade cresce com verificação e atividade saudável. A tolerância de cobrança de 50%, o teto de fila de 3× a cota diária nominal e o teto mensal de 5× o volume incluído (até 4× cobrados como excedente) são limites de cobrança e fila, não vazão garantida do provedor. O envio efetivo depende da etapa de graduação, da margem de segurança e dos recursos regionais disponíveis; pagar nunca ignora esses controles. Com excedente desativado, o envio para na franquia mensal. O Pro 110K anual custa R$ 1.690 antecipados; a franquia de 110.000 renova mensalmente, sem saldo anual acumulado nem excedente medido. Os limites atuais aparecem no painel de reputação da equipe.",
     "founders": {
       "title": "Programa fundadores",
       "items": [
@@ -251,7 +251,7 @@
       "cta": "Garantir minha vaga"
     },
     "noteAttach": "Limite por e-mail: tamanho total dos anexos após decodificação, não por arquivo.",
-    "launchPriceNote": "Novos clientes elegíveis: R$ 99 só na primeira mensalidade; depois R$ 149/mês. Anual: R$ 1.490 antecipados, sem acumular a promoção."
+    "launchPriceNote": "Novos clientes elegíveis: R$ 117 só na primeira mensalidade; depois R$ 169/mês. Anual: R$ 1.690 antecipados, sem acumular a promoção."
   },
   "how": {
     "eyebrow": "Seus próximos passos",
@@ -291,7 +291,7 @@
       },
       {
         "q": "O que acontece quando passo da cota?",
-        "a": "A capacidade cresce com verificação e atividade saudável. A tolerância de cobrança de 50%, o teto de fila de 3× a cota diária nominal e o teto mensal de 5× o volume incluído (até 4× cobrados como excedente) são limites de cobrança e fila, não vazão garantida do provedor. O envio efetivo depende da etapa de graduação, da margem de segurança e dos recursos regionais disponíveis; pagar nunca ignora esses controles. Com excedente desativado, o envio para na franquia mensal. O Pro 110K anual custa R$ 1.490 antecipados; a franquia de 110.000 renova mensalmente, sem saldo anual acumulado nem excedente medido. Os limites atuais aparecem no painel de reputação da equipe."
+        "a": "A capacidade cresce com verificação e atividade saudável. A tolerância de cobrança de 50%, o teto de fila de 3× a cota diária nominal e o teto mensal de 5× o volume incluído (até 4× cobrados como excedente) são limites de cobrança e fila, não vazão garantida do provedor. O envio efetivo depende da etapa de graduação, da margem de segurança e dos recursos regionais disponíveis; pagar nunca ignora esses controles. Com excedente desativado, o envio para na franquia mensal. O Pro 110K anual custa R$ 1.690 antecipados; a franquia de 110.000 renova mensalmente, sem saldo anual acumulado nem excedente medido. Os limites atuais aparecem no painel de reputação da equipe."
       },
       {
         "q": "Preciso de cartão de crédito para começar?",

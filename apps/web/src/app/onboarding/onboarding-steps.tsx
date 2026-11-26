@@ -558,6 +558,11 @@ function ApiQuickstartContent({
             {t("step2.playgroundMintKey")}
           </button>
         ) : null}
+        {!token && createKey.isError ? (
+          <span role="alert" style={{ fontSize: 12.5, color: "var(--ms-danger)" }}>
+            {createKey.error?.message || t("step1.error")}
+          </span>
+        ) : null}
         {!token ? (
           <span className="ms-mono" style={{ fontSize: 12, color: "var(--ms-muted)" }}>
             {t("step2.tryNeedsToken")}
@@ -812,73 +817,75 @@ function ApiQuickstartContent({
   );
 
   const demoPanel = sender ? (
-    <StepCard title={t("demo.title")} body={t("demo.body", { from: sender, to: userEmail })}>
-      {deliveryState === "failed" && currentEmail ? (
-        <>
-          <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
-            {t("attempt.retryBody")}
-          </p>
-          <Link
-            href={`/emails/${currentEmail.id}`}
-            className="ms-btn ms-btn-secondary"
-            style={{ marginTop: 14 }}
-          >
-            {t("attempt.log")}
-          </Link>
-        </>
-      ) : null}
-      <div
-        className="ms-wrap-row"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          marginTop: 14,
-        }}
-      >
-        <button
-          type="button"
-          className="ms-btn ms-btn-primary"
-          disabled={verifying || sendFirst.isPending || deliveryState === "in-flight"}
-          onClick={async () => {
-            track("api_opened");
-            setCaptchaFailed(false);
-            setVerifying(true);
-            try {
-              const token = await turnstile.getToken();
-              sendFirst.mutate({ locale: mailLocale, ...(token ? { captchaToken: token } : {}) });
-            } catch {
-              setCaptchaFailed(true);
-            } finally {
-              setVerifying(false);
-            }
+    <div id="send-test-inbox" style={{ scrollMarginTop: 24 }}>
+      <StepCard title={t("demo.title")} body={t("demo.body", { from: sender, to: userEmail })}>
+        {deliveryState === "failed" && currentEmail ? (
+          <>
+            <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ms-muted)" }}>
+              {t("attempt.retryBody")}
+            </p>
+            <Link
+              href={`/emails/${currentEmail.id}`}
+              className="ms-btn ms-btn-secondary"
+              style={{ marginTop: 14 }}
+            >
+              {t("attempt.log")}
+            </Link>
+          </>
+        ) : null}
+        <div
+          className="ms-wrap-row"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginTop: 14,
           }}
         >
-          <BtnSpinner on={verifying || sendFirst.isPending} />
-          {verifying || sendFirst.isPending
-            ? t("step2.sending")
-            : deliveryState === "in-flight"
-              ? t("attempt.waiting")
-              : deliveryState === "failed"
-                ? t("attempt.retryCta")
-                : t("demo.sendCta")}
-        </button>
-        {turnstile.slot}
-        {sendFirst.isSuccess && deliveryState !== "failed" ? (
-          <span style={{ fontSize: 13, color: "var(--ms-muted)" }}>
-            {t("step2.sentTo", { to: userEmail })}
-          </span>
-        ) : captchaFailed || sendFirst.error?.data?.code === "FORBIDDEN" ? (
-          <span style={{ fontSize: 13, color: "var(--ms-danger)" }}>
-            {t("step2.captchaFailed")}
-          </span>
-        ) : sendFirst.error?.data?.code === "TOO_MANY_REQUESTS" ? (
-          <span style={{ fontSize: 13, color: "var(--ms-muted)" }}>{t("step2.sendLimited")}</span>
-        ) : sendFirst.isError ? (
-          <span style={{ fontSize: 13, color: "var(--ms-danger)" }}>{t("step2.sendError")}</span>
-        ) : null}
-      </div>
-    </StepCard>
+          <button
+            type="button"
+            className="ms-btn ms-btn-primary"
+            disabled={verifying || sendFirst.isPending || deliveryState === "in-flight"}
+            onClick={async () => {
+              track("api_opened");
+              setCaptchaFailed(false);
+              setVerifying(true);
+              try {
+                const token = await turnstile.getToken();
+                sendFirst.mutate({ locale: mailLocale, ...(token ? { captchaToken: token } : {}) });
+              } catch {
+                setCaptchaFailed(true);
+              } finally {
+                setVerifying(false);
+              }
+            }}
+          >
+            <BtnSpinner on={verifying || sendFirst.isPending} />
+            {verifying || sendFirst.isPending
+              ? t("step2.sending")
+              : deliveryState === "in-flight"
+                ? t("attempt.waiting")
+                : deliveryState === "failed"
+                  ? t("attempt.retryCta")
+                  : t("demo.sendCta")}
+          </button>
+          {turnstile.slot}
+          {sendFirst.isSuccess && deliveryState !== "failed" ? (
+            <span style={{ fontSize: 13, color: "var(--ms-muted)" }}>
+              {t("step2.sentTo", { to: userEmail })}
+            </span>
+          ) : captchaFailed || sendFirst.error?.data?.code === "FORBIDDEN" ? (
+            <span style={{ fontSize: 13, color: "var(--ms-danger)" }}>
+              {t("step2.captchaFailed")}
+            </span>
+          ) : sendFirst.error?.data?.code === "TOO_MANY_REQUESTS" ? (
+            <span style={{ fontSize: 13, color: "var(--ms-muted)" }}>{t("step2.sendLimited")}</span>
+          ) : sendFirst.isError ? (
+            <span style={{ fontSize: 13, color: "var(--ms-danger)" }}>{t("step2.sendError")}</span>
+          ) : null}
+        </div>
+      </StepCard>
+    </div>
   ) : null;
 
   const resolvedMcpUrl = mcpUrl ?? `${apiUrl.replace(/\/+$/, "")}/mcp`;
@@ -1010,20 +1017,44 @@ function ApiQuickstartContent({
           {!token ? (
             <div
               className="ms-wrap-row"
-              style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                flexWrap: "wrap",
+                marginBottom: 12,
+              }}
             >
-              <button
-                type="button"
-                className="ms-btn ms-btn-secondary ms-btn-sm"
-                disabled={createKey.isPending}
-                onClick={() => {
-                  track("api_opened");
-                  createKey.mutate({ name: t("step1.keyName") });
-                }}
-              >
-                <BtnSpinner on={createKey.isPending} />
-                {t("agentQuickstart.mintKey")}
-              </button>
+              {verifiedDomain ? (
+                <>
+                  <button
+                    type="button"
+                    className="ms-btn ms-btn-secondary ms-btn-sm"
+                    disabled={createKey.isPending}
+                    onClick={() => {
+                      track("api_opened");
+                      createKey.mutate({ name: t("step1.keyName") });
+                    }}
+                  >
+                    <BtnSpinner on={createKey.isPending} />
+                    {t("agentQuickstart.mintKey")}
+                  </button>
+                  {createKey.isError ? (
+                    <span role="alert" style={{ fontSize: 12.5, color: "var(--ms-danger)" }}>
+                      {createKey.error?.message || t("step1.error")}
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <a href="#domain-first" className="ms-btn ms-btn-secondary ms-btn-sm">
+                    {t("agentQuickstart.verifyDomainCta")}
+                  </a>
+                  <span style={{ fontSize: 12.5, color: "var(--ms-muted)" }}>
+                    {t("agentQuickstart.needsDomain")}
+                  </span>
+                </>
+              )}
             </div>
           ) : null}
           <div
@@ -1219,8 +1250,11 @@ function ApiQuickstartContent({
               ) : (
                 <>
                   {createKey.isError ? (
-                    <div style={{ fontSize: 13, color: "var(--ms-danger)", marginTop: 10 }}>
-                      {t("step1.error")}
+                    <div
+                      role="alert"
+                      style={{ fontSize: 13, color: "var(--ms-danger)", marginTop: 10 }}
+                    >
+                      {createKey.error?.message || t("step1.error")}
                     </div>
                   ) : null}
                   <button

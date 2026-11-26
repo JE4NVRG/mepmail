@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { recordAudit } from "../audit";
+import { emitFunnel } from "../funnel";
 import { adminProcedure, router, teamProcedure } from "../trpc";
 
 export const apiKeysRouter = router({
@@ -69,6 +70,12 @@ export const apiKeysRouter = router({
           permission: input.permission,
           domainId: input.domainId ?? null,
         },
+      });
+      await emitFunnel(ctx.db, {
+        name: "first_key",
+        dedupeKey: `first_key:${ctx.teamId}`,
+        teamId: ctx.teamId,
+        props: { permission: input.permission },
       });
       // The full secret exists only in this response — the row stores
       // tokenPrefix + hash + last4, and no other code path returns or logs it.

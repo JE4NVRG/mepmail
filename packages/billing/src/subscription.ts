@@ -200,7 +200,7 @@ export async function applySubscription(
       .where(eq(schema.teams.id, team.id));
     return;
   }
-  let overage = existingOverage;
+  const overage = existingOverage;
   let plan: Plan;
   let planQuota: number | null;
   let rung: PlanRung | null = null;

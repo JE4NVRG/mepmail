@@ -504,6 +504,11 @@ export function MailboxServicePanel({
           {currentPlanCode && !systemLicense ? (
             <span className={styles.planName}>{MAILBOX_PLAN_NAMES[currentPlanCode]}</span>
           ) : null}
+          {plan?.includedWithSendPlan && !systemLicense ? (
+            <span className={styles.badge} data-active={plan.active}>
+              {t("includedBadge")}
+            </span>
+          ) : null}
           {plan ? (
             <span className={styles.badge} data-active={plan.active}>
               {systemLicense ? systemT("licenseLabel") : t(`status.${status}`)}
@@ -757,6 +762,11 @@ export function MailboxServicePanel({
                   <a className="ms-btn ms-btn-primary" href="/settings/billing" data-purchase="">
                     {t("viewSendingPlans")}
                   </a>
+                </div>
+              ) : null}
+              {plan?.includedWithSendPlan ? (
+                <div className={styles.notice} role="status">
+                  <p>{t("includedWithSendBody")}</p>
                 </div>
               ) : null}
               <PurchaseReviewNotice

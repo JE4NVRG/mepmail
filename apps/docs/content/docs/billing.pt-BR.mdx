@@ -12,7 +12,12 @@ hospedada.
 
 Uma escada, do mais barato ao mais caro. Free e Starter limitam os envios por
 dia UTC; Pro e Scale incluem um volume mensal por período de cobrança do
-Stripe e podem cobrar excedente além dele. O Free guarda até 1.000 contatos;
+Stripe e podem cobrar excedente além dele. Todo plano ativo a partir do
+**Pro 110K** (Pro e Scale) também inclui **1 caixa Correio Solo** (1 GiB de
+armazenamento, 500 destinatários de saída e 2.000 recebimentos por mês) sem custo
+extra — no downgrade abaixo do Pro 110K o direito incluso termina e as mensagens
+armazenadas permanecem em leitura/exportação até um novo upgrade ou assinatura
+avulsa do Correio. O Free guarda até 1.000 contatos;
 segmentos, tópicos e contatos são ilimitados do Starter em diante. Domínios de
 envio: 1 no Free, 10 no Starter, 25 no Pro e ilimitados no Scale. Em qualquer
 um desses limites a API responde
@@ -22,18 +27,18 @@ mostra a mesma frase.
 | Degrau | Plano | Preço (US$) | Preço no Brasil (R$) | Incluído | Limite | Excedente por 1.000 (US$ / R$) |
 | --- | --- | --- | --- | --- | --- | --- |
 | `free` | Free | US$ 0 | R$ 0 | 100 | por dia | — |
-| `starter` | Starter | US$ 9 | R$ 49 | 1.500 | por dia | — |
-| `pro_100k` | Pro | US$ 29 (oferta de lançamento; assinaturas anteriores a ela mantêm US$ 20) | R$ 149 (oferta de lançamento; assinaturas anteriores a ela mantêm R$ 99) | 110.000 | por mês | US$ 0,35 / R$ 1,75 |
-| `pro_200k` | Pro | US$ 55 | R$ 279 | 220.000 | por mês | US$ 0,32 / R$ 1,60 |
-| `scale_500k` | Scale | US$ 129 | R$ 649 | 550.000 | por mês | US$ 0,29 / R$ 1,45 |
-| `scale_1m` | Scale | US$ 239 | R$ 1.199 | 1.100.000 | por mês | US$ 0,26 / R$ 1,30 |
-| `scale_1_5m` | Scale | US$ 349 | R$ 1.749 | 1.650.000 | por mês | US$ 0,24 / R$ 1,20 |
-| `scale_2_5m` | Scale | US$ 549 | R$ 2.749 | 2.750.000 | por mês | US$ 0,22 / R$ 1,10 |
+| `starter` | Starter | US$ 9 | R$ 54 | 1.500 | por dia | — |
+| `pro_100k` | Pro | US$ 29 (oferta de lançamento; assinaturas anteriores a ela mantêm US$ 20) | R$ 169 (oferta de lançamento; assinaturas anteriores a ela mantêm R$ 117) | 110.000 | por mês | US$ 0,35 / R$ 2,05 |
+| `pro_200k` | Pro | US$ 55 | R$ 325 | 220.000 | por mês | US$ 0,32 / R$ 1,90 |
+| `scale_500k` | Scale | US$ 129 | R$ 759 | 550.000 | por mês | US$ 0,29 / R$ 1,70 |
+| `scale_1m` | Scale | US$ 239 | R$ 1.399 | 1.100.000 | por mês | US$ 0,26 / R$ 1,55 |
+| `scale_1_5m` | Scale | US$ 349 | R$ 2.049 | 1.650.000 | por mês | US$ 0,24 / R$ 1,40 |
+| `scale_2_5m` | Scale | US$ 549 | R$ 3.229 | 2.750.000 | por mês | US$ 0,22 / R$ 1,30 |
 
-Oferta de lançamento do Pro 110K: US$ 29 por mês (R$ 149), com US$ 20 (R$ 99)
-na primeira mensalidade para novos clientes elegíveis, ou US$ 290 (R$ 1.490)
+Oferta de lançamento do Pro 110K: US$ 29 por mês (R$ 169), com US$ 20 (R$ 117)
+na primeira mensalidade para novos clientes elegíveis, ou US$ 290 (R$ 1.690)
 por um ano pago antecipadamente, sem excedente. No Brasil, todo preço é cobrado
-em reais, no cartão ou no Pix. As regras de fila, excedente e teto de 5× são as
+em reais, no cartão ou no Pix (planos acima de R$ 3.000, como o Scale 2,5M, ficam apenas no cartão pelo limite do Pix). As regras de fila, excedente e teto de 5× são as
 mesmas em todo lugar: [Limites → Volume de envio](/pt-BR/rate-limits#volume-de-envio).
 
 A escada é `PLAN_RUNGS` em `packages/core/src/plans.ts`; Checkout, painel,

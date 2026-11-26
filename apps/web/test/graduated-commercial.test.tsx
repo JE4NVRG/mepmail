@@ -176,7 +176,7 @@ describe("graduated commercial and customer reputation", () => {
             }
           }
           expect(LAUNCH_OFFER.sending.monthlyCents).toBe(2900);
-          expect(LAUNCH_OFFER.sending.brlMonthlyCents).toBe(14900);
+          expect(LAUNCH_OFFER.sending.brlMonthlyCents).toBe(16900);
         });
   }
   for (const value of [null, Number.NaN, Infinity, -1, 0.5])

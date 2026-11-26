@@ -8,10 +8,13 @@ import { LAUNCH_OFFER } from "@/lib/launch-offer";
  */
 export type JsonLd = Record<string, unknown>;
 
-/** The public site's own copies elsewhere (repository and app store). */
+/** The public site's own copies elsewhere (repository, registries and app store). */
 const SAME_AS = [
   "https://github.com/JE4NVRG/mepmail",
   "https://apps.microsoft.com/detail/9nhpx6qrf0pb",
+  "https://www.npmjs.com/package/@mepmail/mcp",
+  "https://glama.ai/mcp/servers/JE4NVRG/mepmail",
+  "https://docs.mepmail.dev",
 ];
 
 export function siteBaseUrl(): string {
@@ -27,7 +30,52 @@ export function organizationJsonLd(base: string): JsonLd {
     name: "MepMail",
     url: `${base}/`,
     logo: `${base}/logo/mepmail-logo-400.png`,
+    email: "suporte@mepmail.dev",
     sameAs: SAME_AS,
+  };
+}
+
+/** Sending API, SMTP relay and official MCP server software product. */
+export function sendingApiJsonLd(base: string, url: string, description: string): JsonLd {
+  return {
+    "@type": "SoftwareApplication",
+    name: "MepMail Send",
+    applicationCategory: "DeveloperApplication",
+    applicationSubCategory: "Email API, SMTP & MCP Server",
+    operatingSystem: "Cloud, Web, Linux, macOS, Windows",
+    url,
+    description,
+    publisher: { "@id": organizationId(base) },
+    offers: [
+      { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
+      {
+        "@type": "Offer",
+        name: "Pro",
+        price: decimal(LAUNCH_OFFER.sending.monthlyCents),
+        priceCurrency: "USD",
+      },
+      {
+        "@type": "Offer",
+        name: "Pro (BRL)",
+        price: decimal(LAUNCH_OFFER.sending.brlMonthlyCents),
+        priceCurrency: "BRL",
+      },
+    ],
+  };
+}
+
+export function breadcrumbJsonLd(
+  base: string,
+  items: readonly { name: string; path: string }[],
+): JsonLd {
+  return {
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: item.path.startsWith("http") ? item.path : `${base}${item.path}`,
+    })),
   };
 }
 

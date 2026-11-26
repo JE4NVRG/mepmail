@@ -144,6 +144,8 @@ export function AuthForm({
   // An invite link carries the invited address; signup starts from it.
   const [email, setEmail] = useState(mode === "signup" ? (params.get("email") ?? "") : "");
   const [password, setPassword] = useState("");
+  const [honeypot, setHoneypot] = useState("");
+  const mountedAtRef = useRef<number>(Date.now());
   const [updatesOptIn, setUpdatesOptIn] = useState(false);
   const [updatesFailed, setUpdatesFailed] = useState(false);
   const [revealPassword, setRevealPassword] = useState(false);
@@ -197,7 +199,17 @@ export function AuthForm({
       setPending(null);
       return;
     }
-    const fetchOptions = { headers: captchaHeaders(token) };
+    const fetchOptions = {
+      headers: {
+        ...captchaHeaders(token),
+        ...(mode === "signup"
+          ? {
+              "x-mepmail-form-elapsed": String(Math.max(0, Date.now() - mountedAtRef.current)),
+              ...(honeypot ? { "x-mepmail-hp": honeypot } : {}),
+            }
+          : {}),
+      },
+    };
     try {
       // O callback explícito também preserva a oferta no reenvio por login não verificado.
       const { data, error } =
@@ -329,7 +341,17 @@ export function AuthForm({
       const { error } = await authClient.signIn.social({
         provider,
         ...(mode === "signup" ? { requestSignUp: true } : {}),
-        fetchOptions: { headers: captchaHeaders(token) },
+        fetchOptions: {
+          headers: {
+            ...captchaHeaders(token),
+            ...(mode === "signup"
+              ? {
+                  "x-mepmail-form-elapsed": String(Math.max(0, Date.now() - mountedAtRef.current)),
+                  ...(honeypot ? { "x-mepmail-hp": honeypot } : {}),
+                }
+              : {}),
+          },
+        },
         callbackURL: next,
         errorCallbackURL: withNext(mode === "login" ? "/login" : "/signup", nextParam),
       });
@@ -483,19 +505,44 @@ export function AuthForm({
         aria-describedby={errorMessage ? "auth-error auth-step" : "auth-step"}
       >
         {mode === "signup" ? (
-          <div className={`ms-field ${styles.field}`}>
-            <label htmlFor="name">{t("name")}</label>
-            <input
-              id="name"
-              type="text"
-              className={`ms-input ${styles.control}`}
-              autoComplete="name"
-              placeholder={t("namePlaceholder")}
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
+          <>
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                left: "-9999px",
+                width: 1,
+                height: 1,
+                overflow: "hidden",
+                opacity: 0,
+                pointerEvents: "none",
+              }}
+            >
+              <label htmlFor="company-website">Company</label>
+              <input
+                id="company-website"
+                name="company"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
+              />
+            </div>
+            <div className={`ms-field ${styles.field}`}>
+              <label htmlFor="name">{t("name")}</label>
+              <input
+                id="name"
+                type="text"
+                className={`ms-input ${styles.control}`}
+                autoComplete="name"
+                placeholder={t("namePlaceholder")}
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+          </>
         ) : null}
         <div className={`ms-field ${styles.field}`}>
           <label htmlFor="email">{t("email")}</label>

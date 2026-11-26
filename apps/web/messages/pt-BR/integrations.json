@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Integrações: n8n, Slack, Discord, Telegram, MCP e SMTP",
-    "description": "Integre o MepMail com n8n, Slack, Discord, Telegram, MCP e SMTP: notificações, caixas de e-mail para agentes de IA e API compatível com a do Resend."
+    "title": "Integrações: MCP, SMTP, Webhooks, n8n e Slack | MepMail",
+    "description": "Conecte o MepMail ao Claude, Cursor, n8n, Slack, Discord, Telegram, SMTP e API REST com MCP oficial e credenciais isoladas por escopo."
   },
   "hero": {
     "eyebrow": "Integrações",

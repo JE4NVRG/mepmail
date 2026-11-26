@@ -6,6 +6,8 @@ import {
   countDistinctRecipients,
   DAY_MS,
   DRAIN_MAX_PER_RUN,
+  emitFunnelEvent,
+  type FunnelEventTarget,
   failQueuedEmailsForDomain,
   fetchDeliverabilityHealth,
   getInstanceSettings,
@@ -845,6 +847,7 @@ const REVERIFY_BATCH = 100;
 export interface ReverifyDomainsDeps {
   clientForRegion: (region: string) => SesIdentityClient;
   resolver: DnsResolver;
+  funnel?: FunnelEventTarget | undefined;
   now?: Date;
   batchSize?: number;
 }
@@ -877,8 +880,10 @@ export async function reverifyDomains(db: Db, deps: ReverifyDomainsDeps): Promis
   const due = await db
     .select({
       id: schema.domains.id,
+      teamId: schema.domains.teamId,
       name: schema.domains.name,
       region: schema.domains.region,
+      status: schema.domains.status,
       mailFromSubdomain: schema.domains.mailFromSubdomain,
       dkimSelector: schema.domains.dkimSelector,
       dkimPublicKey: schema.domains.dkimPublicKey,
@@ -920,6 +925,14 @@ export async function reverifyDomains(db: Db, deps: ReverifyDomainsDeps): Promis
           ...(status === "verified" && !domain.verifiedAt ? { verifiedAt: now } : {}),
         })
         .where(eq(schema.domains.id, domain.id));
+      if (status === "verified" && domain.status !== "verified" && deps.funnel) {
+        await emitFunnelEvent(db, deps.funnel, {
+          name: "domain_verified",
+          dedupeKey: `domain_verified:${domain.teamId}`,
+          teamId: domain.teamId,
+          props: { region: domain.region },
+        });
+      }
     } catch (err) {
       if ((err as { name?: string }).name === "NotFoundException") {
         // The SES identity is gone (deleted outside the app): the stored

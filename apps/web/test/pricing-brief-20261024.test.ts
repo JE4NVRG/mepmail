@@ -113,10 +113,10 @@ describe("pricing brief 2026-10-24: server-rendered product choice", () => {
   it("separates the Brazilian Mail/Pix price from Send and from the card-only trial", async () => {
     context.locale = "pt-BR";
     const html = await render({ focus: "mail" });
-    expect(html).toContain("Correio a partir de R$ 14,90/mês no Pix ou cartão");
+    expect(html).toContain("Correio a partir de R$ 16,90/mês no Pix ou cartão");
     expect(html).toContain("não de um plano de Envio");
     expect(html).toContain("O teste de 7 dias é só no cartão");
-    expect(html).toContain("Starter: R$ 49/mês (US$ 9 em dólar)");
+    expect(html).toContain("Starter: R$ 54/mês (US$ 9 em dólar)");
   });
 
   it("retains a real Mail anchor without bypassing the closed availability gate", async () => {

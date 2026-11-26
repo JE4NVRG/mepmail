@@ -1,6 +1,7 @@
 import { getLocale } from "next-intl/server";
 import { LandingLangSwitch } from "@/components/landing-lang-switch";
 import { publicSignupCopy } from "@/lib/public-signup-copy";
+import { showSourceLinkEnabled } from "@/lib/source-link";
 import type { PublicSignupAvailability } from "@/server/public-signup";
 import styles from "./auth.module.css";
 
@@ -43,9 +44,11 @@ export async function SignupClosed({
             <a className={styles.back} href="/status">
               {copy.status}
             </a>
-            <a className={styles.back} href="/source">
-              {copy.source}
-            </a>
+            {showSourceLinkEnabled() ? (
+              <a className={styles.back} href="/source">
+                {copy.source}
+              </a>
+            ) : null}
             <a className={styles.back} href="/support">
               {copy.contact}
             </a>

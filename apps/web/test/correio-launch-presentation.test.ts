@@ -124,7 +124,7 @@ const expectations = {
       /earlier accounts authorized for Mail may keep their current Send plan when adding mailboxes/,
     // The internal license is an operator detail: the public page never names it.
     internalWording: /\bSystem\b|exempt/i,
-    paidSeparately: /Mail is paid separately/,
+    paidSeparately: /Solo is included from Send Pro 110K up/,
     sendOnly: "Send only",
     combined: "Send + Mail",
     contractsPreserved: /existing subscriptions are preserved/i,
@@ -165,7 +165,7 @@ const expectations = {
     authorizedEarlierPlan:
       /contas anteriores autorizadas para o Correio podem manter o plano atual de Envio ao adicionar caixas/,
     internalWording: /\bSystem\b|isent/i,
-    paidSeparately: /Correio é pago à parte/,
+    paidSeparately: /Solo já vem incluso a partir do Envio Pro 110K/,
     sendOnly: "Só Envio",
     combined: "Envio + Correio",
     contractsPreserved: /assinaturas atuais são preservadas/i,
@@ -187,7 +187,7 @@ const expectations = {
     publicMailboxMcpPending: /O MCP do Correio dá ao agente as ferramentas da própria caixa/,
     agentFragment: "conecte-um-agente-por-mcp",
     docsPrefix: "https://docs.mepmail.dev/pt-BR",
-    planPrices: ["R$ 14,90", "R$ 29,90", "R$ 64,90"],
+    planPrices: ["R$ 16,90", "R$ 34,90", "R$ 74,90"],
     plansNoSending: /O Correio não exige plano de Envio/,
     plansBilling: "Plano de Envio + um plano do Correio",
   },
@@ -505,7 +505,7 @@ describe.each(["en", "pt-BR"] as const)("Correio sold without Envio in %s", (loc
   it("adds the standalone plan, priced and linked to sign-up, only when its flag is on", async () => {
     vi.stubEnv("MAILBOX_EARLY_ACCESS_OPEN", "true");
     // Portuguese readers get Brazil's price list in reais (Pix or card).
-    const equipe = locale === "pt-BR" ? /R\$ 64,90/ : /US\$ 12\.90/;
+    const equipe = locale === "pt-BR" ? /R\$ 74,90/ : /US\$ 12\.90/;
     const closed = section(await render(locale), "correio-plans-title");
     expect(closed).not.toMatch(equipe);
     vi.stubEnv("MAILBOX_STANDALONE_OPEN", "true");

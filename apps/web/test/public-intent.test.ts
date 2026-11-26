@@ -211,7 +211,7 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(intro).toContain(messages(locale).pricing.choice.freeCta);
       const mail = (await render({ focus: "mail" })).replace(/\u00a0/g, " ");
       const mailIntro = mail.slice(0, mail.indexOf('id="correio"'));
-      expect(mailIntro).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
+      expect(mailIntro).toContain(locale === "en" ? "US$ 2.90" : "R$ 16,90");
     });
 
     it("starts with Send by default and preserves each paid plan's intent", async () => {
@@ -227,7 +227,7 @@ for (const locale of ["en", "pt-BR"] as const) {
       expect(intro).toContain(messages(locale).pricing.choice.freeCta);
       const mail = (await render({ focus: "mail" })).replace(/\u00a0/g, " ");
       const mailIntro = mail.slice(0, mail.indexOf('id="correio"'));
-      expect(mailIntro).toContain(locale === "en" ? "US$ 2.90" : "R$ 14,90");
+      expect(mailIntro).toContain(locale === "en" ? "US$ 2.90" : "R$ 16,90");
       for (const rung of ["starter", "pro_100k", "pro_200k", "scale_500k"])
         expect(html).toContain(`href="/signup?next=%2Fsettings%2Fbilling%3Fplan%3D${rung}"`);
       for (const plan of ["solo", "duo", "equipe"] as const)

@@ -49,12 +49,12 @@ describe("public offer selection preserves the legacy contract", () => {
   it("uses charged BRL catalog prices and a dated BCB conversion only for foreign providers", () => {
     const before = PRICE_ROWS.map((row) => ({ ...row }));
     const brl = comparisonRowsForLocale(true, "pt-BR");
-    expect(brl.map((row) => row.mepmail)).toEqual([149, 279, 649, 1199, 1749, 2749]);
+    expect(brl.map((row) => row.mepmail)).toEqual([169, 325, 759, 1399, 2049, 3229]);
     expect(brl[0]?.resend).toBeCloseTo(44 * COMPARISON_FX.brlPerUsd);
     expect(COMPARISON_FX.date).toBe("2026-10-15");
     expect(COMPARISON_FX.url).toContain("bcb.gov.br");
     for (const row of brl) expect(row.savings).toBe(`${computeSavings(row).savingsPct}%`);
-    expect(formatComparisonPrice(brl[0]?.mepmail ?? null, "pt-BR")).toBe("R$ 149,00");
+    expect(formatComparisonPrice(brl[0]?.mepmail ?? null, "pt-BR")).toBe("R$ 169,00");
     expect(comparisonRowsForLocale(true, "en")[0]?.mepmail).toBe(29);
     expect(PRICE_ROWS).toEqual(before);
   });

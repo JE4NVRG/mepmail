@@ -18,6 +18,12 @@ const config = {
     return [
       { source: "/docs", destination: "/", permanent: true },
       { source: "/docs/:path*", destination: "/:path*", permanent: true },
+      // Crawlers extract inline RSC props ("./public/openapi.json") and template
+      // route literals ("/templates/{id}", "/publish", "/duplicate") as relative URLs.
+      { source: "/:path*/public/openapi.json", destination: "/openapi.json", permanent: true },
+      { source: "/templates/:path*", destination: "/concepts/templates", permanent: true },
+      { source: "/publish", destination: "/concepts/templates", permanent: true },
+      { source: "/duplicate", destination: "/concepts/templates", permanent: true },
       ...aliases.flatMap(([name, en, pt]) => [
         { source: `/${name}`, destination: `/${en}`, permanent: false },
         { source: `/en/${name}`, destination: `/${en}`, permanent: false },

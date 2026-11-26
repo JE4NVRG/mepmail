@@ -280,4 +280,55 @@ describe("actual authenticated team presentation router (synthetic membership)",
       ]);
     }
   });
+
+  it("returns normal without banner when all served SES regions are healthy", async () => {
+    vi.stubEnv("AWS_ACCESS_KEY_ID", "fixture");
+    vi.stubEnv("AWS_SECRET_ACCESS_KEY", "fixture");
+    vi.stubEnv("AWS_REGIONS", "us-east-1,eu-west-1");
+    vi.stubEnv("IS_CLOUD", "true");
+    vi.stubEnv("SNS_TOPIC_ARNS", topics.join(","));
+    vi.stubEnv(
+      "SENDING_PROVIDER_POLICY_JSON",
+      JSON.stringify({
+        version: 1,
+        graduated: true,
+        paused: false,
+        defaults: { transactional: "ses", campaign: "disabled" },
+      }),
+    );
+    vi.stubEnv("MAILBOX_SES_OUTBOUND_REGIONS", "[]");
+    for (const domains of [[domain], []]) {
+      let query = 0;
+      const db = {
+        select: () => ({
+          from: () => ({
+            where: () => Promise.resolve(query++ === 0 ? domains : []),
+          }),
+        }),
+      } as unknown as Db;
+      const make = createCallerFactory(
+        router({
+          system: createSystemRouter({
+            accountClient: () => ({
+              async send() {
+                return {
+                  SendingEnabled: true,
+                  ProductionAccessEnabled: true,
+                  EnforcementStatus: "HEALTHY",
+                  SendQuota: { Max24HourSend: 54900, SentLast24Hours: 0, MaxSendRate: 14 },
+                };
+              },
+            }),
+          }),
+        }),
+      );
+      const caller = make({
+        db,
+        teamId,
+        role: "owner",
+        session: { user: { id: "fixture", email: "fixture@example.test", name: "Fixture" } },
+      } as Context);
+      expect(await caller.system.sendingAvailability()).toEqual({ state: "normal" });
+    }
+  });
 });

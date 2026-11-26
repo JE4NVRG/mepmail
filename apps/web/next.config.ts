@@ -58,6 +58,7 @@ const config: NextConfig = {
         destination: "https://docs.mepmail.dev/rate-limits",
         permanent: true,
       },
+      { source: "/mcp", destination: "https://docs.mepmail.dev/mcp", permanent: true },
       { source: "/docs", destination: "https://docs.mepmail.dev", permanent: true },
       {
         source: "/docs/:path*",

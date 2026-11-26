@@ -56,7 +56,7 @@ export function sendingAvailability(input: {
   ) {
     return { state: "limited" };
   }
-  if (!policy?.restoration && input.healthySesRoute !== undefined) {
+  if (!policy?.restoration && input.sesPaused && input.healthySesRoute !== undefined) {
     return {
       state:
         input.healthySesRoute && [transactional, campaign].includes("ses") ? "limited" : "paused",

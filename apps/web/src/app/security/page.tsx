@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import {
   PublicFooter,
   PublicHeader,
   type PublicSiteLabels,
   SignupLink,
 } from "@/components/site-chrome";
+import { StructuredData } from "@/components/structured-data";
 import { DOCS_URL } from "@/lib/docs-links";
 import { legalLinks } from "@/lib/legal-links";
+import { localizedPath } from "@/lib/public-locale-url";
+import {
+  breadcrumbJsonLd,
+  faqJsonLd,
+  organizationJsonLd,
+  siteBaseUrl,
+} from "@/lib/structured-data";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "../site-v2.css";
@@ -52,6 +60,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * vive no namespace "security"; o chrome e o catálogo público vêm de "landing".
  */
 export default async function SecurityPage() {
+  const locale = (await getLocale()) === "pt-BR" ? "pt-BR" : "en";
   const t = await getTranslations("security");
   const l = await getTranslations("landing");
   const site = {
@@ -73,9 +82,20 @@ export default async function SecurityPage() {
   const faq = t.raw("faq.items") as FaqItem[];
   const disclosure = t.raw("disclosure.bullets") as string[];
   const privacyHref = legalLinks().privacy;
+  const base = siteBaseUrl();
 
   return (
     <div className="gtm v2">
+      <StructuredData
+        graph={[
+          organizationJsonLd(base),
+          breadcrumbJsonLd(base, [
+            { name: "MepMail", path: localizedPath("/", locale) },
+            { name: t("hero.eyebrow"), path: localizedPath(canonical, locale) },
+          ]),
+          faqJsonLd(faq),
+        ]}
+      />
       <PublicHeader labels={site} page="security" />
       <main id="conteudo">
         <section className="v2-dark v2-sec v2s-hero">

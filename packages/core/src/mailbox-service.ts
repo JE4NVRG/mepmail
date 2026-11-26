@@ -1,6 +1,7 @@
 import { type Db, schema } from "@millionsend/db";
 import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { monthlyBillingUsagePeriod } from "./billing-usage-period.js";
+import { planIncludesCorreioSolo } from "./plans.js";
 
 export class MailboxServiceError extends Error {
   constructor(
@@ -95,6 +96,70 @@ export async function assertMailboxTrialSending(
 export type MailboxSubscription = typeof schema.mailboxSubscriptions.$inferSelect;
 /** Internal capacity for the verified platform operator; never a paid-plan allowance. */
 export const SYSTEM_MAILBOX_STORAGE_BYTES = 50 * 1024 ** 3;
+/** Commercial Mail Solo allowance included free with every active Pro 110K+ / Scale Send plan. */
+export const INCLUDED_SOLO_TERMS = {
+  planCode: "solo" as const,
+  seats: 1,
+  includedMailboxes: 1,
+  quotaScope: "team" as const,
+  storageBytesPerMailbox: 1024 ** 3,
+  includedOutboundPerMailbox: 500,
+  inboundDeliveriesPerPeriod: 2000,
+  inboundBytesPerPeriod: 512 * 1024 ** 2,
+  outboundBytesPerPeriod: 256 * 1024 ** 2,
+} as const;
+const ANNUAL_PERIOD_THRESHOLD_MS = 45 * 24 * 3_600_000;
+
+function utcMonthWindow(now: Date): { start: Date; end: Date } {
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+  return { start, end };
+}
+
+function includedSoloPlanForTeam(
+  teamId: string,
+  team: {
+    currentPeriodStart: Date | null;
+    currentPeriodEnd: Date | null;
+  },
+  now: Date,
+): MailboxSubscription {
+  const fallback = utcMonthWindow(now);
+  const periodStart = team.currentPeriodStart ?? fallback.start;
+  const periodEnd =
+    team.currentPeriodEnd && team.currentPeriodEnd > now ? team.currentPeriodEnd : fallback.end;
+  const interval =
+    periodEnd.getTime() - periodStart.getTime() > ANNUAL_PERIOD_THRESHOLD_MS ? "year" : "month";
+  return {
+    teamId,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    stripeSubscriptionItemId: null,
+    stripePriceId: null,
+    stripeSubscriptionCreated: null,
+    livemode: false,
+    currency: null,
+    unitAmount: null,
+    extraUnitAmount: null,
+    interval,
+    status: "active",
+    seats: INCLUDED_SOLO_TERMS.seats,
+    storageBytesPerMailbox: INCLUDED_SOLO_TERMS.storageBytesPerMailbox,
+    includedOutboundPerMailbox: INCLUDED_SOLO_TERMS.includedOutboundPerMailbox,
+    quotaScope: INCLUDED_SOLO_TERMS.quotaScope,
+    includedMailboxes: INCLUDED_SOLO_TERMS.includedMailboxes,
+    planCode: INCLUDED_SOLO_TERMS.planCode,
+    inboundDeliveriesPerPeriod: INCLUDED_SOLO_TERMS.inboundDeliveriesPerPeriod,
+    inboundBytesPerPeriod: INCLUDED_SOLO_TERMS.inboundBytesPerPeriod,
+    outboundBytesPerPeriod: INCLUDED_SOLO_TERMS.outboundBytesPerPeriod,
+    periodStart,
+    periodEnd,
+    cancelAtPeriodEnd: false,
+    cancelAt: null,
+    lastEventCreated: null,
+    updatedAt: now,
+  };
+}
 export type MailboxOperationalPlan = MailboxSubscription & {
   unlimitedSeats: boolean;
   unlimitedOutbound: boolean;
@@ -172,7 +237,14 @@ export async function mailboxServiceEntitlement(
   now = new Date(),
 ) {
   const teamQuery = db
-    .select({ plan: schema.teams.plan, suspendedAt: schema.teams.suspendedAt })
+    .select({
+      plan: schema.teams.plan,
+      planQuota: schema.teams.planQuota,
+      planStatus: schema.teams.planStatus,
+      currentPeriodStart: schema.teams.currentPeriodStart,
+      currentPeriodEnd: schema.teams.currentPeriodEnd,
+      suspendedAt: schema.teams.suspendedAt,
+    })
     .from(schema.teams)
     .where(eq(schema.teams.id, teamId));
   const [team] = await (lock ? teamQuery.for("share") : teamQuery);
@@ -202,9 +274,14 @@ export async function mailboxServiceEntitlement(
     .select()
     .from(schema.mailboxSubscriptions)
     .where(eq(schema.mailboxSubscriptions.teamId, teamId));
-  const [plan] = await (lock ? planQuery.for("update") : planQuery);
+  const [storedPlan] = await (lock ? planQuery.for("update") : planQuery);
   const allowed = !!team && !team.suspendedAt;
-  const resourcePolicyActive = allowed && !!plan && (system || mailboxServiceActive(plan, now));
+  const hasActivePaidMail = !!storedPlan && mailboxServiceActive(storedPlan, now);
+  const includedBySend =
+    allowed && !system && !hasActivePaidMail && !!team && planIncludesCorreioSolo(team, now);
+  const plan = includedBySend ? includedSoloPlanForTeam(teamId, team, now) : storedPlan;
+  const resourcePolicyActive =
+    allowed && !!plan && (system || includedBySend || mailboxServiceActive(plan, now));
   return {
     // Preserve the audited grant row; only the authority-derived operational view changes.
     plan: system && plan ? { ...plan, storageBytesPerMailbox: SYSTEM_MAILBOX_STORAGE_BYTES } : plan,
@@ -213,9 +290,10 @@ export async function mailboxServiceEntitlement(
       : plan
         ? ("subscription" as const)
         : ("none" as const),
+    includedWithSendPlan: includedBySend,
     unlimitedSeats: system,
     unlimitedOutbound: system,
-    active: allowed && (system || mailboxServiceActive(plan, now)),
+    active: allowed && (system || includedBySend || mailboxServiceActive(plan, now)),
     resourcePolicyActive,
     usagePeriod: system || !plan ? null : mailboxSubscriptionUsagePeriod(plan, now),
   };
@@ -261,6 +339,7 @@ export async function mailboxServiceState(db: Db, teamId: string) {
   return {
     active: entitlement.active,
     licenseKind: entitlement.licenseKind,
+    includedWithSendPlan: entitlement.includedWithSendPlan,
     unlimitedSeats: entitlement.unlimitedSeats,
     unlimitedOutbound: entitlement.unlimitedOutbound,
     resourcePolicyActive: entitlement.resourcePolicyActive,

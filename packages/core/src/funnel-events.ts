@@ -23,28 +23,38 @@ import { isLoopbackUrl } from "./url.js";
  * Umami as its own anonymous session, as the tracker's own events do.
  */
 export const FUNNEL_EVENT_NAMES = [
+  "signup",
   "account_created",
   "signup_complete",
   "first_send",
   "subscription_paid",
   "email_verified",
+  "domain_added",
+  "domain_verified",
+  "first_key",
   "first_email_sent",
   "checkout_started",
   "payment_succeeded",
+  "upgrade",
 ] as const;
 
 export type FunnelEventName = (typeof FUNNEL_EVENT_NAMES)[number];
 
 /** Where each event is attributed in Umami's page views; its dashboard reads the funnel by path. */
 export const FUNNEL_EVENT_PATHS: Record<FunnelEventName, string> = {
+  signup: "/signup",
   account_created: "/signup",
   signup_complete: "/signup",
   first_send: "/emails",
   subscription_paid: "/settings/billing",
   email_verified: "/verify-email",
+  domain_added: "/domains",
+  domain_verified: "/domains",
+  first_key: "/api-keys",
   first_email_sent: "/emails",
   checkout_started: "/settings/billing",
   payment_succeeded: "/settings/billing",
+  upgrade: "/settings/billing",
 };
 
 /** Cookie the proxy writes a visit's raw channel into, read back at sign-up. */

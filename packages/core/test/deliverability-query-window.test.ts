@@ -389,7 +389,7 @@ describe("window-bounded deliverability query", () => {
           if (
             row &&
             ["sent", "hardBounced", "complained", "watermark"].every((key) =>
-              Object.prototype.hasOwnProperty.call(row, key),
+              Object.hasOwn(row, key),
             )
           )
             captured.push(query);

@@ -3,6 +3,7 @@
 import type { RungChange } from "@millionsend/billing";
 import {
   formatVolume,
+  PIX_MAX_BRL_CENTS,
   PLAN_CONTACT_LIMIT,
   PLAN_DOMAIN_LIMIT,
   PLAN_RUNGS,
@@ -522,6 +523,7 @@ export function BillingView({
     return [
       domains === null ? t("features.domainsUnlimited") : t("features.domains", { n: domains }),
       contacts === null ? t("features.contacts") : t("features.contactsLimit", { n: contacts }),
+      ...(p === "pro" || p === "scale" ? [t("features.mailIncluded")] : []),
       t("features.broadcasts"),
       t("features.integrations"),
       t("features.agents"),
@@ -1259,7 +1261,11 @@ export function BillingView({
                                 : t("switch")
                               : t("choose")}
                           </button>
-                          {pixOffer ? (
+                          {pixOffer &&
+                          (newOffer && r.key === newOffer.rung
+                            ? LAUNCH_OFFER.sending.brlMonthlyCents *
+                              (launchInterval === "year" ? LAUNCH_OFFER.annualChargedMonths : 1)
+                            : r.brlPriceCents) <= PIX_MAX_BRL_CENTS ? (
                             <button
                               type="button"
                               className="ms-btn ms-btn-secondary"

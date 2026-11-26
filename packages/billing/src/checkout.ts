@@ -1,5 +1,4 @@
-import type { Db } from "@millionsend/db";
-import { schema } from "@millionsend/db";
+import type { Db, schema } from "@millionsend/db";
 import { beginSendCheckout, type SendCheckoutInput } from "./send-checkout.js";
 import type { BillingStripe } from "./stripe.js";
 

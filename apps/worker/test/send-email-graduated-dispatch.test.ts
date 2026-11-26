@@ -596,4 +596,55 @@ describe("ordinary API dispatch under graduated sending", () => {
     expect(modelPosts).toBe(0);
     expect(transported).toBe(0);
   });
+
+  it("transient judge upstream errors park without tagging content_review so quota.drain retries", async () => {
+    const t = await tenant("upstream-park");
+    const email = await seed(t);
+    await admit(email.id, t.teamId, t.domainId);
+    const origFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url =
+          typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        if (url === "https://api.commandcode.ai/alpha/billing/credits") {
+          return new Response(
+            JSON.stringify({
+              credits: {
+                monthlyCredits: 100,
+                purchasedCredits: 100,
+                freeCredits: 0,
+                belowThreshold: false,
+              },
+              windowLimits: {
+                exceeded: false,
+                fiveHour: { used: 0, cap: 1000, remaining: 1000, resetAtMs: Date.now() + 60_000 },
+                weekly: { used: 0, cap: 5000, remaining: 5000, resetAtMs: Date.now() + 60_000 },
+              },
+              availableCredits: 200,
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        if (url === "https://api.commandcode.ai/provider/v1/chat/completions") {
+          return new Response(JSON.stringify({ error: "upstream unavailable" }), {
+            status: 502,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return origFetch(input, init);
+      }),
+    );
+    try {
+      expect(await send(email.id)).toBe("parked");
+      const [row] = await fixture.db
+        .select()
+        .from(schema.emails)
+        .where(eq(schema.emails.id, email.id));
+      expect(row?.latestStatus).toBe("queued_quota");
+      expect(row?.tags).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

@@ -325,9 +325,30 @@ describe("logs.diagnosis", () => {
     expect(before.firstSendAt).toBeNull();
     expect(before.errors).toHaveLength(0);
 
-    await insertRequest({ teamId, path: "/emails", statusCode: 422, responseBody: { message: "All recipients are suppressed: dead@example.com. Remove the suppression at /suppressions to send again." } });
-    await insertRequest({ teamId, path: "/emails", statusCode: 422, responseBody: { message: "All recipients are suppressed: dead@example.com. Remove the suppression at /suppressions to send again." } });
-    await insertRequest({ teamId, path: "/domains", statusCode: 403, responseBody: { message: "forbidden" } });
+    await insertRequest({
+      teamId,
+      path: "/emails",
+      statusCode: 422,
+      responseBody: {
+        message:
+          "All recipients are suppressed: dead@example.com. Remove the suppression at /suppressions to send again.",
+      },
+    });
+    await insertRequest({
+      teamId,
+      path: "/emails",
+      statusCode: 422,
+      responseBody: {
+        message:
+          "All recipients are suppressed: dead@example.com. Remove the suppression at /suppressions to send again.",
+      },
+    });
+    await insertRequest({
+      teamId,
+      path: "/domains",
+      statusCode: 403,
+      responseBody: { message: "forbidden" },
+    });
     await insertRequest({ teamId, path: "/emails", statusCode: 202 });
 
     await db.insert(schema.funnelEvents).values({

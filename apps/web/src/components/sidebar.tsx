@@ -23,6 +23,7 @@ import { DOCS_URL } from "@/lib/docs-links";
 import { isAppLocale, LOCALES, setLocaleCookie } from "@/lib/locale-cookie";
 import { isActive } from "@/lib/nav";
 import { MAIL_NAV_ITEM, type ProductNavItem, useProductNavigation } from "@/lib/product-navigation";
+import { showSourceLinkEnabled } from "@/lib/source-link";
 import { openSupportChat } from "@/lib/support-chat";
 import { applyTheme, currentTheme, type Theme } from "@/lib/theme";
 
@@ -354,12 +355,14 @@ export function Sidebar({
               <ExternalArrowGlyph size={12} />
             </span>
           </a>
-          <a href="/source" title={t("sourceDownload")}>
-            <span className="ms-nav-icon" aria-hidden="true">
-              <SourceGlyph size={15} />
-            </span>
-            {t("sourceCode")}
-          </a>
+          {showSourceLinkEnabled() ? (
+            <a href="/source" title={t("sourceDownload")}>
+              <span className="ms-nav-icon" aria-hidden="true">
+                <SourceGlyph size={15} />
+              </span>
+              {t("sourceCode")}
+            </a>
+          ) : null}
         </section>
       </nav>
       <div style={{ flex: 1 }} />

@@ -1,8 +1,8 @@
 {
   "meta": {
-    "title": "Preços: todos os planos MepMail em uma página",
-    "description": "Preços do MepMail em reais, no cartão ou no Pix: grátis com 100 e-mails/dia, Pro com 110 mil e-mails por R$ 149/mês (R$ 99 no 1º mês) e Scale até 2,75M. Excedente por mil e sem fidelidade.",
-    "launchDescription": "Todos os planos numa página: Correio a partir de R$ 14,90/mês e Envio grátis com 100 e-mails/dia ou Pro com 110 mil e-mails por R$ 149/mês. Pague com Pix ou cartão."
+    "title": "Preços — API de E-mail, SMTP, MCP e E-mail Corporativo",
+    "description": "Preços do MepMail em reais, no cartão ou no Pix: grátis com 100 e-mails/dia, Pro com 110 mil e-mails por R$ 169/mês (R$ 117 no 1º mês) e Scale até 2,75M. Excedente por mil e sem fidelidade.",
+    "launchDescription": "E-mail no domínio a partir de R$ 16,90/mês e API de E-mail + SMTP + MCP grátis (100/dia) ou Pro 110K por R$ 169/mês no Pix ou cartão."
   },
   "choice": {
     "title": "Do que você precisa?",
@@ -16,7 +16,7 @@
     "freeCta": "Começar grátis · 100 e-mails/dia",
     "mailTitle": "Caixas de e-mail no seu domínio.",
     "mailEntry": "O Correio começa em {price}/mês. O teste de 7 dias exige cartão; cancele antes do fim para não ser cobrado. É separado do Envio Free.",
-    "mailPix": "Correio a partir de R$ 14,90/mês no Pix ou cartão. R$ 14,90 é preço do Correio, não de um plano de Envio. O teste de 7 dias é só no cartão.",
+    "mailPix": "Correio a partir de R$ 16,90/mês no Pix ou cartão. R$ 16,90 é preço do Correio, não de um plano de Envio. O teste de 7 dias é só no cartão.",
     "mailClosed": "Consulte os preços e a disponibilidade do Correio na página do produto. Criar uma conta grátis de Envio não ativa um teste do Correio.",
     "dailyNote": "Os volumes mensais de Free e Starter são ilustrativos, não uma franquia mensal: cada dia UTC tem seu próprio limite. Com o excedente pago desligado, o envio mensal para na cota."
   },
@@ -36,7 +36,7 @@
   "note": "O Envio começa grátis: 100 e-mails por dia, sem cartão. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe; a cobrança começa no fim do teste, a menos que você cancele antes.",
   "plans": {
     "title": "Todos os planos de Envio.",
-    "intro": "Free: 100 e-mails/dia sem cartão. Starter: R$ 49/mês (US$ 9 em dólar) para 1.500 e-mails/dia. Planos maiores abaixo; condições iniciais e anuais existentes preservadas. Regras de fila e excedentes no FAQ de preços.",
+    "intro": "Free: 100 e-mails/dia sem cartão. Starter: R$ 54/mês (US$ 9 em dólar) para 1.500 e-mails/dia. Planos maiores abaixo; condições iniciais e anuais existentes preservadas. Regras de fila e excedentes no FAQ de preços.",
     "details": "Detalhes de limites, filas e excedentes"
   },
   "included": {
@@ -62,11 +62,11 @@
     "items": [
       {
         "q": "Como funciona o excedente?",
-        "a": "A capacidade cresce com verificação e atividade saudável. A tolerância de cobrança de 50%, o teto de fila de 3× a cota diária nominal e o teto mensal de 5× o volume incluído (até 4× cobrados como excedente) são limites de cobrança e fila, não vazão garantida do provedor. O envio efetivo depende da etapa de graduação, da margem de segurança e dos recursos regionais disponíveis; pagar nunca ignora esses controles. Com excedente desativado, o envio para na franquia mensal. O Pro 110K anual custa R$ 1.490 antecipados; a franquia de 110.000 renova mensalmente, sem saldo anual acumulado nem excedente medido. Os limites atuais aparecem no painel de reputação da equipe."
+        "a": "A capacidade cresce com verificação e atividade saudável. A tolerância de cobrança de 50%, o teto de fila de 3× a cota diária nominal e o teto mensal de 5× o volume incluído (até 4× cobrados como excedente) são limites de cobrança e fila, não vazão garantida do provedor. O envio efetivo depende da etapa de graduação, da margem de segurança e dos recursos regionais disponíveis; pagar nunca ignora esses controles. Com excedente desativado, o envio para na franquia mensal. O Pro 110K anual custa R$ 1.690 antecipados; a franquia de 110.000 renova mensalmente, sem saldo anual acumulado nem excedente medido. Os limites atuais aparecem no painel de reputação da equipe."
       },
       {
         "q": "Posso usar Correio e Envio juntos?",
-        "a": "Sim, na mesma conta e no mesmo domínio verificado. O Correio cuida das caixas de pessoas e agentes; o Envio, dos e-mails da sua aplicação por API ou SMTP. Cada um tem a sua credencial e o seu limite, e você paga a soma dos planos que escolher, sem pacote obrigatório. Com o Correio ativo, o Envio Free aceita até 3 domínios (10 com o Equipe)."
+        "a": "Sim, na mesma conta e no mesmo domínio verificado. Planos a partir do Pro 110K já incluem 1 caixa Correio Solo (1 GiB, 500 envios/mês) sem custo extra; no Free e Starter ou para mais caixas, contrate Solo, Duo ou Equipe à parte."
       },
       {
         "q": "Como o uso é contado?",
@@ -74,7 +74,7 @@
       },
       {
         "q": "Existe fidelidade e posso trocar de plano depois?",
-        "a": "O Pro 110K oferece mensal e anual antecipado de 12 meses. O anual custa R$ 1.490, sem acumular a promoção da primeira mensalidade. As ações disponíveis para sua assinatura aparecem no painel; assinaturas anteriores mantêm o preço contratado enquanto estiverem ativas."
+        "a": "O Pro 110K oferece mensal e anual antecipado de 12 meses. O anual custa R$ 1.690, sem acumular a promoção da primeira mensalidade. As ações disponíveis para sua assinatura aparecem no painel; assinaturas anteriores mantêm o preço contratado enquanto estiverem ativas."
       },
       {
         "q": "Qual o limite de anexos por mensagem?",
@@ -82,7 +82,7 @@
       },
       {
         "q": "Preciso de cartão para começar?",
-        "a": "Não no Envio Free. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe: a primeira cobrança acontece no fim do teste, a menos que você cancele antes, e um aviso chega 2 dias antes. Durante o teste, o envio pelo Correio fica em até 50 destinatários por dia e 200 no total. No Envio, a oferta Pro 110K custa R$ 149/mês, com R$ 99 apenas na primeira mensalidade de novos clientes elegíveis, ou R$ 1.490/ano antecipados."
+        "a": "Não no Envio Free. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe: a primeira cobrança acontece no fim do teste, a menos que você cancele antes, e um aviso chega 2 dias antes. Durante o teste, o envio pelo Correio fica em até 50 destinatários por dia e 200 no total. No Envio, a oferta Pro 110K custa R$ 169/mês, com R$ 117 apenas na primeira mensalidade de novos clientes elegíveis, ou R$ 1.690/ano antecipados."
       },
       {
         "q": "Posso pagar com Pix?",
@@ -104,26 +104,26 @@
     "title": "Uma franquia mensal. Duas formas de pagar.",
     "body": "110 mil e-mails de Envio por mês para a sua aplicação, campanhas e agentes. Escolha mensal ou anual no painel; a elegibilidade da promoção é confirmada antes do checkout.",
     "monthTitle": "Mensal",
-    "monthIntro": "R$ 99 só na primeira mensalidade de novos clientes elegíveis. Renovação: R$ 149/mês.",
+    "monthIntro": "R$ 117 só na primeira mensalidade de novos clientes elegíveis. Renovação: R$ 169/mês.",
     "monthQuota": "O excedente vem ligado nos planos mensais e pode ser desligado em Cobrança.",
     "yearTitle": "Anual",
     "perYear": "/ano",
-    "yearUpfront": "R$ 1.490 pagos antecipadamente para 12 meses: o valor de 10 mensalidades normais. Não acumula a promoção inicial.",
+    "yearUpfront": "R$ 1.690 pagos antecipadamente para 12 meses: o valor de 10 mensalidades normais. Não acumula a promoção inicial.",
     "yearQuota": "A franquia de 110 mil renova mensalmente, sem saldo anual acumulado. O envio para na cota mensal; o anual não inclui cobrança de excedentes.",
     "preserved": "Contratos existentes mantêm seus valores e limites; não há migração automática.",
     "mailCta": "Conhecer o Correio",
-    "mailAccess": "O Correio é pago à parte, com ou sem plano de Envio: Solo R$ 14,90, Duo R$ 29,90 ou Equipe R$ 64,90 por mês.",
+    "mailAccess": "Planos a partir do Pro 110K incluem 1 caixa Correio Solo (1 GiB, 500 envios/mês) sem custo adicional. Planos avulsos do Correio: Solo R$ 16,90, Duo R$ 34,90 ou Equipe R$ 74,90 por mês.",
     "monthLocal": "Fora do Brasil, em dólar: {first} no 1º mês, depois {price} por mês.",
     "yearLocal": "Fora do Brasil, em dólar: {price} por ano."
   },
   "launchFaq": [
     {
       "q": "Como funciona o excedente?",
-      "a": "A capacidade cresce com verificação e atividade saudável. A tolerância de cobrança de 50%, o teto de fila de 3× a cota diária nominal e o teto mensal de 5× o volume incluído (até 4× cobrados como excedente) são limites de cobrança e fila, não vazão garantida do provedor. O envio efetivo depende da etapa de graduação, da margem de segurança e dos recursos regionais disponíveis; pagar nunca ignora esses controles. Com excedente desativado, o envio para na franquia mensal. O Pro 110K anual custa R$ 1.490 antecipados; a franquia de 110.000 renova mensalmente, sem saldo anual acumulado nem excedente medido. Os limites atuais aparecem no painel de reputação da equipe."
+      "a": "A capacidade cresce com verificação e atividade saudável. A tolerância de cobrança de 50%, o teto de fila de 3× a cota diária nominal e o teto mensal de 5× o volume incluído (até 4× cobrados como excedente) são limites de cobrança e fila, não vazão garantida do provedor. O envio efetivo depende da etapa de graduação, da margem de segurança e dos recursos regionais disponíveis; pagar nunca ignora esses controles. Com excedente desativado, o envio para na franquia mensal. O Pro 110K anual custa R$ 1.690 antecipados; a franquia de 110.000 renova mensalmente, sem saldo anual acumulado nem excedente medido. Os limites atuais aparecem no painel de reputação da equipe."
     },
     {
       "q": "Posso usar Correio e Envio juntos?",
-      "a": "Sim, na mesma conta e no mesmo domínio verificado. O Correio cuida das caixas de pessoas e agentes; o Envio, dos e-mails da sua aplicação por API ou SMTP. Cada um tem a sua credencial e o seu limite, e você paga a soma dos planos que escolher, sem pacote obrigatório. Com o Correio ativo, o Envio Free aceita até 3 domínios (10 com o Equipe)."
+      "a": "Sim, na mesma conta e no mesmo domínio verificado. Planos a partir do Pro 110K já incluem 1 caixa Correio Solo (1 GiB, 500 envios/mês) sem custo extra; no Free e Starter ou para mais caixas, contrate Solo, Duo ou Equipe à parte."
     },
     {
       "q": "Como o uso é contado?",
@@ -131,7 +131,7 @@
     },
     {
       "q": "Existe fidelidade e posso trocar de plano depois?",
-      "a": "O Pro 110K oferece mensal e anual antecipado de 12 meses. O anual custa R$ 1.490, sem acumular a promoção da primeira mensalidade. As ações disponíveis para sua assinatura aparecem no painel; assinaturas anteriores mantêm o preço contratado enquanto estiverem ativas."
+      "a": "O Pro 110K oferece mensal e anual antecipado de 12 meses. O anual custa R$ 1.690, sem acumular a promoção da primeira mensalidade. As ações disponíveis para sua assinatura aparecem no painel; assinaturas anteriores mantêm o preço contratado enquanto estiverem ativas."
     },
     {
       "q": "Qual o limite de anexos por mensagem?",
@@ -139,7 +139,7 @@
     },
     {
       "q": "Preciso de cartão para começar?",
-      "a": "Não no Envio Free. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe: a primeira cobrança acontece no fim do teste, a menos que você cancele antes, e um aviso chega 2 dias antes. Durante o teste, o envio pelo Correio fica em até 50 destinatários por dia e 200 no total. No Envio, a oferta Pro 110K custa R$ 149/mês, com R$ 99 apenas na primeira mensalidade de novos clientes elegíveis, ou R$ 1.490/ano antecipados."
+      "a": "Não no Envio Free. O Correio tem 7 dias grátis com cartão no primeiro plano da equipe: a primeira cobrança acontece no fim do teste, a menos que você cancele antes, e um aviso chega 2 dias antes. Durante o teste, o envio pelo Correio fica em até 50 destinatários por dia e 200 no total. No Envio, a oferta Pro 110K custa R$ 169/mês, com R$ 117 apenas na primeira mensalidade de novos clientes elegíveis, ou R$ 1.690/ano antecipados."
     },
     {
       "q": "Posso pagar com Pix?",

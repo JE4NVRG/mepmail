@@ -37,6 +37,7 @@ describe("mcpServerCardBody", () => {
     expect(body.serverInfo.name).toBe("io.github.JE4NVRG/mepmail");
     expect(body.name).toBe(body.serverInfo.name);
     expect(body.version).toBe(body.serverInfo.version);
+    expect(body.websiteUrl).toBe("https://mepmail.dev");
     expect(body.authentication.required).toBe(true);
     // The field the Smithery static-card example reads.
     expect(body.authentication.schemes).toEqual(["oauth2"]);

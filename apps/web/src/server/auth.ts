@@ -47,6 +47,7 @@ import { enqueueRecipientErase } from "./queue";
 import { recordSignupAdvertising } from "./signup-advertising";
 import { notifySignupAlert } from "./signup-alert";
 import {
+  assertSignupBotSignals,
   assertSignupBotVerification,
   SIGNUP_BOT_OAUTH_CONTEXT,
   signupBotProtectionEnabled,
@@ -312,17 +313,24 @@ export function createAuth(
         user.id,
         requestHeaders?.get("cookie") ?? null,
       );
+      const baseProps = {
+        ...attributionProps(attribution, localeFromHeaders(requestHeaders)),
+        plan: "free",
+        measurement_version: "2",
+        ...requestedFunnelIntent(requestHeaders?.get("cookie") ?? null),
+      };
       await emitFunnel(db, {
         name: "account_created",
         dedupeKey: `account:${user.id}`,
         // No team exists yet, so the plan is the one every new account starts on.
         resolve: (tx) => userFunnelProps(tx, user.id),
-        props: {
-          ...attributionProps(attribution, localeFromHeaders(requestHeaders)),
-          plan: "free",
-          measurement_version: "2",
-          ...requestedFunnelIntent(requestHeaders?.get("cookie") ?? null),
-        },
+        props: baseProps,
+      });
+      await emitFunnel(db, {
+        name: "signup",
+        dedupeKey: `signup_funnel:${user.id}`,
+        resolve: (tx) => userFunnelProps(tx, user.id),
+        props: baseProps,
       });
       return attribution;
     } catch (error) {
@@ -737,6 +745,7 @@ export function createAuth(
             signupOpen(),
             canary.admitted ? { canaryEmail: canary.email } : null,
           );
+          if (isCloudDeployment()) assertSignupBotSignals(ctx.headers);
           if (signupBotProtectionEnabled()) {
             await assertSignupBotVerification(ctx.headers, baseURL);
             verifiedSignupContexts.add(ctx.context);
@@ -748,6 +757,7 @@ export function createAuth(
           // A normal existing-account social login needs no new challenge.
           // A tokenless implicit signup is rejected in user.create instead.
           if (body?.requestSignUp === true || ctx.headers?.has("x-captcha-response")) {
+            assertSignupBotSignals(ctx.headers);
             await assertSignupBotVerification(ctx.headers, baseURL);
             verifiedSignupContexts.add(ctx.context);
             await addOAuthServerContext({ [SIGNUP_BOT_OAUTH_CONTEXT]: true });

@@ -1,4 +1,5 @@
 import { useTranslations } from "next-intl";
+import { showSourceLinkEnabled } from "@/lib/source-link";
 
 /** Centered card on the void with the wordmark above — login/signup/onboarding frame. */
 export function AuthShell({ children }: { children: React.ReactNode }) {
@@ -25,13 +26,15 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
       <div className="ms-card" style={{ width: 380, maxWidth: "100%", padding: 28 }}>
         {children}
       </div>
-      <a
-        href="/source"
-        title={t("sourceDownload")}
-        style={{ marginTop: 16, fontSize: 12, color: "var(--ms-muted)" }}
-      >
-        {t("sourceCode")}
-      </a>
+      {showSourceLinkEnabled() ? (
+        <a
+          href="/source"
+          title={t("sourceDownload")}
+          style={{ marginTop: 16, fontSize: 12, color: "var(--ms-muted)" }}
+        >
+          {t("sourceCode")}
+        </a>
+      ) : null}
     </main>
   );
 }

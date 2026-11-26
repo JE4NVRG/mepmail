@@ -9,6 +9,7 @@ import {
   recoverMailboxCheckoutSession,
 } from "@millionsend/billing";
 import { env, isCloudDeployment } from "@millionsend/config";
+import { planIncludesCorreioSolo } from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -251,6 +252,7 @@ export async function mailboxBillingPresentation(
       sendBillingContract: schema.teams.sendBillingContract,
       suspendedAt: schema.teams.suspendedAt,
       plan: schema.teams.plan,
+      planQuota: schema.teams.planQuota,
       planStatus: schema.teams.planStatus,
       stripeCustomerId: schema.teams.stripeCustomerId,
       stripeSubscriptionId: schema.teams.stripeSubscriptionId,
@@ -266,7 +268,8 @@ export async function mailboxBillingPresentation(
   if (!member) throw new MailboxLifecycleError("forbidden");
   const canManage = member.role === "owner" || member.role === "admin";
   const cohort = mailboxEarlyAccessCohort();
-  const paidSending = hasPaidSendingPlanForMailbox(member, cohort);
+  const includedWithSend = planIncludesCorreioSolo(member);
+  const paidSending = hasPaidSendingPlanForMailbox(member, cohort) || includedWithSend;
   // Without Envio the team buys the standalone offer, when it is open.
   const audience: MailboxAudience = paidSending ? "with_sending" : "standalone";
   const standaloneOffers = paidSending ? [] : mailboxBillingOffers("standalone");
@@ -274,6 +277,7 @@ export async function mailboxBillingPresentation(
     member.plan !== "system" && !paidSending && standaloneOffers.length === 0;
   const earlyAccessRequired =
     member.plan !== "system" &&
+    !includedWithSend &&
     !(audience === "standalone" && standaloneOffers.length > 0
       ? mailboxLaunchCohortOpen(cohort)
       : mailboxLaunchCohortAllows(cohort, {

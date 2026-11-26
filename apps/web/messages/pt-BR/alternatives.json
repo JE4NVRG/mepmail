@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Alternativa ao Resend: fluxos de envio e preços",
-    "description": "Compare fluxos compatíveis de envio no MepMail, com API, SMTP e MCP. Preços Resend conferidos em 16/10/2026, com fontes e diferenças de recursos."
+    "title": "Alternativa ao Resend — API, SMTP, E-mail no Domínio e Preços",
+    "description": "Compare MepMail vs Resend por volume em reais no Pix ou cartão. Mantenha o baseUrl do SDK com SMTP, caixas no domínio e MCP oficial."
   },
   "eyebrow": "Alternativas",
   "title": "Vindo do Resend? <highlight>Mantenha o SDK.</highlight>",

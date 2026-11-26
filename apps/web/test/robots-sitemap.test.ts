@@ -149,13 +149,22 @@ describe("robots.txt + sitemap.xml agreement", () => {
     expect(urls.some((entry) => entry.url === "https://mepmail.dev/?lang=pt-BR")).toBe(true);
   });
 
-  it("keeps login and signup crawlable for noindex without advertising them in either locale", () => {
+  it("keeps login, signup, updates and /mcp crawlable without advertising them in the sitemap", () => {
     const allow = allowedPaths();
-    for (const path of ["/login", "/signup", "/signup?next=%2Femails"]) {
+    for (const path of [
+      "/login",
+      "/signup",
+      "/signup?next=%2Femails",
+      "/updates",
+      "/mcp",
+      "/docs",
+    ]) {
       expect(isAllowed(path, allow)).toBe(true);
     }
     for (const entry of sitemap()) {
-      expect(["/login", "/signup"]).not.toContain(new URL(entry.url).pathname);
+      expect(["/login", "/signup", "/updates", "/mcp", "/docs"]).not.toContain(
+        new URL(entry.url).pathname,
+      );
     }
   });
 

@@ -16,6 +16,7 @@ import {
 } from "@millionsend/billing";
 import {
   abuseJudgeConfig,
+  appHostname,
   customerSmtpRelay,
   env,
   notificationsEmailFrom,
@@ -23,6 +24,7 @@ import {
   sesTenantsEnabled,
   trackingCnameTarget,
   trackingSubdomainsSupported,
+  umamiFunnel,
   unsubscribeBaseUrl,
 } from "@millionsend/config";
 import {
@@ -769,7 +771,14 @@ await queue.scheduleCrons(
       );
     },
     "domains.reverify": async () => {
-      const result = await reverifyDomains(db, { clientForRegion, resolver: nodeDnsResolver });
+      const configured = umamiFunnel();
+      const result = await reverifyDomains(db, {
+        clientForRegion,
+        resolver: nodeDnsResolver,
+        ...(configured.endpoint && configured.websiteId
+          ? { funnel: { ...configured, hostname: appHostname() } }
+          : {}),
+      });
       if (result.checked > 0 || result.failed > 0) {
         console.log(`domains.reverify: checked=${result.checked} failed=${result.failed}`);
       }

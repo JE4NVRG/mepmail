@@ -698,6 +698,7 @@ export {
   assertMailboxStorage,
   assertMailboxTrialSending,
   effectiveDomainLimit,
+  INCLUDED_SOLO_TERMS,
   lockMailboxService,
   MAILBOX_PLAN_DOMAIN_LIMIT,
   MAILBOX_PLAN_DOMAIN_LIMITS,
@@ -806,6 +807,7 @@ export {
 export {
   effectivePlan,
   formatVolume,
+  INCLUDED_CORREIO_MIN_QUOTA,
   isPlanRungKey,
   type LadderPlan,
   monthlyCapacity,
@@ -824,6 +826,7 @@ export {
   type PlanRung,
   type PlanRungKey,
   planCanHidePoweredBy,
+  planIncludesCorreioSolo,
   planLabel,
   QUOTA_TOLERANCE,
   type QuotaTeamRow,

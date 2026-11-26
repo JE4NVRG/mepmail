@@ -1,6 +1,10 @@
 /** Optional registry; production hosting/transport is a separate capability. */
 import { isCloudDeployment } from "@millionsend/config";
-import { mailboxDomainLock, mailboxServiceEntitlement } from "@millionsend/core";
+import {
+  mailboxDomainLock,
+  mailboxServiceEntitlement,
+  planIncludesCorreioSolo,
+} from "@millionsend/core";
 import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, eq, sql } from "drizzle-orm";
@@ -86,6 +90,7 @@ async function accessMember(db: Db, actor: { teamId: string; userId: string }) {
     .select({
       id: schema.teams.id,
       plan: schema.teams.plan,
+      planQuota: schema.teams.planQuota,
       planStatus: schema.teams.planStatus,
       suspendedAt: schema.teams.suspendedAt,
       stripeCustomerId: schema.teams.stripeCustomerId,
@@ -123,6 +128,7 @@ export async function mailboxActorAccessEnabled(
   if (member.plan === "system")
     return (await mailboxServiceEntitlement(db, actor.teamId)).unlimitedSeats;
   if (!cohort) return false;
+  if (planIncludesCorreioSolo(member, now)) return true;
   if (
     mailboxLaunchCohortAllows(
       cohort,
@@ -163,6 +169,7 @@ export async function mailboxCreateAccessEnabled(
   if (!member || member.suspendedAt) return false;
   if (member.plan === "system")
     return (await mailboxServiceEntitlement(db, actor.teamId)).unlimitedSeats;
+  if (planIncludesCorreioSolo(member, now)) return true;
   if (
     !mailboxLaunchCohortAllows(
       cohort,

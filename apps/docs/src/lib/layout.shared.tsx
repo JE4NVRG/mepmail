@@ -23,17 +23,21 @@ export function baseOptions(lang = "en"): BaseLayoutProps {
           </a>
         ),
       },
-      {
-        type: "custom",
-        secondary: true,
-        // An archive is a download, not a client-side route. A native anchor
-        // prevents Next from prefetching several MB on every docs page.
-        children: (
-          <a href="/source" download>
-            {portuguese ? "Código-fonte (AGPL)" : "Source (AGPL)"}
-          </a>
-        ),
-      },
+      ...(process.env.SHOW_SOURCE_LINK !== "false"
+        ? [
+            {
+              type: "custom" as const,
+              secondary: true,
+              // An archive is a download, not a client-side route. A native anchor
+              // prevents Next from prefetching several MB on every docs page.
+              children: (
+                <a href="/source" download>
+                  {portuguese ? "Código-fonte (AGPL)" : "Source (AGPL)"}
+                </a>
+              ),
+            },
+          ]
+        : []),
     ],
   };
 }

@@ -14,6 +14,12 @@
     "skip": "Pular por enquanto",
     "noDomain": "Ainda não tem domínio?",
     "noDomainLink": "Comece pelo Gmail, iCloud ou Yahoo que você já usa, grátis e sem mexer em DNS",
+    "quickTest": {
+      "badge": "Sem DNS",
+      "title": "Enviar teste para minha caixa em 1 clique",
+      "body": "Quer testar a entrega antes de configurar o DNS? Envie um e-mail de teste da plataforma direto para o seu endereço.",
+      "cta": "Enviar teste para minha caixa"
+    },
     "help": "Precisa de ajuda? Fale com a gente",
     "domain": {
       "title": "Qual é o seu domínio?",
@@ -104,7 +110,7 @@
     },
     "api": {
       "title": "Prefere começar pela API?",
-      "body": "Envie um e-mail de teste e pegue uma chave de API. Dá para fazer agora, mesmo sem domínio."
+      "body": "Envie um e-mail de demonstração da plataforma agora, mesmo sem domínio, e libere chaves de API após verificar seu domínio."
     }
   },
   "title": "Envie seu primeiro e-mail",
@@ -247,6 +253,8 @@
     "domainFallback": "seudominio.com.br",
     "apiHint": "Cria uma caixa @seu-domínio e retorna o token mmb_ exclusivo dessa caixa na mesma resposta.",
     "mintKey": "Gerar chave API para copiar",
+    "needsDomain": "Adicione e verifique um domínio no Passo 01 acima para gerar chaves de API.",
+    "verifyDomainCta": "Verificar domínio no Passo 01",
     "manageAgents": "Gerenciar permissões de agentes no Correio",
     "mcpSettings": "Ver todas as ferramentas MCP"
   }

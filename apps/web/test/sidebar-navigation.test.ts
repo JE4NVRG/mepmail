@@ -108,14 +108,14 @@ function hrefs(markup: string) {
 
 for (const locale of ["en", "pt-BR"] as const) {
   describe(`stable Sidebar navigation (${locale})`, () => {
-    it.each(["pending", "paused", "error"] as const)(
+    it.each(["paused", "error"] as const)(
       "explains the unresolved %s profile with a reachable retry and keeps private links hidden",
       (profile) => {
         state.profile = profile;
         state.operator = false;
         const { nav } = navMarkup(locale);
         const messages = locale === "en" ? enNav : ptNav;
-        const message = messages.recovery[profile === "pending" ? "loading" : profile];
+        const message = messages.recovery[profile];
         expect(nav).toContain(renderToStaticMarkup(createElement(Fragment, null, message)));
         expect(nav).toContain(messages.recovery.retry);
         expect(nav).toContain(profile === "error" ? 'role="alert"' : 'role="status"');
@@ -124,6 +124,18 @@ for (const locale of ["en", "pt-BR"] as const) {
           expect(hrefs(nav)).not.toContain(href);
       },
     );
+
+    it("renders skeleton placeholders instead of a recovery banner while the profile is pending", () => {
+      state.profile = "pending";
+      state.operator = false;
+      const { nav } = navMarkup(locale);
+      const messages = locale === "en" ? enNav : ptNav;
+      expect(nav).toContain(messages.products.send);
+      expect(nav).toContain('aria-hidden="true"');
+      expect(nav).not.toContain(messages.recovery.retry);
+      for (const href of ["/emails", "/domains", "/api-keys", "/console"])
+        expect(hrefs(nav)).not.toContain(href);
+    });
 
     it("does not trust cached policy privileges when a background policy check fails", () => {
       state.profile = "error";

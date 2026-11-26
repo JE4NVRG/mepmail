@@ -290,6 +290,9 @@ function ext(id: string): VmValue {
     return { legalLinks: () => ({ terms: "/terms", privacy: "/privacy", refund: "/refund" }) };
   if (s === "lib/structured-data")
     return {
+      correioJsonLd: nil,
+      sendingApiJsonLd: nil,
+      breadcrumbJsonLd: nil,
       faqJsonLd: nil,
       organizationJsonLd: nil,
       websiteJsonLd: nil,

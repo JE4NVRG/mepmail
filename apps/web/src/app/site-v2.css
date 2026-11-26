@@ -1041,13 +1041,16 @@
   font-size: 13px;
   color: var(--v2-faint);
 }
-.v2 .gtm-plan .gtm-plan-badge {
+.v2 .gtm-plan .gtm-plan-badge,
+[data-theme="light"] .v2 .gtm-plan .gtm-plan-badge {
   align-self: flex-start;
   padding: 3px 10px;
   border-radius: 12px;
-  border: 1px solid #3a3150;
-  color: var(--v2-lavender);
+  background: var(--v2-violet);
+  border: 1px solid #7b52dc;
+  color: #ffffff;
   font-size: 12px;
+  font-weight: 600;
 }
 .v2 .gtm-plan .ms-btn {
   margin-top: auto;

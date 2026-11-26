@@ -1,8 +1,8 @@
 {
   "appName": "MepMail",
   "meta": {
-    "title": "MepMail · The open-source email platform",
-    "description": "Email on your domain for people and AI agents, plus sending by API, SMTP and MCP for your app. Open source, on Amazon SES. Send starts free, with 100 emails a day and no card."
+    "title": "MepMail · Sending API, SMTP, Domain Mailboxes & MCP",
+    "description": "Sending API, SMTP relay, and real mailboxes on your domain for apps and AI agents, with official MCP. Send starts free with 100 emails/day, no card."
   },
   "copy": "Copy",
   "copied": "Copied",

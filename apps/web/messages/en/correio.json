@@ -11,7 +11,7 @@
     "lead": "Bought a domain? Get email on it without paying for hosting. Use it in the browser or the Windows and Linux apps, and connect agents to the mailboxes you choose: you and your agent in the same mailbox.",
     "primary": "See how it works",
     "secondary": "Explore Send plans",
-    "note": "Mail is paid separately. Choose Solo, Duo or Equipe in the dashboard, with or without a Send plan.",
+    "note": "Pro 110K+ Send plans include 1 Mail Solo mailbox. Or choose Solo, Duo or Equipe on its own.",
     "audiences": ["For you", "For your team", "For your agents"]
   },
   "use": {
@@ -71,7 +71,7 @@
     "steps": [
       {
         "title": "Choose your Mail plan",
-        "body": "Choose Solo, Duo or Equipe, with or without a Send plan. Mail is billed separately. Pro 110K Send costs US$ 29/month; eligible new customers pay US$ 20 only for the first monthly bill."
+        "body": "Pro 110K+ Send includes 1 Mail Solo mailbox at no extra charge, or choose Solo, Duo or Equipe on its own. Pro 110K Send costs US$ 29/month; eligible new customers pay US$ 20 only for the first monthly bill."
       },
       {
         "title": "Connect a domain you own",
@@ -125,7 +125,7 @@
   "plans": {
     "eyebrow": "Send + Mail",
     "title": "A plan for your application. Mailboxes for your conversations.",
-    "body": "Send handles application emails and campaigns. Mail provides inboxes and outboxes for people and agents, paid separately, with or without a Send plan.",
+    "body": "Send handles application emails and campaigns. Plans from Pro 110K up include 1 Mail Solo mailbox; smaller or standalone tiers choose Solo, Duo or Equipe with or without a Send plan.",
     "sending": {
       "label": "For your application",
       "title": "Send only",
@@ -138,7 +138,7 @@
       "body": "With a paying Send plan you choose the same Mail plans. Mailboxes already bought as Send add-ons keep their price and terms.",
       "note": "Mail subscriptions are open in the dashboard. Choose Solo, Duo or Equipe; a Send plan is not required."
     },
-    "terms": "Mail is paid separately. An upgrade is charged at once; a smaller plan applies when your usage fits it, without a refund for the current month. Stored messages are kept. You can continue using Send on its own.",
+    "terms": "Solo is included from Send Pro 110K up; additional plans are paid separately. An upgrade is charged at once; a smaller plan applies when your usage fits it, without a refund for the current month. Stored messages are kept. You can continue using Send on its own.",
     "solo": {
       "label": "Mail plans",
       "title": "Solo, Duo or Equipe",
@@ -269,7 +269,7 @@
     "heroStatus": "Open to everyone, with or without a Send plan",
     "heroSecondary": "See plans and prices",
     "setupFirstTitle": "Choose how to subscribe",
-    "setupFirst": "Choose Solo (1 mailbox, US$ 2.90 a month), Duo (3, US$ 5.90) or Equipe (10, US$ 12.90); in Brazil, R$ 14.90, R$ 29.90 or R$ 64.90. The mailboxes share the plan's storage, sends and received messages, with up to 3 domains (10 on Equipe). Send is not needed, and existing contracts are preserved.",
+    "setupFirst": "Choose Solo (1 mailbox, US$ 2.90 a month), Duo (3, US$ 5.90) or Equipe (10, US$ 12.90); in Brazil, R$ 16.90, R$ 34.90 or R$ 74.90. The mailboxes share the plan's storage, sends and received messages, with up to 3 domains (10 on Equipe). Send is not needed, and existing contracts are preserved.",
     "restStatus": "Available for activated mailboxes",
     "plansBody": "Send handles application emails and campaigns. Mail gives people and agents inboxes and outboxes in three plans, with or without a Send plan.",
     "mailNote": "Verify your domain and complete any required reviews before subscribing in the dashboard. Receiving also needs DNS/MX and activation.",

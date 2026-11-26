@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { DocsLink } from "@/components/public-events";
 import {
   PublicFooter,
@@ -8,9 +8,17 @@ import {
   SignupLink,
 } from "@/components/site-chrome";
 import { StackLogoRow } from "@/components/stack-logos";
+import { StructuredData } from "@/components/structured-data";
 import { DOCS_URL } from "@/lib/docs-links";
 import { legalLinks } from "@/lib/legal-links";
+import { localizedPath } from "@/lib/public-locale-url";
 import { STACK_SLUGS } from "@/lib/stack-logos";
+import {
+  breadcrumbJsonLd,
+  organizationJsonLd,
+  sendingApiJsonLd,
+  siteBaseUrl,
+} from "@/lib/structured-data";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
 import "./integrations.css";
@@ -66,6 +74,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * a copy da página vive no namespace "integrations".
  */
 export default async function IntegrationsPage() {
+  const locale = (await getLocale()) === "pt-BR" ? "pt-BR" : "en";
   const t = await getTranslations("integrations");
   const l = await getTranslations("landing");
   const site = {
@@ -79,9 +88,21 @@ export default async function IntegrationsPage() {
   const cards = t.raw("cards.items") as IntegrationCard[];
   const credentials = t.raw("credentials.items") as Credential[];
   const accessLabels = t.raw("accessLabels") as Record<AccessLabel, string>;
+  const base = siteBaseUrl();
+  const pageUrl = `${base}${localizedPath(canonical, locale)}`;
 
   return (
     <div className="gtm">
+      <StructuredData
+        graph={[
+          organizationJsonLd(base),
+          breadcrumbJsonLd(base, [
+            { name: "MepMail", path: localizedPath("/", locale) },
+            { name: t("hero.eyebrow"), path: localizedPath(canonical, locale) },
+          ]),
+          sendingApiJsonLd(base, pageUrl, t("meta.description")),
+        ]}
+      />
       <PublicHeader labels={site} page="integrations" />
       <main id="conteudo">
         <section className="gtm-section gtm-hero">

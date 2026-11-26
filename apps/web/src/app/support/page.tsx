@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { EloziSupport, type EloziSupportLabels } from "@/components/elozi-support";
 import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/site-chrome";
+import { StructuredData } from "@/components/structured-data";
 import { DOCS_URL } from "@/lib/docs-links";
 import { resolveEloziSupportChannel } from "@/lib/elozi-support";
 import { legalLinks } from "@/lib/legal-links";
+import { localizedPath } from "@/lib/public-locale-url";
+import {
+  breadcrumbJsonLd,
+  faqJsonLd,
+  organizationJsonLd,
+  siteBaseUrl,
+} from "@/lib/structured-data";
 import { hasSession } from "@/server/auth";
 import { publicPageUrls } from "@/server/public-seo";
 import "../landing.css";
@@ -56,6 +64,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * vive no namespace "support".
  */
 export default async function SupportPage() {
+  const locale = (await getLocale()) === "pt-BR" ? "pt-BR" : "en";
   const t = await getTranslations("support");
   const l = await getTranslations("landing");
   // Signed in: identity is required even when configuration is temporarily unavailable.
@@ -71,9 +80,20 @@ export default async function SupportPage() {
   const channels = t.raw("channels.items") as SupportChannel[];
   const faq = t.raw("faq.items") as FaqItem[];
   const badges = t.raw("hero.badges") as string[];
+  const base = siteBaseUrl();
 
   return (
     <div className="gtm">
+      <StructuredData
+        graph={[
+          organizationJsonLd(base),
+          breadcrumbJsonLd(base, [
+            { name: "MepMail", path: localizedPath("/", locale) },
+            { name: t("hero.eyebrow"), path: localizedPath(canonical, locale) },
+          ]),
+          faqJsonLd(faq),
+        ]}
+      />
       <PublicHeader labels={site} page="support" />
       <main id="conteudo">
         <section className="gtm-section gtm-hero">

@@ -10,8 +10,8 @@ export const LAUNCH_OFFER = {
     firstMonthlyCents: 2000,
     monthlyRecipientDeliveries: 110_000,
     /** In Brazil the same offer is charged in reais (the prices' BRL currency option). */
-    brlMonthlyCents: 14_900,
-    brlFirstMonthlyCents: 9_900,
+    brlMonthlyCents: 16_900,
+    brlFirstMonthlyCents: 11_700,
   },
   annualChargedMonths: 10,
   annualServiceMonths: 12,
@@ -33,7 +33,7 @@ export const LAUNCH_OFFER = {
       mailboxes: 1,
       storageGiB: 1,
       monthlyCents: 290,
-      brlMonthlyCents: 1490,
+      brlMonthlyCents: 1690,
       monthlyRecipientDeliveries: 500,
       monthlyInboundMessages: 2000,
       domains: 3,
@@ -43,7 +43,7 @@ export const LAUNCH_OFFER = {
       mailboxes: 3,
       storageGiB: 3,
       monthlyCents: 590,
-      brlMonthlyCents: 2990,
+      brlMonthlyCents: 3490,
       monthlyRecipientDeliveries: 2000,
       monthlyInboundMessages: 5000,
       domains: 3,
@@ -53,7 +53,7 @@ export const LAUNCH_OFFER = {
       mailboxes: 10,
       storageGiB: 10,
       monthlyCents: 1290,
-      brlMonthlyCents: 6490,
+      brlMonthlyCents: 7490,
       // 10,000 recipients and 10 domains (Jean, 2026-10-20): ahead of AgentMail's
       // Developer tier (10 inboxes, 10,000 emails, 10 domains, US$ 20) at a lower price.
       monthlyRecipientDeliveries: 10000,

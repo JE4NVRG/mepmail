@@ -9,6 +9,9 @@ export type Plan = (typeof schema.planEnum.enumValues)[number];
 /** A plan on the ladder: every plan but system, which has no rung and no cap. */
 export type LadderPlan = Exclude<Plan, "system">;
 
+/** Stripe's Pix limit per payment in Brazil: R$ 3.000,00 (300,000 centavos). */
+export const PIX_MAX_BRL_CENTS = 300_000;
+
 /** Days past current_period_end a paid plan keeps its limits without a fresh Stripe period. */
 export const PLAN_GRACE_DAYS = 7;
 
@@ -29,9 +32,37 @@ export function effectivePlan(
   return currentPeriodEnd.getTime() + PLAN_GRACE_DAYS * DAY_MS < now.getTime() ? "free" : plan;
 }
 
+/** Included monthly Send quota threshold at which one Correio Solo mailbox is included. */
+export const INCLUDED_CORREIO_MIN_QUOTA = 110_000;
+
 /** Whether a plan may drop the "Powered by MepMail" line from the hosted unsubscribe page. */
 export function planCanHidePoweredBy(plan: Plan): boolean {
   return plan !== "free";
+}
+
+/**
+ * Every active paid Send plan from Pro 110K upward includes one Correio Solo
+ * mailbox at no extra cost (without creating a separate Mail Stripe subscription).
+ */
+export function planIncludesCorreioSolo(
+  team: {
+    plan: Plan;
+    planQuota?: number | null;
+    planStatus?: string | null;
+    currentPeriodEnd?: Date | null;
+    suspendedAt?: Date | null;
+  },
+  now: Date = new Date(),
+): boolean {
+  if (team.suspendedAt) return false;
+  const eff = effectivePlan(team.plan, team.currentPeriodEnd ?? null, now);
+  if (eff !== "pro" && eff !== "scale") return false;
+  if (team.planStatus && team.planStatus !== "active" && team.planStatus !== "trialing") {
+    return false;
+  }
+  const first = PLAN_RUNGS.find((r) => r.plan === eff);
+  const quota = team.planQuota ?? first?.included ?? 0;
+  return quota >= INCLUDED_CORREIO_MIN_QUOTA;
 }
 
 /** Plan names as every surface says them: the same word in every language. */
@@ -90,7 +121,7 @@ export const PLAN_RUNGS = [
     period: "day",
     priceCents: 900,
     overageCentsPer1k: null,
-    brlPriceCents: 4_900,
+    brlPriceCents: 5_400,
     brlOverageCentsPer1k: null,
   },
   {
@@ -100,8 +131,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 2_000,
     overageCentsPer1k: 35,
-    brlPriceCents: 9_900,
-    brlOverageCentsPer1k: 175,
+    brlPriceCents: 11_700,
+    brlOverageCentsPer1k: 205,
   },
   {
     key: "pro_200k",
@@ -110,8 +141,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 5_500,
     overageCentsPer1k: 32,
-    brlPriceCents: 27_900,
-    brlOverageCentsPer1k: 160,
+    brlPriceCents: 32_500,
+    brlOverageCentsPer1k: 190,
   },
   {
     key: "scale_500k",
@@ -120,8 +151,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 12_900,
     overageCentsPer1k: 29,
-    brlPriceCents: 64_900,
-    brlOverageCentsPer1k: 145,
+    brlPriceCents: 75_900,
+    brlOverageCentsPer1k: 170,
   },
   {
     key: "scale_1m",
@@ -130,8 +161,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 23_900,
     overageCentsPer1k: 26,
-    brlPriceCents: 119_900,
-    brlOverageCentsPer1k: 130,
+    brlPriceCents: 139_900,
+    brlOverageCentsPer1k: 155,
   },
   {
     key: "scale_1_5m",
@@ -140,8 +171,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 34_900,
     overageCentsPer1k: 24,
-    brlPriceCents: 174_900,
-    brlOverageCentsPer1k: 120,
+    brlPriceCents: 204_900,
+    brlOverageCentsPer1k: 140,
   },
   {
     key: "scale_2_5m",
@@ -150,8 +181,8 @@ export const PLAN_RUNGS = [
     period: "month",
     priceCents: 54_900,
     overageCentsPer1k: 22,
-    brlPriceCents: 274_900,
-    brlOverageCentsPer1k: 110,
+    brlPriceCents: 322_900,
+    brlOverageCentsPer1k: 130,
   },
 ] as const satisfies readonly PlanRung[];
 

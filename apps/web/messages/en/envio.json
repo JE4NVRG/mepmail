@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "MepMail Send: an email API compatible with the Resend SDK",
-    "description": "Transactional email and campaigns over API, SMTP and MCP. Compatible with the Resend SDK, with {checks} checks on every email, signed webhooks and plans from free. 100 emails a day free, no card."
+    "title": "MepMail Send: Transactional Email API, SMTP Relay & MCP",
+    "description": "Transactional email and campaigns over API, SMTP and official MCP, with {checks} deliverability checks, signed webhooks and 100 emails/day free."
   },
   "hero": {
     "eyebrow": "Send · transactional email and campaigns",

@@ -25,7 +25,14 @@ import {
 } from "@/lib/landing-pricing";
 import { CORREIO_FROM_BRL_CENTS, CORREIO_FROM_CENTS, LAUNCH_OFFER } from "@/lib/launch-offer";
 import { legalLinks } from "@/lib/legal-links";
-import { faqJsonLd, organizationJsonLd, siteBaseUrl, websiteJsonLd } from "@/lib/structured-data";
+import {
+  correioJsonLd,
+  faqJsonLd,
+  organizationJsonLd,
+  sendingApiJsonLd,
+  siteBaseUrl,
+  websiteJsonLd,
+} from "@/lib/structured-data";
 import { titlePhrases } from "@/lib/title-phrases";
 import type { publicMarketingAdmission } from "@/server/public-marketing-admission";
 import "./landing.css";
@@ -136,12 +143,20 @@ export async function HomeV2({
   const checks = t.raw("envio.checks") as CheckItem[];
   const faq = t.raw("faq.items") as FaqItem[];
   const base = siteBaseUrl();
+  const homeUrl = `${base}${brazil ? "/?lang=pt-BR" : "/"}`;
+  const correioUrl = `${base}/correio${brazil ? "?lang=pt-BR" : ""}`;
   const b = (chunks: ReactNode) => <strong>{chunks}</strong>;
 
   return (
     <div className="gtm v2">
       <StructuredData
-        graph={[organizationJsonLd(base), websiteJsonLd(base, locale), faqJsonLd(faq)]}
+        graph={[
+          organizationJsonLd(base),
+          websiteJsonLd(base, locale),
+          sendingApiJsonLd(base, homeUrl, l("meta.description")),
+          correioJsonLd(base, correioUrl, mail("meta.description")),
+          faqJsonLd(faq),
+        ]}
       />
       <ArrivalTracker />
       <PublicHeader labels={site} page="landing" />

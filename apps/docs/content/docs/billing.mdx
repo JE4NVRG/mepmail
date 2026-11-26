@@ -11,7 +11,11 @@ Stripe key. This page is for operating a hosted deployment.
 
 One ladder, cheapest first. Free and Starter cap sends per UTC day; Pro and
 Scale include a monthly volume per Stripe billing period and can bill overage
-past it. Free holds up to 1,000 contacts; segments, topics and contacts are
+past it. Every active plan from **Pro 110K** upward (Pro and Scale) also includes
+**1 Mail Solo mailbox** (1 GiB storage, 500 outbound recipients and 2,000
+inbound messages per month) at no extra cost — downgrading below Pro 110K ends
+the included mailbox entitlement while keeping stored messages readable/exportable
+until you upgrade again or subscribe to Mail separately. Free holds up to 1,000 contacts; segments, topics and contacts are
 unlimited from Starter up. Sending domains: 1 on Free, 10 on Starter, 25 on
 Pro and unlimited on Scale. At either cap the API answers
 `403 plan_limit_reached` ("Your plan allows up to 1000 contacts")
@@ -20,18 +24,18 @@ and the dashboard shows the same sentence.
 | Rung | Plan | Price (USD) | Price in Brazil (BRL) | Included | Cap | Overage per 1,000 (USD / BRL) |
 | --- | --- | --- | --- | --- | --- | --- |
 | `free` | Free | $0 | R$ 0 | 100 | per day | — |
-| `starter` | Starter | $9 | R$ 49 | 1,500 | per day | — |
-| `pro_100k` | Pro | $29 (launch offer; subscriptions from before it keep $20) | R$ 149 (launch offer; subscriptions from before it keep R$ 99) | 110,000 | per month | $0.35 / R$ 1.75 |
-| `pro_200k` | Pro | $55 | R$ 279 | 220,000 | per month | $0.32 / R$ 1.60 |
-| `scale_500k` | Scale | $129 | R$ 649 | 550,000 | per month | $0.29 / R$ 1.45 |
-| `scale_1m` | Scale | $239 | R$ 1,199 | 1,100,000 | per month | $0.26 / R$ 1.30 |
-| `scale_1_5m` | Scale | $349 | R$ 1,749 | 1,650,000 | per month | $0.24 / R$ 1.20 |
-| `scale_2_5m` | Scale | $549 | R$ 2,749 | 2,750,000 | per month | $0.22 / R$ 1.10 |
+| `starter` | Starter | $9 | R$ 54 | 1,500 | per day | — |
+| `pro_100k` | Pro | $29 (launch offer; subscriptions from before it keep $20) | R$ 169 (launch offer; subscriptions from before it keep R$ 117) | 110,000 | per month | $0.35 / R$ 2.05 |
+| `pro_200k` | Pro | $55 | R$ 325 | 220,000 | per month | $0.32 / R$ 1.90 |
+| `scale_500k` | Scale | $129 | R$ 759 | 550,000 | per month | $0.29 / R$ 1.70 |
+| `scale_1m` | Scale | $239 | R$ 1,399 | 1,100,000 | per month | $0.26 / R$ 1.55 |
+| `scale_1_5m` | Scale | $349 | R$ 2,049 | 1,650,000 | per month | $0.24 / R$ 1.40 |
+| `scale_2_5m` | Scale | $549 | R$ 3,229 | 2,750,000 | per month | $0.22 / R$ 1.30 |
 
-Pro 110K's launch offer: $29 a month (R$ 149), with $20 (R$ 99) on the first
-monthly bill for eligible new customers, or $290 (R$ 1,490) for a year paid
+Pro 110K's launch offer: $29 a month (R$ 169), with $20 (R$ 117) on the first
+monthly bill for eligible new customers, or $290 (R$ 1,690) for a year paid
 upfront, which has no overage. In Brazil every price is charged in reais, by
-card or Pix. The queue, overage and 5× ceiling rules are the same everywhere:
+card or Pix (plans above R$ 3,000, such as Scale 2.5M, are card-only due to the Pix cap). The queue, overage and 5× ceiling rules are the same everywhere:
 [Rate limits → Sending volume](/rate-limits#sending-volume).
 
 The ladder is `PLAN_RUNGS` in `packages/core/src/plans.ts`; Checkout, the

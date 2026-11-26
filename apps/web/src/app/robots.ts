@@ -39,6 +39,9 @@ export default function robots(): MetadataRoute.Robots {
         // The public status page with the published incident history.
         "/status",
         "/changelog",
+        "/mcp",
+        "/docs",
+        "/updates",
         "/login",
         "/signup",
         "/terms",

@@ -4,6 +4,7 @@ import { CodeDemo } from "@/components/code-demo";
 import { ComparisonReference } from "@/components/comparison-reference";
 import { SignupCta } from "@/components/signup-cta";
 import { PublicFooter, PublicHeader, type PublicSiteLabels } from "@/components/site-chrome";
+import { StructuredData } from "@/components/structured-data";
 import { RESEND_PRICING_SOURCE, resendSavings } from "@/lib/alternatives-resend";
 import { DOCS_URL } from "@/lib/docs-links";
 import {
@@ -16,6 +17,12 @@ import {
 import { legalLinks } from "@/lib/legal-links";
 import { signupHref } from "@/lib/public-intent";
 import { localizedPath } from "@/lib/public-locale-url";
+import {
+  breadcrumbJsonLd,
+  organizationJsonLd,
+  sendingApiJsonLd,
+  siteBaseUrl,
+} from "@/lib/structured-data";
 import { publicPageUrls } from "@/server/public-seo";
 import "../../landing.css";
 import "./resend.css";
@@ -81,8 +88,21 @@ export default async function ResendAlternativePage() {
       : t("table.resendBasisPlain", { plan: quote.plan, base: formatUsd(quote.base, locale) });
   };
 
+  const base = siteBaseUrl();
+  const pageUrl = `${base}${localizedPath(canonical, locale)}`;
+
   return (
     <div className="gtm alternatives-resend">
+      <StructuredData
+        graph={[
+          organizationJsonLd(base),
+          breadcrumbJsonLd(base, [
+            { name: "MepMail", path: localizedPath("/", locale) },
+            { name: t("eyebrow"), path: localizedPath(canonical, locale) },
+          ]),
+          sendingApiJsonLd(base, pageUrl, t("meta.description")),
+        ]}
+      />
       <PublicHeader labels={site} page="alternatives" />
       <main id="conteudo">
         <section className="gtm-section gtm-alt gtm-hero">
