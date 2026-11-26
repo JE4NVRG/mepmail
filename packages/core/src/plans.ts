@@ -55,14 +55,11 @@ export function planIncludesCorreioSolo(
   now: Date = new Date(),
 ): boolean {
   if (team.suspendedAt) return false;
+  if (team.planStatus !== "active") return false;
   const eff = effectivePlan(team.plan, team.currentPeriodEnd ?? null, now);
   if (eff !== "pro" && eff !== "scale") return false;
-  if (team.planStatus && team.planStatus !== "active" && team.planStatus !== "trialing") {
-    return false;
-  }
-  const first = PLAN_RUNGS.find((r) => r.plan === eff);
-  const quota = team.planQuota ?? first?.included ?? 0;
-  return quota >= INCLUDED_CORREIO_MIN_QUOTA;
+  if (team.planQuota === undefined || team.planQuota === null) return false;
+  return team.planQuota >= INCLUDED_CORREIO_MIN_QUOTA;
 }
 
 /** Plan names as every surface says them: the same word in every language. */

@@ -10,6 +10,7 @@ vi.mock("@/components/site-chrome", () => ({
   PublicFooter: () => createElement("footer", null, "MepMail"),
 }));
 vi.mock("next-intl/server", () => ({
+  getLocale: async () => current.locale,
   getTranslations: async (namespace: string) => {
     const copy = current.locale === "pt-BR" ? pt : en;
     const translate = (key: string) => {

@@ -276,9 +276,10 @@ export async function mailboxServiceEntitlement(
     .where(eq(schema.mailboxSubscriptions.teamId, teamId));
   const [storedPlan] = await (lock ? planQuery.for("update") : planQuery);
   const allowed = !!team && !team.suspendedAt;
-  const hasActivePaidMail = !!storedPlan && mailboxServiceActive(storedPlan, now);
+  // Respect any explicit mailbox_subscriptions row (including past_due/canceled recovery)
+  // rather than overriding a registered paid contract with the implicit Pro 110K grant.
   const includedBySend =
-    allowed && !system && !hasActivePaidMail && !!team && planIncludesCorreioSolo(team, now);
+    allowed && !system && !storedPlan && !!team && planIncludesCorreioSolo(team, now);
   const plan = includedBySend ? includedSoloPlanForTeam(teamId, team, now) : storedPlan;
   const resourcePolicyActive =
     allowed && !!plan && (system || includedBySend || mailboxServiceActive(plan, now));

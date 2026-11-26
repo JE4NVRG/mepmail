@@ -14,7 +14,10 @@ import { type Db, schema } from "@millionsend/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { mailboxIncludedSeats } from "../../../../packages/billing/src/mailbox";
-import { hasPaidSendingPlanForMailbox } from "../../../../packages/billing/src/mailbox-addon";
+import {
+  hasPaidSendingPlan,
+  hasPaidSendingPlanForMailbox,
+} from "../../../../packages/billing/src/mailbox-addon";
 import { mailboxTrialDays } from "../../../../packages/billing/src/mailbox-trial-eligibility";
 import {
   mailboxLaunchCohortAllows,
@@ -268,7 +271,7 @@ export async function mailboxBillingPresentation(
   if (!member) throw new MailboxLifecycleError("forbidden");
   const canManage = member.role === "owner" || member.role === "admin";
   const cohort = mailboxEarlyAccessCohort();
-  const includedWithSend = planIncludesCorreioSolo(member);
+  const includedWithSend = hasPaidSendingPlan(member) && planIncludesCorreioSolo(member);
   const paidSending = hasPaidSendingPlanForMailbox(member, cohort) || includedWithSend;
   // Without Envio the team buys the standalone offer, when it is open.
   const audience: MailboxAudience = paidSending ? "with_sending" : "standalone";

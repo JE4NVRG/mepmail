@@ -191,9 +191,11 @@ describe("auth UX: synthetic component state harness", () => {
     // confirm-password); one eye toggles the password.
     h.params = new URLSearchParams("email=preview%40example.invalid&next=%2Finvite%2Ftest");
     const tree = render("signup");
+    const hp = find(tree, (n) => n.type === "input" && n.props.id === "company-website");
+    expect(hp.props.tabIndex).toBe(-1);
     expect(
       nodes(tree)
-        .filter((n) => n.type === "input")
+        .filter((n) => n.type === "input" && n.props.id !== "company-website")
         .map((n) => n.props.id),
     ).toEqual(["name", "email", "password"]);
     expect(find(tree, (n) => n.props.id === "email").props.value).toBe("preview@example.invalid");
@@ -316,7 +318,9 @@ describe("auth UX: synthetic component state harness", () => {
     expect(h.social).toHaveBeenCalledWith(
       expect.objectContaining({
         requestSignUp: true,
-        fetchOptions: { headers: { "x-captcha-response": "synthetic-challenge" } },
+        fetchOptions: {
+          headers: expect.objectContaining({ "x-captcha-response": "synthetic-challenge" }),
+        },
       }),
     );
   });

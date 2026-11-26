@@ -8,7 +8,10 @@ import {
 import { type Db, schema } from "@millionsend/db";
 import { TRPCError } from "@trpc/server";
 import { and, eq, sql } from "drizzle-orm";
-import { hasPaidSendingPlanForMailbox } from "../../../../packages/billing/src/mailbox-addon";
+import {
+  hasPaidSendingPlan,
+  hasPaidSendingPlanForMailbox,
+} from "../../../../packages/billing/src/mailbox-addon";
 import {
   mailboxLaunchCohortAllows,
   mailboxLaunchCohortOpen,
@@ -128,7 +131,7 @@ export async function mailboxActorAccessEnabled(
   if (member.plan === "system")
     return (await mailboxServiceEntitlement(db, actor.teamId)).unlimitedSeats;
   if (!cohort) return false;
-  if (planIncludesCorreioSolo(member, now)) return true;
+  if (hasPaidSendingPlan(member, now) && planIncludesCorreioSolo(member, now)) return true;
   if (
     mailboxLaunchCohortAllows(
       cohort,
@@ -169,7 +172,7 @@ export async function mailboxCreateAccessEnabled(
   if (!member || member.suspendedAt) return false;
   if (member.plan === "system")
     return (await mailboxServiceEntitlement(db, actor.teamId)).unlimitedSeats;
-  if (planIncludesCorreioSolo(member, now)) return true;
+  if (hasPaidSendingPlan(member, now) && planIncludesCorreioSolo(member, now)) return true;
   if (
     !mailboxLaunchCohortAllows(
       cohort,

@@ -174,7 +174,7 @@ function factory(code: string, filename: string) {
 function loadSignupBranch(depsIn: Record<string, unknown>) {
   return factory(
     `export function make(deps) {
-  const { canarySignupAdmissionFor, assertSignupAllowed, signupOpen, signupBotProtectionEnabled, assertSignupBotVerification, verifiedSignupContexts, baseURL, db } = deps;
+  const { canarySignupAdmissionFor, assertSignupAllowed, signupOpen, signupBotProtectionEnabled, assertSignupBotVerification, verifiedSignupContexts, baseURL, db, isCloudDeployment = () => false, assertSignupBotSignals = () => {} } = deps;
   return async (ctx) => { ${SIGNUP_GUARD} {${block(AUTH, SIGNUP_GUARD)}} };
 }`,
     "signup-branch.ts",
@@ -185,7 +185,7 @@ function loadSignupBranch(depsIn: Record<string, unknown>) {
 function loadSocialBranch(depsIn: Record<string, unknown>) {
   return factory(
     `export function make(deps) {
-  const { canarySignupAdmissionFor, signupBotProtectionEnabled, assertSignupBotVerification, verifiedSignupContexts, addOAuthServerContext, SIGNUP_BOT_OAUTH_CONTEXT, baseURL } = deps;
+  const { canarySignupAdmissionFor, signupBotProtectionEnabled, assertSignupBotVerification, verifiedSignupContexts, addOAuthServerContext, SIGNUP_BOT_OAUTH_CONTEXT, baseURL, assertSignupBotSignals = () => {} } = deps;
   return async (ctx) => { ${SOCIAL_GUARD} {${block(AUTH, SOCIAL_GUARD)}} };
 }`,
     "social-branch.ts",

@@ -295,6 +295,7 @@ describe("sanitized Mail billing presentation and guarded Checkout", () => {
     expect(await as().mailboxes.service()).toEqual({
       active: false,
       licenseKind: "none",
+      includedWithSendPlan: false,
       unlimitedSeats: false,
       unlimitedOutbound: false,
       resourcePolicyActive: false,

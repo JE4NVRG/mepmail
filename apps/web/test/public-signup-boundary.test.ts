@@ -299,6 +299,7 @@ function ext(id: string): VmValue {
       siteBaseUrl: () => "https://mepmail.dev",
     };
   if (s === "lib/stack-logos") return { HOME_STACK_LOGOS: [] };
+  if (s === "lib/source-link") return { showSourceLinkEnabled: () => true };
   if (s === "lib/landing-pricing")
     return {
       COMPARISON_FX: { date: "2026-10-01", brlPerUsd: 5 },
