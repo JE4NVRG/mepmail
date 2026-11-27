@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "mepmail": {
+      "url": "https://api.mepmail.dev/mcp"
+    }
+  }
+}
