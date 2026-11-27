@@ -7,6 +7,7 @@ import {
   graduatedSendingEnabled,
   MailboxContentError,
   type MailboxOutboxSender,
+  mailboxReplySourceForOutbox,
   MailboxSendDeferredError,
   MailboxSendRejectedError,
   type MailboxTransportMimeAdapter,
@@ -82,6 +83,9 @@ async function checkMailboxContent(
   db: Db,
   input: Parameters<MailboxOutboxSender["send"]>[0],
 ): Promise<void> {
+  // A policy read failure must never become an exemption: no binding means the
+  // original cold-outreach rule, which is what an unreadable row deserves.
+  const replySourceItemId = await mailboxReplySourceForOutbox(db, input).catch(() => null);
   try {
     const parsed = await simpleParser(input.raw, { skipImageLinks: true, skipTextToHtml: true });
     if (
@@ -92,6 +96,7 @@ async function checkMailboxContent(
           subject: parsed.subject ?? "",
           html: typeof parsed.html === "string" ? parsed.html : null,
           text: parsed.text ?? null,
+          replySourceItemId,
         })
       ).action === "hold"
     )

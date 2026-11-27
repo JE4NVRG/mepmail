@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next-intl/plugin", () => ({ default: () => (config: unknown) => config }));
@@ -92,5 +94,22 @@ describe("public Meta Content Security Policy", () => {
         "no-referrer",
       );
     }
+  });
+
+  it("exposes NEXT_PUBLIC ad-tag build args in Dockerfile before the web build step", () => {
+    const dockerfile = readFileSync(
+      path.resolve(import.meta.dirname, "../../../Dockerfile"),
+      "utf8",
+    );
+    const buildIdx = dockerfile.indexOf("pnpm --filter @millionsend/web build");
+    expect(buildIdx).toBeGreaterThan(0);
+    const beforeBuild = dockerfile.slice(0, buildIdx);
+    expect(beforeBuild).toContain("ARG NEXT_PUBLIC_META_PIXEL_ENABLED=false");
+    expect(beforeBuild).toContain("ARG NEXT_PUBLIC_META_PIXEL_ID=");
+    expect(beforeBuild).toContain(
+      "ENV NEXT_PUBLIC_META_PIXEL_ENABLED=$NEXT_PUBLIC_META_PIXEL_ENABLED",
+    );
+    expect(beforeBuild).toContain("NEXT_PUBLIC_META_PIXEL_ID=$NEXT_PUBLIC_META_PIXEL_ID");
+    expect(beforeBuild).toContain("ARG NEXT_PUBLIC_GOOGLE_TAG_ENABLED=false");
   });
 });

@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { type Db, schema } from "@millionsend/db";
-import { and, asc, eq, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import {
   type MailboxOutboundOutcome,
   mailboxOutboundEvents,
@@ -80,7 +80,11 @@ import {
   mailboxSubscriptionUsagePeriod,
   requireMailboxSeat,
 } from "./mailbox-service.js";
-import { mailboxProviderThreadKeys, mailboxThreadKeys } from "./mailbox-thread.js";
+import {
+  mailboxProviderThreadKeys,
+  mailboxReplyParent,
+  mailboxThreadKeys,
+} from "./mailbox-thread.js";
 import { parseMailbox } from "./sender-address.js";
 import { checkSignupSend } from "./signup-risk-enforcement.js";
 import { hashRecipient } from "./suppressions.js";
@@ -266,6 +270,116 @@ function approvedHashes(teamId: string, recipients: readonly string[], count: nu
   );
   if (hashes.length !== count) throw new MailboxContentError("invalid");
   return hashes;
+}
+
+/**
+ * Reads back the admission-time binding for one outbox row. Scoped by team AND
+ * mailbox, so a row of another tenant or box can never lend its proof to this
+ * attempt. Null (no row, no binding, or an unreadable one) keeps the full
+ * cold-outreach rule; callers must treat a thrown error as "no binding" and
+ * fail closed, never as an exemption.
+ */
+export async function mailboxReplySourceForOutbox(
+  db: Db,
+  input: { teamId: string; mailboxId: string; outboxId: string },
+): Promise<string | null> {
+  const [row] = await db
+    .select({ replySourceItemId: mailboxOutbox.replySourceItemId })
+    .from(mailboxOutbox)
+    .where(
+      and(
+        eq(mailboxOutbox.id, input.outboxId),
+        eq(mailboxOutbox.teamId, input.teamId),
+        eq(mailboxOutbox.mailboxId, input.mailboxId),
+      ),
+    );
+  return row?.replySourceItemId ?? null;
+}
+
+/**
+ * Addresses that belong to a conversation with this mailbox: whoever wrote the
+ * message RECEIVED here plus everyone it was addressed to, minus the mailbox's
+ * own addresses (its address and its aliases). A reply may only be bound when
+ * every recipient it carries is one of these, so adding a recipient turns the
+ * binding off instead of smuggling an unrelated recipient through the exemption.
+ */
+async function conversationParticipants(
+  db: Db,
+  input: { mailboxId: string; address: string; source: Buffer },
+  mime: MailboxTransportMimeAdapter,
+) {
+  const aliases = await db
+    .select({ address: schema.mailboxAliases.address })
+    .from(schema.mailboxAliases)
+    .where(eq(schema.mailboxAliases.mailboxId, input.mailboxId));
+  const own = new Set([input.address, ...aliases.map((alias) => alias.address)].map(addr));
+  const parsed = await mime.parse(Buffer.from(input.source));
+  // The received message's own envelope From is the authority for who wrote to
+  // us; To/Cc name the other participants of that same conversation.
+  return new Set(
+    [parsed.from, ...(parsed.to ?? []), ...(parsed.cc ?? [])]
+      .map((value) => addr(value))
+      .filter((value) => !own.has(value)),
+  );
+}
+
+/**
+ * Server-owned reply binding. Returns the RECEIVED item of this same mailbox that
+ * these exact draft bytes answer, or null when nothing proves the conversation.
+ *
+ * Both facts are read from sealed bytes the sender cannot rewrite after
+ * admission: the draft's own In-Reply-To names the parent Message-ID, and only
+ * an item of THIS mailbox (kind inbox, still in the inbox folder) whose
+ * message_key is that parent can be the source. A forged In-Reply-To therefore
+ * reaches no row unless the parent really arrived here, and a Message-ID copied
+ * from another mailbox or team matches nothing because the lookup is scoped by
+ * mailbox_id. The candidate is then opened and must itself still carry that
+ * exact Message-ID, so a stale or reused index key cannot bind.
+ */
+export async function resolveMailboxReplySource(
+  db: Db,
+  keys: Keyring,
+  input: {
+    teamId: string;
+    mailboxId: string;
+    address: string;
+    recipients: readonly string[];
+    raw: Buffer;
+  },
+  mime: MailboxTransportMimeAdapter,
+): Promise<string | null> {
+  const parent = mailboxReplyParent(input.raw);
+  if (!parent) return null;
+  const [source] = await db
+    .select()
+    .from(schema.mailboxItems)
+    .where(
+      and(
+        eq(schema.mailboxItems.mailboxId, input.mailboxId),
+        eq(schema.mailboxItems.teamId, input.teamId),
+        eq(schema.mailboxItems.kind, "inbox"),
+        eq(schema.mailboxItems.deliveryFolder, "inbox"),
+        eq(schema.mailboxItems.messageKey, parent.idKey),
+        isNull(schema.mailboxItems.trashedAt),
+      ),
+    )
+    .limit(1);
+  if (!source) return null;
+  const received = await open(source, keys);
+  // The received bytes must carry that exact Message-ID. message_key alone is a
+  // digest comparison, and a row whose key was written before this column
+  // existed must not become a binding on the strength of the index.
+  if (mailboxReplyParent(received) === null) {
+    const own = received.toString("latin1").slice(0, 64 * 1024);
+    if (!own.includes(parent.rawId)) return null;
+  }
+  const items = await conversationParticipants(
+    db,
+    { mailboxId: input.mailboxId, address: input.address, source: received },
+    mime,
+  );
+  if (!input.recipients.length) return null;
+  return input.recipients.every((recipient) => items.has(addr(recipient))) ? source.id : null;
 }
 
 /** Admission/pre-provider check only. A database failure throws so callers can
@@ -1277,6 +1391,42 @@ async function queueAuthorizedMailboxDraft(
   );
   if (approval.kind === "agent" && approval.expiresAt && approval.expiresAt.getTime() <= Date.now())
     throw new MailboxAgentAccessError("forbidden");
+  // Resolved from the sealed bytes inside the same lock as the draft and the
+  // outbox, so the binding describes exactly the message being admitted. It is
+  // proof for the send policy, never a grant: an unproven conversation leaves
+  // the column null and the original cold-outreach rule untouched.
+  const replySourceItemId = await resolveMailboxReplySource(
+    tx,
+    keys,
+    {
+      teamId: actor.teamId,
+      mailboxId: input.mailboxId,
+      address: box.address,
+      recipients,
+      raw,
+    },
+    mime,
+  );
+  // One live reply per received message: a queued, sending, unknown or accepted
+  // reply already answers it. Checked before the insert so the caller gets a
+  // conflict it can report, and the partial unique index below still catches a
+  // concurrent double submit. A failed send is out of the index on purpose, so
+  // correcting and resending stays possible.
+  if (replySourceItemId) {
+    const [answered] = await tx
+      .select({ id: mailboxOutbox.id, status: mailboxOutbox.status })
+      .from(mailboxOutbox)
+      .where(
+        and(
+          eq(mailboxOutbox.teamId, actor.teamId),
+          eq(mailboxOutbox.mailboxId, input.mailboxId),
+          eq(mailboxOutbox.replySourceItemId, replySourceItemId),
+          ne(mailboxOutbox.status, "failed"),
+        ),
+      )
+      .limit(1);
+    if (answered) throw new MailboxContentError("conflict");
+  }
   const [row] = await tx
     .insert(mailboxOutbox)
     .values({
@@ -1295,6 +1445,7 @@ async function queueAuthorizedMailboxDraft(
       periodEnd: usagePeriod.end,
       rawBytes: raw.length,
       rawSha256: hash(raw),
+      replySourceItemId,
       ...mailboxThreadKeys(raw),
       ...sealed,
     })

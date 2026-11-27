@@ -61,6 +61,10 @@ export const mailboxOutbox = pgTable(
     messageKey: text("message_key"),
     threadKey: text("thread_key"),
     errorCode: text("error_code"),
+    // Resposta vinculada (mailbox-drizzle 0040): o item RECEBIDO desta mesma caixa
+    // que estes bytes respondem, decidido no servidor na admissão. Null em mensagem
+    // nova e em resposta cujo vínculo não se provou. Nunca é autorização de leitura.
+    replySourceItemId: uuid("reply_source_item_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

@@ -721,6 +721,7 @@ export {
   type MailboxThreadKeys,
   mailboxIdKey,
   mailboxProviderThreadKeys,
+  mailboxReplyParent,
   mailboxThreadKeys,
 } from "./mailbox-thread.js";
 export {
@@ -741,10 +742,12 @@ export {
   type MailboxTransportMimeAdapter,
   mailboxBlockedRecipients,
   mailboxRecipientHash,
+  mailboxReplySourceForOutbox,
   queueMailboxAgentDraft,
   queueMailboxDraft,
   receiveMailboxMime,
   reconcileMailboxOutbox,
+  resolveMailboxReplySource,
   sendMailboxOutbox,
 } from "./mailbox-transport.js";
 export {

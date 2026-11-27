@@ -56,6 +56,28 @@ export function mailboxThreadKeys(raw: Uint8Array): MailboxThreadKeys {
 }
 
 /**
+ * The Message-ID this message answers, digests only: `idKey` names the parent
+ * (`sha256` prefix, comparable to `mailbox_items.message_key`) and `rawId` is
+ * the observed header value when the caller must compare it verbatim.
+ *
+ * Only the top-level header block is read, and only the FIRST In-Reply-To: a
+ * message that answers a conversation carries one parent. A value that is not a
+ * complete RFC Message-ID yields nothing, so a malformed or multi-id header
+ * never becomes a reply binding by accident.
+ */
+export function mailboxReplyParent(raw: Uint8Array): { idKey: string; rawId: string } | null {
+  const headers = headerLines(raw);
+  const values = headers.get("in-reply-to");
+  if (!values?.length) return null;
+  // Folded continuations are already unfolded; a second id in the same value is
+  // not one parent and is refused rather than guessed.
+  const matches = values.flatMap((value) => value.match(ID_TOKEN) ?? []);
+  if (matches.length !== 1) return null;
+  const rawId = mailboxMessageId(matches[0]);
+  return rawId ? { idKey: mailboxIdKey(rawId), rawId } : null;
+}
+
+/**
  * When the provider rewrites a sent message's Message-ID, replies refer to the
  * provider's ID. A message that started its own conversation moves to that ID.
  */

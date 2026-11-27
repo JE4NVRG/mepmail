@@ -1,7 +1,7 @@
 import { type Db, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import { recordOperatorAlert } from "./operator-alerts.js";
-import { guardColdOutreach } from "./outreach-guard.js";
+import { guardColdOutreachWithReply } from "./outreach-guard.js";
 import { foldText, holdTeamForReview, senderName } from "./send-review.js";
 import { parseMailbox } from "./sender-address.js";
 
@@ -10,6 +10,12 @@ export interface PreSendContentInput {
   subject: string;
   html?: string | null;
   text?: string | null;
+  /**
+   * Admission-time reply binding proved by the server for THIS message (see
+   * resolveMailboxReplySource). Only the sender branch of the cold-outreach rule
+   * consults it; phishing, brand/account and payment checks never do.
+   */
+  replySourceItemId?: string | null;
 }
 
 /** No URLs, tokens, body excerpts or recipients may enter an alert. */
@@ -90,10 +96,11 @@ export function evaluatePreSendContent(input: PreSendContentInput): PreSendConte
   ) {
     throw new Error("pre_send_content_unavailable");
   }
-  const outreach = guardColdOutreach({
+  const outreach = guardColdOutreachWithReply({
     from: input.from,
     subject: input.subject,
     text: input.text ?? "",
+    replySourceItemId: input.replySourceItemId ?? null,
   });
   if (outreach.blocked) return { action: "hold", code: "cold_outreach", signal: outreach.signal };
 

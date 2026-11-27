@@ -281,6 +281,13 @@
       "when": 1795467600000,
       "tag": "0039_mailbox_outbox_large_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795467600001,
+      "tag": "0040_mailbox_reply_binding",
+      "breakpoints": true
     }
   ]
 }

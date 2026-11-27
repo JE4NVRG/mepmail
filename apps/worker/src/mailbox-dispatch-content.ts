@@ -21,7 +21,7 @@ import {
   type DispatchAttachmentMeta,
   validateDispatchAttachments,
 } from "../../../packages/core/src/attachment-policy.js";
-import { guardColdOutreach } from "../../../packages/core/src/outreach-guard.js";
+import { guardColdOutreachWithReply } from "../../../packages/core/src/outreach-guard.js";
 import {
   type DispatchContentSnapshot,
   qualifyDispatchContent,
@@ -422,6 +422,10 @@ export async function withMailboxDispatchContent<T>(
   // The outbox input has no subject field: the raw message is the only authority
   // for what the recipient will actually read.
   let sourceSubject = "";
+  // Admission-time reply binding for THIS outbox row; null keeps the full
+  // cold-outreach rule. Declared outside the try so the policy check below reads
+  // exactly what this attempt resolved.
+  let replySourceItemId: string | null = null;
   try {
     wire = stripMailboxPrivateHeaders(Buffer.from(input.raw));
     const [source, final] = await Promise.all([inspect(input.raw), inspect(wire)]);
@@ -436,6 +440,21 @@ export async function withMailboxDispatchContent<T>(
       .from(schema.teams)
       .where(eq(schema.teams.id, input.teamId));
     if (!team) held();
+    // Read back the admission-time binding, scoped to this exact outbox row. A
+    // missing row, a different team/mailbox or a null column all read as "no
+    // binding", so the cold-outreach rule applies as before. Nothing here is
+    // inferred from the message: the id was proved from the sealed bytes.
+    const [bindingRow] = await db
+      .select({ replySourceItemId: schema.mailboxOutbox.replySourceItemId })
+      .from(schema.mailboxOutbox)
+      .where(
+        and(
+          eq(schema.mailboxOutbox.id, input.outboxId),
+          eq(schema.mailboxOutbox.teamId, input.teamId),
+          eq(schema.mailboxOutbox.mailboxId, input.mailboxId),
+        ),
+      );
+    replySourceItemId = bindingRow?.replySourceItemId ?? null;
     const domains = await db
       .select({ name: schema.domains.name })
       .from(schema.domains)
@@ -552,9 +571,10 @@ export async function withMailboxDispatchContent<T>(
   // Cold outreach never leaves through SES, whatever the judge said about the
   // copy: the trigger that paused the account was sending, not wording.
   if (
-    guardColdOutreach({
+    guardColdOutreachWithReply({
       from: (input as { from?: string }).from ?? "",
       subject: (input as { subject?: string }).subject ?? sourceSubject,
+      replySourceItemId,
     }).blocked
   ) {
     heldColdOutreach();

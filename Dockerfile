@@ -10,6 +10,14 @@ RUN --mount=type=cache,id=mepmail-pnpm-store,target=/root/.local/share/pnpm/stor
   pnpm fetch --store-dir=/root/.local/share/pnpm/store
 
 FROM deps AS build
+ARG NEXT_PUBLIC_META_PIXEL_ENABLED=false
+ARG NEXT_PUBLIC_META_PIXEL_ID=
+ARG NEXT_PUBLIC_GOOGLE_TAG_ENABLED=false
+ARG NEXT_PUBLIC_GOOGLE_TAG_ID=
+ENV NEXT_PUBLIC_META_PIXEL_ENABLED=$NEXT_PUBLIC_META_PIXEL_ENABLED \
+    NEXT_PUBLIC_META_PIXEL_ID=$NEXT_PUBLIC_META_PIXEL_ID \
+    NEXT_PUBLIC_GOOGLE_TAG_ENABLED=$NEXT_PUBLIC_GOOGLE_TAG_ENABLED \
+    NEXT_PUBLIC_GOOGLE_TAG_ID=$NEXT_PUBLIC_GOOGLE_TAG_ID
 COPY . .
 RUN --mount=type=cache,id=mepmail-pnpm-store,target=/root/.local/share/pnpm/store \
   pnpm install --frozen-lockfile --offline --store-dir=/root/.local/share/pnpm/store
