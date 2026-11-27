@@ -6,8 +6,8 @@ import { type Db, schema } from "@millionsend/db";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { JudgeVerdict } from "../src/abuse-judge/types.js";
 import { withMailboxDispatchContent } from "../../../apps/worker/src/mailbox-dispatch-content.js";
+import type { JudgeVerdict } from "../src/abuse-judge/types.js";
 import { EnvKeyring } from "../src/crypto/keyring.js";
 import { saveMailboxDraft } from "../src/mailbox-private-store.js";
 import { mailboxThreadKeys } from "../src/mailbox-thread.js";
@@ -19,7 +19,7 @@ import {
   receiveMailboxMime,
   resolveMailboxReplySource,
 } from "../src/mailbox-transport.js";
-import { guardColdOutreachWithReply, guardColdOutreach } from "../src/outreach-guard.js";
+import { guardColdOutreach, guardColdOutreachWithReply } from "../src/outreach-guard.js";
 
 /**
  * Respostas legítimas do parcerias@ (Jean 2026-11-26).
@@ -644,6 +644,8 @@ describe("thread keys still describe the conversation", () => {
       .select()
       .from(schema.mailboxItems)
       .where(eq(schema.mailboxItems.id, received));
-    expect(item!.messageKey).toBe(mailboxThreadKeys(Buffer.from(`Message-ID: ${messageId}\r\n\r\n`)).messageKey);
+    expect(item!.messageKey).toBe(
+      mailboxThreadKeys(Buffer.from(`Message-ID: ${messageId}\r\n\r\n`)).messageKey,
+    );
   });
 });
